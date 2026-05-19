@@ -69,6 +69,12 @@ appsettings.Local.json
 .env.*
 !.env.example
 
+# Claude Code
+.claude/settings.local.json
+.claude/plans/
+.claude/cache/
+.claude/logs/
+
 # Plan / scratch
 plans/
 scratch/
