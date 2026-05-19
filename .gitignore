@@ -1,0 +1,74 @@
+# Build output
+bin/
+obj/
+out/
+artifacts/
+publish/
+[Dd]ebug/
+[Rr]elease/
+x64/
+x86/
+ARM/
+ARM64/
+
+# Test
+TestResults/
+*.coverage
+*.coveragexml
+coverage*.json
+coverage*.xml
+coverage*.info
+
+# NuGet
+*.nupkg
+*.snupkg
+.nuget/
+project.lock.json
+project.fragment.lock.json
+
+# IDE - Visual Studio / Rider / VS Code
+.vs/
+.vscode/
+.idea/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+*.userprefs
+*.swp
+
+# Rider
+_ReSharper.Caches/
+*.DotSettings.user
+
+# Tooling
+.tools/
+tools/
+.nswag/
+
+# Logs / temp
+*.log
+*.tlog
+*.tmp
+*.bak
+*.cache
+*.pidb
+
+# OS
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+.DS_Store
+
+# Local config / secrets
+*.local.toml
+*.local.json
+appsettings.Development.json
+appsettings.Local.json
+.env
+.env.*
+!.env.example
+
+# Plan / scratch
+plans/
+scratch/
