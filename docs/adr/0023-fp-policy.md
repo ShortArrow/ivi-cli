@@ -5,21 +5,21 @@
 
 ## Context
 
-0003 で「FP 寄りの C#」を採用したが、宣言レベルに留まっていた。本 ADR は **コードに落とすための具体的規約**（immutability の徹底度、Result 型の入手元、Option を入れるか、sum type の表現、async ポリシー、pure/impure の境界）を確定させる。
+ADR 0003 adopted "FP-leaning C#", but stayed at the declarative level. This ADR establishes **the concrete conventions needed to translate that stance into code**: how strictly to enforce immutability, where the Result type comes from, whether to introduce Option, how to express sum types, the async policy, and where the pure/impure boundary sits.
 
-C# は OO 言語であり、FP を完全に貫くと言語と戦うことになる。**読みやすい範囲で副作用を edge に押し出し、core を pure に保つ** ことを実用目標とする。
+C# is an OO language, and pursuing FP to its full extent would mean fighting the language. The practical goal is to **push side effects to the edges and keep the core pure**, within the limits of readability.
 
 ## Decision
 
 ### 1. Immutability
 
-- **Domain 型は `record`**（positional records 優先）。
-- public な property は `init` のみ可。`set` は禁止。
-- コレクションを domain 境界で公開する場合は `IReadOnlyList<T>` / `IReadOnlyDictionary<TKey,TValue>` / `ImmutableArray<T>` のいずれかを返す。`List<T>` / `Dictionary<,>` を公開しない。
-- 内部実装で mutable collection を使うのは可。ただし呼び出し側に渡る前に readonly 化する。
-- mutation は `with` 式で新インスタンスを作って表現する。
+- **Domain types are `record`** (positional records preferred).
+- Public properties may only have `init`. `set` is forbidden.
+- When a collection is exposed across a domain boundary, return `IReadOnlyList<T>`, `IReadOnlyDictionary<TKey,TValue>`, or `ImmutableArray<T>`. Do not expose `List<T>` or `Dictionary<,>`.
+- Mutable collections may be used in internal implementations, but must be wrapped as read-only before they reach the caller.
+- Mutation is expressed by constructing a new instance with the `with` expression.
 
-例:
+Example:
 
 ```csharp
 public sealed record Device(DeviceName Name, VisaResource Resource, Timeout Timeout);
@@ -29,22 +29,22 @@ var updated = device with { Timeout = Timeout.FromMilliseconds(5000) };
 
 ### 2. Nullable Reference Types (NRT)
 
-- 全プロジェクトで `<Nullable>enable</Nullable>`（`build/Directory.Build.props` で一元設定、雛形時に追加）。
-- 警告は error 扱い（`<TreatWarningsAsErrors>true</TreatWarningsAsErrors>` を併用、ただし範囲は別 ADR で要詰め）。
-- **`null!` は禁止**。やむを得ない escape hatch（フレームワーク要件等）は `// nullable-escape: <reason>` コメントを付けて個別に許可。
-- 「不在」は `T?` で表現する。次節 §3 と整合。
+- `<Nullable>enable</Nullable>` across all projects (configured centrally in `build/Directory.Build.props`, and added in the project template).
+- Warnings are treated as errors (`<TreatWarningsAsErrors>true</TreatWarningsAsErrors>` is used alongside; the exact scope is to be pinned down in a separate ADR).
+- **`null!` is forbidden**. Any unavoidable escape hatch (framework requirements, etc.) must carry a `// nullable-escape: <reason>` comment and be allowed case by case.
+- "Absence" is expressed with `T?`, consistent with §3 below.
 
-### 3. Option<T> を導入しない
+### 3. Do not introduce Option<T>
 
-- C# の NRT (`T?`) で十分。`Option<T>` ライブラリ（`LanguageExt` 等）は採用しない。
-- パイプライン中の表現力不足は `T?` + 拡張メソッド（`.Map`, `.Bind` 等の自前実装）で補う。
-- 理由: NRT 厳格運用と Option 併用は二重表現になり、レビュー時の混乱要因。NRT 一本に絞る。
+- C#'s NRT (`T?`) is sufficient. `Option<T>` libraries (`LanguageExt` and the like) are not adopted.
+- When expressiveness in a pipeline is lacking, supplement `T?` with extension methods (in-house `.Map`, `.Bind`, etc.).
+- Rationale: combining strict NRT with Option leads to double representation and confuses reviewers. We standardize on NRT alone.
 
-### 4. Result<T, TError> — 自前最小実装
+### 4. Result<T, TError> — minimal in-house implementation
 
-`IviCli.Domain` 内に最小実装を置く。ライブラリ依存なし。
+A minimal implementation lives inside `IviCli.Domain`. No library dependency.
 
-想定 shape:
+Intended shape:
 
 ```csharp
 public abstract record Result<T, TError>
@@ -68,11 +68,11 @@ public static class ResultExtensions
 }
 ```
 
-正式 API は実装時に詰める。ライブラリ移行は `IviCli.Domain` 内に閉じるので将来 `OneOf` / `LanguageExt` への置換は局所的。
+The final API will be settled at implementation time. Because any library migration is contained within `IviCli.Domain`, a future switch to `OneOf` or `LanguageExt` remains local.
 
-### 5. Sum Type は sealed record hierarchy
+### 5. Sum types as a sealed record hierarchy
 
-C# ネイティブの discriminated union が無いため、closed type set を `abstract record` + `sealed record` で表現する。
+Because C# has no native discriminated union, a closed type set is expressed with `abstract record` + `sealed record`.
 
 ```csharp
 public abstract record VisaResource;
@@ -88,74 +88,74 @@ string Describe(VisaResource r) => r switch
 };
 ```
 
-- `switch` 式で網羅させる。新 case 追加で全 switch がコンパイル警告に出る運用を狙う（`exhaustive` の擬似的実現）。
-- discriminator のための `enum Kind` プロパティは追加しない（型自体が discriminator）。
+- Use the `switch` expression to enforce exhaustiveness. Adding a new case should trigger compiler warnings across all switches (a pseudo-`exhaustive` regime).
+- Do not add an `enum Kind` discriminator property (the type itself is the discriminator).
 
-### 6. Pure / Impure の境界 — Impureim Sandwich
+### 6. Pure / impure boundary — Impureim Sandwich
 
 ```
-[Impure] Read inputs   →  Cli ハンドラ / Backend / Infrastructure (I/O)
-[Pure]   Compute       →  Application / Domain (副作用なし)
+[Impure] Read inputs   →  Cli handler / Backend / Infrastructure (I/O)
+[Pure]   Compute       →  Application / Domain (no side effects)
 [Impure] Write outputs →  Cli (stdout/stderr/exit code) / Backend / Infrastructure
 ```
 
-- Domain 層は副作用禁止（I/O・時刻取得・ランダム・例外 throw も避ける）。
-- Application 層は port 経由でのみ I/O を表現（直接呼ばない）。
-- I/O を含む method は `*Async` suffix を必須にする（pure な計算は同期 method）。
-- `IClock`, `IRandom` のような副作用 port を Application で明示的に注入する（テストで差し替え可能にする）。
+- The Domain layer forbids side effects (no I/O, no clock reads, no randomness, no exception throws either).
+- The Application layer expresses I/O only via ports (never calls it directly).
+- Methods that involve I/O must carry the `*Async` suffix (pure computations are synchronous methods).
+- Side-effecting ports such as `IClock` and `IRandom` are explicitly injected at the Application layer (so they can be swapped in tests).
 
-### 7. Async ポリシー
+### 7. Async policy
 
-- `async/await` 全面採用。同期と非同期を混在させない（同期 wrapper の `.Result` / `.Wait()` / `.GetAwaiter().GetResult()` は禁止）。
-- public async method は `CancellationToken` を **必須引数** で受ける（default 値も与えない、呼び出し側に明示させる）。
-- `ConfigureAwait(false)`: 本プロジェクトは CLI バイナリのみで SynchronizationContext 起因のデッドロックリスクが無いため、**書かない**。ライブラリ化する将来時点で再検討。
-- async void 禁止（ハンドラ等で必要な場合は同期ラップでブロックせず、await できる入り口を作る）。
+- `async/await` is adopted across the board. Do not mix sync and async (synchronous wrappers via `.Result`, `.Wait()`, or `.GetAwaiter().GetResult()` are forbidden).
+- Public async methods take `CancellationToken` as a **required argument** (no default value either — the caller must pass it explicitly).
+- `ConfigureAwait(false)`: this project ships only as a CLI binary and has no SynchronizationContext-induced deadlock risk, so **we do not write it**. To be revisited if and when the code is repackaged as a library.
+- `async void` is forbidden (when handlers etc. seem to require it, build an `await`-able entry point rather than blocking with a synchronous wrap).
 
-### 8. Interface vs Func / Delegate
+### 8. Interface vs Func / delegate
 
-- 多態が必要、または methods が複数 → **interface**（`IIviBackend`, `IConfigStore`, `ISessionStore`, `IClock`）
-- 単一の関数で表現できる port → **`Func<...>` / delegate** で注入可
-- 「テストのためだけの interface 量産」は禁止。具象クラスを実装に持ち、テストで Fake を直接渡す方が読みやすい場合は interface を避ける。
+- When polymorphism is needed or multiple methods are involved → **interface** (`IIviBackend`, `IConfigStore`, `ISessionStore`, `IClock`).
+- When a port can be expressed by a single function → injectable as **`Func<...>` / delegate**.
+- Do not proliferate interfaces solely for testing. If concrete classes plus directly-passed Fakes read better in tests, skip the interface.
 
-### 9. Pattern Matching
+### 9. Pattern matching
 
-- `switch` **statement** ではなく `switch` **expression** を優先。
-- `is` パターン、property pattern、relational pattern、list pattern を活用。
-- expression-bodied member は副作用なし method 限定。
+- Prefer the `switch` **expression** over the `switch` **statement**.
+- Make use of `is` patterns, property patterns, relational patterns, and list patterns.
+- Expression-bodied members are limited to side-effect-free methods.
 
-### 10. LINQ ポリシー
+### 10. LINQ policy
 
-- 表現が明らかに読みやすくなる場合は LINQ chain を使う。
-- hot path（コマンドごとに必ず通る経路、Backend 内部ループ等）では `foreach` を許容。allocation を避けたい場合に LINQ を強制しない（pragmatism）。
-- 副作用を伴う `.ToList()` 後の mutation 等、純粋性を壊す使い方は避ける。
+- Use LINQ chains when they make the expression clearly more readable.
+- On hot paths (paths that every command traverses, inner loops inside Backend, etc.), `foreach` is acceptable. Where allocations should be avoided, do not force LINQ (pragmatism).
+- Avoid usages that break purity, such as mutating after `.ToList()` with side effects.
 
-### 11. Exception の扱い（0014 と整合）
+### 11. Handling exceptions (consistent with 0014)
 
-- 業務的失敗（validation, parse, not found, conflict, transport error）は **Result.Error** で表す。
-- Exception を throw するのは:
-  - プログラミングエラー（前提条件違反、`ArgumentNullException` 等）
-  - 真の例外状況（OOM, disk full, OS 例外伝播）
-- catch は composition root（`IviCli.Cli/Program.cs`）の最外周でのみ。下層で catch するのは「Result に詰め直す目的」のみ。
+- Business failures (validation, parse, not found, conflict, transport error) are represented as **Result.Error**.
+- Exceptions are thrown for:
+  - Programming errors (precondition violations, `ArgumentNullException`, etc.).
+  - Genuinely exceptional conditions (OOM, disk full, OS exception propagation).
+- `catch` is permitted only at the outermost ring of the composition root (`IviCli.Cli/Program.cs`). Catching at lower layers is allowed solely "to repackage into a Result".
 
-詳細は 0014 で別途確定。
+The details will be settled separately in 0014.
 
 ## Consequences
 
 **Pros**
 
-- core が pure で testable、I/O を Fake/Mock で差し替えるテストが書きやすい（0009 の前提と整合）。
-- sealed record hierarchy + `switch` 式で型レベルの網羅性が効く。
-- NRT + Result 二本立てで「失敗の表現」が一意に決まる。
-- ライブラリ依存ゼロで FP 表現が完結（NuGet 依存は production binary には増えない）。
+- The core is pure and testable; tests that substitute I/O with Fakes/Mocks are easy to write (consistent with the premises of 0009).
+- The sealed record hierarchy plus `switch` expression yields type-level exhaustiveness.
+- The NRT + Result pairing pins down a single way to express failure.
+- FP expression is complete with zero library dependencies (no extra NuGet dependency in production binaries).
 
 **Cons**
 
-- 自前 Result 実装の追加コスト（〜100 行程度）と保守責任。
-- C# 開発者によっては record / pattern matching / Result が不慣れ。
-- NRT を厳格運用すると、外部ライブラリ境界で警告抑制の手間が出る場合がある。
+- Additional cost of maintaining an in-house Result implementation (around 100 lines) and the responsibility that comes with it.
+- Some C# developers are unfamiliar with records, pattern matching, or Result.
+- Strict NRT can produce warning-suppression busywork at external-library boundaries.
 
 **Mitigations**
 
-- Result の API は最小から始め、必要に応じて拡張。将来 `OneOf` / `LanguageExt` への置換は `IviCli.Domain` 内で局所的に可能。
-- 不慣れ問題は `docs/domain-glossary.md` と本 ADR、それから雛形コードの一貫性で吸収。
-- NRT 警告抑制は `// nullable-escape: <reason>` で trackable に。
+- Start the Result API minimal and extend as needed. A future switch to `OneOf` or `LanguageExt` remains local within `IviCli.Domain`.
+- The unfamiliarity issue is absorbed by `docs/domain-glossary.md`, this ADR, and consistency in the project template code.
+- NRT warning suppression is kept trackable via `// nullable-escape: <reason>`.

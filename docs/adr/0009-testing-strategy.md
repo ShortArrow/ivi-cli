@@ -5,39 +5,39 @@
 
 ## Context
 
-本プロジェクトの開発は TDD サイクル（Red-Green-Refactor）を必須とし、テスト記述は Given/When/Then で状態差分に集中する形を採る。
-PRD §13 で test stack（xUnit / NSubstitute / Shouldly / Logging.Abstractions / System.IO.Abstractions.TestingHelpers）と Phase 1 のテスト対象は宣言済み。
-本 ADR は **どこまで広げるか・どこに線を引くか** を確定させる。
+Development of this project requires the TDD cycle (Red-Green-Refactor), and tests are written in Given/When/Then form, focusing on state differences.
+PRD §13 already declares the test stack (xUnit / NSubstitute / Shouldly / Logging.Abstractions / System.IO.Abstractions.TestingHelpers) and the Phase 1 test targets.
+This ADR fixes **how far we extend testing and where we draw the line**.
 
-依存する確定事項:
+Dependent decisions already in place:
 
-- 0021 で `tests/` 配下の test project は src と 1:1 ミラー、integration は trait 分離と決定済み
-- 0003 で Application 層に port を置き Backend を adapter とする方針が確定（mock 対象が明確になる）
-- 0003 で FakeBackend を `IviCli.Backends.Fake` として独立アセンブリ化することが確定
+- 0021 decided that test projects under `tests/` mirror `src/` 1:1, and that integration tests are separated by trait.
+- 0003 decided that the Application layer exposes ports and Backends are adapters (making the mock surface explicit).
+- 0003 decided that the FakeBackend is shipped as a standalone assembly `IviCli.Backends.Fake`.
 
 ## Decision
 
-### 1. テスト分類とゲート
+### 1. Test categories and gating
 
-| 分類 | 範囲 | xUnit Trait | CI gating |
+| Category | Scope | xUnit Trait | CI gating |
 | --- | --- | --- | --- |
-| **Unit** | Domain / Application / FakeBackend / Cli の純粋ロジック | (なし、既定) | PR で必須 |
-| **Integration** | 実 VISA / 実ファイル / 実 socket / 実プロセス | `Category=Integration` | nightly + 手動 trigger |
-| **Architecture** | 0021 の依存方向違反検出（NetArchTest） | `Category=Architecture` | PR で必須 |
+| **Unit** | Pure logic in Domain / Application / FakeBackend / Cli | (none, default) | Required on PR |
+| **Integration** | Real VISA / real files / real sockets / real processes | `Category=Integration` | Nightly + manual trigger |
+| **Architecture** | Dependency-direction violations from 0021 (NetArchTest) | `Category=Architecture` | Required on PR |
 
-- PR 既定実行: `dotnet test --filter "Category!=Integration"`
-- Integration は nightly ワークフロー（0020 で詳細）
-- Architecture テストは Unit と同じく既定実行（Trait は分類のためのみ）
+- Default PR run: `dotnet test --filter "Category!=Integration"`
+- Integration runs on the nightly workflow (details in 0020).
+- Architecture tests run by default like Unit (the Trait exists only for classification).
 
-### 2. TDD サイクル
+### 2. TDD cycle
 
-- 既存テストが無い領域に対しても、Red を先に書く。
-- 環境制約（実機要件等）で Red が困難な場合は **特性テスト（characterization test）** を最小単位で先行追加する。
-- 「ログを見て実装の正しさを確認」する代わりに、振る舞いをテストで固定する。
+- Even in areas without existing tests, write Red first.
+- When Red is impractical due to environment constraints (real hardware requirements, etc.), add a minimal **characterization test** up front.
+- Instead of "checking correctness by looking at logs," pin behavior down with tests.
 
-### 3. テスト命名
+### 3. Test naming
 
-`<MethodOrBehavior>_<Scenario>_<Expectation>` を基本形とする。domain-glossary の語彙と一致させる。
+Use `<MethodOrBehavior>_<Scenario>_<Expectation>` as the base form. Align vocabulary with the domain glossary.
 
 ```csharp
 [Fact] public void AddDevice_WithDuplicateName_ReturnsConflictError();
@@ -45,11 +45,11 @@ PRD §13 で test stack（xUnit / NSubstitute / Shouldly / Logging.Abstractions 
 [Fact] public async Task QueryAsync_OnDisconnectMidQuery_ReturnsTransportError();
 ```
 
-クラス名は `<TypeUnderTest>Tests`（例: `AddDeviceCommandHandlerTests`）。
+Class names follow `<TypeUnderTest>Tests` (e.g. `AddDeviceCommandHandlerTests`).
 
 ### 4. AAA / Given-When-Then
 
-テスト本体は Given/When/Then 三区画で書き、「状態の期待差分」に集中する。
+Write the body of each test in three Given/When/Then sections, focusing on the "expected state difference."
 
 ```csharp
 [Fact]
@@ -67,17 +67,17 @@ public void AddDevice_WithDuplicateName_ReturnsConflictError()
 }
 ```
 
-### 5. モック方針
+### 5. Mocking policy
 
-- **Mock 対象は Port のみ**: `IIviBackend`, `IConfigStore`, `ISessionStore`, `IClock`, `IFileSystem`
-- **Mock してはいけない**: Domain Entity / Value Object / Domain Service（実物を使う）
-- **Backend 関連のテストは `IviCli.Backends.Fake` を優先**。NSubstitute での `IIviBackend` モックは Application 層 / Cli 層テストでのみ使う。
-- 理由: Fake は domain 不変条件込みで「本物に近い偽物」、mock は単発契約のみ。Fake で書ける挙動テストを mock で再実装しない。
+- **Mock only Ports**: `IIviBackend`, `IConfigStore`, `ISessionStore`, `IClock`, `IFileSystem`.
+- **Do not mock**: Domain Entity / Value Object / Domain Service (use the real ones).
+- **Prefer `IviCli.Backends.Fake` for Backend-related tests.** Use NSubstitute mocks of `IIviBackend` only in Application-layer / Cli-layer tests.
+- Rationale: the Fake is a "near-real fake" that honors domain invariants, while a mock encodes only a single-shot contract. Do not re-implement behavior tests in mocks when the Fake can express them.
 
-### 6. FakeBackend の fault injection
+### 6. FakeBackend fault injection
 
-`IviCli.Backends.Fake` は単なる echo ではなく、テスト用の builder API を提供する。
-正式 API は実装時に詰めるが、想定される使用感:
+`IviCli.Backends.Fake` is not a mere echo — it provides a builder API for tests.
+The exact API will be settled during implementation, but the intended feel is:
 
 ```csharp
 var fake = new FakeBackend();
@@ -88,59 +88,59 @@ fake.OnQuery("psu1", "MEAS:VOLT?").Timeout();
 fake.SimulateDisconnect("psu1", after: 100.ms);
 ```
 
-PRD §13.3 の lifecycle テスト対象（open success/failure, query/read timeout, disconnect mid-query, reconnect, dispose once, online/offline 判定）はすべて Fake で書けるようにする。
+All lifecycle test targets in PRD §13.3 (open success/failure, query/read timeout, disconnect mid-query, reconnect, dispose-once, online/offline determination) must be expressible with the Fake.
 
-### 7. 追加ツール
+### 7. Additional tooling
 
-| ツール | 用途 | 採用 |
+| Tool | Purpose | Adopted |
 | --- | --- | --- |
-| **NetArchTest** | 0021 の依存方向違反、layer 違反、interface 未実装等の検出 | 採用 |
-| **Verify** (snapshot) | `--json` 出力契約、help text、レンダリング出力 | 採用 |
-| **FsCheck** (property-based) | VO 不変条件（VisaResource parse/serialize の roundtrip、Timeout 範囲制約等） | 限定採用（VO 周辺のみ） |
-| **coverlet** | カバレッジ計測 | 採用（可視化のみ、数値ゲートなし） |
-| **Stryker.NET** (mutation) | テスト質の検証 | **不採用**（Phase 1 では過剰） |
+| **NetArchTest** | Detect dependency-direction violations, layer violations, missing interface implementations, etc. from 0021 | Adopted |
+| **Verify** (snapshot) | `--json` output contract, help text, rendered output | Adopted |
+| **FsCheck** (property-based) | VO invariants (VisaResource parse/serialize roundtrip, Timeout range constraints, etc.) | Adopted with scope limited to VO-related areas |
+| **coverlet** | Coverage measurement | Adopted (visualization only, no numeric gate) |
+| **Stryker.NET** (mutation) | Verifying test quality | **Not adopted** (overkill for Phase 1) |
 
-### 8. 共有 Test Helper: `tests/IviCli.TestKit/`
+### 8. Shared Test Helper: `tests/IviCli.TestKit/`
 
-以下を集約する共有ライブラリを作る:
+Create a shared library that consolidates:
 
-- **Test Data Builder**: `ConfigBuilder`, `SessionStateBuilder`, `DeviceBuilder` 等
-- **FakeBackend Schedule DSL**: §6 の builder API
-- **Custom Shouldly extensions**: `result.ShouldBeError(...)` 等の Result 型用 assertion
-- **Verify 設定**: snapshot 配置規約・正規化ルール
-- **Trait constants**: `Categories.Integration`, `Categories.Architecture`
+- **Test Data Builders**: `ConfigBuilder`, `SessionStateBuilder`, `DeviceBuilder`, etc.
+- **FakeBackend Schedule DSL**: the builder API from §6.
+- **Custom Shouldly extensions**: Result-type assertions such as `result.ShouldBeError(...)`.
+- **Verify configuration**: snapshot placement conventions and normalization rules.
+- **Trait constants**: `Categories.Integration`, `Categories.Architecture`.
 
-`tests/IviCli.TestKit/` は src ではなく tests/ 配下に置く（0021 のテスト 1:1 ミラー対象外、test infrastructure として扱う）。
+`tests/IviCli.TestKit/` lives under `tests/` rather than `src/` (it is outside the 1:1 mirror rule from 0021 and treated as test infrastructure).
 
-### 9. カバレッジ方針
+### 9. Coverage policy
 
-- coverlet で計測、PR コメント等で可視化のみ。
-- **数値ゲートを置かない**。本プロジェクトの方針は「行動として TDD を守る」ことであり、後付けで数値を満たすためのテストは目的を歪める。
-- カバレッジ低下を機械的に検出するスクリプトは可（情報提示用、blocking しない）。
+- Measure with coverlet and surface the result via PR comments — visualization only.
+- **No numeric gate.** The project's policy is "stick to TDD as a behavior," and tests written after the fact to meet a coverage number distort that goal.
+- A script that mechanically detects coverage drops is acceptable for informational purposes (non-blocking).
 
-### 10. async テスト
+### 10. async tests
 
-- Backend 系は `async Task` を返すテストを既定とする。
-- timeout は **テスト側でも明示**: `[Fact(Timeout=5000)]` を整備し、デッドロック・無限ループを CI でハングさせない。
-- `CancellationToken` は Backend port の全 method に伝播済み（0003 / 0015）、テストでも明示的にキャンセル経路を踏む。
+- Backend-related tests return `async Task` by default.
+- Set timeouts **explicitly on the test side as well**: standardize on `[Fact(Timeout=5000)]` to prevent deadlocks and infinite loops from hanging CI.
+- `CancellationToken` is already propagated to every method of the Backend port (0003 / 0015); tests must exercise the cancellation path explicitly.
 
 ## Consequences
 
 **Pros**
 
-- 単一 mock ライブラリ + 単一 fake の双輪で、テスト書き味が一貫する。
-- Architecture テストで CA 違反が早期に検出できる（人手レビュー依存を減らせる）。
-- Snapshot で `--json` 出力契約が CI で固定される（PRD §9 の AI/CI 連携の根拠）。
-- カバレッジ非ゲートで「数値合わせテスト」の発生を抑制。
+- A single mock library plus a single fake gives a consistent feel when writing tests.
+- Architecture tests catch CA violations early (reducing reliance on manual review).
+- Snapshots pin the `--json` output contract in CI (the basis for AI/CI integration in PRD §9).
+- The absence of a coverage gate suppresses "tests written to hit a number."
 
 **Cons**
 
-- FakeBackend の fault injection DSL を実装する初期投資。
-- NetArchTest / Verify / FsCheck / coverlet で NuGet 依存が増える（test 側のみで本体 binary には影響なし）。
-- TestKit 経由でテスト間に「共有」が発生し、不用意な拡張で結合度が上がるリスク。
+- Up-front investment to implement the FakeBackend fault injection DSL.
+- More NuGet dependencies from NetArchTest / Verify / FsCheck / coverlet (test-side only; no impact on the shipped binary).
+- Sharing via TestKit creates coupling across tests; careless extension can raise coupling further.
 
 **Mitigations**
 
-- FakeBackend DSL は最小から始め、PRD §13.3 の lifecycle ケースを満たす範囲に絞る。
-- TestKit に置く対象は「**2 箇所以上のテストから参照される共通ヘルパ**」に限定する（YAGNI 厳守）。
-- 重要な test infrastructure 変更は ADR を切らずとも PR description で根拠を残す。
+- Start the FakeBackend DSL from the minimum and limit it to satisfying the lifecycle cases in PRD §13.3.
+- Restrict what goes into TestKit to **common helpers referenced from two or more tests** (strict YAGNI).
+- Significant changes to test infrastructure can record their rationale in the PR description without needing a new ADR.
