@@ -7,7 +7,7 @@
 
 Phase 1 着手前にアセンブリ分割とディレクトリ配置を確定させる。
 PRD は `IIviBackend` を transport 抽象として位置づけており、HiSLIP / VXI-11 / Socket は NuGet 依存と実装複雑度が大きく異なる。
-Clean Architecture (CLAUDE.md 第4原則) と Backend 多態の両方を素直に表現する分割が必要。
+Clean Architecture（依存方向を上位抽象へ単方向、逆参照・循環の禁止）と Backend 多態の両方を素直に表現する分割が必要。
 
 ## Decision
 
@@ -62,7 +62,7 @@ Domain ← Application ← Infrastructure
 将来: Server / Management → Application → Domain
 ```
 
-- 依存は常に上位（抽象）方向へ。逆参照・循環は禁止 (CLAUDE.md 第4原則)。
+- 依存は常に上位（抽象）方向へ。逆参照・循環は禁止。
 - `IIviBackend` 等の port は `IviCli.Application` に定義し、各 `IviCli.Backends.*` がそれを実装する。
 - `IviCli.Cli` のみが全レイヤーを参照できる（DI 組み立て用 composition root）。
 

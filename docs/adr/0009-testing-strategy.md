@@ -5,7 +5,7 @@
 
 ## Context
 
-CLAUDE.md 第2原則は TDD サイクル（Red-Green-Refactor）を必須とし、第5原則は Given/When/Then で状態差分に集中する設計を求めている。
+本プロジェクトの開発は TDD サイクル（Red-Green-Refactor）を必須とし、テスト記述は Given/When/Then で状態差分に集中する形を採る。
 PRD §13 で test stack（xUnit / NSubstitute / Shouldly / Logging.Abstractions / System.IO.Abstractions.TestingHelpers）と Phase 1 のテスト対象は宣言済み。
 本 ADR は **どこまで広げるか・どこに線を引くか** を確定させる。
 
@@ -32,7 +32,7 @@ PRD §13 で test stack（xUnit / NSubstitute / Shouldly / Logging.Abstractions 
 ### 2. TDD サイクル
 
 - 既存テストが無い領域に対しても、Red を先に書く。
-- 環境制約（実機要件等）で Red が困難な場合は **特性テスト（characterization test）** を最小単位で先行追加する（CLAUDE.md 第2原則）。
+- 環境制約（実機要件等）で Red が困難な場合は **特性テスト（characterization test）** を最小単位で先行追加する。
 - 「ログを見て実装の正しさを確認」する代わりに、振る舞いをテストで固定する。
 
 ### 3. テスト命名
@@ -49,7 +49,7 @@ PRD §13 で test stack（xUnit / NSubstitute / Shouldly / Logging.Abstractions 
 
 ### 4. AAA / Given-When-Then
 
-CLAUDE.md 第5原則と整合させ、テスト本体は Given/When/Then 三区画で書く。
+テスト本体は Given/When/Then 三区画で書き、「状態の期待差分」に集中する。
 
 ```csharp
 [Fact]
@@ -115,7 +115,7 @@ PRD §13.3 の lifecycle テスト対象（open success/failure, query/read time
 ### 9. カバレッジ方針
 
 - coverlet で計測、PR コメント等で可視化のみ。
-- **数値ゲートを置かない**。CLAUDE.md 第2原則は「行動として TDD を守る」ことを求めており、後付けで数値を満たすためのテストは目的を歪める。
+- **数値ゲートを置かない**。本プロジェクトの方針は「行動として TDD を守る」ことであり、後付けで数値を満たすためのテストは目的を歪める。
 - カバレッジ低下を機械的に検出するスクリプトは可（情報提示用、blocking しない）。
 
 ### 10. async テスト

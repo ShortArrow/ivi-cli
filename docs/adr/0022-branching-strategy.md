@@ -8,9 +8,6 @@
 ブランチ運用方針を確定させる。IVI-CLI は CLI ツール OSS であり、並行サポート版や長期メンテブランチを持たない。
 継続デリバリ・single product・single trunk を前提とする現代 CLI OSS のデファクト（`gh`, `kubectl`, `helm`, `terraform`, `ripgrep`, `bat`, `uv`/`ruff` などほぼ全て）に準拠する。
 
-なお、CLAUDE.md 第7原則は「`develop` に PR を作成する。`main` 直 PR は事前合意が必要」と定めているが、これは web/業務寄りプロジェクトを前提とした global ルールである。
-本プロジェクト（CLI OSS）には適合しないため、**本 ADR をもってプロジェクトローカルに override する**。
-
 ## Decision
 
 ### Branch model: GitHub Flow
@@ -74,11 +71,6 @@ hotfix/crash-on-empty-config
 2. `main` に annotated tag を打つ: `git tag -a v0.1.0 -m "..."`。
 3. tag push で GitHub Actions が release / artifact 生成（CI 構築は 0020 で別途）。
 4. hotfix が必要になったら `hotfix/*` を `main` から切って通常 PR で戻す。
-
-### Override of CLAUDE.md 第7原則
-
-global CLAUDE.md は本プロジェクトに対して上記運用を override される。
-他プロジェクトでは依然 `develop` 既定が有効。
 
 ## Consequences
 
