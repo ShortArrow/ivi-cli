@@ -11,7 +11,7 @@ We need a single source of truth for:
 
 - Which kinds of documents the project keeps, where they live, and who they target.
 - The natural language of those documents (English-primary vs bilingual).
-- ADR conventions (numbering, required sections, lifecycle, immutability).
+- ADR conventions (numbering, required sections, lifecycle, update policy).
 - Inline code documentation scope (XML doc comments).
 - CHANGELOG strategy.
 - The pattern for paired bilingual documents (PRD-style language switcher).
@@ -25,7 +25,7 @@ This ADR establishes those conventions. It is the first ADR written in English; 
 | Category | Location | Purpose |
 | --- | --- | --- |
 | PRD | `docs/PRD.md` (+ optional `docs/PRD.jp.md`) | Product requirements; reader-facing |
-| ADR | `docs/adr/NNNN-*.md` | Architectural decisions; immutable record |
+| ADR | `docs/adr/NNNN-*.md` | Architectural decisions; living documents tracked in git |
 | Domain Glossary | `docs/domain-glossary.md` | Ubiquitous-language catalog of Entities / Value Objects / Domain Services |
 | README | `/README.md` (+ optional `/README.jp.md`) | Project intro, install, quick start; reader-facing |
 | CONTRIBUTING | `/CONTRIBUTING.md` | Developer onboarding |
@@ -54,7 +54,8 @@ README, CONTRIBUTING, and CHANGELOG are deferred until they have a non-trivial f
   - `Accepted` — binding; the project follows this decision.
   - `Deprecated` — no longer recommended, but no replacement is mandated.
   - `Superseded by NNNN` — replaced by a newer ADR.
-- **Immutability**: once an ADR is `Accepted`, content changes are editorial only (typo fixes, link repair, clarification of existing meaning). A change of policy requires a new ADR that supersedes the old one. The old ADR's `Status` is then updated to `Superseded by NNNN`, and the new ADR's `Context` explains the supersession.
+- **Living documents**: ADRs are maintained like the PRD — they may be updated in place through normal PRs to refine, clarify, or revise a decision. The `Date` field reflects the original acceptance and is not bumped for ordinary updates; the git history is the authoritative change log.
+- **When to create a new ADR instead**: a new ADR (with the older one's `Status` set to `Superseded by NNNN`) is preferred only when (a) the change is large enough that preserving the original decision aids history, (b) the original ADR is widely cross-referenced and rewriting it would confuse readers, or (c) the decision reverses rather than refines. In all other cases, edit in place.
 - **No external references**: ADRs must not cite files outside the repository (user-global config, private notes, chat transcripts). If a principle is load-bearing, restate its content inline.
 - **Numbering gaps**: it is acceptable to skip numbers (e.g. accepting 0021 before 0010). Skeleton files for planned ADRs may exist with `Status: Draft`.
 
@@ -122,7 +123,7 @@ When created, it must reference:
 
 In effect as of this ADR's acceptance:
 
-1. The five accepted Japanese ADRs (`0003`, `0009`, `0021`, `0022`, `0023`) will be translated to English in a single follow-up commit. The translation is treated as editorial; no supersession is required.
+1. The five accepted Japanese ADRs (`0003`, `0009`, `0021`, `0022`, `0023`) will be translated to English in a single follow-up commit. The translation is an in-place update; no supersession is required.
 2. `docs/domain-glossary.md` will be translated to English in the same follow-up commit.
 3. Skeleton ADRs `0001`–`0020` already have English titles; their bodies remain `TBD` and are unaffected.
 4. `docs/PRD.md` (English) is already the canonical PRD; `docs/PRD.jp.md` remains as the optional bilingual companion under §4.
@@ -133,7 +134,7 @@ In effect as of this ADR's acceptance:
 
 - Documentation is accessible to international contributors and users.
 - Single language for the repository reduces sync overhead (only PRD/README have i18n companions).
-- ADR immutability + supersession yields a readable decision history.
+- ADRs evolve in place under git, and the PR + commit history serves as the authoritative change log; supersession is reserved for genuine reversals or large rewrites.
 - Authoritative source of `--help` text being in code prevents drift between code and docs.
 
 **Cons**
