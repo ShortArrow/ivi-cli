@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <RootNamespace>IviCli.Backends.Local</RootNamespace>
+    <AssemblyName>IviCli.Backends.Local</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\IviCli.Application\IviCli.Application.csproj" />
+  </ItemGroup>
+</Project>

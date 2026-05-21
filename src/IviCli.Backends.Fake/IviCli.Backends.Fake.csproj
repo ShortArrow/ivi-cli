@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <RootNamespace>IviCli.Backends.Fake</RootNamespace>
+    <AssemblyName>IviCli.Backends.Fake</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\IviCli.Application\IviCli.Application.csproj" />
+  </ItemGroup>
+</Project>

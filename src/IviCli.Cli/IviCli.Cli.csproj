@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>IviCli.Cli</RootNamespace>
+    <AssemblyName>ivicli</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\IviCli.Application\IviCli.Application.csproj" />
+    <ProjectReference Include="..\IviCli.Infrastructure\IviCli.Infrastructure.csproj" />
+    <ProjectReference Include="..\IviCli.Backends.Local\IviCli.Backends.Local.csproj" />
+    <ProjectReference Include="..\IviCli.Backends.Fake\IviCli.Backends.Fake.csproj" />
+  </ItemGroup>
+</Project>

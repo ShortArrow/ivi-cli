@@ -1,0 +1,31 @@
+{
+  "$schema": "https://alirezanet.github.io/Husky.Net/schema.json",
+  "tasks": [
+    {
+      "name": "format-check",
+      "group": "pre-commit",
+      "command": "dotnet",
+      "args": ["csharpier", "check", "."]
+    },
+    {
+      "name": "build",
+      "group": "pre-push",
+      "command": "dotnet",
+      "args": ["build", "--nologo", "--verbosity", "minimal"]
+    },
+    {
+      "name": "test",
+      "group": "pre-push",
+      "command": "dotnet",
+      "args": [
+        "test",
+        "--no-build",
+        "--nologo",
+        "--verbosity",
+        "minimal",
+        "--filter",
+        "Category!=Integration"
+      ]
+    }
+  ]
+}

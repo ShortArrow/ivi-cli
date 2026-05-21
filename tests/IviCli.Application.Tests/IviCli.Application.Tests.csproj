@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <RootNamespace>IviCli.Application.Tests</RootNamespace>
+    <AssemblyName>IviCli.Application.Tests</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\IviCli.Application\IviCli.Application.csproj" />
+    <ProjectReference Include="..\..\src\IviCli.Backends.Fake\IviCli.Backends.Fake.csproj" />
+    <ProjectReference Include="..\IviCli.TestKit\IviCli.TestKit.csproj" />
+  </ItemGroup>
+</Project>

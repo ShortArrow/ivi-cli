@@ -1,0 +1,6 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <RootNamespace>IviCli.Domain</RootNamespace>
+    <AssemblyName>IviCli.Domain</AssemblyName>
+  </PropertyGroup>
+</Project>
