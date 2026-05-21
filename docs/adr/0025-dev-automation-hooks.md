@@ -46,7 +46,7 @@ Rationale:
 
 ### 3. pre-commit: CSharpier format verification only
 
-Run **`csharpier --check .`** on commit. If formatting drift is detected, the commit is **rejected** (not auto-fixed), and the developer is asked to run `csharpier .` and re-stage.
+Run **`dotnet csharpier check .`** on commit. If formatting drift is detected, the commit is **rejected** (not auto-fixed), and the developer is asked to run `dotnet csharpier format .` and re-stage.
 
 Rationale:
 
@@ -108,7 +108,8 @@ Differing hook behavior by branch (`main` vs feature) is **not** adopted.
 ```sh
 #!/bin/sh
 . "$(dirname "$0")/_/husky.sh"
-dotnet csharpier --check .
+dotnet tool restore >/dev/null
+dotnet husky run --group pre-commit
 ```
 
 `.husky/pre-push`:
@@ -116,8 +117,8 @@ dotnet csharpier --check .
 ```sh
 #!/bin/sh
 . "$(dirname "$0")/_/husky.sh"
-dotnet build --nologo --verbosity minimal
-dotnet test --no-build --filter "Category!=Integration" --nologo --verbosity minimal
+dotnet tool restore >/dev/null
+dotnet husky run --group pre-push
 ```
 
 `.claude/settings.json` (PostToolUse hook for CSharpier):
@@ -129,7 +130,7 @@ dotnet test --no-build --filter "Category!=Integration" --nologo --verbosity min
       {
         "matcher": "Edit|Write",
         "filter": { "path": "**/*.cs" },
-        "command": "dotnet csharpier {{path}}",
+        "command": "dotnet csharpier format {{path}}",
         "blocking": false
       }
     ]
