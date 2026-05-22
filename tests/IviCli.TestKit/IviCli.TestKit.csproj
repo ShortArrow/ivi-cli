@@ -7,5 +7,6 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\IviCli.Domain\IviCli.Domain.csproj" />
     <ProjectReference Include="..\..\src\IviCli.Application\IviCli.Application.csproj" />
+    <ProjectReference Include="..\..\src\IviCli.Backends.Fake\IviCli.Backends.Fake.csproj" />
   </ItemGroup>
 </Project>

@@ -199,6 +199,13 @@
           "TestableIO.System.IO.Abstractions": "[22.1.0, )"
         }
       },
+      "ivicli.backends.fake": {
+        "type": "Project",
+        "dependencies": {
+          "IviCli.Application": "[1.0.0, )",
+          "Microsoft.Extensions.DependencyInjection.Abstractions": "[9.0.11, )"
+        }
+      },
       "ivicli.domain": {
         "type": "Project"
       },
@@ -216,6 +223,7 @@
         "type": "Project",
         "dependencies": {
           "IviCli.Application": "[1.0.0, )",
+          "IviCli.Backends.Fake": "[1.0.0, )",
           "IviCli.Domain": "[1.0.0, )",
           "Microsoft.Extensions.Logging.Abstractions": "[9.0.11, )",
           "NSubstitute": "[5.3.0, )",

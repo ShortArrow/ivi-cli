@@ -102,6 +102,13 @@
           "TestableIO.System.IO.Abstractions": "[22.1.0, )"
         }
       },
+      "ivicli.backends.fake": {
+        "type": "Project",
+        "dependencies": {
+          "IviCli.Application": "[1.0.0, )",
+          "Microsoft.Extensions.DependencyInjection.Abstractions": "[9.0.11, )"
+        }
+      },
       "ivicli.domain": {
         "type": "Project"
       },
