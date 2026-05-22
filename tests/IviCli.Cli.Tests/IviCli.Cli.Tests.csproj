@@ -6,6 +6,15 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\IviCli.Cli\IviCli.Cli.csproj" />
+    <ProjectReference Include="..\..\src\IviCli.Domain\IviCli.Domain.csproj" />
+    <ProjectReference Include="..\..\src\IviCli.Application\IviCli.Application.csproj" />
+    <ProjectReference Include="..\..\src\IviCli.Infrastructure\IviCli.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\src\IviCli.Backends.Local\IviCli.Backends.Local.csproj" />
+    <ProjectReference Include="..\..\src\IviCli.Backends.Fake\IviCli.Backends.Fake.csproj" />
     <ProjectReference Include="..\IviCli.TestKit\IviCli.TestKit.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="NetArchTest.Rules" />
   </ItemGroup>
 </Project>
