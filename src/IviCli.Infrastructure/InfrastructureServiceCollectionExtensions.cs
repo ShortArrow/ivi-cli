@@ -1,9 +1,11 @@
 using System.IO.Abstractions;
 using IviCli.Application.Backends;
 using IviCli.Application.Configuration;
+using IviCli.Application.Mock;
 using IviCli.Application.Session;
 using IviCli.Infrastructure.Backends;
 using IviCli.Infrastructure.Configuration;
+using IviCli.Infrastructure.Mock;
 using IviCli.Infrastructure.Session;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -66,5 +68,31 @@ public static class InfrastructureServiceCollectionExtensions
             return new DefaultBackendFactory(fallback);
         });
         return services;
+    }
+
+    /// <summary>
+    /// Registers <see cref="TomlScenarioStore"/> as the default
+    /// <see cref="IScenarioStore"/>. <paramref name="scenarioDirectory"/>
+    /// may be <see langword="null"/> to default to a <c>scenarios/</c>
+    /// sibling of the supplied config path.
+    /// </summary>
+    public static IServiceCollection AddIviCliScenarioStore(
+        this IServiceCollection services,
+        string configPath,
+        string? scenarioDirectory = null
+    )
+    {
+        var directory = scenarioDirectory ?? DeriveDefaultScenarioDirectory(configPath);
+        services.AddSingleton<IScenarioStore>(sp => new TomlScenarioStore(
+            sp.GetRequiredService<IFileSystem>(),
+            directory
+        ));
+        return services;
+    }
+
+    private static string DeriveDefaultScenarioDirectory(string configPath)
+    {
+        var directory = Path.GetDirectoryName(configPath) ?? ".";
+        return Path.Combine(directory, "scenarios");
     }
 }

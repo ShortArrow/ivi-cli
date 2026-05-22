@@ -1,9 +1,14 @@
 using System.CommandLine;
 using IviCli.Application;
+using IviCli.Application.Mock;
+using IviCli.Application.Session;
 using IviCli.Backends.Fake;
 using IviCli.Cli.Commands;
 using IviCli.Cli.Logging;
 using IviCli.Cli.Paths;
+using IviCli.Domain;
+using IviCli.Domain.Mock;
+using IviCli.Domain.Session;
 using IviCli.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -42,7 +47,9 @@ internal static class Program
             var services = new ServiceCollection();
             services.AddLogging(b => b.AddSerilog(Log.Logger, dispose: false));
             services.AddIviCliApplication();
+            services.AddIviCliMock();
             services.AddIviCliInfrastructure(configPath);
+            services.AddIviCliScenarioStore(configPath);
             services.AddIviCliBackendsFake();
             services.AddIviCliBackendFactory();
             services.AddSingleton(
@@ -60,6 +67,11 @@ internal static class Program
                 e.Cancel = true;
                 cts.Cancel();
             };
+
+            // Activate any scenario named by IVICLI_SCENARIO (env wins) or
+            // session.json (persisted) before parsing the command line, so
+            // visa subcommands see the scenario on this same invocation.
+            await ActivateScenarioIfRequested(provider, cts.Token);
 
             var root = BuildRoot(provider);
             return await root.Parse(args).InvokeAsync(cts.Token);
@@ -95,12 +107,58 @@ internal static class Program
         visa.Subcommands.Add(VisaReadCommand.Build(services));
         visa.Subcommands.Add(VisaStatusCommand.Build(services));
 
+        var mock = new Command("mock", "Manage mock-device behaviour for the Fake Backend.");
+        mock.Subcommands.Add(MockScenarioCommand.Build(services));
+
         var root = new RootCommand(
             "ivi-cli: integrated CLI for managing, diagnosing, and operating VISA/IVI instruments."
         );
         root.Subcommands.Add(visa);
+        root.Subcommands.Add(mock);
         root.Subcommands.Add(DiagnoseCommand.Build(services));
         return root;
+    }
+
+    private static async Task ActivateScenarioIfRequested(
+        IServiceProvider services,
+        CancellationToken ct
+    )
+    {
+        // Highest precedence: IVICLI_SCENARIO env var. Falls back to session.json.
+        string? requested = Environment.GetEnvironmentVariable("IVICLI_SCENARIO");
+        if (string.IsNullOrEmpty(requested))
+        {
+            var sessionStore = services.GetRequiredService<ISessionStore>();
+            var sessionResult = await sessionStore.LoadAsync(ct);
+            if (
+                sessionResult is Result<SessionState, SessionStoreError>.Ok { Value: var session }
+                && session.ActiveScenario is { } scenarioName
+            )
+            {
+                requested = scenarioName.Value;
+            }
+        }
+        if (string.IsNullOrEmpty(requested))
+        {
+            return;
+        }
+        if (
+            ScenarioName.From(requested)
+            is not Result<ScenarioName, ScenarioNameError>.Ok { Value: var name }
+        )
+        {
+            Log.Logger.Warning("ignoring invalid IVICLI_SCENARIO value {Raw}", requested);
+            return;
+        }
+        var store = services.GetRequiredService<IScenarioStore>();
+        var loadResult = await store.LoadAsync(name, ct);
+        if (loadResult is not Result<MockScenario, ScenarioStoreError>.Ok { Value: var scenario })
+        {
+            Log.Logger.Warning("could not load active scenario {Name}: ignored", requested);
+            return;
+        }
+        var fake = services.GetRequiredService<FakeBackend>();
+        fake.ActivateScenario(scenario);
     }
 
     private static LogEventLevel ResolveVerbosity(string[] args, out bool quiet)

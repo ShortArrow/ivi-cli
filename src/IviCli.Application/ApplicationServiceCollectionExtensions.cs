@@ -1,5 +1,6 @@
 using IviCli.Application.Devices;
 using IviCli.Application.Diagnostics;
+using IviCli.Application.Mock;
 using IviCli.Application.Session;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -32,6 +33,22 @@ public static class ApplicationServiceCollectionExtensions
         services.AddSingleton<StatusDeviceCommandHandler>();
         services.AddSingleton<ScanDevicesQueryHandler>();
         services.AddSingleton<DiagnoseQueryHandler>();
+        return services;
+    }
+
+    /// <summary>
+    /// Registers mock-scenario handlers. The caller must already have an
+    /// <see cref="IScenarioStore"/> registration (Infrastructure or test
+    /// double).
+    /// </summary>
+    public static IServiceCollection AddIviCliMock(this IServiceCollection services)
+    {
+        services.AddSingleton<ListScenariosQueryHandler>();
+        services.AddSingleton<CreateScenarioCommandHandler>();
+        services.AddSingleton<RemoveScenarioCommandHandler>();
+        services.AddSingleton<ShowScenarioQueryHandler>();
+        services.AddSingleton<ActivateScenarioCommandHandler>();
+        services.AddSingleton<DeactivateScenarioCommandHandler>();
         return services;
     }
 }
