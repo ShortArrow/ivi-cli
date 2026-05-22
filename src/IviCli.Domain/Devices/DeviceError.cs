@@ -3,7 +3,20 @@ namespace IviCli.Domain.Devices;
 /// <summary>
 /// Errors that can arise from device-related operations in the domain.
 /// </summary>
-public abstract record DeviceError;
+public abstract record DeviceError : IviError
+{
+    /// <inheritdoc/>
+    public abstract LogSeverity Severity { get; }
+
+    /// <inheritdoc/>
+    public abstract string Message { get; }
+
+    /// <inheritdoc/>
+    public virtual IReadOnlyList<object?> LogArgs => Array.Empty<object?>();
+
+    /// <inheritdoc/>
+    public virtual Exception? Cause => null;
+}
 
 /// <summary>
 /// A <see cref="DeviceName"/> could not be constructed from the given raw input
@@ -11,4 +24,14 @@ public abstract record DeviceError;
 /// permitted character pattern).
 /// </summary>
 /// <param name="Raw">The raw input string as provided by the caller.</param>
-public sealed record InvalidDeviceNameFormat(string Raw) : DeviceError;
+public sealed record InvalidDeviceNameFormat(string Raw) : DeviceError
+{
+    /// <inheritdoc/>
+    public override LogSeverity Severity => LogSeverity.Warning;
+
+    /// <inheritdoc/>
+    public override string Message => "invalid device name format: {Raw}";
+
+    /// <inheritdoc/>
+    public override IReadOnlyList<object?> LogArgs => new object?[] { Raw };
+}
