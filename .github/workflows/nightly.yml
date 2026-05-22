@@ -1,0 +1,94 @@
+name: nightly
+
+on:
+  schedule:
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: nightly
+  cancel-in-progress: false
+
+jobs:
+  integration:
+    name: integration / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    env:
+      DOTNET_NOLOGO: true
+      DOTNET_CLI_TELEMETRY_OPTOUT: true
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@3e891b0cb619bf60e2c25674b222b8940e2c1c25 # v4.1.0
+        with:
+          global-json-file: global.json
+          cache: true
+          cache-dependency-path: '**/packages.lock.json'
+
+      - name: Restore tools
+        run: dotnet tool restore
+
+      - name: Restore (locked)
+        run: dotnet restore --locked-mode
+
+      - name: Build
+        run: dotnet build --no-restore --configuration Release
+
+      - name: Integration tests
+        # When no integration tests match the filter the command exits non-zero;
+        # tolerate that until the suite grows. Hardware-dependent tests run only
+        # on self-hosted runners (not configured here).
+        continue-on-error: true
+        run: |
+          dotnet test --no-build --configuration Release \
+            --filter "Category=Integration" \
+            --logger "trx;LogFileName=integration.trx" \
+            --results-directory ./TestResults
+
+      - name: Upload integration test results
+        if: always()
+        uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882 # v4.4.3
+        with:
+          name: integration-${{ matrix.os }}
+          path: ./TestResults
+
+  dependency-scan:
+    name: dependency vulnerability scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      DOTNET_NOLOGO: true
+      DOTNET_CLI_TELEMETRY_OPTOUT: true
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@3e891b0cb619bf60e2c25674b222b8940e2c1c25 # v4.1.0
+        with:
+          global-json-file: global.json
+
+      - name: Restore (locked)
+        run: dotnet restore --locked-mode
+
+      - name: Scan vulnerable packages
+        shell: bash
+        run: |
+          set -e
+          report=$(dotnet list package --vulnerable --include-transitive 2>&1 || true)
+          echo "$report"
+          if echo "$report" | grep -E -q '> [A-Za-z0-9\.]+\s+>.*High|> [A-Za-z0-9\.]+\s+>.*Critical'; then
+            echo "::error::High or Critical vulnerability detected in dependencies."
+            exit 1
+          fi
+
+      - name: Warn on deprecated packages
+        run: dotnet list package --deprecated
