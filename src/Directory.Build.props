@@ -9,6 +9,7 @@
     <!-- CA1716: nested record variant names like `Ok` / `Error` are intentional per ADR 0023 §5. -->
     <!-- CA1859: returning the abstract sum-type root is the intent (per-domain ADR 0014 §1); the perf hint conflicts with polymorphism. -->
     <!-- CA1715: type names like `IviError` already start with `I`; the lowercase `v` is from the project name `Ivi`. -->
-    <NoWarn>$(NoWarn);CS1591;CA1716;CA1859;CA1715</NoWarn>
+    <!-- CA1848 / CA2254 / CA1873: the IviError contract emits dynamic templates and args (ADR 0014 §9); source-gen LoggerMessage is reserved for hot paths per ADR 0011 §8. -->
+    <NoWarn>$(NoWarn);CS1591;CA1716;CA1859;CA1715;CA1848;CA2254;CA1873</NoWarn>
   </PropertyGroup>
 </Project>

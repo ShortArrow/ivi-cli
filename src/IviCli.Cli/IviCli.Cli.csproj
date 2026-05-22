@@ -11,4 +11,15 @@
     <ProjectReference Include="..\IviCli.Backends.Local\IviCli.Backends.Local.csproj" />
     <ProjectReference Include="..\IviCli.Backends.Fake\IviCli.Backends.Fake.csproj" />
   </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="System.CommandLine" />
+    <PackageReference Include="Microsoft.Extensions.Hosting" />
+    <PackageReference Include="Microsoft.Extensions.Logging" />
+    <PackageReference Include="Serilog" />
+    <PackageReference Include="Serilog.Extensions.Hosting" />
+    <PackageReference Include="Serilog.Sinks.Console" />
+    <PackageReference Include="Serilog.Sinks.File" />
+    <PackageReference Include="Serilog.Formatting.Compact" />
+  </ItemGroup>
 </Project>
