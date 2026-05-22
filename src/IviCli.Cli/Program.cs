@@ -81,6 +81,8 @@ internal static class Program
         visa.Subcommands.Add(VisaAddCommand.Build(services));
         visa.Subcommands.Add(VisaRemoveCommand.Build(services));
         visa.Subcommands.Add(VisaListCommand.Build(services));
+        visa.Subcommands.Add(VisaUseCommand.Build(services));
+        visa.Subcommands.Add(VisaCurrentCommand.Build(services));
 
         var root = new RootCommand(
             "ivi-cli: integrated CLI for managing, diagnosing, and operating VISA/IVI instruments."

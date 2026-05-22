@@ -1,4 +1,5 @@
 using IviCli.Application.Devices;
+using IviCli.Application.Session;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace IviCli.Application;
@@ -22,6 +23,8 @@ public static class ApplicationServiceCollectionExtensions
         services.AddSingleton<AddDeviceCommandHandler>();
         services.AddSingleton<RemoveDeviceCommandHandler>();
         services.AddSingleton<ListDevicesQueryHandler>();
+        services.AddSingleton<SetCurrentDeviceCommandHandler>();
+        services.AddSingleton<GetCurrentDeviceQueryHandler>();
         return services;
     }
 }
