@@ -83,6 +83,7 @@ internal static class Program
         visa.Subcommands.Add(VisaListCommand.Build(services));
         visa.Subcommands.Add(VisaUseCommand.Build(services));
         visa.Subcommands.Add(VisaCurrentCommand.Build(services));
+        visa.Subcommands.Add(VisaScanCommand.Build(services));
         visa.Subcommands.Add(VisaQueryCommand.Build(services));
         visa.Subcommands.Add(VisaWriteCommand.Build(services));
         visa.Subcommands.Add(VisaReadCommand.Build(services));
