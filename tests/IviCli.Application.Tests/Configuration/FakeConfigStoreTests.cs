@@ -4,7 +4,6 @@ using IviCli.Domain.Configuration;
 using IviCli.Domain.Devices;
 using IviCli.Domain.Visa;
 using IviCli.TestKit;
-using Timeout = IviCli.Domain.Timeout;
 
 namespace IviCli.Application.Tests.Configuration;
 

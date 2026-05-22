@@ -7,6 +7,7 @@
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <!-- CS1591: tolerate missing XML docs while scaffolding; revisit per ADR 0024. -->
     <!-- CA1716: nested record variant names like `Ok` / `Error` are intentional per ADR 0023 §5. -->
-    <NoWarn>$(NoWarn);CS1591;CA1716</NoWarn>
+    <!-- CA1859: returning the abstract sum-type root is the intent (per-domain ADR 0014 §1); the perf hint conflicts with polymorphism. -->
+    <NoWarn>$(NoWarn);CS1591;CA1716;CA1859</NoWarn>
   </PropertyGroup>
 </Project>

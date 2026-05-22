@@ -11,6 +11,15 @@
     <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
   </PropertyGroup>
 
+  <!--
+    Disambiguate IviCli.Domain.Timeout from System.Threading.Timeout, which is
+    pulled in implicitly via the System.Threading global using. The alias makes
+    `Timeout` unambiguously refer to the domain Value Object.
+  -->
+  <ItemGroup Label="Global type aliases">
+    <Using Include="IviCli.Domain.Timeout" Alias="Timeout" />
+  </ItemGroup>
+
   <PropertyGroup Label="Assembly metadata">
     <Authors>ivi-cli contributors</Authors>
     <Product>IVI-CLI</Product>
