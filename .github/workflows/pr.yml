@@ -1,0 +1,118 @@
+name: pr
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, edited]
+    branches: [main]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: pr-${{ github.head_ref }}
+  cancel-in-progress: true
+
+jobs:
+  pr-title-validation:
+    name: PR title (Conventional Commits)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: amannn/action-semantic-pull-request@0723387faaf9b38adef4775cd42cfd5155ed6017 # v5.5.3
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          types: |
+            feat
+            fix
+            docs
+            chore
+            refactor
+            test
+            perf
+            build
+            ci
+            hotfix
+
+  docs-sync-check:
+    name: PRD/README i18n sync
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
+      - name: Verify PRD.md / PRD.jp.md modified together
+        shell: bash
+        run: |
+          set -euo pipefail
+          base="${{ github.event.pull_request.base.sha }}"
+          head="${{ github.event.pull_request.head.sha }}"
+          changed=$(git diff --name-only "$base" "$head")
+          touched_en=0
+          touched_jp=0
+          echo "$changed" | grep -qx 'docs/PRD.md' && touched_en=1 || true
+          echo "$changed" | grep -qx 'docs/PRD.jp.md' && touched_jp=1 || true
+          if [ "$touched_en" -ne "$touched_jp" ]; then
+            echo "::error::PRD.md and PRD.jp.md must be modified in the same PR (ADR 0024 §4)."
+            exit 1
+          fi
+          touched_readme_en=0
+          touched_readme_jp=0
+          echo "$changed" | grep -qx 'README.md' && touched_readme_en=1 || true
+          echo "$changed" | grep -qx 'README.jp.md' && touched_readme_jp=1 || true
+          # README.jp.md may not yet exist; skip gating until it does.
+          if [ -f 'README.jp.md' ] && [ "$touched_readme_en" -ne "$touched_readme_jp" ]; then
+            echo "::error::README.md and README.jp.md must be modified in the same PR (ADR 0024 §4)."
+            exit 1
+          fi
+
+  build-and-test:
+    name: build / format / analyzers / test
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      DOTNET_NOLOGO: true
+      DOTNET_CLI_TELEMETRY_OPTOUT: true
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@3e891b0cb619bf60e2c25674b222b8940e2c1c25 # v4.1.0
+        with:
+          global-json-file: global.json
+          cache: true
+          cache-dependency-path: '**/packages.lock.json'
+
+      - name: Restore tools
+        run: dotnet tool restore
+
+      - name: Restore (locked)
+        run: dotnet restore --locked-mode
+
+      - name: Format check (CSharpier)
+        run: dotnet csharpier check .
+
+      - name: Analyzer rule check
+        run: dotnet format analyzers --verify-no-changes --no-restore
+
+      - name: Build
+        run: dotnet build --no-restore --configuration Release
+
+      - name: Test (unit + architecture)
+        run: |
+          dotnet test --no-build --configuration Release \
+            --filter "Category!=Integration" \
+            --collect:"XPlat Code Coverage" \
+            --results-directory ./TestResults
+
+      - name: Upload coverage to Codecov
+        if: ${{ env.CODECOV_TOKEN != '' }}
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+        uses: codecov/codecov-action@1e68e06f1dbfde0e4cefc87efeba9e75e3c0cd0a # v5.1.2
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          directory: ./TestResults
+          fail_ci_if_error: false

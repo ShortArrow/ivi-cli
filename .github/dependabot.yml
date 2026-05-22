@@ -1,0 +1,47 @@
+version: 2
+
+updates:
+  - package-ecosystem: nuget
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: '06:00'
+      timezone: Etc/UTC
+    open-pull-requests-limit: 5
+    groups:
+      test-stack:
+        patterns:
+          - 'xunit*'
+          - 'NSubstitute*'
+          - 'Shouldly*'
+          - 'coverlet*'
+          - 'Verify*'
+          - 'FsCheck*'
+          - 'NetArchTest*'
+          - 'Microsoft.NET.Test.Sdk'
+      microsoft-extensions:
+        patterns:
+          - 'Microsoft.Extensions.*'
+      io-abstractions:
+        patterns:
+          - 'TestableIO.System.IO.Abstractions*'
+    labels:
+      - dependencies
+      - nuget
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: '06:00'
+      timezone: Etc/UTC
+    open-pull-requests-limit: 5
+    labels:
+      - dependencies
+      - github-actions
+
+  # Tracks dotnet local tools declared in .config/dotnet-tools.json.
+  # The "nuget" ecosystem above already picks these up when Dependabot
+  # parses dotnet-tools.json; no separate ecosystem entry is required.
