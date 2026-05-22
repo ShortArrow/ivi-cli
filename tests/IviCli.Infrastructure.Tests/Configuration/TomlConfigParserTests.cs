@@ -1,0 +1,169 @@
+using IviCli.Application.Configuration;
+using IviCli.Domain;
+using IviCli.Domain.Configuration;
+using IviCli.Domain.Devices;
+using IviCli.Domain.Visa;
+using IviCli.Infrastructure.Configuration;
+using IviCli.TestKit;
+
+namespace IviCli.Infrastructure.Tests.Configuration;
+
+public class TomlConfigParserTests
+{
+    [Fact]
+    public void Parse_EmptyDocument_ReturnsEmptyConfig()
+    {
+        // Given / When
+        var result = TomlConfigParser.Parse("");
+
+        // Then
+        result.ShouldBeOk().ShouldBe(ConfigDocument.Empty);
+    }
+
+    [Fact]
+    public void Parse_DocumentWithOneDevice_ReturnsConfigWithDevice()
+    {
+        // Given
+        var toml = """
+            [[devices]]
+            name = "psu1"
+            resource = "TCPIP0::192.168.0.10::inst0::INSTR"
+            timeout_ms = 3000
+            """;
+
+        // When
+        var result = TomlConfigParser.Parse(toml);
+
+        // Then
+        var config = result.ShouldBeOk();
+        config.Devices.Length.ShouldBe(1);
+        config.Devices[0].Name.Value.ShouldBe("psu1");
+        config.Devices[0].Resource.ShouldBeOfType<VisaResource.Tcpip>();
+        config.Devices[0].Timeout.Milliseconds.ShouldBe(3000);
+    }
+
+    [Fact]
+    public void Parse_DocumentWithDefaultDevice_LinksDefault()
+    {
+        // Given
+        var toml = """
+            [defaults]
+            device = "psu1"
+
+            [[devices]]
+            name = "psu1"
+            resource = "TCPIP0::host::inst0::INSTR"
+            timeout_ms = 3000
+            """;
+
+        // When
+        var result = TomlConfigParser.Parse(toml);
+
+        // Then
+        var config = result.ShouldBeOk();
+        config.Defaults.Device.ShouldNotBeNull();
+        config.Defaults.Device!.Value.ShouldBe("psu1");
+    }
+
+    [Fact]
+    public void Parse_DefaultDevicePointingToMissingDevice_ReturnsParseFailure()
+    {
+        // Given
+        var toml = """
+            [defaults]
+            device = "ghost"
+            """;
+
+        // When
+        var result = TomlConfigParser.Parse(toml);
+
+        // Then
+        result.ShouldBeError().ShouldBeOfType<ConfigStoreParseFailure>();
+    }
+
+    [Fact]
+    public void Parse_DuplicateDeviceName_ReturnsParseFailure()
+    {
+        // Given
+        var toml = """
+            [[devices]]
+            name = "psu1"
+            resource = "TCPIP0::host::inst0::INSTR"
+            timeout_ms = 3000
+
+            [[devices]]
+            name = "psu1"
+            resource = "USB0::0x0699::0x0408::SN::INSTR"
+            timeout_ms = 5000
+            """;
+
+        // When
+        var result = TomlConfigParser.Parse(toml);
+
+        // Then
+        result.ShouldBeError().ShouldBeOfType<ConfigStoreParseFailure>();
+    }
+
+    [Fact]
+    public void Parse_InvalidDeviceName_ReturnsParseFailure()
+    {
+        // Given
+        var toml = """
+            [[devices]]
+            name = "Invalid Name!"
+            resource = "TCPIP0::host::inst0::INSTR"
+            timeout_ms = 3000
+            """;
+
+        // When
+        var result = TomlConfigParser.Parse(toml);
+
+        // Then
+        result.ShouldBeError().ShouldBeOfType<ConfigStoreParseFailure>();
+    }
+
+    [Fact]
+    public void Parse_MalformedToml_ReturnsParseFailure()
+    {
+        // Given
+        const string toml = "[[devices not valid toml at all";
+
+        // When
+        var result = TomlConfigParser.Parse(toml);
+
+        // Then
+        result.ShouldBeError().ShouldBeOfType<ConfigStoreParseFailure>();
+    }
+
+    [Fact]
+    public void Serialize_RoundtripsThroughParse()
+    {
+        // Given
+        var original = ConfigDocument
+            .Empty.AddDevice(
+                new Device(
+                    DeviceName.From("psu1").ShouldBeOk(),
+                    VisaResource.Parse("TCPIP0::192.168.0.10::inst0::INSTR").ShouldBeOk(),
+                    Timeout.FromMilliseconds(3000).ShouldBeOk()
+                )
+            )
+            .ShouldBeOk()
+            .AddDevice(
+                new Device(
+                    DeviceName.From("scope1").ShouldBeOk(),
+                    VisaResource.Parse("USB0::0x0699::0x0408::SN1::INSTR").ShouldBeOk(),
+                    Timeout.FromMilliseconds(5000).ShouldBeOk()
+                )
+            )
+            .ShouldBeOk()
+            .SetDefaultDevice(DeviceName.From("psu1").ShouldBeOk())
+            .ShouldBeOk();
+
+        // When
+        var serialized = TomlConfigParser.Serialize(original);
+        var roundtripped = TomlConfigParser.Parse(serialized).ShouldBeOk();
+
+        // Then
+        roundtripped.ShouldBe(original);
+    }
+}
