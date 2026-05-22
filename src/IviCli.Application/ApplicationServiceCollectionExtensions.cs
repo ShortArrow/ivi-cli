@@ -25,6 +25,10 @@ public static class ApplicationServiceCollectionExtensions
         services.AddSingleton<ListDevicesQueryHandler>();
         services.AddSingleton<SetCurrentDeviceCommandHandler>();
         services.AddSingleton<GetCurrentDeviceQueryHandler>();
+        services.AddSingleton<QueryDeviceCommandHandler>();
+        services.AddSingleton<WriteDeviceCommandHandler>();
+        services.AddSingleton<ReadDeviceCommandHandler>();
+        services.AddSingleton<StatusDeviceCommandHandler>();
         return services;
     }
 }
