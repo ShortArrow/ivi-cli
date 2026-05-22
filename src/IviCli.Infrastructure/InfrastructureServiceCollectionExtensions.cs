@@ -1,8 +1,10 @@
 using System.IO.Abstractions;
 using IviCli.Application.Backends;
 using IviCli.Application.Configuration;
+using IviCli.Application.Session;
 using IviCli.Infrastructure.Backends;
 using IviCli.Infrastructure.Configuration;
+using IviCli.Infrastructure.Session;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace IviCli.Infrastructure;
@@ -13,15 +15,22 @@ namespace IviCli.Infrastructure;
 public static class InfrastructureServiceCollectionExtensions
 {
     /// <summary>
-    /// Registers the production <see cref="IFileSystem"/> and the
-    /// <see cref="TomlConfigStore"/> bound to the supplied <paramref name="configPath"/>.
+    /// Registers the production <see cref="IFileSystem"/>, the
+    /// <see cref="TomlConfigStore"/> bound to <paramref name="configPath"/>,
+    /// and the <see cref="JsonSessionStore"/> bound to <paramref name="sessionPath"/>
+    /// (a sibling of <paramref name="configPath"/> when <see langword="null"/>).
     /// </summary>
     /// <param name="services">The service collection to mutate.</param>
     /// <param name="configPath">Absolute path to the <c>config.toml</c> file.</param>
+    /// <param name="sessionPath">
+    /// Absolute path to the <c>session.json</c> file. When <see langword="null"/>
+    /// a sibling of <paramref name="configPath"/> is used.
+    /// </param>
     /// <returns>The same <paramref name="services"/> for chaining.</returns>
     public static IServiceCollection AddIviCliInfrastructure(
         this IServiceCollection services,
-        string configPath
+        string configPath,
+        string? sessionPath = null
     )
     {
         services.AddSingleton<IFileSystem, FileSystem>();
@@ -29,7 +38,17 @@ public static class InfrastructureServiceCollectionExtensions
             sp.GetRequiredService<IFileSystem>(),
             configPath
         ));
+        services.AddSingleton<ISessionStore>(sp => new JsonSessionStore(
+            sp.GetRequiredService<IFileSystem>(),
+            sessionPath ?? DeriveDefaultSessionPath(configPath)
+        ));
         return services;
+    }
+
+    private static string DeriveDefaultSessionPath(string configPath)
+    {
+        var directory = Path.GetDirectoryName(configPath) ?? ".";
+        return Path.Combine(directory, "session.json");
     }
 
     /// <summary>
