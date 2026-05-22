@@ -49,6 +49,8 @@ public static class ApplicationServiceCollectionExtensions
         services.AddSingleton<ShowScenarioQueryHandler>();
         services.AddSingleton<ActivateScenarioCommandHandler>();
         services.AddSingleton<DeactivateScenarioCommandHandler>();
+        services.AddSingleton<AddSceneCommandHandler>();
+        services.AddSingleton<RemoveSceneCommandHandler>();
         return services;
     }
 }

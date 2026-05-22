@@ -22,6 +22,7 @@ public static class MockScenarioCommand
         command.Subcommands.Add(BuildShow(services));
         command.Subcommands.Add(BuildActivate(services));
         command.Subcommands.Add(BuildDeactivate(services));
+        command.Subcommands.Add(MockSceneCommand.Build(services));
         return command;
     }
 
