@@ -5,7 +5,10 @@
   </PropertyGroup>
 
   <ItemGroup Label="Runtime — production">
-    <!-- Populated as production dependencies are introduced. -->
+    <PackageVersion
+      Include="Microsoft.Extensions.DependencyInjection.Abstractions"
+      Version="9.0.11"
+    />
   </ItemGroup>
 
   <ItemGroup Label="Test stack — xUnit + assertions">
