@@ -70,8 +70,7 @@ public class VisaResourceTests
     [Theory]
     [InlineData("")]
     [InlineData("not a resource at all")]
-    [InlineData("USB0::0x0699::0x0408::C012345::INSTR")] // valid USB syntax, but unsupported in cycle 1
-    [InlineData("GPIB0::5::INSTR")] // valid GPIB syntax, but unsupported in cycle 1
+    [InlineData("GPIB0::5::INSTR")] // valid GPIB syntax, but unsupported until cycle 3
     [InlineData("TCPIP0::192.168.0.10")] // missing suffix
     [InlineData("TCPIP0::192.168.0.10::inst0::NOTINSTR")] // wrong suffix
     [InlineData("TCPIPx::host::inst0::INSTR")] // non-numeric board

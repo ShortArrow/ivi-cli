@@ -5,11 +5,12 @@ namespace IviCli.Domain.Visa;
 
 /// <summary>
 /// A parsed VISA resource — the structured form of strings such as
-/// <c>TCPIP0::192.168.0.10::inst0::INSTR</c>.
+/// <c>TCPIP0::192.168.0.10::inst0::INSTR</c> or
+/// <c>USB0::0x0699::0x0408::C012345::INSTR</c>.
 /// </summary>
 /// <remarks>
-/// Variants are added as new transports are supported. Cycle 1 of the
-/// implementation introduces <see cref="Tcpip"/>; USB, GPIB, and SOCKET
+/// Variants are added as new transports are supported. Cycles 1 and 2
+/// introduce <see cref="Tcpip"/> and <see cref="Usb"/>; GPIB and SOCKET
 /// follow in later cycles.
 /// </remarks>
 public abstract partial record VisaResource
@@ -28,8 +29,31 @@ public abstract partial record VisaResource
     /// </param>
     public sealed record Tcpip(int Board, string Host, string LanDevice) : VisaResource;
 
+    /// <summary>
+    /// A USB-attached instrument resource of the form
+    /// <c>USB[board]::vendor_id::product_id::serial_number[::interface_number]::INSTR</c>.
+    /// </summary>
+    /// <param name="Board">The USB interface number (defaults to <c>0</c>).</param>
+    /// <param name="VendorId">The USB-IF vendor ID as a canonical <c>0xNNNN</c> string (lowercase).</param>
+    /// <param name="ProductId">The USB-IF product ID as a canonical <c>0xNNNN</c> string (lowercase).</param>
+    /// <param name="SerialNumber">The instrument serial number, vendor-defined.</param>
+    /// <param name="InterfaceNumber">The optional USB interface number; <see langword="null"/> when omitted.</param>
+    public sealed record Usb(
+        int Board,
+        string VendorId,
+        string ProductId,
+        string SerialNumber,
+        int? InterfaceNumber
+    ) : VisaResource;
+
     [GeneratedRegex("^TCPIP(?<board>[0-9]*)$")]
     private static partial Regex TcpipPrefix();
+
+    [GeneratedRegex("^USB(?<board>[0-9]*)$")]
+    private static partial Regex UsbPrefix();
+
+    [GeneratedRegex("^0[xX](?<hex>[0-9a-fA-F]{4})$")]
+    private static partial Regex UsbIdentifier();
 
     private const string SegmentSeparator = "::";
     private const string InstrSuffix = "INSTR";
@@ -51,10 +75,26 @@ public abstract partial record VisaResource
         }
 
         var segments = raw.Split(SegmentSeparator);
+        if (segments.Length == 0)
+        {
+            return Fail(raw);
+        }
 
-        // Forms accepted in cycle 1:
-        //   TCPIP[N]::host::lan_device::INSTR  -> 4 segments
-        //   TCPIP[N]::host::INSTR              -> 3 segments (lan_device defaults to inst0)
+        if (segments[0].StartsWith("TCPIP", StringComparison.Ordinal))
+        {
+            return ParseTcpip(raw, segments);
+        }
+
+        if (segments[0].StartsWith("USB", StringComparison.Ordinal))
+        {
+            return ParseUsb(raw, segments);
+        }
+
+        return Fail(raw);
+    }
+
+    private static Result<VisaResource, VisaResourceError> ParseTcpip(string raw, string[] segments)
+    {
         if (segments.Length is < 3 or > 4)
         {
             return Fail(raw);
@@ -66,8 +106,7 @@ public abstract partial record VisaResource
             return Fail(raw);
         }
 
-        var boardText = prefixMatch.Groups["board"].Value;
-        var board = boardText.Length == 0 ? 0 : int.Parse(boardText, CultureInfo.InvariantCulture);
+        var board = ParseBoard(prefixMatch);
 
         var host = segments[1];
         if (string.IsNullOrEmpty(host))
@@ -94,6 +133,91 @@ public abstract partial record VisaResource
         }
 
         return Result.Success<VisaResource, VisaResourceError>(new Tcpip(board, host, lanDevice));
+    }
+
+    private static Result<VisaResource, VisaResourceError> ParseUsb(string raw, string[] segments)
+    {
+        // Accepted forms:
+        //   USB[N]::vendor::product::serial::INSTR              (5 segments)
+        //   USB[N]::vendor::product::serial::interface::INSTR   (6 segments)
+        if (segments.Length is < 5 or > 6)
+        {
+            return Fail(raw);
+        }
+
+        var prefixMatch = UsbPrefix().Match(segments[0]);
+        if (!prefixMatch.Success)
+        {
+            return Fail(raw);
+        }
+
+        var board = ParseBoard(prefixMatch);
+
+        if (
+            !TryNormaliseUsbId(segments[1], out var vendorId)
+            || !TryNormaliseUsbId(segments[2], out var productId)
+        )
+        {
+            return Fail(raw);
+        }
+
+        var serialNumber = segments[3];
+        if (string.IsNullOrEmpty(serialNumber))
+        {
+            return Fail(raw);
+        }
+
+        int? interfaceNumber;
+        string suffix;
+        if (segments.Length == 6)
+        {
+            if (
+                !int.TryParse(
+                    segments[4],
+                    NumberStyles.None,
+                    CultureInfo.InvariantCulture,
+                    out var ifn
+                )
+            )
+            {
+                return Fail(raw);
+            }
+            interfaceNumber = ifn;
+            suffix = segments[5];
+        }
+        else
+        {
+            interfaceNumber = null;
+            suffix = segments[4];
+        }
+
+        if (suffix != InstrSuffix)
+        {
+            return Fail(raw);
+        }
+
+        return Result.Success<VisaResource, VisaResourceError>(
+            new Usb(board, vendorId, productId, serialNumber, interfaceNumber)
+        );
+    }
+
+    private static int ParseBoard(Match prefixMatch)
+    {
+        var boardText = prefixMatch.Groups["board"].Value;
+        return boardText.Length == 0 ? 0 : int.Parse(boardText, CultureInfo.InvariantCulture);
+    }
+
+    private static bool TryNormaliseUsbId(string raw, out string normalised)
+    {
+        var match = UsbIdentifier().Match(raw);
+        if (!match.Success)
+        {
+            normalised = string.Empty;
+            return false;
+        }
+
+        normalised = "0x" + match.Groups["hex"].Value.ToLowerInvariant();
+        return true;
     }
 
     private static Result<VisaResource, VisaResourceError> Fail(string raw) =>
