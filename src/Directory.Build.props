@@ -5,7 +5,8 @@
   <PropertyGroup>
     <IsPackable>false</IsPackable>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
-    <!-- Phase 1: tolerate missing XML docs while scaffolding; revisit per ADR 0024. -->
-    <NoWarn>$(NoWarn);CS1591</NoWarn>
+    <!-- CS1591: tolerate missing XML docs while scaffolding; revisit per ADR 0024. -->
+    <!-- CA1716: nested record variant names like `Ok` / `Error` are intentional per ADR 0023 §5. -->
+    <NoWarn>$(NoWarn);CS1591;CA1716</NoWarn>
   </PropertyGroup>
 </Project>

@@ -6,6 +6,9 @@
     <IsPackable>false</IsPackable>
     <IsTestProject Condition="$(MSBuildProjectName.EndsWith('.Tests'))">true</IsTestProject>
     <GenerateDocumentationFile>false</GenerateDocumentationFile>
+    <!-- CA1707: test method names follow `<Method>_<Scenario>_<Expectation>` per ADR 0009 §3. -->
+    <!-- CA1062: public surface argument-null guards aren't relevant in test code. -->
+    <NoWarn>$(NoWarn);CA1707;CA1062</NoWarn>
   </PropertyGroup>
 
   <!-- Packages useful to every test-side project (including TestKit). -->
