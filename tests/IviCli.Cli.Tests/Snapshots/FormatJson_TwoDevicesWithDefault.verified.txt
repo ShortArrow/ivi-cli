@@ -1,0 +1,1 @@
+﻿{"devices":[{"name":"psu1","timeout_ms":3000},{"name":"scope1","timeout_ms":5000}],"default":"psu1"}

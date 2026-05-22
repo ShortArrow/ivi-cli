@@ -1,0 +1,2 @@
+﻿* psu1	3000ms
+  scope1	5000ms

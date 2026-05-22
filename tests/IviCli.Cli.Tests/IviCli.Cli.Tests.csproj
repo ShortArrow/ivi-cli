@@ -16,5 +16,6 @@
 
   <ItemGroup>
     <PackageReference Include="NetArchTest.Rules" />
+    <PackageReference Include="Verify.Xunit" />
   </ItemGroup>
 </Project>

@@ -52,41 +52,11 @@ public static class VisaListCommand
 
     private static int ReportSuccess(DeviceListing listing, bool emitJson)
     {
-        if (emitJson)
-        {
-            // Phase 1: minimal hand-rolled JSON to avoid pulling
-            // System.Text.Json conventions in front of dedicated DTOs.
-            Console.Write("{\"devices\":[");
-            for (var i = 0; i < listing.Devices.Length; i++)
-            {
-                if (i > 0)
-                {
-                    Console.Write(",");
-                }
-                var d = listing.Devices[i];
-                Console.Write(
-                    $"{{\"name\":\"{d.Name.Value}\",\"timeout_ms\":{d.Timeout.Milliseconds}}}"
-                );
-            }
-            Console.Write("],\"default\":");
-            Console.Write(listing.DefaultDevice is { } def ? $"\"{def.Value}\"" : "null");
-            Console.WriteLine("}");
-        }
-        else
-        {
-            if (listing.Devices.Length == 0)
-            {
-                Console.WriteLine("(no devices configured)");
-            }
-            else
-            {
-                foreach (var d in listing.Devices)
-                {
-                    var marker = listing.DefaultDevice == d.Name ? "*" : " ";
-                    Console.WriteLine($"{marker} {d.Name.Value}\t{d.Timeout}");
-                }
-            }
-        }
+        Console.Write(
+            emitJson
+                ? DeviceListingFormatter.FormatJson(listing)
+                : DeviceListingFormatter.FormatHuman(listing)
+        );
         return ExitCodeMapper.Success;
     }
 
