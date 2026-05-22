@@ -1,4 +1,5 @@
 using IviCli.Application.Devices;
+using IviCli.Application.Diagnostics;
 using IviCli.Application.Session;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -30,6 +31,7 @@ public static class ApplicationServiceCollectionExtensions
         services.AddSingleton<ReadDeviceCommandHandler>();
         services.AddSingleton<StatusDeviceCommandHandler>();
         services.AddSingleton<ScanDevicesQueryHandler>();
+        services.AddSingleton<DiagnoseQueryHandler>();
         return services;
     }
 }

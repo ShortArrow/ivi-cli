@@ -45,6 +45,12 @@ internal static class Program
             services.AddIviCliInfrastructure(configPath);
             services.AddIviCliBackendsFake();
             services.AddIviCliBackendFactory();
+            services.AddSingleton(
+                new IviCli.Application.Diagnostics.DiagnoseHandlerOptions(
+                    ConfigPath: configPath,
+                    LogDirectory: IviPaths.ResolveLogDirectory()
+                )
+            );
 
             await using var provider = services.BuildServiceProvider();
 
@@ -93,6 +99,7 @@ internal static class Program
             "ivi-cli: integrated CLI for managing, diagnosing, and operating VISA/IVI instruments."
         );
         root.Subcommands.Add(visa);
+        root.Subcommands.Add(DiagnoseCommand.Build(services));
         return root;
     }
 

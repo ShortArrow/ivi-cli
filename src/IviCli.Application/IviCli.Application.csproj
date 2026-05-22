@@ -10,5 +10,6 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
+    <PackageReference Include="TestableIO.System.IO.Abstractions" />
   </ItemGroup>
 </Project>
