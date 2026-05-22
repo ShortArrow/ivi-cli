@@ -89,3 +89,23 @@ public sealed record UnsupportedTransport(DeviceName DeviceName) : BackendError
     /// <inheritdoc/>
     public override IReadOnlyList<object?> LogArgs => new object?[] { DeviceName };
 }
+
+/// <summary>
+/// A mock scenario scene contradicted the operation being performed (e.g. a
+/// <c>respond</c> scene matched a <c>WriteAsync</c> call, or an <c>ack</c>
+/// scene matched a <c>QueryAsync</c>). Surfaced loudly to make scenario
+/// authoring mistakes visible at test time per ADR 0026 §6.
+/// </summary>
+/// <param name="Match">The matched SCPI text.</param>
+/// <param name="Reason">Human-readable description of the contradiction.</param>
+public sealed record MockScenarioContractMismatch(string Match, string Reason) : BackendError
+{
+    /// <inheritdoc/>
+    public override LogSeverity Severity => LogSeverity.Error;
+
+    /// <inheritdoc/>
+    public override string Message => "mock scenario mismatch for {Match}: {Reason}";
+
+    /// <inheritdoc/>
+    public override IReadOnlyList<object?> LogArgs => new object?[] { Match, Reason };
+}

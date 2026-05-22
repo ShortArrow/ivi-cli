@@ -1,4 +1,5 @@
 using IviCli.Domain.Devices;
+using IviCli.Domain.Mock;
 
 namespace IviCli.Domain.Session;
 
@@ -14,8 +15,13 @@ namespace IviCli.Domain.Session;
 /// explicit name is given. <see langword="null"/> means there is no
 /// current device selected.
 /// </param>
-public sealed record SessionState(DeviceName? CurrentDevice)
+/// <param name="ActiveScenario">
+/// The currently-activated mock scenario name, or <see langword="null"/>
+/// when no scenario is active (ADR 0026 §2). The <c>IVICLI_SCENARIO</c>
+/// environment variable takes precedence at runtime.
+/// </param>
+public sealed record SessionState(DeviceName? CurrentDevice, ScenarioName? ActiveScenario = null)
 {
-    /// <summary>The empty session state: no current device.</summary>
-    public static SessionState Empty { get; } = new(CurrentDevice: null);
+    /// <summary>The empty session state: no current device, no active scenario.</summary>
+    public static SessionState Empty { get; } = new(CurrentDevice: null, ActiveScenario: null);
 }

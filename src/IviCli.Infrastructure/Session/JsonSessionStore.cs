@@ -4,6 +4,7 @@ using System.Text.Json.Serialization;
 using IviCli.Application.Session;
 using IviCli.Domain;
 using IviCli.Domain.Devices;
+using IviCli.Domain.Mock;
 using IviCli.Domain.Session;
 
 namespace IviCli.Infrastructure.Session;
@@ -89,7 +90,22 @@ public sealed class JsonSessionStore : ISessionStore
             currentDevice = nameOk.Value;
         }
 
-        return Result.Success<SessionState, SessionStoreError>(new SessionState(currentDevice));
+        ScenarioName? activeScenario = null;
+        if (!string.IsNullOrEmpty(dto.ActiveScenario))
+        {
+            var scenarioResult = ScenarioName.From(dto.ActiveScenario);
+            if (scenarioResult is not Result<ScenarioName, ScenarioNameError>.Ok scenarioOk)
+            {
+                return Result.Failure<SessionState, SessionStoreError>(
+                    new SessionStoreParseFailure($"invalid active_scenario: {dto.ActiveScenario}")
+                );
+            }
+            activeScenario = scenarioOk.Value;
+        }
+
+        return Result.Success<SessionState, SessionStoreError>(
+            new SessionState(currentDevice, activeScenario)
+        );
     }
 
     /// <inheritdoc/>
@@ -100,7 +116,11 @@ public sealed class JsonSessionStore : ISessionStore
     {
         ct.ThrowIfCancellationRequested();
 
-        var dto = new SessionStateDto { CurrentDevice = state.CurrentDevice?.Value };
+        var dto = new SessionStateDto
+        {
+            CurrentDevice = state.CurrentDevice?.Value,
+            ActiveScenario = state.ActiveScenario?.Value,
+        };
         var serialized = JsonSerializer.Serialize(dto, JsonOptions);
 
         var directory = _fs.Path.GetDirectoryName(_path);
@@ -175,5 +195,8 @@ public sealed class JsonSessionStore : ISessionStore
     {
         [JsonPropertyName("current_device")]
         public string? CurrentDevice { get; set; }
+
+        [JsonPropertyName("active_scenario")]
+        public string? ActiveScenario { get; set; }
     }
 }
