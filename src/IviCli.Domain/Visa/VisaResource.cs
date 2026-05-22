@@ -9,9 +9,9 @@ namespace IviCli.Domain.Visa;
 /// <c>USB0::0x0699::0x0408::C012345::INSTR</c>.
 /// </summary>
 /// <remarks>
-/// Variants are added as new transports are supported. Cycles 1 and 2
-/// introduce <see cref="Tcpip"/> and <see cref="Usb"/>; GPIB and SOCKET
-/// follow in later cycles.
+/// Variants are added as new transports are supported. Cycles 1, 2 and 3
+/// introduce <see cref="Tcpip"/>, <see cref="Usb"/> and <see cref="Gpib"/>;
+/// SOCKET and other transports follow in later cycles.
 /// </remarks>
 public abstract partial record VisaResource
 {
@@ -46,11 +46,28 @@ public abstract partial record VisaResource
         int? InterfaceNumber
     ) : VisaResource;
 
+    /// <summary>
+    /// A GPIB (IEEE-488) instrument resource of the form
+    /// <c>GPIB[board]::primary_address[::secondary_address]::INSTR</c>.
+    /// </summary>
+    /// <param name="Board">The GPIB interface number (defaults to <c>0</c>).</param>
+    /// <param name="PrimaryAddress">The GPIB primary address (0–30).</param>
+    /// <param name="SecondaryAddress">
+    /// The optional GPIB secondary address (0–30); <see langword="null"/> when omitted.
+    /// </param>
+    public sealed record Gpib(int Board, int PrimaryAddress, int? SecondaryAddress) : VisaResource;
+
+    /// <summary>Inclusive upper bound for GPIB primary and secondary addresses.</summary>
+    public const int MaxGpibAddress = 30;
+
     [GeneratedRegex("^TCPIP(?<board>[0-9]*)$")]
     private static partial Regex TcpipPrefix();
 
     [GeneratedRegex("^USB(?<board>[0-9]*)$")]
     private static partial Regex UsbPrefix();
+
+    [GeneratedRegex("^GPIB(?<board>[0-9]*)$")]
+    private static partial Regex GpibPrefix();
 
     [GeneratedRegex("^0[xX](?<hex>[0-9a-fA-F]{4})$")]
     private static partial Regex UsbIdentifier();
@@ -88,6 +105,11 @@ public abstract partial record VisaResource
         if (segments[0].StartsWith("USB", StringComparison.Ordinal))
         {
             return ParseUsb(raw, segments);
+        }
+
+        if (segments[0].StartsWith("GPIB", StringComparison.Ordinal))
+        {
+            return ParseGpib(raw, segments);
         }
 
         return Fail(raw);
@@ -199,6 +221,72 @@ public abstract partial record VisaResource
         return Result.Success<VisaResource, VisaResourceError>(
             new Usb(board, vendorId, productId, serialNumber, interfaceNumber)
         );
+    }
+
+    private static Result<VisaResource, VisaResourceError> ParseGpib(string raw, string[] segments)
+    {
+        // Accepted forms:
+        //   GPIB[N]::primary::INSTR              (3 segments)
+        //   GPIB[N]::primary::secondary::INSTR   (4 segments)
+        if (segments.Length is < 3 or > 4)
+        {
+            return Fail(raw);
+        }
+
+        var prefixMatch = GpibPrefix().Match(segments[0]);
+        if (!prefixMatch.Success)
+        {
+            return Fail(raw);
+        }
+
+        var board = ParseBoard(prefixMatch);
+
+        if (!TryParseGpibAddress(segments[1], out var primaryAddress))
+        {
+            return Fail(raw);
+        }
+
+        int? secondaryAddress;
+        string suffix;
+        if (segments.Length == 4)
+        {
+            if (!TryParseGpibAddress(segments[2], out var secondary))
+            {
+                return Fail(raw);
+            }
+            secondaryAddress = secondary;
+            suffix = segments[3];
+        }
+        else
+        {
+            secondaryAddress = null;
+            suffix = segments[2];
+        }
+
+        if (suffix != InstrSuffix)
+        {
+            return Fail(raw);
+        }
+
+        return Result.Success<VisaResource, VisaResourceError>(
+            new Gpib(board, primaryAddress, secondaryAddress)
+        );
+    }
+
+    private static bool TryParseGpibAddress(string raw, out int address)
+    {
+        if (
+            int.TryParse(raw, NumberStyles.None, CultureInfo.InvariantCulture, out var parsed)
+            && parsed >= 0
+            && parsed <= MaxGpibAddress
+        )
+        {
+            address = parsed;
+            return true;
+        }
+
+        address = 0;
+        return false;
     }
 
     private static int ParseBoard(Match prefixMatch)
