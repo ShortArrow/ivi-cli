@@ -18,6 +18,15 @@ public abstract partial record VisaResource
     private VisaResource() { }
 
     /// <summary>
+    /// Returns a redacted form of this resource suitable for logging at
+    /// <c>Information</c> or above, per ADR 0017 §3. Variable, sensitive
+    /// segments (hostnames, IP literals, serial numbers) are replaced with
+    /// <c>***</c>; the transport prefix and well-known suffix remain so
+    /// operators can still tell variants apart in logs.
+    /// </summary>
+    public abstract string ToLogString();
+
+    /// <summary>
     /// A TCPIP LAN-attached instrument resource of the form
     /// <c>TCPIP[board]::host::lan_device::INSTR</c>.
     /// </summary>
@@ -27,7 +36,15 @@ public abstract partial record VisaResource
     /// The LAN device name (typically <c>inst0</c> for VXI-11 / LXI or
     /// <c>hislipN</c> for HiSLIP). Defaults to <c>inst0</c> when omitted in input.
     /// </param>
-    public sealed record Tcpip(int Board, string Host, string LanDevice) : VisaResource;
+    public sealed record Tcpip(int Board, string Host, string LanDevice) : VisaResource
+    {
+        /// <inheritdoc/>
+        public override string ToLogString() =>
+            string.Create(
+                System.Globalization.CultureInfo.InvariantCulture,
+                $"TCPIP{Board}::***::{LanDevice}::INSTR"
+            );
+    }
 
     /// <summary>
     /// A USB-attached instrument resource of the form
@@ -44,7 +61,20 @@ public abstract partial record VisaResource
         string ProductId,
         string SerialNumber,
         int? InterfaceNumber
-    ) : VisaResource;
+    ) : VisaResource
+    {
+        /// <inheritdoc/>
+        public override string ToLogString() =>
+            InterfaceNumber is { } iface
+                ? string.Create(
+                    System.Globalization.CultureInfo.InvariantCulture,
+                    $"USB{Board}::{VendorId}::{ProductId}::***::{iface}::INSTR"
+                )
+                : string.Create(
+                    System.Globalization.CultureInfo.InvariantCulture,
+                    $"USB{Board}::{VendorId}::{ProductId}::***::INSTR"
+                );
+    }
 
     /// <summary>
     /// A GPIB (IEEE-488) instrument resource of the form
@@ -55,7 +85,20 @@ public abstract partial record VisaResource
     /// <param name="SecondaryAddress">
     /// The optional GPIB secondary address (0–30); <see langword="null"/> when omitted.
     /// </param>
-    public sealed record Gpib(int Board, int PrimaryAddress, int? SecondaryAddress) : VisaResource;
+    public sealed record Gpib(int Board, int PrimaryAddress, int? SecondaryAddress) : VisaResource
+    {
+        /// <inheritdoc/>
+        public override string ToLogString() =>
+            SecondaryAddress is { } secondary
+                ? string.Create(
+                    System.Globalization.CultureInfo.InvariantCulture,
+                    $"GPIB{Board}::{PrimaryAddress}::{secondary}::INSTR"
+                )
+                : string.Create(
+                    System.Globalization.CultureInfo.InvariantCulture,
+                    $"GPIB{Board}::{PrimaryAddress}::INSTR"
+                );
+    }
 
     /// <summary>Inclusive upper bound for GPIB primary and secondary addresses.</summary>
     public const int MaxGpibAddress = 30;

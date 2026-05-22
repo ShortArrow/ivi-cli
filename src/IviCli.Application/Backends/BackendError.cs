@@ -73,7 +73,7 @@ public sealed record DeviceNotResponding(VisaResource Resource) : BackendError
     public override string Message => "device not responding: {Resource}";
 
     /// <inheritdoc/>
-    public override IReadOnlyList<object?> LogArgs => new object?[] { Resource };
+    public override IReadOnlyList<object?> LogArgs => new object?[] { Resource.ToLogString() };
 }
 
 /// <summary>The Backend cannot route the request to a compatible transport for this device.</summary>
