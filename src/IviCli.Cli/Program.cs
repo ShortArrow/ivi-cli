@@ -1,5 +1,6 @@
 using System.CommandLine;
 using IviCli.Application;
+using IviCli.Backends.Fake;
 using IviCli.Cli.Commands;
 using IviCli.Cli.Logging;
 using IviCli.Cli.Paths;
@@ -42,6 +43,8 @@ internal static class Program
             services.AddLogging(b => b.AddSerilog(Log.Logger, dispose: false));
             services.AddIviCliApplication();
             services.AddIviCliInfrastructure(configPath);
+            services.AddIviCliBackendsFake();
+            services.AddIviCliBackendFactory();
 
             await using var provider = services.BuildServiceProvider();
 

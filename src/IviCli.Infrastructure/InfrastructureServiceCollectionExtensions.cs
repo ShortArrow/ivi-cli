@@ -1,5 +1,7 @@
 using System.IO.Abstractions;
+using IviCli.Application.Backends;
 using IviCli.Application.Configuration;
+using IviCli.Infrastructure.Backends;
 using IviCli.Infrastructure.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -27,6 +29,23 @@ public static class InfrastructureServiceCollectionExtensions
             sp.GetRequiredService<IFileSystem>(),
             configPath
         ));
+        return services;
+    }
+
+    /// <summary>
+    /// Registers <see cref="DefaultBackendFactory"/> as the default
+    /// <see cref="IBackendFactory"/>. The caller is responsible for having
+    /// already registered at least one <see cref="IIviBackend"/>
+    /// implementation (typically <c>AddIviCliBackendsFake()</c> or, in the
+    /// future, <c>AddIviCliBackendsLocal()</c>).
+    /// </summary>
+    public static IServiceCollection AddIviCliBackendFactory(this IServiceCollection services)
+    {
+        services.AddSingleton<IBackendFactory>(sp =>
+        {
+            var fallback = sp.GetRequiredService<IIviBackend>();
+            return new DefaultBackendFactory(fallback);
+        });
         return services;
     }
 }
