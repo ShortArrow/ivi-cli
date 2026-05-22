@@ -20,6 +20,7 @@ public static class ApplicationServiceCollectionExtensions
     public static IServiceCollection AddIviCliApplication(this IServiceCollection services)
     {
         services.AddSingleton<AddDeviceCommandHandler>();
+        services.AddSingleton<RemoveDeviceCommandHandler>();
         services.AddSingleton<ListDevicesQueryHandler>();
         return services;
     }

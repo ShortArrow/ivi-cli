@@ -79,6 +79,7 @@ internal static class Program
     {
         var visa = new Command("visa", "VISA transport / SCPI operations.");
         visa.Subcommands.Add(VisaAddCommand.Build(services));
+        visa.Subcommands.Add(VisaRemoveCommand.Build(services));
         visa.Subcommands.Add(VisaListCommand.Build(services));
 
         var root = new RootCommand(
