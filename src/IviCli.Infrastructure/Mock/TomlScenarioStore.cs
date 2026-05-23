@@ -199,6 +199,41 @@ public sealed class TomlScenarioStore : IScenarioStore
         );
     }
 
+    /// <inheritdoc/>
+    public async Task<Result<MockScenario, ScenarioStoreError>> AppendSceneAsync(
+        ScenarioName name,
+        MockScene scene,
+        CancellationToken ct
+    )
+    {
+        // Load-or-create, append, save. Concurrent recorders on the same
+        // scenario are not supported in v1 (ADR 0027 §4).
+        MockScenario scenario;
+        var loadResult = await LoadAsync(name, ct);
+        if (loadResult is Result<MockScenario, ScenarioStoreError>.Ok ok)
+        {
+            scenario = ok.Value;
+        }
+        else if (
+            loadResult is Result<MockScenario, ScenarioStoreError>.Error { Err: ScenarioNotFound }
+        )
+        {
+            scenario = MockScenario.Empty(name);
+        }
+        else
+        {
+            return loadResult;
+        }
+
+        var updated = scenario.AddScene(scene);
+        var saveResult = await SaveAsync(updated, overwriteIfExists: true, ct);
+        if (saveResult is Result<Unit, ScenarioStoreError>.Error err)
+        {
+            return Result.Failure<MockScenario, ScenarioStoreError>(err.Err);
+        }
+        return Result.Success<MockScenario, ScenarioStoreError>(updated);
+    }
+
     private string PathFor(ScenarioName name) =>
         _fs.Path.Combine(_directory, name.Value + FileExtension);
 }

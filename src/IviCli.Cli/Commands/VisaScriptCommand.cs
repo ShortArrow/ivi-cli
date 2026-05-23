@@ -44,10 +44,7 @@ public static class VisaScriptCommand
                 var handler = services.GetRequiredService<ScriptDeviceCommandHandler>();
                 var logger = services.GetRequiredService<ILogger<ScriptDeviceCommandHandler>>();
 
-                var result = await handler.HandleAsync(
-                    new ScriptDeviceCommand(device, source),
-                    ct
-                );
+                var result = await handler.HandleAsync(new ScriptDeviceCommand(device, source), ct);
                 return result switch
                 {
                     Result<ScriptExecutionReport, ScriptDeviceError>.Ok ok => Render(ok.Value),

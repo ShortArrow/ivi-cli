@@ -85,10 +85,7 @@ public static class VisaMonitorCommand
     private static Task EmitTextAsync(MonitorSample s)
     {
         Console.WriteLine(
-            string.Create(
-                CultureInfo.InvariantCulture,
-                $"{s.Timestamp:O}  {s.Query}  {s.Response}"
-            )
+            string.Create(CultureInfo.InvariantCulture, $"{s.Timestamp:O}  {s.Query}  {s.Response}")
         );
         return Task.CompletedTask;
     }
@@ -117,8 +114,10 @@ public static class VisaMonitorCommand
         Console.Error.WriteLine(UserFacingMessage(error));
         return error switch
         {
-            MonitorDeviceInvalidQuery or MonitorDeviceInvalidInterval
-            or MonitorDeviceInvalidName or MonitorDeviceNoTarget => ExitCodeMapper.UsageError,
+            MonitorDeviceInvalidQuery
+            or MonitorDeviceInvalidInterval
+            or MonitorDeviceInvalidName
+            or MonitorDeviceNoTarget => ExitCodeMapper.UsageError,
             MonitorDeviceUnknown => ExitCodeMapper.DeviceError,
             MonitorDeviceTransportFailure => ExitCodeMapper.TransportError,
             MonitorDeviceStoreFailure => ExitCodeMapper.ConfigurationError,

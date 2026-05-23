@@ -23,7 +23,106 @@ public static class MockScenarioCommand
         command.Subcommands.Add(BuildActivate(services));
         command.Subcommands.Add(BuildDeactivate(services));
         command.Subcommands.Add(MockSceneCommand.Build(services));
+        command.Subcommands.Add(BuildRecord(services));
         return command;
+    }
+
+    private static Command BuildRecord(IServiceProvider services)
+    {
+        var nameArg = new Argument<string>("name") { Description = "Scenario to record into." };
+        var scriptOpt = new Option<string>("--from-script")
+        {
+            Description = "Script file whose queries/writes will be captured (ADR 0027 §4).",
+            Required = true,
+        };
+        var deviceOpt = new Option<string?>("--device")
+        {
+            Description = "Target device alias (defaults to session-current).",
+        };
+
+        var cmd = new Command(
+            "record",
+            "Replay a script against the active backend and record observed traffic into a scenario."
+        );
+        cmd.Arguments.Add(nameArg);
+        cmd.Options.Add(scriptOpt);
+        cmd.Options.Add(deviceOpt);
+
+        cmd.SetAction(
+            async (parseResult, ct) =>
+            {
+                var name = parseResult.GetRequiredValue(nameArg);
+                var scriptPath = parseResult.GetRequiredValue(scriptOpt);
+                var device = parseResult.GetValue(deviceOpt);
+
+                if (!File.Exists(scriptPath))
+                {
+                    Console.Error.WriteLine($"error: script file not found: {scriptPath}");
+                    return ExitCodeMapper.UsageError;
+                }
+                var source = await File.ReadAllTextAsync(scriptPath, ct);
+
+                var handler = services.GetRequiredService<RecordScenarioCommandHandler>();
+                var logger = services.GetRequiredService<ILogger<RecordScenarioCommandHandler>>();
+                var result = await handler.HandleAsync(
+                    new RecordScenarioCommand(name, device, source),
+                    ct
+                );
+                return result switch
+                {
+                    Result<RecordScenarioReport, RecordScenarioError>.Ok ok => RecordOk(ok.Value),
+                    Result<RecordScenarioReport, RecordScenarioError>.Error err => RecordFail(
+                        err.Err,
+                        logger
+                    ),
+                    _ => ExitCodeMapper.GenericFailure,
+                };
+            }
+        );
+        return cmd;
+    }
+
+    private static int RecordOk(RecordScenarioReport report)
+    {
+        Console.WriteLine(
+            $"recorded {report.ScenesRecorded} scene(s) into scenario '{report.ScenarioName.Value}'"
+        );
+        return ExitCodeMapper.Success;
+    }
+
+    private static int RecordFail(RecordScenarioError error, ILogger logger)
+    {
+        logger.Log(
+            Logging.SerilogConfiguration.ToLogLevel(error.Severity),
+            error.Cause,
+            error.Message,
+            error.LogArgs.ToArray()
+        );
+        Console.Error.WriteLine(
+            error switch
+            {
+                RecordScenarioInvalidName n => $"error: invalid scenario name '{n.Raw}'.",
+                RecordScenarioParseFailure p => $"error: script parse failed ({p.Inner.Message}).",
+                RecordScenarioInvalidDeviceName d => $"error: invalid device name '{d.Raw}'.",
+                RecordScenarioNoTarget =>
+                    "error: no current device. Use `visa use <name>` first or pass --device.",
+                RecordScenarioUnknownDevice u => $"error: no device named '{u.Name.Value}'.",
+                RecordScenarioTransportFailure => "error: transport failure while recording.",
+                RecordScenarioStoreFailure => "error: scenario storage failed.",
+                _ => "error: scenario recording failed.",
+            }
+        );
+        return error switch
+        {
+            RecordScenarioInvalidName
+            or RecordScenarioParseFailure
+            or RecordScenarioInvalidDeviceName
+            or RecordScenarioNoTarget => ExitCodeMapper.UsageError,
+            RecordScenarioUnknownDevice => ExitCodeMapper.DeviceError,
+            RecordScenarioTransportFailure => ExitCodeMapper.TransportError,
+            RecordScenarioStoreFailure => ExitCodeMapper.ConfigurationError,
+            _ => ExitCodeMapper.GenericFailure,
+        };
     }
 
     private static Command BuildList(IServiceProvider services)

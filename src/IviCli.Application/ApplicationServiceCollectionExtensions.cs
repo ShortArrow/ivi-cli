@@ -55,6 +55,7 @@ public static class ApplicationServiceCollectionExtensions
         services.AddSingleton<DeactivateScenarioCommandHandler>();
         services.AddSingleton<AddSceneCommandHandler>();
         services.AddSingleton<RemoveSceneCommandHandler>();
+        services.AddSingleton<RecordScenarioCommandHandler>();
         return services;
     }
 

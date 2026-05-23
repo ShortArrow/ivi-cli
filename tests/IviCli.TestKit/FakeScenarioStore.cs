@@ -106,4 +106,20 @@ public sealed class FakeScenarioStore : IScenarioStore
             Result.Success<bool, ScenarioStoreError>(_scenarios.ContainsKey(name.Value))
         );
     }
+
+    /// <inheritdoc/>
+    public Task<Result<MockScenario, ScenarioStoreError>> AppendSceneAsync(
+        ScenarioName name,
+        MockScene scene,
+        CancellationToken ct
+    )
+    {
+        ct.ThrowIfCancellationRequested();
+        var scenario = _scenarios.TryGetValue(name.Value, out var existing)
+            ? existing
+            : MockScenario.Empty(name);
+        var updated = scenario.AddScene(scene);
+        _scenarios[name.Value] = updated;
+        return Task.FromResult(Result.Success<MockScenario, ScenarioStoreError>(updated));
+    }
 }

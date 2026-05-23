@@ -56,10 +56,7 @@ public sealed record ScpiScript(ImmutableArray<ScpiScriptDirective> Directives)
         return idx < 0 ? line : line[..idx];
     }
 
-    private static Result<ScpiScriptDirective, ScpiScriptError> ParseDirective(
-        string raw,
-        int line
-    )
+    private static Result<ScpiScriptDirective, ScpiScriptError> ParseDirective(string raw, int line)
     {
         if (raw.StartsWith("sleep ", StringComparison.OrdinalIgnoreCase))
         {
@@ -70,7 +67,11 @@ public sealed record ScpiScript(ImmutableArray<ScpiScriptDirective> Directives)
             )
             {
                 return Result.Failure<ScpiScriptDirective, ScpiScriptError>(
-                    new ScpiScriptInvalidDirective(line, raw, "sleep argument must be a non-negative integer")
+                    new ScpiScriptInvalidDirective(
+                        line,
+                        raw,
+                        "sleep argument must be a non-negative integer"
+                    )
                 );
             }
             return Result.Success<ScpiScriptDirective, ScpiScriptError>(
