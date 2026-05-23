@@ -1,0 +1,210 @@
+using System.CommandLine;
+using IviCli.Application.Servers;
+using IviCli.Domain;
+using IviCli.Domain.Servers;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+
+namespace IviCli.Cli.Commands;
+
+/// <summary>Wires the <c>server route</c> subcommand tree (PRD §6.3).</summary>
+public static class ServerRouteCommand
+{
+    /// <summary>Returns the <c>route</c> command, ready to attach under <c>server</c>.</summary>
+    public static Command Build(IServiceProvider services)
+    {
+        var command = new Command("route", "Manage server-to-device routes.");
+        command.Subcommands.Add(BuildList(services));
+        command.Subcommands.Add(BuildAdd(services));
+        command.Subcommands.Add(BuildRemove(services));
+        return command;
+    }
+
+    private static Command BuildList(IServiceProvider services)
+    {
+        var cmd = new Command("list", "List configured routes.");
+        cmd.SetAction(
+            async (parseResult, ct) =>
+            {
+                var handler = services.GetRequiredService<ListRoutesQueryHandler>();
+                var logger = services.GetRequiredService<ILogger<ListRoutesQueryHandler>>();
+                var result = await handler.HandleAsync(new ListRoutesQuery(), ct);
+                return result switch
+                {
+                    Result<RouteListing, ListRoutesError>.Ok ok => Render(ok.Value),
+                    Result<RouteListing, ListRoutesError>.Error err => ServerCommand.Log(
+                        err.Err,
+                        logger,
+                        "error: failed to list routes.",
+                        ExitCodeMapper.ConfigurationError
+                    ),
+                    _ => ExitCodeMapper.GenericFailure,
+                };
+            }
+        );
+        return cmd;
+    }
+
+    private static int Render(RouteListing listing)
+    {
+        if (listing.Routes.IsEmpty)
+        {
+            Console.WriteLine("(no routes configured)");
+        }
+        else
+        {
+            foreach (var r in listing.Routes)
+            {
+                Console.WriteLine(
+                    $"[{r.Endpoint.Value}] {r.ServerName.Value} -> {r.DeviceName.Value}"
+                );
+            }
+        }
+        return ExitCodeMapper.Success;
+    }
+
+    private static Command BuildAdd(IServiceProvider services)
+    {
+        var serverArg = new Argument<string>("server") { Description = "Server alias." };
+        var endpointArg = new Argument<string>("endpoint")
+        {
+            Description = "Public endpoint (hislip0 / 5025 etc.).",
+        };
+        var deviceArg = new Argument<string>("device")
+        {
+            Description = "Device alias to bind to this endpoint.",
+        };
+
+        var cmd = new Command("add", "Bind a public endpoint to a local device.");
+        cmd.Arguments.Add(serverArg);
+        cmd.Arguments.Add(endpointArg);
+        cmd.Arguments.Add(deviceArg);
+
+        cmd.SetAction(
+            async (parseResult, ct) =>
+            {
+                var server = parseResult.GetRequiredValue(serverArg);
+                var endpoint = parseResult.GetRequiredValue(endpointArg);
+                var device = parseResult.GetRequiredValue(deviceArg);
+
+                var handler = services.GetRequiredService<AddRouteCommandHandler>();
+                var logger = services.GetRequiredService<ILogger<AddRouteCommandHandler>>();
+                var result = await handler.HandleAsync(
+                    new AddRouteCommand(server, endpoint, device),
+                    ct
+                );
+                return result switch
+                {
+                    Result<Route, AddRouteError>.Ok ok => ServerCommand.Ok(
+                        $"added route {ok.Value.ServerName.Value}/{ok.Value.Endpoint.Value} -> {ok.Value.DeviceName.Value}"
+                    ),
+                    Result<Route, AddRouteError>.Error err => err.Err switch
+                    {
+                        AddRouteInvalidServer i => ServerCommand.Log(
+                            err.Err,
+                            logger,
+                            $"error: invalid server name '{i.Raw}'.",
+                            ExitCodeMapper.UsageError
+                        ),
+                        AddRouteInvalidEndpoint i => ServerCommand.Log(
+                            err.Err,
+                            logger,
+                            $"error: invalid endpoint '{i.Raw}'.",
+                            ExitCodeMapper.UsageError
+                        ),
+                        AddRouteInvalidDevice i => ServerCommand.Log(
+                            err.Err,
+                            logger,
+                            $"error: invalid device name '{i.Raw}'.",
+                            ExitCodeMapper.UsageError
+                        ),
+                        AddRouteServerMissing m => ServerCommand.Log(
+                            err.Err,
+                            logger,
+                            $"error: no such server '{m.Server.Value}'.",
+                            ExitCodeMapper.DeviceError
+                        ),
+                        AddRouteDeviceMissing m => ServerCommand.Log(
+                            err.Err,
+                            logger,
+                            $"error: no such device '{m.Device.Value}'.",
+                            ExitCodeMapper.DeviceError
+                        ),
+                        AddRouteDuplicate d => ServerCommand.Log(
+                            err.Err,
+                            logger,
+                            $"error: route '{d.Server.Value}/{d.Endpoint.Value}' already exists.",
+                            ExitCodeMapper.DeviceError
+                        ),
+                        _ => ServerCommand.Log(
+                            err.Err,
+                            logger,
+                            "error: configuration storage failed.",
+                            ExitCodeMapper.ConfigurationError
+                        ),
+                    },
+                    _ => ExitCodeMapper.GenericFailure,
+                };
+            }
+        );
+        return cmd;
+    }
+
+    private static Command BuildRemove(IServiceProvider services)
+    {
+        var serverArg = new Argument<string>("server") { Description = "Server alias." };
+        var endpointArg = new Argument<string>("endpoint") { Description = "Public endpoint." };
+
+        var cmd = new Command("remove", "Remove a server-to-device route.");
+        cmd.Arguments.Add(serverArg);
+        cmd.Arguments.Add(endpointArg);
+
+        cmd.SetAction(
+            async (parseResult, ct) =>
+            {
+                var server = parseResult.GetRequiredValue(serverArg);
+                var endpoint = parseResult.GetRequiredValue(endpointArg);
+
+                var handler = services.GetRequiredService<RemoveRouteCommandHandler>();
+                var logger = services.GetRequiredService<ILogger<RemoveRouteCommandHandler>>();
+                var result = await handler.HandleAsync(
+                    new RemoveRouteCommand(server, endpoint),
+                    ct
+                );
+                return result switch
+                {
+                    Result<Unit, RemoveRouteError>.Ok => ServerCommand.Ok("route removed"),
+                    Result<Unit, RemoveRouteError>.Error err => err.Err switch
+                    {
+                        RemoveRouteInvalidServer i => ServerCommand.Log(
+                            err.Err,
+                            logger,
+                            $"error: invalid server name '{i.Raw}'.",
+                            ExitCodeMapper.UsageError
+                        ),
+                        RemoveRouteInvalidEndpoint i => ServerCommand.Log(
+                            err.Err,
+                            logger,
+                            $"error: invalid endpoint '{i.Raw}'.",
+                            ExitCodeMapper.UsageError
+                        ),
+                        RemoveRouteNotFound nf => ServerCommand.Log(
+                            err.Err,
+                            logger,
+                            $"error: no such route '{nf.Server.Value}/{nf.Endpoint.Value}'.",
+                            ExitCodeMapper.DeviceError
+                        ),
+                        _ => ServerCommand.Log(
+                            err.Err,
+                            logger,
+                            "error: configuration storage failed.",
+                            ExitCodeMapper.ConfigurationError
+                        ),
+                    },
+                    _ => ExitCodeMapper.GenericFailure,
+                };
+            }
+        );
+        return cmd;
+    }
+}

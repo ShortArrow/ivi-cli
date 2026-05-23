@@ -3,6 +3,8 @@ using IviCli.Application;
 using IviCli.Application.Mock;
 using IviCli.Application.Session;
 using IviCli.Backends.Fake;
+using IviCli.Backends.HiSlip;
+using IviCli.Backends.Socket;
 using IviCli.Cli.Commands;
 using IviCli.Cli.Logging;
 using IviCli.Cli.Paths;
@@ -10,6 +12,7 @@ using IviCli.Domain;
 using IviCli.Domain.Mock;
 using IviCli.Domain.Session;
 using IviCli.Infrastructure;
+using IviCli.Server;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Serilog;
@@ -48,10 +51,24 @@ internal static class Program
             services.AddLogging(b => b.AddSerilog(Log.Logger, dispose: false));
             services.AddIviCliApplication();
             services.AddIviCliMock();
+            services.AddIviCliServers();
+            services.AddIviCliGatewayServers();
             services.AddIviCliInfrastructure(configPath);
             services.AddIviCliScenarioStore(configPath);
             services.AddIviCliBackendsFake();
-            services.AddIviCliBackendFactory();
+            services.AddIviCliBackendsSocket();
+            services.AddIviCliBackendsHiSlip();
+            // Composition-root wiring of DefaultBackendFactory: route TCPIP
+            // HiSLIP -> HiSlipBackend, SOCKET-style TCPIP -> SocketBackend,
+            // everything else -> FakeBackend (until LocalBackend lands).
+            services.AddSingleton<IviCli.Application.Backends.IBackendFactory>(
+                sp => new IviCli.Infrastructure.Backends.DefaultBackendFactory(
+                    fallbackBackend: sp.GetRequiredService<IviCli.Backends.Fake.FakeBackend>(),
+                    localBackend: null,
+                    hislipBackend: sp.GetRequiredService<IviCli.Backends.HiSlip.HiSlipBackend>(),
+                    socketBackend: sp.GetRequiredService<IviCli.Backends.Socket.SocketBackend>()
+                )
+            );
             services.AddSingleton(
                 new IviCli.Application.Diagnostics.DiagnoseHandlerOptions(
                     ConfigPath: configPath,
@@ -115,6 +132,7 @@ internal static class Program
         );
         root.Subcommands.Add(visa);
         root.Subcommands.Add(mock);
+        root.Subcommands.Add(ServerCommand.Build(services));
         root.Subcommands.Add(DiagnoseCommand.Build(services));
         return root;
     }
