@@ -28,6 +28,7 @@ public static class ServerCommand
         command.Subcommands.Add(start);
         command.Subcommands.Add(stop);
         command.Subcommands.Add(status);
+        command.Subcommands.Add(ServerLogCommand.Build());
         return command;
     }
 
