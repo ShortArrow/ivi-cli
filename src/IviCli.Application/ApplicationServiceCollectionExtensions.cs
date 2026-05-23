@@ -1,6 +1,7 @@
 using IviCli.Application.Devices;
 using IviCli.Application.Diagnostics;
 using IviCli.Application.Mock;
+using IviCli.Application.Servers;
 using IviCli.Application.Session;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -51,6 +52,18 @@ public static class ApplicationServiceCollectionExtensions
         services.AddSingleton<DeactivateScenarioCommandHandler>();
         services.AddSingleton<AddSceneCommandHandler>();
         services.AddSingleton<RemoveSceneCommandHandler>();
+        return services;
+    }
+
+    /// <summary>Registers server / route management handlers.</summary>
+    public static IServiceCollection AddIviCliServers(this IServiceCollection services)
+    {
+        services.AddSingleton<AddServerCommandHandler>();
+        services.AddSingleton<RemoveServerCommandHandler>();
+        services.AddSingleton<ListServersQueryHandler>();
+        services.AddSingleton<AddRouteCommandHandler>();
+        services.AddSingleton<RemoveRouteCommandHandler>();
+        services.AddSingleton<ListRoutesQueryHandler>();
         return services;
     }
 }
