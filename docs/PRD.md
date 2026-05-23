@@ -781,6 +781,17 @@ Phase 2:
 * HiSLIP-compatible server
 * remote instrument gateway
 
+Phase 3 (operator-facing automation):
+
+* visa script — execute a sequence of SCPI commands from a file with
+  per-line dispatch (write / query / sleep / assert) against the active device.
+* visa monitor — poll a query at a fixed interval and stream timestamped
+  responses to stdout (and optional structured log file), until interrupted.
+* mock scenario record — append observed query/write traffic into a
+  scenario file for later playback, closing the loop with ADR 0026.
+* server log — tail the gateway's per-server structured log file with
+  optional follow / level filter (operator-facing observability).
+
 ---
 
 ## Not in MVP

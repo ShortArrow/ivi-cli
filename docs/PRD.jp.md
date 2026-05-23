@@ -787,6 +787,17 @@ Phase 2:
 * HiSLIP-compatible server
 * remote instrument gateway
 
+Phase 3 (オペレータ向け自動化):
+
+* visa script — SCPI コマンド列をファイルから読み込み、write / query /
+  sleep / assert を行ごとにアクティブデバイスへ実行する。
+* visa monitor — クエリを一定間隔で繰り返しタイムスタンプ付きで標準出力
+  および構造化ログに流す。中断まで継続。
+* mock scenario record — 実行中の query/write トラフィックをシナリオファイル
+  に追記し、ADR 0026 の再生ループを閉じる。
+* server log — ゲートウェイのサーバ別構造化ログを tail（follow / レベル
+  フィルタ）。オペレータ向け観測性。
+
 ---
 
 ## MVPに含めない
