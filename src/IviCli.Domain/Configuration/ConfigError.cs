@@ -1,4 +1,5 @@
 using IviCli.Domain.Devices;
+using IviCli.Domain.Servers;
 
 namespace IviCli.Domain.Configuration;
 
@@ -67,4 +68,82 @@ public sealed record DefaultDeviceMissing(DeviceName Name) : ConfigError
 
     /// <inheritdoc/>
     public override IReadOnlyList<object?> LogArgs => new object?[] { Name };
+}
+
+/// <summary>A server with the same name already exists.</summary>
+public sealed record DuplicateServerName(ServerName Name) : ConfigError
+{
+    /// <inheritdoc/>
+    public override LogSeverity Severity => LogSeverity.Warning;
+
+    /// <inheritdoc/>
+    public override string Message => "duplicate server name: {Name}";
+
+    /// <inheritdoc/>
+    public override IReadOnlyList<object?> LogArgs => new object?[] { Name };
+}
+
+/// <summary>The referenced server does not exist.</summary>
+public sealed record ServerNotFound(ServerName Name) : ConfigError
+{
+    /// <inheritdoc/>
+    public override LogSeverity Severity => LogSeverity.Warning;
+
+    /// <inheritdoc/>
+    public override string Message => "server not found: {Name}";
+
+    /// <inheritdoc/>
+    public override IReadOnlyList<object?> LogArgs => new object?[] { Name };
+}
+
+/// <summary>A route's owning server does not exist in the configuration.</summary>
+public sealed record RouteServerMissing(ServerName Server) : ConfigError
+{
+    /// <inheritdoc/>
+    public override LogSeverity Severity => LogSeverity.Warning;
+
+    /// <inheritdoc/>
+    public override string Message => "route references missing server: {Server}";
+
+    /// <inheritdoc/>
+    public override IReadOnlyList<object?> LogArgs => new object?[] { Server };
+}
+
+/// <summary>A route's target device does not exist in the configuration.</summary>
+public sealed record RouteDeviceMissing(DeviceName Device) : ConfigError
+{
+    /// <inheritdoc/>
+    public override LogSeverity Severity => LogSeverity.Warning;
+
+    /// <inheritdoc/>
+    public override string Message => "route references missing device: {Device}";
+
+    /// <inheritdoc/>
+    public override IReadOnlyList<object?> LogArgs => new object?[] { Device };
+}
+
+/// <summary>A route with the same (server, public endpoint) pair already exists.</summary>
+public sealed record DuplicateRoute(ServerName Server, PublicEndpoint Endpoint) : ConfigError
+{
+    /// <inheritdoc/>
+    public override LogSeverity Severity => LogSeverity.Warning;
+
+    /// <inheritdoc/>
+    public override string Message => "duplicate route: {Server}/{Endpoint}";
+
+    /// <inheritdoc/>
+    public override IReadOnlyList<object?> LogArgs => new object?[] { Server, Endpoint };
+}
+
+/// <summary>The referenced route does not exist.</summary>
+public sealed record RouteNotFound(ServerName Server, PublicEndpoint Endpoint) : ConfigError
+{
+    /// <inheritdoc/>
+    public override LogSeverity Severity => LogSeverity.Warning;
+
+    /// <inheritdoc/>
+    public override string Message => "route not found: {Server}/{Endpoint}";
+
+    /// <inheritdoc/>
+    public override IReadOnlyList<object?> LogArgs => new object?[] { Server, Endpoint };
 }
