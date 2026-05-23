@@ -2,6 +2,7 @@ using IviCli.Application.Configuration;
 using IviCli.Domain;
 using IviCli.Domain.Configuration;
 using IviCli.Domain.Devices;
+using IviCli.Domain.Servers;
 using IviCli.Domain.Visa;
 using Tomlyn;
 using Tomlyn.Model;
@@ -18,8 +19,15 @@ public static class TomlConfigParser
 {
     private const string DefaultsTable = "defaults";
     private const string DevicesArray = "devices";
+    private const string ServersArray = "servers";
+    private const string RoutesArray = "routes";
     private const string DeviceField = "device";
     private const string NameField = "name";
+    private const string TypeField = "type";
+    private const string BindField = "bind";
+    private const string PortField = "port";
+    private const string ServerField = "server";
+    private const string EndpointField = "endpoint";
     private const string ResourceField = "resource";
     private const string TimeoutMillisecondsField = "timeout_ms";
 
@@ -66,6 +74,63 @@ public static class TomlConfigParser
                 }
 
                 config = addOk.Value;
+            }
+        }
+
+        // Servers (optional).
+        if (model.TryGetValue(ServersArray, out var serversValue))
+        {
+            if (serversValue is not TomlTableArray serversTable)
+            {
+                return Fail($"expected an array of tables at [[{ServersArray}]]");
+            }
+            foreach (var serverTable in serversTable)
+            {
+                var serverResult = ParseServer(serverTable);
+                if (serverResult is not Result<Server, ConfigStoreError>.Ok serverOk)
+                {
+                    return Result.Failure<ConfigDocument, ConfigStoreError>(
+                        ((Result<Server, ConfigStoreError>.Error)serverResult).Err
+                    );
+                }
+                var addResult = config.AddServer(serverOk.Value);
+                if (addResult is not Result<ConfigDocument, ConfigError>.Ok serverAddOk)
+                {
+                    return Fail(
+                        $"config validation failed: "
+                            + ((Result<ConfigDocument, ConfigError>.Error)addResult).Err.Message
+                    );
+                }
+                config = serverAddOk.Value;
+            }
+        }
+
+        // Routes (optional). Must be parsed after servers + devices so the
+        // cross-entity invariants in AddRoute can fire.
+        if (model.TryGetValue(RoutesArray, out var routesValue))
+        {
+            if (routesValue is not TomlTableArray routesTable)
+            {
+                return Fail($"expected an array of tables at [[{RoutesArray}]]");
+            }
+            foreach (var routeTable in routesTable)
+            {
+                var routeResult = ParseRoute(routeTable);
+                if (routeResult is not Result<Route, ConfigStoreError>.Ok routeOk)
+                {
+                    return Result.Failure<ConfigDocument, ConfigStoreError>(
+                        ((Result<Route, ConfigStoreError>.Error)routeResult).Err
+                    );
+                }
+                var addResult = config.AddRoute(routeOk.Value);
+                if (addResult is not Result<ConfigDocument, ConfigError>.Ok routeAddOk)
+                {
+                    return Fail(
+                        $"config validation failed: "
+                            + ((Result<ConfigDocument, ConfigError>.Error)addResult).Err.Message
+                    );
+                }
+                config = routeAddOk.Value;
             }
         }
 
@@ -128,7 +193,133 @@ public static class TomlConfigParser
             builder.AppendLine();
         }
 
+        foreach (var server in document.Servers)
+        {
+            builder.AppendLine(inv, $"[[{ServersArray}]]");
+            builder.AppendLine(inv, $"{NameField} = \"{server.Name.Value}\"");
+            builder.AppendLine(inv, $"{TypeField} = \"{FormatServerType(server.Type)}\"");
+            builder.AppendLine(inv, $"{BindField} = \"{server.Bind.Value}\"");
+            builder.AppendLine(inv, $"{PortField} = {server.Port.Value}");
+            builder.AppendLine();
+        }
+
+        foreach (var route in document.Routes)
+        {
+            builder.AppendLine(inv, $"[[{RoutesArray}]]");
+            builder.AppendLine(inv, $"{ServerField} = \"{route.ServerName.Value}\"");
+            builder.AppendLine(inv, $"{EndpointField} = \"{route.Endpoint.Value}\"");
+            builder.AppendLine(inv, $"{DeviceField} = \"{route.DeviceName.Value}\"");
+            builder.AppendLine();
+        }
+
         return builder.ToString();
+    }
+
+    private static string FormatServerType(ServerType type) =>
+        type switch
+        {
+            ServerType.Local => "local",
+            ServerType.Socket => "socket",
+            ServerType.HiSlip => "hislip",
+            ServerType.Vxi11 => "vxi11",
+            _ => "local",
+        };
+
+    private static Result<Server, ConfigStoreError> ParseServer(TomlTable table)
+    {
+        if (!table.TryGetValue(NameField, out var nameValue) || nameValue is not string nameRaw)
+        {
+            return FailServer($"[[{ServersArray}]] entry is missing string field '{NameField}'");
+        }
+        var nameResult = ServerName.From(nameRaw);
+        if (nameResult is not Result<ServerName, ServerNameError>.Ok nameOk)
+        {
+            return FailServer($"invalid server name: {nameRaw}");
+        }
+
+        if (!table.TryGetValue(TypeField, out var typeValue) || typeValue is not string typeRaw)
+        {
+            return FailServer($"[[{ServersArray}]] entry '{nameRaw}' missing '{TypeField}'");
+        }
+        var type = typeRaw.ToLowerInvariant() switch
+        {
+            "local" => ServerType.Local,
+            "socket" => ServerType.Socket,
+            "hislip" => ServerType.HiSlip,
+            "vxi11" => ServerType.Vxi11,
+            _ => (ServerType?)null,
+        };
+        if (type is null)
+        {
+            return FailServer($"unknown server type '{typeRaw}' for '{nameRaw}'");
+        }
+
+        var bindRaw = table.TryGetValue(BindField, out var bv) && bv is string b ? b : "127.0.0.1";
+        var bindResult = IpAddress.From(bindRaw);
+        if (bindResult is not Result<IpAddress, IpAddressError>.Ok bindOk)
+        {
+            return FailServer($"invalid bind for '{nameRaw}': {bindRaw}");
+        }
+
+        if (!table.TryGetValue(PortField, out var portValue) || portValue is not long portLong)
+        {
+            return FailServer($"[[{ServersArray}]] entry '{nameRaw}' missing '{PortField}'");
+        }
+        var portResult = Port.From((int)portLong);
+        if (portResult is not Result<Port, PortError>.Ok portOk)
+        {
+            return FailServer($"invalid port for '{nameRaw}': {portLong}");
+        }
+
+        return Result.Success<Server, ConfigStoreError>(
+            new Server(nameOk.Value, type.Value, bindOk.Value, portOk.Value)
+        );
+    }
+
+    private static Result<Route, ConfigStoreError> ParseRoute(TomlTable table)
+    {
+        if (
+            !table.TryGetValue(ServerField, out var serverValue)
+            || serverValue is not string serverRaw
+        )
+        {
+            return FailRoute($"[[{RoutesArray}]] entry missing '{ServerField}'");
+        }
+        var serverNameResult = ServerName.From(serverRaw);
+        if (serverNameResult is not Result<ServerName, ServerNameError>.Ok serverNameOk)
+        {
+            return FailRoute($"invalid route server name: {serverRaw}");
+        }
+
+        if (
+            !table.TryGetValue(EndpointField, out var endpointValue)
+            || endpointValue is not string endpointRaw
+        )
+        {
+            return FailRoute($"[[{RoutesArray}]] entry missing '{EndpointField}'");
+        }
+        var endpointResult = PublicEndpoint.From(endpointRaw);
+        if (endpointResult is not Result<PublicEndpoint, PublicEndpointError>.Ok endpointOk)
+        {
+            return FailRoute($"invalid route endpoint: {endpointRaw}");
+        }
+
+        if (
+            !table.TryGetValue(DeviceField, out var deviceValue)
+            || deviceValue is not string deviceRaw
+        )
+        {
+            return FailRoute($"[[{RoutesArray}]] entry missing '{DeviceField}'");
+        }
+        var deviceNameResult = DeviceName.From(deviceRaw);
+        if (deviceNameResult is not Result<DeviceName, DeviceError>.Ok deviceNameOk)
+        {
+            return FailRoute($"invalid route device name: {deviceRaw}");
+        }
+
+        return Result.Success<Route, ConfigStoreError>(
+            new Route(serverNameOk.Value, endpointOk.Value, deviceNameOk.Value)
+        );
     }
 
     private static string FormatResource(VisaResource resource) =>
@@ -201,4 +392,10 @@ public static class TomlConfigParser
 
     private static Result<Device, ConfigStoreError> FailDevice(string reason) =>
         Result.Failure<Device, ConfigStoreError>(new ConfigStoreParseFailure(reason));
+
+    private static Result<Server, ConfigStoreError> FailServer(string reason) =>
+        Result.Failure<Server, ConfigStoreError>(new ConfigStoreParseFailure(reason));
+
+    private static Result<Route, ConfigStoreError> FailRoute(string reason) =>
+        Result.Failure<Route, ConfigStoreError>(new ConfigStoreParseFailure(reason));
 }
