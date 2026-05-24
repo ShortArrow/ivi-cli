@@ -2,10 +2,12 @@ using System.IO.Abstractions;
 using IviCli.Application.Backends;
 using IviCli.Application.Configuration;
 using IviCli.Application.Mock;
+using IviCli.Application.Servers;
 using IviCli.Application.Session;
 using IviCli.Infrastructure.Backends;
 using IviCli.Infrastructure.Configuration;
 using IviCli.Infrastructure.Mock;
+using IviCli.Infrastructure.Servers;
 using IviCli.Infrastructure.Session;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -51,6 +53,23 @@ public static class InfrastructureServiceCollectionExtensions
     {
         var directory = Path.GetDirectoryName(configPath) ?? ".";
         return Path.Combine(directory, "session.json");
+    }
+
+    /// <summary>
+    /// Registers the <see cref="IServerProcessRegistry"/> implementation
+    /// backed by <see cref="FilePidRegistry"/> rooted at
+    /// <paramref name="serverStateDirectory"/>.
+    /// </summary>
+    public static IServiceCollection AddIviCliServerProcessRegistry(
+        this IServiceCollection services,
+        string serverStateDirectory
+    )
+    {
+        services.AddSingleton<IServerProcessRegistry>(sp => new FilePidRegistry(
+            sp.GetRequiredService<IFileSystem>(),
+            serverStateDirectory
+        ));
+        return services;
     }
 
     /// <summary>

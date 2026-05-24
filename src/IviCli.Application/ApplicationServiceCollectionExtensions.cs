@@ -68,6 +68,7 @@ public static class ApplicationServiceCollectionExtensions
         services.AddSingleton<AddRouteCommandHandler>();
         services.AddSingleton<RemoveRouteCommandHandler>();
         services.AddSingleton<ListRoutesQueryHandler>();
+        services.AddSingleton<StopServerCommandHandler>();
         return services;
     }
 }

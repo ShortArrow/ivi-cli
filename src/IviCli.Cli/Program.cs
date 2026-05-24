@@ -54,6 +54,7 @@ internal static class Program
             services.AddIviCliServers();
             services.AddIviCliGatewayServers();
             services.AddIviCliInfrastructure(configPath);
+            services.AddIviCliServerProcessRegistry(IviPaths.ResolveServerStateDirectory());
             services.AddIviCliScenarioStore(configPath);
             services.AddIviCliBackendsFake();
             services.AddIviCliBackendsSocket();

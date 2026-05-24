@@ -67,12 +67,21 @@ public sealed class StartServerCommandHandler
 {
     private readonly IConfigStore _configStore;
     private readonly IGatewayServerFactory _factory;
+    private readonly IServerProcessRegistry _registry;
+    private readonly TimeProvider _time;
 
     /// <summary>Creates a new handler.</summary>
-    public StartServerCommandHandler(IConfigStore configStore, IGatewayServerFactory factory)
+    public StartServerCommandHandler(
+        IConfigStore configStore,
+        IGatewayServerFactory factory,
+        IServerProcessRegistry registry,
+        TimeProvider? time = null
+    )
     {
         _configStore = configStore;
         _factory = factory;
+        _registry = registry;
+        _time = time ?? TimeProvider.System;
     }
 
     /// <summary>Runs the requested server.</summary>
@@ -112,16 +121,55 @@ public sealed class StartServerCommandHandler
             return Result.Failure<Unit, StartServerError>(new StartServerLifecycleFailure(err));
         }
 
-        var runResult = await gateway.RunAsync(server, config, ct);
-        return runResult switch
+        var writeResult = await _registry.WriteAsync(
+            name,
+            Environment.ProcessId,
+            _time.GetUtcNow(),
+            ct
+        );
+        if (writeResult is Result<Unit, ServerProcessRegistryError>.Error writeErr)
         {
-            Result<Unit, GatewayServerError>.Ok ok => Result.Success<Unit, StartServerError>(
-                ok.Value
-            ),
-            Result<Unit, GatewayServerError>.Error err => Result.Failure<Unit, StartServerError>(
-                new StartServerLifecycleFailure(err.Err)
-            ),
-            _ => throw new InvalidOperationException("unknown Result variant"),
-        };
+            return Result.Failure<Unit, StartServerError>(
+                new StartServerRegistryFailure(writeErr.Err)
+            );
+        }
+
+        try
+        {
+            var runResult = await gateway.RunAsync(server, config, ct);
+            return runResult switch
+            {
+                Result<Unit, GatewayServerError>.Ok ok => Result.Success<Unit, StartServerError>(
+                    ok.Value
+                ),
+                Result<Unit, GatewayServerError>.Error err => Result.Failure<
+                    Unit,
+                    StartServerError
+                >(new StartServerLifecycleFailure(err.Err)),
+                _ => throw new InvalidOperationException("unknown Result variant"),
+            };
+        }
+        finally
+        {
+            // Best-effort cleanup; if the file system rejects the delete the
+            // next start overwrites the PID file anyway.
+            _ = await _registry.DeleteAsync(name, ct);
+        }
     }
+}
+
+/// <summary>The PID registry failed to record this server's process.</summary>
+public sealed record StartServerRegistryFailure(ServerProcessRegistryError Inner) : StartServerError
+{
+    /// <inheritdoc/>
+    public override LogSeverity Severity => Inner.Severity;
+
+    /// <inheritdoc/>
+    public override string Message => Inner.Message;
+
+    /// <inheritdoc/>
+    public override IReadOnlyList<object?> LogArgs => Inner.LogArgs;
+
+    /// <inheritdoc/>
+    public override Exception? Cause => Inner.Cause;
 }

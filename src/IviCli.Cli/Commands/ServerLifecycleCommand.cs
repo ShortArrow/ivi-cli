@@ -1,4 +1,5 @@
 using System.CommandLine;
+using System.Diagnostics;
 using IviCli.Application.Servers;
 using IviCli.Domain;
 using IviCli.Domain.Servers;
@@ -21,7 +22,7 @@ public static class ServerLifecycleCommand
     /// </summary>
     public static (Command Start, Command Stop, Command Status) BuildAll(
         IServiceProvider services
-    ) => (BuildStart(services), BuildStop(), BuildStatus(services));
+    ) => (BuildStart(services), BuildStop(services), BuildStatus(services));
 
     /// <summary>Backwards-compatible placeholder so other callers of Build do not break.</summary>
     public static Command Build(IServiceProvider services)
@@ -93,22 +94,103 @@ public static class ServerLifecycleCommand
         return cmd;
     }
 
-    private static Command BuildStop()
+    private static Command BuildStop(IServiceProvider services)
     {
+        var nameArg = new Argument<string>("name")
+        {
+            Description = "Configured server name whose process should be terminated.",
+        };
         var cmd = new Command(
             "stop",
-            "Stop a running gateway. v1 runs in the foreground; send SIGINT / Ctrl+C to the running process."
+            "Send a termination signal to the process recorded in the server's PID file."
         );
+        cmd.Arguments.Add(nameArg);
+
         cmd.SetAction(
-            (parseResult, ct) =>
+            async (parseResult, ct) =>
             {
-                Console.Error.WriteLine(
-                    "server stop: v1 runs in the foreground. Press Ctrl+C in the running `server start` window to stop it."
-                );
-                return Task.FromResult(ExitCodeMapper.UsageError);
+                var name = parseResult.GetRequiredValue(nameArg);
+                var handler = services.GetRequiredService<StopServerCommandHandler>();
+                var logger = services.GetRequiredService<ILogger<StopServerCommandHandler>>();
+
+                var result = await handler.HandleAsync(new StopServerCommand(name), ct);
+                if (result is not Result<ServerProcessEntry, StopServerError>.Ok ok)
+                {
+                    var err = ((Result<ServerProcessEntry, StopServerError>.Error)result).Err;
+                    return err switch
+                    {
+                        StopServerInvalidName n => ServerCommand.Log(
+                            err,
+                            logger,
+                            $"error: invalid server name '{n.Raw}'.",
+                            ExitCodeMapper.UsageError
+                        ),
+                        StopServerUnknown u => ServerCommand.Log(
+                            err,
+                            logger,
+                            $"error: no such server '{u.Name.Value}'.",
+                            ExitCodeMapper.DeviceError
+                        ),
+                        StopServerNotRunning nr => ServerCommand.Log(
+                            err,
+                            logger,
+                            $"error: server '{nr.Name.Value}' is not running.",
+                            ExitCodeMapper.UsageError
+                        ),
+                        StopServerRegistryFailure => ServerCommand.Log(
+                            err,
+                            logger,
+                            "error: server process registry failure.",
+                            ExitCodeMapper.ConfigurationError
+                        ),
+                        _ => ServerCommand.Log(
+                            err,
+                            logger,
+                            "error: configuration storage failed.",
+                            ExitCodeMapper.ConfigurationError
+                        ),
+                    };
+                }
+
+                var entry = ok.Value;
+                var killed = TryKillProcess(entry.ProcessId);
+                if (!killed)
+                {
+                    // Process already gone; remove the stale PID file anyway.
+                    _ = await handler.ClearEntryAsync(entry.Name, ct);
+                    Console.Error.WriteLine(
+                        $"server '{entry.Name.Value}' (pid {entry.ProcessId}) was not running; cleared stale PID file."
+                    );
+                    return ExitCodeMapper.Success;
+                }
+                _ = await handler.ClearEntryAsync(entry.Name, ct);
+                Console.WriteLine($"stopped server '{entry.Name.Value}' (pid {entry.ProcessId}).");
+                return ExitCodeMapper.Success;
             }
         );
         return cmd;
+    }
+
+    private static bool TryKillProcess(int pid)
+    {
+        try
+        {
+            using var proc = Process.GetProcessById(pid);
+            proc.Kill(entireProcessTree: false);
+            // Wait a brief moment for the OS to reap the process so a
+            // subsequent `server status` does not still report running.
+            proc.WaitForExit(milliseconds: 5_000);
+            return true;
+        }
+        catch (ArgumentException)
+        {
+            // No such process.
+            return false;
+        }
+        catch (InvalidOperationException)
+        {
+            return false;
+        }
     }
 
     private static Command BuildStatus(IServiceProvider services)
@@ -119,6 +201,7 @@ public static class ServerLifecycleCommand
             {
                 var listServers = services.GetRequiredService<ListServersQueryHandler>();
                 var listRoutes = services.GetRequiredService<ListRoutesQueryHandler>();
+                var registry = services.GetRequiredService<IServerProcessRegistry>();
 
                 var servers = await listServers.HandleAsync(new ListServersQuery(), ct);
                 var routes = await listRoutes.HandleAsync(new ListRoutesQuery(), ct);
@@ -142,8 +225,10 @@ public static class ServerLifecycleCommand
                 {
                     foreach (var s in serversOk.Value.Servers)
                     {
+                        var runningStatus = await DescribeRunningStateAsync(registry, s.Name, ct);
                         Console.WriteLine(
-                            $"  {s.Name.Value} ({s.Type.ToString().ToLowerInvariant()}) {s.Bind.Value}:{s.Port.Value}"
+                            $"  {s.Name.Value} ({s.Type.ToString().ToLowerInvariant()}) "
+                                + $"{s.Bind.Value}:{s.Port.Value}  {runningStatus}"
                         );
                     }
                 }
@@ -165,5 +250,34 @@ public static class ServerLifecycleCommand
             }
         );
         return cmd;
+    }
+
+    private static async Task<string> DescribeRunningStateAsync(
+        IServerProcessRegistry registry,
+        ServerName name,
+        CancellationToken ct
+    )
+    {
+        var read = await registry.ReadAsync(name, ct);
+        if (
+            read
+            is not Result<ServerProcessEntry?, ServerProcessRegistryError>.Ok { Value: var entry }
+        )
+        {
+            return "[registry unreadable]";
+        }
+        if (entry is null)
+        {
+            return "[stopped]";
+        }
+        try
+        {
+            using var proc = Process.GetProcessById(entry.ProcessId);
+            return $"[running pid {entry.ProcessId}]";
+        }
+        catch (ArgumentException)
+        {
+            return $"[stale pid {entry.ProcessId}]";
+        }
     }
 }

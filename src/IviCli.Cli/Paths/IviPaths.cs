@@ -9,9 +9,11 @@ public static class IviPaths
     private const string AppFolderName = "ivi-cli";
     private const string ConfigFileName = "config.toml";
     private const string LogDirectoryName = "logs";
+    private const string ServersDirectoryName = "servers";
 
     private const string ConfigOverrideEnv = "IVICLI_CONFIG";
     private const string LogDirOverrideEnv = "IVICLI_LOG_DIR";
+    private const string ServerStateDirOverrideEnv = "IVICLI_SERVER_STATE_DIR";
 
     /// <summary>
     /// Returns the absolute path to <c>config.toml</c>, respecting the
@@ -78,5 +80,49 @@ public static class IviPaths
                 "state"
             );
         return Path.Combine(stateRoot, AppFolderName, LogDirectoryName);
+    }
+
+    /// <summary>
+    /// Returns the absolute path to the per-server runtime state directory
+    /// where PID files live, respecting the
+    /// <c>IVICLI_SERVER_STATE_DIR</c> environment-variable override.
+    /// </summary>
+    public static string ResolveServerStateDirectory()
+    {
+        var overrideValue = Environment.GetEnvironmentVariable(ServerStateDirOverrideEnv);
+        if (!string.IsNullOrEmpty(overrideValue))
+        {
+            return overrideValue;
+        }
+
+        if (OperatingSystem.IsWindows())
+        {
+            return Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                AppFolderName,
+                ServersDirectoryName
+            );
+        }
+
+        if (OperatingSystem.IsMacOS())
+        {
+            return Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+                "Library",
+                "Application Support",
+                AppFolderName,
+                ServersDirectoryName
+            );
+        }
+
+        // Linux / other Unix
+        var stateRoot =
+            Environment.GetEnvironmentVariable("XDG_STATE_HOME")
+            ?? Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+                ".local",
+                "state"
+            );
+        return Path.Combine(stateRoot, AppFolderName, ServersDirectoryName);
     }
 }
