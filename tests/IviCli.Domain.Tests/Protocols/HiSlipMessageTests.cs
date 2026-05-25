@@ -78,10 +78,36 @@ public sealed class HiSlipMessageTests
     [InlineData(HiSlipMessageType.AsyncInitializeResponse)]
     [InlineData(HiSlipMessageType.AsyncMaximumMessageSize)]
     [InlineData(HiSlipMessageType.AsyncMaximumMessageSizeResponse)]
+    [InlineData(HiSlipMessageType.AsyncDeviceClear)]
+    [InlineData(HiSlipMessageType.AsyncDeviceClearAcknowledge)]
+    [InlineData(HiSlipMessageType.AsyncLock)]
+    [InlineData(HiSlipMessageType.AsyncLockResponse)]
+    [InlineData(HiSlipMessageType.AsyncReleaseLock)]
+    [InlineData(HiSlipMessageType.ServiceRequest)]
     public void WriteHeader_round_trips_each_type(HiSlipMessageType type)
     {
         var buffer = new byte[HiSlipMessage.HeaderSize];
         HiSlipMessage.WriteHeader(buffer, type, 0, 0, 0);
         HiSlipMessage.ReadHeader(buffer).Type.ShouldBe(type);
+    }
+
+    [Fact]
+    public void HiSlip_v2_message_numbers_do_not_collide_with_v1()
+    {
+        // Sanity: v1 used 0..7, 16, 17, 27, 28. v2 must not collide.
+        var v1Values = new[] { 0, 1, 2, 3, 4, 5, 6, 7, 16, 17, 27, 28 };
+        var v2Values = new[]
+        {
+            (int)HiSlipMessageType.AsyncDeviceClear,
+            (int)HiSlipMessageType.AsyncDeviceClearAcknowledge,
+            (int)HiSlipMessageType.AsyncLock,
+            (int)HiSlipMessageType.AsyncLockResponse,
+            (int)HiSlipMessageType.AsyncReleaseLock,
+            (int)HiSlipMessageType.ServiceRequest,
+        };
+        foreach (var v2 in v2Values)
+        {
+            v1Values.ShouldNotContain(v2);
+        }
     }
 }

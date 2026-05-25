@@ -34,6 +34,32 @@ must guarantee at the wire level.
   control channel / FatalError. Locking, async I/O cancellation,
   trigger, and remote-mode handling are out of scope for v1.
 
+### 1.5 HiSLIP v2 — operator features (this revision)
+
+HiSLIP v1 above covers the happy-path SCPI tunnel. HiSLIP v2 adds the
+operator-facing controls real VISA clients exercise as soon as a
+session lives long enough to matter:
+
+- **Async device clear** — the spec's recommended way to reset the
+  bound instrument's I/O buffers without tearing the session down.
+  Message types `AsyncDeviceClear` (12) and `AsyncDeviceClearAcknowledge`
+  (13). The server flushes the per-session sync-channel read/write
+  state and replies on the async channel.
+- **Async lock / release lock** — exclusive access negotiation. Message
+  types `AsyncLock` (18), `AsyncLockResponse` (19), `AsyncReleaseLock`
+  (29). The server tracks a per-route lock holder (single session id);
+  contended `AsyncLock` returns failure code `1` so the client backs off.
+  Locks released on disconnect.
+- **Service Request (SRQ)** — server → client notification on the async
+  channel that the underlying instrument raised its STB bit. Message
+  type `ServiceRequest` (30). v2 implements the framing; the actual
+  STB polling against the backend is best-effort (the local backend
+  may not expose it). The framing is enough to let real VISA clients
+  install an SRQ handler without crashing.
+
+TLS, full lock-timeout semantics, vendor extensions, and the trigger
+sub-protocol remain deferred to v3.
+
 ### 2. Phase 2 deferred (future ADRs / revisions)
 
 - **VXI-11** — investigation only. The XDR/RPC dependency and the
@@ -41,6 +67,8 @@ must guarantee at the wire level.
 - **Management API** (gRPC / HTTP JSON) — declared in PRD §7.5; the
   surface is out of scope for Phase 2 v1. When it lands, it gets its
   own ADR (0019 area).
+- **HiSLIP v3** — TLS wrap, lock timeout / lock string semantics,
+  trigger sub-protocol, vendor extension messages.
 
 ### 3. Wire-format guarantees per transport
 

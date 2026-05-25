@@ -30,6 +30,8 @@ public sealed class HiSlipGatewayServer : IGatewayServer
 
     private readonly IBackendFactory _backendFactory;
     private readonly ILogger<HiSlipGatewayServer> _logger;
+    private readonly object _lockGate = new();
+    private ushort _lockHolder; // 0 = unlocked, otherwise the session id holding the lock
 
     /// <summary>Creates a new HiSLIP gateway.</summary>
     public HiSlipGatewayServer(IBackendFactory backendFactory, ILogger<HiSlipGatewayServer> logger)
@@ -130,7 +132,12 @@ public sealed class HiSlipGatewayServer : IGatewayServer
                     await HandleSyncChannelAsync(stream, firstHeader, server, config, ct);
                     break;
                 case HiSlipMessageType.AsyncInitialize:
-                    await HandleAsyncChannelAsync(stream, firstHeader, ct);
+                    // The client sends back the session id (low 16 bits of
+                    // the message parameter) it received from
+                    // InitializeResponse so the async channel can be
+                    // correlated with its sync sibling.
+                    var sessionId = (ushort)(firstHeader.MessageParameter & 0xFFFF);
+                    await HandleAsyncChannelAsync(stream, firstHeader, sessionId, ct);
                     break;
                 default:
                     await SendFatalAsync(
@@ -261,9 +268,10 @@ public sealed class HiSlipGatewayServer : IGatewayServer
         }
     }
 
-    private static async Task HandleAsyncChannelAsync(
+    private async Task HandleAsyncChannelAsync(
         NetworkStream stream,
         HiSlipHeader init,
+        ushort sessionId,
         CancellationToken ct
     )
     {
@@ -274,8 +282,8 @@ public sealed class HiSlipGatewayServer : IGatewayServer
             await ReadExactlyAsync(stream, buf, ct);
         }
 
-        // Echo back AsyncInitializeResponse (max-message-size is the only
-        // negotiation we honor in v1).
+        // Echo back AsyncInitializeResponse. The message parameter carries
+        // the server's protocol version + features (0 in v2).
         var resp = new byte[HiSlipMessage.HeaderSize];
         HiSlipMessage.WriteHeader(
             resp,
@@ -286,50 +294,139 @@ public sealed class HiSlipGatewayServer : IGatewayServer
         );
         await stream.WriteAsync(resp, ct);
 
-        // The async channel handles control messages; v1 only honors the
-        // max-message-size negotiation.
-        while (!ct.IsCancellationRequested)
+        try
         {
-            try
+            while (!ct.IsCancellationRequested)
             {
-                await ReadExactlyAsync(stream, resp.AsMemory(0, HiSlipMessage.HeaderSize), ct);
+                try
+                {
+                    await ReadExactlyAsync(stream, resp.AsMemory(0, HiSlipMessage.HeaderSize), ct);
+                }
+                catch (EndOfStreamException)
+                {
+                    break;
+                }
+                var header = HiSlipMessage.ReadHeader(resp);
+                byte[] payload = Array.Empty<byte>();
+                if (header.PayloadLength > 0)
+                {
+                    payload = new byte[header.PayloadLength];
+                    await ReadExactlyAsync(stream, payload, ct);
+                }
+
+                switch (header.Type)
+                {
+                    case HiSlipMessageType.AsyncMaximumMessageSize:
+                        await SendMaximumMessageSizeResponseAsync(stream, ct);
+                        break;
+                    case HiSlipMessageType.AsyncLock:
+                        await HandleAsyncLockAsync(stream, header, sessionId, ct);
+                        break;
+                    case HiSlipMessageType.AsyncReleaseLock:
+                        ReleaseLock(sessionId);
+                        break;
+                    case HiSlipMessageType.AsyncDeviceClear:
+                        await SendDeviceClearAckAsync(stream, ct);
+                        break;
+                    case HiSlipMessageType.FatalError:
+                        return;
+                    default:
+                        // Unknown async control: silently ignored in v2.
+                        break;
+                }
             }
-            catch (EndOfStreamException)
-            {
-                break;
-            }
-            var header = HiSlipMessage.ReadHeader(resp);
-            if (header.PayloadLength > 0)
-            {
-                var pl = new byte[header.PayloadLength];
-                await ReadExactlyAsync(stream, pl, ct);
-            }
-            if (header.Type == HiSlipMessageType.AsyncMaximumMessageSize)
-            {
-                // Reply with our own max.
-                var payload = new byte[8];
-                System.Buffers.Binary.BinaryPrimitives.WriteUInt64BigEndian(
-                    payload,
-                    DefaultMaxMessageSize
-                );
-                HiSlipMessage.WriteHeader(
-                    resp,
-                    HiSlipMessageType.AsyncMaximumMessageSizeResponse,
-                    controlCode: 0,
-                    messageParameter: 0,
-                    payloadLength: 8
-                );
-                await stream.WriteAsync(resp, ct);
-                await stream.WriteAsync(payload, ct);
-            }
-            else if (header.Type == HiSlipMessageType.FatalError)
-            {
-                break;
-            }
-            // Other async control messages are silently acknowledged in v1
-            // (status query, lock, etc. — explicit "not implemented" can
-            // come later).
         }
+        finally
+        {
+            // Release any lock this session was holding on disconnect.
+            ReleaseLock(sessionId);
+        }
+    }
+
+    private static async Task SendMaximumMessageSizeResponseAsync(
+        NetworkStream stream,
+        CancellationToken ct
+    )
+    {
+        var resp = new byte[HiSlipMessage.HeaderSize];
+        var payload = new byte[8];
+        System.Buffers.Binary.BinaryPrimitives.WriteUInt64BigEndian(payload, DefaultMaxMessageSize);
+        HiSlipMessage.WriteHeader(
+            resp,
+            HiSlipMessageType.AsyncMaximumMessageSizeResponse,
+            controlCode: 0,
+            messageParameter: 0,
+            payloadLength: 8
+        );
+        await stream.WriteAsync(resp, ct);
+        await stream.WriteAsync(payload, ct);
+    }
+
+    private async Task HandleAsyncLockAsync(
+        NetworkStream stream,
+        HiSlipHeader request,
+        ushort sessionId,
+        CancellationToken ct
+    )
+    {
+        // Control byte semantics (ADR 0007 §1.5): 1 = acquire, 0 = release.
+        // Spec proper uses a flag bit; for this project's v2 minimum we accept
+        // anything non-zero as acquire to match common VISA clients.
+        var acquire = request.ControlCode != 0;
+        byte responseControl;
+        if (!acquire)
+        {
+            ReleaseLock(sessionId);
+            responseControl = 1; // granted (release always succeeds)
+        }
+        else
+        {
+            lock (_lockGate)
+            {
+                if (_lockHolder == 0 || _lockHolder == sessionId)
+                {
+                    _lockHolder = sessionId;
+                    responseControl = 1; // granted
+                }
+                else
+                {
+                    responseControl = 0; // denied (someone else holds it)
+                }
+            }
+        }
+        var resp = new byte[HiSlipMessage.HeaderSize];
+        HiSlipMessage.WriteHeader(
+            resp,
+            HiSlipMessageType.AsyncLockResponse,
+            controlCode: responseControl,
+            messageParameter: 0,
+            payloadLength: 0
+        );
+        await stream.WriteAsync(resp, ct);
+    }
+
+    private void ReleaseLock(ushort sessionId)
+    {
+        lock (_lockGate)
+        {
+            if (_lockHolder == sessionId)
+            {
+                _lockHolder = 0;
+            }
+        }
+    }
+
+    private static async Task SendDeviceClearAckAsync(NetworkStream stream, CancellationToken ct)
+    {
+        var resp = new byte[HiSlipMessage.HeaderSize];
+        HiSlipMessage.WriteHeader(
+            resp,
+            HiSlipMessageType.AsyncDeviceClearAcknowledge,
+            controlCode: 0,
+            messageParameter: 0,
+            payloadLength: 0
+        );
+        await stream.WriteAsync(resp, ct);
     }
 
     private static async Task DispatchScpiAsync(

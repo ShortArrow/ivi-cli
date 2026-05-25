@@ -109,4 +109,24 @@ public enum HiSlipMessageType : byte
 
     /// <summary>Maximum message-size response.</summary>
     AsyncMaximumMessageSizeResponse = 28,
+
+    // ----- HiSLIP v2 (ADR 0007 §1.5) -----
+
+    /// <summary>Async device-clear request (client -> server on async channel).</summary>
+    AsyncDeviceClear = 12,
+
+    /// <summary>Async device-clear acknowledge (server -> client on async channel).</summary>
+    AsyncDeviceClearAcknowledge = 13,
+
+    /// <summary>Async lock request (client -> server). Control byte 1 = acquire.</summary>
+    AsyncLock = 18,
+
+    /// <summary>Async lock response. Control byte 1 = granted, 0 = denied.</summary>
+    AsyncLockResponse = 19,
+
+    /// <summary>Async release lock (client -> server).</summary>
+    AsyncReleaseLock = 29,
+
+    /// <summary>Server-pushed service request notification (server -> client).</summary>
+    ServiceRequest = 30,
 }
