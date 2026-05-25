@@ -4,6 +4,7 @@ using IviCli.Application.Mock;
 using IviCli.Application.Session;
 using IviCli.Backends.Fake;
 using IviCli.Backends.HiSlip;
+using IviCli.Backends.Local;
 using IviCli.Backends.Socket;
 using IviCli.Cli.Commands;
 using IviCli.Cli.Logging;
@@ -59,13 +60,14 @@ internal static class Program
             services.AddIviCliBackendsFake();
             services.AddIviCliBackendsSocket();
             services.AddIviCliBackendsHiSlip();
+            services.AddIviCliBackendsLocal();
             // Composition-root wiring of DefaultBackendFactory: route TCPIP
             // HiSLIP -> HiSlipBackend, SOCKET-style TCPIP -> SocketBackend,
-            // everything else -> FakeBackend (until LocalBackend lands).
+            // other TCPIP / USB / GPIB -> LocalBackend, fallback -> FakeBackend.
             services.AddSingleton<IviCli.Application.Backends.IBackendFactory>(
                 sp => new IviCli.Infrastructure.Backends.DefaultBackendFactory(
                     fallbackBackend: sp.GetRequiredService<IviCli.Backends.Fake.FakeBackend>(),
-                    localBackend: null,
+                    localBackend: sp.GetRequiredService<IviCli.Backends.Local.LocalBackend>(),
                     hislipBackend: sp.GetRequiredService<IviCli.Backends.HiSlip.HiSlipBackend>(),
                     socketBackend: sp.GetRequiredService<IviCli.Backends.Socket.SocketBackend>()
                 )
