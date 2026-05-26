@@ -96,8 +96,10 @@ silently succeed.
 
 ### 2. Phase 2 deferred (future ADRs / revisions)
 
-- **VXI-11** — investigation only. The XDR/RPC dependency and the
-  smaller install base make HiSLIP a better target first.
+- **VXI-11** — moved to [ADR 0029](0029-vxi11-gateway.md). Wire-level
+  subset (Core program 395183/v1 + portmapper GETPORT) lands so legacy
+  VISA clients on a `TCPIP::host::inst0::INSTR` resource can drive the
+  same routed backend the HiSLIP gateway already serves.
 - **Management API** (gRPC / HTTP JSON) — declared in PRD §7.5; the
   surface is out of scope for Phase 2 v1. When it lands, it gets its
   own ADR (0019 area).
