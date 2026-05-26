@@ -36,37 +36,36 @@ jobs:
             hotfix
 
   docs-sync-check:
-    name: PRD/README i18n sync
+    name: PRD/README/CONTRIBUTING i18n sync
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           fetch-depth: 0
-      - name: Verify PRD.md / PRD.jp.md modified together
+      - name: Verify bilingual doc pairs modified together
         shell: bash
         run: |
           set -euo pipefail
           base="${{ github.event.pull_request.base.sha }}"
           head="${{ github.event.pull_request.head.sha }}"
           changed=$(git diff --name-only "$base" "$head")
-          touched_en=0
-          touched_jp=0
-          echo "$changed" | grep -qx 'docs/PRD.md' && touched_en=1 || true
-          echo "$changed" | grep -qx 'docs/PRD.jp.md' && touched_jp=1 || true
-          if [ "$touched_en" -ne "$touched_jp" ]; then
-            echo "::error::PRD.md and PRD.jp.md must be modified in the same PR (ADR 0024 §4)."
-            exit 1
-          fi
-          touched_readme_en=0
-          touched_readme_jp=0
-          echo "$changed" | grep -qx 'README.md' && touched_readme_en=1 || true
-          echo "$changed" | grep -qx 'README.jp.md' && touched_readme_jp=1 || true
-          # README.jp.md may not yet exist; skip gating until it does.
-          if [ -f 'README.jp.md' ] && [ "$touched_readme_en" -ne "$touched_readme_jp" ]; then
-            echo "::error::README.md and README.jp.md must be modified in the same PR (ADR 0024 §4)."
-            exit 1
-          fi
+          check_pair() {
+            local en_path="$1"
+            local jp_path="$2"
+            local en=0
+            local jp=0
+            echo "$changed" | grep -qx "$en_path" && en=1 || true
+            echo "$changed" | grep -qx "$jp_path" && jp=1 || true
+            # JP mirror may not yet exist; skip gating until it does.
+            if [ -f "$jp_path" ] && [ "$en" -ne "$jp" ]; then
+              echo "::error::$en_path and $jp_path must be modified in the same PR (ADR 0024 §4)."
+              exit 1
+            fi
+          }
+          check_pair 'docs/PRD.md' 'docs/PRD.jp.md'
+          check_pair 'README.md' 'README.jp.md'
+          check_pair 'CONTRIBUTING.md' 'CONTRIBUTING.jp.md'
 
   build-and-test:
     name: build / format / analyzers / test

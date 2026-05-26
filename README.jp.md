@@ -4,18 +4,18 @@
 
 `ivi-cli` は、VISA/IVI 経由で計測器を管理・診断・操作する統合 CLI です。
 
-> ステータス: **alpha** — Phase 1 を開発中。CLI は起動し設定ファイルを永続化しますが、多くのサブコマンドと Backend 実装は実装途上です。v0.1.0 までは破壊的変更が発生します。
+> ステータス: **alpha** — Phase 1–3 まで landed、現在 batch C 進行中。サブコマンド木 (HiSLIP / SOCKET gateway 含む) はビルド・配備可能。v0.1.0 までは破壊的変更が発生する可能性があります。
 
 ## ハイライト
 
 - **状態保持型 UX.** `ivicli visa add psu1 ...` で alias を一度登録すれば、以降は `psu1` だけで操作できます。
 - **VISA 互換.** 標準的な `TCPIP::` / `USB::` / `GPIB::` のリソース文字列を独自構文なしで扱います。
-- **Backend 非依存.** Local NI-VISA / HiSLIP / raw socket / fake / replay の各 backend が単一の transport 抽象を共有します。
-- **自動化指向.** stdout はデータ（`--json` 含む）専用、stderr はログ専用。終了コードは POSIX 慣習に従います。
+- **複数バックエンド.** Local NI-VISA / HiSLIP / raw TCP SOCKET / Fake (プログラム可能 + scenario 再生) / Replay (厳密な決定論的再生) を単一の `IIviBackend` port 越しに提供します。
+- **ゲートウェイサーバ.** ローカル計測器を HiSLIP (`TCPIP::host::hislip0::INSTR`) または raw socket で公開し、リモートの PyVISA / NI-VISA クライアントから駆動できます。
+- **シナリオ録画.** `mock scenario record --from-script` でスクリプト実行中の SCPI トラフィックを取得、`IVICLI_REPLAY=<scenario>` で同じスクリプトをハードウェアなしに決定論的に再実行できます。
+- **自動化指向.** stdout はデータ (`--json` 含む)、stderr はログ専用。終了コードは POSIX 慣習に従い、bash / zsh / PowerShell の補完をサポートします。
 
 ## インストール
-
-Phase 1 では 2 経路で配布します:
 
 ```sh
 # .NET tool（.NET 10 SDK / runtime 必須）
@@ -30,20 +30,41 @@ dotnet tool install -g ivi-cli
 ## クイックスタート
 
 ```sh
+# 1. 計測器を登録
 ivicli visa add psu1 TCPIP0::192.168.0.10::inst0::INSTR
-ivicli visa list
-ivicli visa list --json
+ivicli visa use psu1
+
+# 2. 通信
+ivicli visa query "*IDN?"
+ivicli visa write "OUTP ON"
+
+# 3. ハードウェアの代わりに録画済みシナリオを再生
+IVICLI_REPLAY=psu1-smoke ivicli visa query "*IDN?"
+
+# 4. リモートクライアント用に HiSLIP で公開
+ivicli server add hislip-srv --type hislip --port 4880
+ivicli server route add hislip-srv hislip0 psu1
+ivicli server start hislip-srv
 ```
 
 設定ファイルは OS ごとに XDG 風のパスに置かれます:
 
 | OS | 既定パス |
 | --- | --- |
-| Linux | `$XDG_CONFIG_HOME/ivi-cli/config.toml`（既定 `~/.config/ivi-cli/config.toml`） |
+| Linux | `$XDG_CONFIG_HOME/ivi-cli/config.toml`（既定で `~/.config/ivi-cli/config.toml`） |
 | macOS | `~/.config/ivi-cli/config.toml` |
 | Windows | `%LOCALAPPDATA%\ivi-cli\config.toml` |
 
-`IVICLI_CONFIG` 環境変数または将来の `--config <path>` で override 可能です。
+環境変数 `IVICLI_CONFIG` で上書き可能です。
+
+## サブコマンドマップ
+
+| グループ | 動詞 | 用途 |
+| --- | --- | --- |
+| `visa` | `add` `remove` `list` `use` `current` `scan` `query` `write` `read` `status` `script` `monitor` | 計測器の管理と通信 |
+| `mock scenario` | `list` `create` `remove` `show` `activate` `deactivate` `record` + `scene add` / `scene remove` | モックデバイス用シナリオの編集と記録 |
+| `server` | `add` `remove` `list` `route add` / `route remove` / `route list` `start` `stop` `status` `log` | ゲートウェイサーバのライフサイクル |
+| top-level | `diagnose` `completion <shell>` | 環境ヘルスチェック + シェル補完 |
 
 ## 詳細度 / フォーマットのフラグ
 
@@ -56,28 +77,45 @@ ivicli visa list --json
 | `--log-file <path>` | rolling log file の出力先を上書き |
 | `--log-format human\|json` | console の format（既定 `human`） |
 
+## シェル補完
+
+```sh
+# bash: .bashrc から source
+eval "$(ivicli completion bash)"
+
+# zsh: .zshrc から source
+eval "$(ivicli completion zsh)"
+
+# PowerShell: $PROFILE から source
+ivicli completion powershell | Out-String | Invoke-Expression
+```
+
+導入後、`<Tab>` でサブコマンド・オプション・実行時識別子（device alias、server 名、scenario 名）が展開されます。
+
+## アーキテクチャ
+
+```mermaid
+flowchart LR
+    Cli["IviCli.Cli<br/>(composition root)"] --> App["IviCli.Application<br/>(handlers, ports)"]
+    Cli --> Server["IviCli.Server<br/>(HiSLIP / SOCKET gateways)"]
+    Server --> App
+    Cli --> Infra["IviCli.Infrastructure<br/>(TomlConfigStore, FilePidRegistry)"]
+    Infra --> App
+    Cli --> Backends["IviCli.Backends.*<br/>(Fake / Local / HiSlip / Socket / Replay)"]
+    Backends --> App
+    App --> Domain["IviCli.Domain<br/>(value objects, entities, errors)"]
+    Server --> Domain
+    Backends --> Domain
+```
+
+依存方向は一方向 (Domain ← Application ← {Infrastructure, Backends, Server} ← Cli)。アーキテクチャテスト (`tests/IviCli.Cli.Tests/Architecture/`) が PR ごとに違反を検知します。
+
 ## ドキュメント
 
-- [PRD](docs/PRD.jp.md) — プロダクト要件定義（[English](docs/PRD.md)）
-- [Architecture Decision Records](docs/adr/) — Accepted な全意思決定（英語のみ）
-- [Domain glossary](docs/domain-glossary.md) — ubiquitous-language カタログ（英語のみ）
-
-## プロジェクト構成
-
-```
-src/
- ├─ IviCli.Domain          — Value Object / Entity / エラー（外部依存ゼロ）
- ├─ IviCli.Application     — use-case ハンドラ・port
- ├─ IviCli.Infrastructure  — TomlConfigStore 等の adapter
- ├─ IviCli.Backends.Local  — NI-VISA backend（実装中）
- ├─ IviCli.Backends.Fake   — テスト / CI 用の in-memory backend
- └─ IviCli.Cli             — composition root（System.CommandLine / Serilog / DI）
-tests/
- ├─ IviCli.<Layer>.Tests   — unit / architecture テスト（src と 1:1）
- └─ IviCli.TestKit         — Test Data Builder / FakeConfigStore / 共有 assertion
-```
-
-詳細は [ADR 0021](docs/adr/0021-repository-layout.md) を参照。
+- [PRD](docs/PRD.jp.md) — プロダクト要件 ([English](docs/PRD.md))
+- [Architecture Decision Records](docs/adr/) — Accepted な意思決定。読み始めの推奨: [ADR 0003](docs/adr/0003-architecture-style.md) (アーキテクチャスタイル)、[ADR 0021](docs/adr/0021-repository-layout.md) (層アセンブリ)、[ADR 0007](docs/adr/0007-network-transport.md) (HiSLIP / SOCKET)
+- [Domain glossary](docs/domain-glossary.md) — ユビキタス言語カタログ
+- [Contributing](CONTRIBUTING.jp.md) — ローカル開発・ブランチ運用・hooks ([English](CONTRIBUTING.md))
 
 ## ソースからビルド
 
@@ -88,7 +126,7 @@ dotnet build
 dotnet test --filter "Category!=Integration"
 ```
 
-ローカル hook（commit 時の CSharpier check、push 時の build + test）は初回 contributor で `dotnet husky install` を実行することで有効化されます。
+ローカル hooks (commit 時 CSharpier formatter チェック、push 時 build + tests) は初回 `dotnet husky install` で導入されます。
 
 ## ライセンス
 
