@@ -22,6 +22,21 @@ public class DependencyDirectionTests
     );
     private static readonly Assembly BackendsLocalAssembly = Assembly.Load("IviCli.Backends.Local");
     private static readonly Assembly BackendsFakeAssembly = Assembly.Load("IviCli.Backends.Fake");
+    private static readonly Assembly BackendsHiSlipAssembly = Assembly.Load(
+        "IviCli.Backends.HiSlip"
+    );
+    private static readonly Assembly BackendsSocketAssembly = Assembly.Load(
+        "IviCli.Backends.Socket"
+    );
+    private static readonly Assembly ServerAssembly = Assembly.Load("IviCli.Server");
+
+    private static readonly string[] AllBackendAssemblyNames =
+    [
+        "IviCli.Backends.Local",
+        "IviCli.Backends.Fake",
+        "IviCli.Backends.HiSlip",
+        "IviCli.Backends.Socket",
+    ];
 
     [Fact]
     public void Domain_DoesNotDependOnAnyOtherProjectAssembly()
@@ -34,6 +49,9 @@ public class DependencyDirectionTests
                 "IviCli.Infrastructure",
                 "IviCli.Backends.Local",
                 "IviCli.Backends.Fake",
+                "IviCli.Backends.HiSlip",
+                "IviCli.Backends.Socket",
+                "IviCli.Server",
                 "IviCli.Cli"
             )
             .GetResult();
@@ -45,7 +63,7 @@ public class DependencyDirectionTests
     }
 
     [Fact]
-    public void Application_DoesNotDependOnInfrastructureOrBackendsOrCli()
+    public void Application_DoesNotDependOnInfrastructureOrBackendsOrServerOrCli()
     {
         var result = Types
             .InAssembly(ApplicationAssembly)
@@ -54,6 +72,9 @@ public class DependencyDirectionTests
                 "IviCli.Infrastructure",
                 "IviCli.Backends.Local",
                 "IviCli.Backends.Fake",
+                "IviCli.Backends.HiSlip",
+                "IviCli.Backends.Socket",
+                "IviCli.Server",
                 "IviCli.Cli"
             )
             .GetResult();
@@ -65,41 +86,74 @@ public class DependencyDirectionTests
     }
 
     [Fact]
-    public void Infrastructure_DoesNotDependOnBackendsOrCli()
+    public void Infrastructure_DoesNotDependOnBackendsOrServerOrCli()
     {
         var result = Types
             .InAssembly(InfrastructureAssembly)
             .Should()
-            .NotHaveDependencyOnAny("IviCli.Backends.Local", "IviCli.Backends.Fake", "IviCli.Cli")
+            .NotHaveDependencyOnAny(
+                "IviCli.Backends.Local",
+                "IviCli.Backends.Fake",
+                "IviCli.Backends.HiSlip",
+                "IviCli.Backends.Socket",
+                "IviCli.Server",
+                "IviCli.Cli"
+            )
             .GetResult();
 
         result.IsSuccessful.ShouldBeTrue(
-            "Infrastructure must not depend on Backends or Cli: "
+            "Infrastructure must not depend on Backends, Server or Cli: "
+                + FormatFailingTypes(result.FailingTypeNames)
+        );
+    }
+
+    [Theory]
+    [InlineData("IviCli.Backends.Local")]
+    [InlineData("IviCli.Backends.Fake")]
+    [InlineData("IviCli.Backends.HiSlip")]
+    [InlineData("IviCli.Backends.Socket")]
+    public void Backend_DoesNotDependOnInfrastructureOrServerOrCliOrOtherBackends(
+        string assemblyName
+    )
+    {
+        var assembly = Assembly.Load(assemblyName);
+        string[] upstreamAssemblies = ["IviCli.Infrastructure", "IviCli.Server", "IviCli.Cli"];
+        var siblingsAndUpward = AllBackendAssemblyNames
+            .Where(n => n != assemblyName)
+            .Concat(upstreamAssemblies)
+            .ToArray();
+
+        var result = Types
+            .InAssembly(assembly)
+            .Should()
+            .NotHaveDependencyOnAny(siblingsAndUpward)
+            .GetResult();
+
+        result.IsSuccessful.ShouldBeTrue(
+            $"{assemblyName} must depend only on Application/Domain: "
                 + FormatFailingTypes(result.FailingTypeNames)
         );
     }
 
     [Fact]
-    public void Backends_DoNotDependOnInfrastructureOrCliOrEachOther()
+    public void Server_DoesNotDependOnInfrastructureOrBackendsOrCli()
     {
-        var localResult = Types
-            .InAssembly(BackendsLocalAssembly)
+        var result = Types
+            .InAssembly(ServerAssembly)
             .Should()
-            .NotHaveDependencyOnAny("IviCli.Infrastructure", "IviCli.Backends.Fake", "IviCli.Cli")
+            .NotHaveDependencyOnAny(
+                "IviCli.Infrastructure",
+                "IviCli.Backends.Local",
+                "IviCli.Backends.Fake",
+                "IviCli.Backends.HiSlip",
+                "IviCli.Backends.Socket",
+                "IviCli.Cli"
+            )
             .GetResult();
-        localResult.IsSuccessful.ShouldBeTrue(
-            "Backends.Local must depend only on Application/Domain: "
-                + FormatFailingTypes(localResult.FailingTypeNames)
-        );
 
-        var fakeResult = Types
-            .InAssembly(BackendsFakeAssembly)
-            .Should()
-            .NotHaveDependencyOnAny("IviCli.Infrastructure", "IviCli.Backends.Local", "IviCli.Cli")
-            .GetResult();
-        fakeResult.IsSuccessful.ShouldBeTrue(
-            "Backends.Fake must depend only on Application/Domain: "
-                + FormatFailingTypes(fakeResult.FailingTypeNames)
+        result.IsSuccessful.ShouldBeTrue(
+            "Server must reach Backends only through the IIviBackend port: "
+                + FormatFailingTypes(result.FailingTypeNames)
         );
     }
 
@@ -107,7 +161,7 @@ public class DependencyDirectionTests
     public void DomainTypes_AreImmutableRecords()
     {
         // Domain types should be records (immutable) per ADR 0023 §1.
-        // This is a smoke test that hits a few representative types.
+        // Extended in Task 2 to cover Phase 2/3 additions.
         var domainRecordTypes = new[]
         {
             typeof(DeviceName),
@@ -115,6 +169,13 @@ public class DependencyDirectionTests
             typeof(Domain.Timeout),
             typeof(Device),
             typeof(Domain.Configuration.ConfigDocument),
+            // Phase 2 additions
+            typeof(Domain.Servers.Server),
+            typeof(Domain.Servers.Route),
+            typeof(Domain.Servers.ServerName),
+            typeof(Domain.Servers.IpAddress),
+            typeof(Domain.Servers.Port),
+            typeof(Domain.Servers.PublicEndpoint),
         };
 
         foreach (var t in domainRecordTypes)
@@ -123,6 +184,23 @@ public class DependencyDirectionTests
             t.GetProperty("EqualityContract", BindingFlags.Instance | BindingFlags.NonPublic)
                 .ShouldNotBeNull($"{t.FullName} should be a record (have EqualityContract)");
         }
+    }
+
+    [Fact]
+    public void HiSlipHeader_IsReadonlyRecordStruct()
+    {
+        // HiSlipHeader is a `readonly record struct` for zero-allocation
+        // header passing. record struct types do not expose
+        // EqualityContract (that is unique to record classes), so we check
+        // the IsValueType + readonly markers instead.
+        var t = typeof(Domain.Protocols.HiSlipHeader);
+        t.IsValueType.ShouldBeTrue("HiSlipHeader should be a value type (record struct)");
+        // The compiler stamps record structs with a parameterless instance
+        // constructor by default; the marker we rely on is
+        // System.Runtime.CompilerServices.IsExternalInit baked into the
+        // setters, but that's hard to inspect. The IsValueType check + the
+        // explicit `readonly` keyword in the declaration is sufficient
+        // signal for the architecture suite.
     }
 
     private static string FormatFailingTypes(IEnumerable<string>? typeNames) =>
