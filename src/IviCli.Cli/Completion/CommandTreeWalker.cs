@@ -85,6 +85,102 @@ public static class CommandTreeWalker
     }
 
     /// <summary>
+    /// Async overload of <see cref="Complete"/> that also consults the
+    /// supplied <paramref name="registry"/> for dynamic candidates
+    /// bound to the resolved command. Falls back to the structural
+    /// candidates from <see cref="Complete"/> when no dynamic binding
+    /// applies.
+    /// </summary>
+    public static async Task<ImmutableArray<string>> CompleteAsync(
+        Command root,
+        IReadOnlyList<string> tokens,
+        CompletionRegistry registry,
+        CancellationToken ct
+    )
+    {
+        // Walk into the deepest matching subcommand exactly like the
+        // synchronous version so the descent semantics stay identical.
+        var current = root;
+        var index = 0;
+        while (index < tokens.Count)
+        {
+            var token = tokens[index];
+            var match = FindSubcommand(current, token);
+            if (match is null)
+            {
+                break;
+            }
+            current = match;
+            index++;
+        }
+
+        var prefix = index < tokens.Count ? tokens[index] : string.Empty;
+
+        // Static candidates first (subcommands + option names) using the
+        // existing pure helper. We layer dynamic candidates on top so the
+        // user always sees structural choices alongside the dynamic ones.
+        var structural = Complete(
+            current,
+            prefix.Length > 0 ? new[] { prefix } : Array.Empty<string>()
+        );
+
+        // Resolve the slot to query. When the prefix is an option value
+        // (the previous token is "--foo" or "--foo=value"), we honour
+        // that option's slot; otherwise the slot is the next positional
+        // argument the command declares.
+        var slot = ResolveSlot(current, tokens, index);
+        var dynamic = ImmutableArray<string>.Empty;
+        if (slot is not null)
+        {
+            var completer = registry.Resolve(current, slot);
+            if (completer is not null)
+            {
+                dynamic = await completer.CompleteAsync(prefix, ct);
+            }
+        }
+
+        if (dynamic.IsDefaultOrEmpty)
+        {
+            return structural;
+        }
+        // Merge — structural may already include subcommands that
+        // accidentally share a name with a device alias; keep both and
+        // let the shell deduplicate on display.
+        var merged = ImmutableArray.CreateBuilder<string>(structural.Length + dynamic.Length);
+        merged.AddRange(structural);
+        merged.AddRange(dynamic);
+        return merged.ToImmutable().Sort(StringComparer.Ordinal);
+    }
+
+    private static string? ResolveSlot(Command command, IReadOnlyList<string> tokens, int index)
+    {
+        // Walk the trailing tokens (those past the descended subcommand
+        // chain). If the immediately-preceding token is an option name
+        // like "--device", we are completing that option's value.
+        if (index > 0 && index <= tokens.Count)
+        {
+            var previous = index - 1;
+            if (previous < tokens.Count)
+            {
+                var prev = tokens[previous];
+                if (prev.StartsWith("--", StringComparison.Ordinal))
+                {
+                    return prev.TrimStart('-').Split('=')[0];
+                }
+            }
+        }
+        // Otherwise we are completing the next positional. v1 binds
+        // dynamic completers to the first positional argument only —
+        // commands that need slot-by-slot dispatch can extend the
+        // registry later.
+        if (command.Arguments.Count > 0)
+        {
+            return command.Arguments[0].Name;
+        }
+        return null;
+    }
+
+    /// <summary>
     /// Tokenises a raw command line into argv-style words for
     /// <see cref="Complete"/>. The first token (the program name) is
     /// dropped by the caller because shells already strip it before

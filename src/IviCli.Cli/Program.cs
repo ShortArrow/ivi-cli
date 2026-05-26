@@ -61,6 +61,20 @@ internal static class Program
             services.AddIviCliBackendsSocket();
             services.AddIviCliBackendsHiSlip();
             services.AddIviCliBackendsLocal();
+            // Dynamic-completion plumbing for the `__complete` verb.
+            services.AddSingleton<IviCli.Cli.Completion.CompletionRegistry>();
+            services.AddSingleton<
+                IviCli.Cli.Completion.IDynamicCompleter,
+                IviCli.Cli.Completion.Completers.DeviceNameCompleter
+            >();
+            services.AddSingleton<
+                IviCli.Cli.Completion.IDynamicCompleter,
+                IviCli.Cli.Completion.Completers.ServerNameCompleter
+            >();
+            services.AddSingleton<
+                IviCli.Cli.Completion.IDynamicCompleter,
+                IviCli.Cli.Completion.Completers.ScenarioNameCompleter
+            >();
             // Composition-root wiring of DefaultBackendFactory: route TCPIP
             // HiSLIP -> HiSlipBackend, SOCKET-style TCPIP -> SocketBackend,
             // other TCPIP / USB / GPIB -> LocalBackend, fallback -> FakeBackend.
@@ -181,8 +195,81 @@ internal static class Program
         root.Subcommands.Add(ServerCommand.Build(services));
         root.Subcommands.Add(DiagnoseCommand.Build(services));
         root.Subcommands.Add(CompletionCommand.Build());
-        root.Subcommands.Add(CompleteCommand.Build(root));
+        root.Subcommands.Add(CompleteCommand.Build(root, services));
+
+        // Populate the dynamic-completion registry now that every verb
+        // is attached. Each binding is "command + positional/option
+        // slot → IDynamicCompleter Name"; the registry's Resolve uses
+        // the same key from __complete.
+        BindDynamicCompletion(root, services);
+
         return root;
+    }
+
+    private static void BindDynamicCompletion(RootCommand root, IServiceProvider services)
+    {
+        var registry = services.GetRequiredService<IviCli.Cli.Completion.CompletionRegistry>();
+        var device = services
+            .GetServices<IviCli.Cli.Completion.IDynamicCompleter>()
+            .FirstOrDefault(c => c.Name == "device");
+        var server = services
+            .GetServices<IviCli.Cli.Completion.IDynamicCompleter>()
+            .FirstOrDefault(c => c.Name == "server");
+        var scenario = services
+            .GetServices<IviCli.Cli.Completion.IDynamicCompleter>()
+            .FirstOrDefault(c => c.Name == "scenario");
+        if (device is null || server is null || scenario is null)
+        {
+            return;
+        }
+
+        // visa verbs that accept a device alias as the first positional
+        var visa = root.Subcommands.First(c => c.Name == "visa");
+        foreach (
+            var name in new[] { "use", "remove", "current", "status", "query", "write", "read" }
+        )
+        {
+            var sub = visa.Subcommands.FirstOrDefault(c => c.Name == name);
+            if (sub is not null && sub.Arguments.Count > 0)
+            {
+                registry.Bind(sub, sub.Arguments[0].Name, device);
+            }
+        }
+        // visa script / visa monitor: --device option
+        foreach (var name in new[] { "script", "monitor" })
+        {
+            var sub = visa.Subcommands.FirstOrDefault(c => c.Name == name);
+            if (sub is not null)
+            {
+                registry.Bind(sub, "device", device);
+            }
+        }
+
+        // mock scenario activate / remove / show / record: scenario name positional
+        var mock = root.Subcommands.First(c => c.Name == "mock");
+        var scenarioCmd = mock.Subcommands.FirstOrDefault(c => c.Name == "scenario");
+        if (scenarioCmd is not null)
+        {
+            foreach (var name in new[] { "activate", "remove", "show", "record" })
+            {
+                var sub = scenarioCmd.Subcommands.FirstOrDefault(c => c.Name == name);
+                if (sub is not null && sub.Arguments.Count > 0)
+                {
+                    registry.Bind(sub, sub.Arguments[0].Name, scenario);
+                }
+            }
+        }
+
+        // server start / stop / log: server name positional
+        var serverCmd = root.Subcommands.First(c => c.Name == "server");
+        foreach (var name in new[] { "start", "stop", "log", "remove" })
+        {
+            var sub = serverCmd.Subcommands.FirstOrDefault(c => c.Name == name);
+            if (sub is not null && sub.Arguments.Count > 0)
+            {
+                registry.Bind(sub, sub.Arguments[0].Name, server);
+            }
+        }
     }
 
     private static async Task ActivateScenarioIfRequested(

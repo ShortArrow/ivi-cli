@@ -89,4 +89,84 @@ public sealed class CommandTreeWalkerTests
         var candidates = CommandTreeWalker.Complete(root, tokens);
         candidates.ShouldBeEmpty();
     }
+
+    [Fact]
+    public async Task CompleteAsync_includes_dynamic_candidates_when_bound()
+    {
+        var root = BuildSampleRoot();
+        var useCmd = new Command("use", "Use a device.")
+        {
+            Arguments = { new Argument<string>("name") { Description = "Device alias." } },
+        };
+        root.Subcommands.First(c => c.Name == "visa").Subcommands.Add(useCmd);
+
+        var registry = new CompletionRegistry();
+        var fakeCompleter = new FakeCompleter("device", ["psu1", "dmm1"]);
+        registry.Bind(useCmd, "name", fakeCompleter);
+
+        string[] tokens = ["visa", "use", string.Empty];
+        var candidates = await CommandTreeWalker.CompleteAsync(root, tokens, registry, default);
+        candidates.ShouldContain("psu1");
+        candidates.ShouldContain("dmm1");
+    }
+
+    [Fact]
+    public async Task CompleteAsync_filters_dynamic_candidates_by_prefix()
+    {
+        var root = BuildSampleRoot();
+        var useCmd = new Command("use", "Use.")
+        {
+            Arguments = { new Argument<string>("name") { Description = "Alias." } },
+        };
+        root.Subcommands.First(c => c.Name == "visa").Subcommands.Add(useCmd);
+
+        var registry = new CompletionRegistry();
+        var fakeCompleter = new FakeCompleter("device", ["psu1"]); // pre-filtered
+        registry.Bind(useCmd, "name", fakeCompleter);
+
+        string[] tokens = ["visa", "use", "ps"];
+        var candidates = await CommandTreeWalker.CompleteAsync(root, tokens, registry, default);
+        candidates.ShouldContain("psu1");
+    }
+
+    [Fact]
+    public async Task CompleteAsync_returns_structural_only_when_no_binding()
+    {
+        var root = BuildSampleRoot();
+        var registry = new CompletionRegistry();
+        string[] tokens = ["visa", "s"];
+        var candidates = await CommandTreeWalker.CompleteAsync(root, tokens, registry, default);
+        candidates.ShouldContain("scan");
+        candidates.ShouldContain("script");
+        candidates.ShouldContain("status");
+    }
+
+    private sealed class FakeCompleter : IDynamicCompleter
+    {
+        private readonly System.Collections.Immutable.ImmutableArray<string> _candidates;
+
+        public FakeCompleter(string name, string[] candidates)
+        {
+            Name = name;
+            _candidates = [.. candidates];
+        }
+
+        public string Name { get; }
+
+        public Task<System.Collections.Immutable.ImmutableArray<string>> CompleteAsync(
+            string prefix,
+            CancellationToken ct
+        )
+        {
+            var filtered = System.Collections.Immutable.ImmutableArray.CreateBuilder<string>();
+            foreach (var c in _candidates)
+            {
+                if (c.StartsWith(prefix, StringComparison.Ordinal))
+                {
+                    filtered.Add(c);
+                }
+            }
+            return Task.FromResult(filtered.ToImmutable());
+        }
+    }
 }
