@@ -82,7 +82,6 @@ public sealed class HiSlipMessageTests
     [InlineData(HiSlipMessageType.AsyncDeviceClearAcknowledge)]
     [InlineData(HiSlipMessageType.AsyncLock)]
     [InlineData(HiSlipMessageType.AsyncLockResponse)]
-    [InlineData(HiSlipMessageType.AsyncReleaseLock)]
     [InlineData(HiSlipMessageType.ServiceRequest)]
     public void WriteHeader_round_trips_each_type(HiSlipMessageType type)
     {
@@ -92,22 +91,29 @@ public sealed class HiSlipMessageTests
     }
 
     [Fact]
-    public void HiSlip_v2_message_numbers_do_not_collide_with_v1()
+    public void HiSlip_message_types_follow_IVI_6_1_spec_values()
     {
-        // Sanity: v1 used 0..7, 16, 17, 27, 28. v2 must not collide.
-        var v1Values = new[] { 0, 1, 2, 3, 4, 5, 6, 7, 16, 17, 27, 28 };
-        var v2Values = new[]
-        {
-            (int)HiSlipMessageType.AsyncDeviceClear,
-            (int)HiSlipMessageType.AsyncDeviceClearAcknowledge,
-            (int)HiSlipMessageType.AsyncLock,
-            (int)HiSlipMessageType.AsyncLockResponse,
-            (int)HiSlipMessageType.AsyncReleaseLock,
-            (int)HiSlipMessageType.ServiceRequest,
-        };
-        foreach (var v2 in v2Values)
-        {
-            v1Values.ShouldNotContain(v2);
-        }
+        // IVI-6.1 §10 table — these literals are the contract with real
+        // VISA clients (NI / Keysight / R&S / PyVISA). If a value drifts
+        // out of this table the interop with real instruments breaks
+        // silently at the wire level. Update this test in lockstep with
+        // any deliberate spec revision.
+        ((byte)HiSlipMessageType.Initialize).ShouldBe<byte>(0);
+        ((byte)HiSlipMessageType.InitializeResponse).ShouldBe<byte>(1);
+        ((byte)HiSlipMessageType.FatalError).ShouldBe<byte>(2);
+        ((byte)HiSlipMessageType.Error).ShouldBe<byte>(3);
+        ((byte)HiSlipMessageType.AsyncLock).ShouldBe<byte>(4);
+        ((byte)HiSlipMessageType.AsyncLockResponse).ShouldBe<byte>(5);
+        ((byte)HiSlipMessageType.Data).ShouldBe<byte>(6);
+        ((byte)HiSlipMessageType.DataEnd).ShouldBe<byte>(7);
+        ((byte)HiSlipMessageType.DeviceClearComplete).ShouldBe<byte>(8);
+        ((byte)HiSlipMessageType.DeviceClearAcknowledge).ShouldBe<byte>(9);
+        ((byte)HiSlipMessageType.AsyncMaximumMessageSize).ShouldBe<byte>(15);
+        ((byte)HiSlipMessageType.AsyncMaximumMessageSizeResponse).ShouldBe<byte>(16);
+        ((byte)HiSlipMessageType.AsyncInitialize).ShouldBe<byte>(17);
+        ((byte)HiSlipMessageType.AsyncInitializeResponse).ShouldBe<byte>(18);
+        ((byte)HiSlipMessageType.AsyncDeviceClear).ShouldBe<byte>(19);
+        ((byte)HiSlipMessageType.ServiceRequest).ShouldBe<byte>(20);
+        ((byte)HiSlipMessageType.AsyncDeviceClearAcknowledge).ShouldBe<byte>(23);
     }
 }

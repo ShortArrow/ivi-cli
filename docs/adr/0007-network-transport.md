@@ -38,27 +38,61 @@ must guarantee at the wire level.
 
 HiSLIP v1 above covers the happy-path SCPI tunnel. HiSLIP v2 adds the
 operator-facing controls real VISA clients exercise as soon as a
-session lives long enough to matter:
+session lives long enough to matter. Message-type values match
+**IVI-6.1 §10**'s table verbatim so real VISA clients (NI, Keysight,
+R&S, PyVISA) interoperate at the wire level:
 
 - **Async device clear** — the spec's recommended way to reset the
   bound instrument's I/O buffers without tearing the session down.
-  Message types `AsyncDeviceClear` (12) and `AsyncDeviceClearAcknowledge`
-  (13). The server flushes the per-session sync-channel read/write
-  state and replies on the async channel.
-- **Async lock / release lock** — exclusive access negotiation. Message
-  types `AsyncLock` (18), `AsyncLockResponse` (19), `AsyncReleaseLock`
-  (29). The server tracks a per-route lock holder (single session id);
-  contended `AsyncLock` returns failure code `1` so the client backs off.
-  Locks released on disconnect.
-- **Service Request (SRQ)** — server → client notification on the async
-  channel that the underlying instrument raised its STB bit. Message
-  type `ServiceRequest` (30). v2 implements the framing; the actual
-  STB polling against the backend is best-effort (the local backend
-  may not expose it). The framing is enough to let real VISA clients
-  install an SRQ handler without crashing.
+  Message types `AsyncDeviceClear` (19) and
+  `AsyncDeviceClearAcknowledge` (23). The server flushes the
+  per-session sync-channel read/write state and replies on the async
+  channel.
+- **Async lock / release** — exclusive access negotiation. A single
+  message type `AsyncLock` (4) handles both acquire and release: the
+  header's control byte is `1` to acquire and `0` to release. The
+  server replies with `AsyncLockResponse` (5) carrying `1` for granted
+  / `0` for denied. The server tracks a per-route lock holder (single
+  session id); contended acquire returns denied. Locks are released
+  automatically on disconnect.
+- **Service Request (SRQ)** — server → client notification on the
+  async channel that the underlying instrument raised its STB bit.
+  Message type `ServiceRequest` (20). v2 implements the framing; the
+  actual STB polling against the backend is best-effort (the local
+  backend may not expose it). The framing is enough to let real VISA
+  clients install an SRQ handler without crashing.
 
-TLS, full lock-timeout semantics, vendor extensions, and the trigger
-sub-protocol remain deferred to v3.
+TLS, full lock-timeout semantics, vendor extensions, the trigger
+sub-protocol, the remote/local control pair, and async status query
+remain deferred to v3.
+
+#### Spec values (IVI-6.1 §10)
+
+| Type | Value |
+| --- | --- |
+| Initialize | 0 |
+| InitializeResponse | 1 |
+| FatalError | 2 |
+| Error | 3 |
+| AsyncLock | 4 |
+| AsyncLockResponse | 5 |
+| Data | 6 |
+| DataEnd | 7 |
+| DeviceClearComplete | 8 |
+| DeviceClearAcknowledge | 9 |
+| AsyncMaximumMessageSize | 15 |
+| AsyncMaximumMessageSizeResponse | 16 |
+| AsyncInitialize | 17 |
+| AsyncInitializeResponse | 18 |
+| AsyncDeviceClear | 19 |
+| ServiceRequest | 20 |
+| AsyncDeviceClearAcknowledge | 23 |
+
+Values 10–14, 21–22, 24–26 are reserved by the spec for messages we
+defer to v3 (remote/local control, trigger, async interrupted, async
+status query, lock info) and intentionally absent from
+`HiSlipMessageType` so an enum cast to one of those bytes cannot
+silently succeed.
 
 ### 2. Phase 2 deferred (future ADRs / revisions)
 

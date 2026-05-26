@@ -74,59 +74,60 @@ public readonly record struct HiSlipHeader(
 /// <summary>HiSLIP message type codes per IVI-6.1 §10.</summary>
 public enum HiSlipMessageType : byte
 {
-    /// <summary>Initialize request from client (handshake start).</summary>
+    // ----- HiSLIP v1 / v2 (IVI-6.1 §10 message-type table) -----
+    // Values below match the IVI-6.1 specification. Implementations
+    // 10-14 / 21-22 / 24-26 are reserved for v3 (remote/local, trigger,
+    // status query, lock-info, etc.) and intentionally absent here so
+    // a stray enum cast to one of those bytes cannot silently succeed.
+
+    /// <summary>Initialize request from client (handshake start). Spec value 0.</summary>
     Initialize = 0,
 
-    /// <summary>Initialize response from server.</summary>
+    /// <summary>Initialize response from server. Spec value 1.</summary>
     InitializeResponse = 1,
 
-    /// <summary>Fatal error message; terminates the connection.</summary>
+    /// <summary>Fatal error message; terminates the connection. Spec value 2.</summary>
     FatalError = 2,
 
-    /// <summary>Non-fatal error.</summary>
+    /// <summary>Non-fatal error. Spec value 3.</summary>
     Error = 3,
 
-    /// <summary>Synchronous data with intermediate flag.</summary>
-    Data = 4,
+    /// <summary>Async lock request (client -> server). Control byte 1 = acquire, 0 = release. Spec value 4.</summary>
+    AsyncLock = 4,
 
-    /// <summary>Synchronous data with end-of-message flag.</summary>
-    DataEnd = 5,
+    /// <summary>Async lock response. Control byte 1 = granted, 0 = denied. Spec value 5.</summary>
+    AsyncLockResponse = 5,
 
-    /// <summary>Device-clear complete.</summary>
-    DeviceClearComplete = 6,
+    /// <summary>Synchronous data with intermediate flag. Spec value 6.</summary>
+    Data = 6,
 
-    /// <summary>Async device-clear acknowledgement.</summary>
-    DeviceClearAcknowledge = 7,
+    /// <summary>Synchronous data with end-of-message flag. Spec value 7.</summary>
+    DataEnd = 7,
 
-    /// <summary>Async initialize request (control channel handshake).</summary>
-    AsyncInitialize = 16,
+    /// <summary>Device-clear complete on the sync channel. Spec value 8.</summary>
+    DeviceClearComplete = 8,
 
-    /// <summary>Async initialize response (server -> client).</summary>
-    AsyncInitializeResponse = 17,
+    /// <summary>Sync-channel device-clear acknowledgement. Spec value 9.</summary>
+    DeviceClearAcknowledge = 9,
 
-    /// <summary>Maximum message-size advertisement.</summary>
-    AsyncMaximumMessageSize = 27,
+    /// <summary>Maximum message-size advertisement on async channel. Spec value 15.</summary>
+    AsyncMaximumMessageSize = 15,
 
-    /// <summary>Maximum message-size response.</summary>
-    AsyncMaximumMessageSizeResponse = 28,
+    /// <summary>Maximum message-size response on async channel. Spec value 16.</summary>
+    AsyncMaximumMessageSizeResponse = 16,
 
-    // ----- HiSLIP v2 (ADR 0007 §1.5) -----
+    /// <summary>Async initialize request (control channel handshake). Spec value 17.</summary>
+    AsyncInitialize = 17,
 
-    /// <summary>Async device-clear request (client -> server on async channel).</summary>
-    AsyncDeviceClear = 12,
+    /// <summary>Async initialize response (server -> client). Spec value 18.</summary>
+    AsyncInitializeResponse = 18,
 
-    /// <summary>Async device-clear acknowledge (server -> client on async channel).</summary>
-    AsyncDeviceClearAcknowledge = 13,
+    /// <summary>Async device-clear request (client -> server on async channel). Spec value 19.</summary>
+    AsyncDeviceClear = 19,
 
-    /// <summary>Async lock request (client -> server). Control byte 1 = acquire.</summary>
-    AsyncLock = 18,
+    /// <summary>Server-pushed service request notification (server -> client). Spec value 20.</summary>
+    ServiceRequest = 20,
 
-    /// <summary>Async lock response. Control byte 1 = granted, 0 = denied.</summary>
-    AsyncLockResponse = 19,
-
-    /// <summary>Async release lock (client -> server).</summary>
-    AsyncReleaseLock = 29,
-
-    /// <summary>Server-pushed service request notification (server -> client).</summary>
-    ServiceRequest = 30,
+    /// <summary>Async-channel device-clear acknowledgement (server -> client). Spec value 23.</summary>
+    AsyncDeviceClearAcknowledge = 23,
 }

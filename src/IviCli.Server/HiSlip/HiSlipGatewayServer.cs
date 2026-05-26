@@ -320,10 +320,9 @@ public sealed class HiSlipGatewayServer : IGatewayServer
                         await SendMaximumMessageSizeResponseAsync(stream, ct);
                         break;
                     case HiSlipMessageType.AsyncLock:
+                        // IVI-6.1 §10: AsyncLock with control byte 0 releases
+                        // the lock, with 1 acquires. Single message type.
                         await HandleAsyncLockAsync(stream, header, sessionId, ct);
-                        break;
-                    case HiSlipMessageType.AsyncReleaseLock:
-                        ReleaseLock(sessionId);
                         break;
                     case HiSlipMessageType.AsyncDeviceClear:
                         await SendDeviceClearAckAsync(stream, ct);

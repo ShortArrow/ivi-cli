@@ -32,8 +32,9 @@ public sealed class HiSlipV2Tests
         resp.Type.ShouldBe(HiSlipMessageType.AsyncLockResponse);
         resp.ControlCode.ShouldBe<byte>(1); // granted
 
-        // Release: AsyncReleaseLock has no response per spec; we just send.
-        await harness.SendOneWayAsync(HiSlipMessageType.AsyncReleaseLock);
+        // Per IVI-6.1, release is AsyncLock with control byte 0.
+        var release = await harness.SendAsync(HiSlipMessageType.AsyncLock, controlCode: 0);
+        release.ControlCode.ShouldBe<byte>(1); // release always succeeds
     }
 
     [Fact]
