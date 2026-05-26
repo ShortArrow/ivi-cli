@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <RootNamespace>IviCli.Backends.Replay.Tests</RootNamespace>
+    <AssemblyName>IviCli.Backends.Replay.Tests</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\IviCli.Backends.Replay\IviCli.Backends.Replay.csproj" />
+    <ProjectReference Include="..\IviCli.TestKit\IviCli.TestKit.csproj" />
+  </ItemGroup>
+</Project>

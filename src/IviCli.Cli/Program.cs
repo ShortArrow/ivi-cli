@@ -64,14 +64,55 @@ internal static class Program
             // Composition-root wiring of DefaultBackendFactory: route TCPIP
             // HiSLIP -> HiSlipBackend, SOCKET-style TCPIP -> SocketBackend,
             // other TCPIP / USB / GPIB -> LocalBackend, fallback -> FakeBackend.
-            services.AddSingleton<IviCli.Application.Backends.IBackendFactory>(
-                sp => new IviCli.Infrastructure.Backends.DefaultBackendFactory(
-                    fallbackBackend: sp.GetRequiredService<IviCli.Backends.Fake.FakeBackend>(),
+            // When IVICLI_REPLAY=<scenario> is set, swap the fallback for a
+            // ReplayBackend so device traffic is served from the recorded
+            // scenario instead of hitting any live transport (ADR 0028 §2).
+            services.AddSingleton<IviCli.Application.Backends.IBackendFactory>(sp =>
+            {
+                IviCli.Application.Backends.IIviBackend fallback =
+                    sp.GetRequiredService<IviCli.Backends.Fake.FakeBackend>();
+                var replayName = Environment.GetEnvironmentVariable("IVICLI_REPLAY");
+                if (!string.IsNullOrEmpty(replayName))
+                {
+                    var store = sp.GetRequiredService<IScenarioStore>();
+                    if (
+                        ScenarioName.From(replayName) is Result<ScenarioName, ScenarioNameError>.Ok
+                        {
+                            Value: var sn
+                        }
+                    )
+                    {
+                        var loaded = store
+                            .LoadAsync(sn, CancellationToken.None)
+                            .GetAwaiter()
+                            .GetResult();
+                        if (loaded is Result<MockScenario, ScenarioStoreError>.Ok { Value: var sc })
+                        {
+                            fallback = new IviCli.Backends.Replay.ReplayBackend(sc);
+                        }
+                        else
+                        {
+                            Log.Logger.Warning(
+                                "IVICLI_REPLAY={Name}: scenario could not be loaded; falling back to FakeBackend",
+                                replayName
+                            );
+                        }
+                    }
+                    else
+                    {
+                        Log.Logger.Warning(
+                            "IVICLI_REPLAY={Name}: invalid scenario name; falling back to FakeBackend",
+                            replayName
+                        );
+                    }
+                }
+                return new IviCli.Infrastructure.Backends.DefaultBackendFactory(
+                    fallbackBackend: fallback,
                     localBackend: sp.GetRequiredService<IviCli.Backends.Local.LocalBackend>(),
                     hislipBackend: sp.GetRequiredService<IviCli.Backends.HiSlip.HiSlipBackend>(),
                     socketBackend: sp.GetRequiredService<IviCli.Backends.Socket.SocketBackend>()
-                )
-            );
+                );
+            });
             services.AddSingleton(
                 new IviCli.Application.Diagnostics.DiagnoseHandlerOptions(
                     ConfigPath: configPath,

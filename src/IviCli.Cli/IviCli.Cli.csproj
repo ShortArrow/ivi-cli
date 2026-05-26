@@ -9,6 +9,7 @@
     <ProjectReference Include="..\IviCli.Application\IviCli.Application.csproj" />
     <ProjectReference Include="..\IviCli.Infrastructure\IviCli.Infrastructure.csproj" />
     <ProjectReference Include="..\IviCli.Backends.Local\IviCli.Backends.Local.csproj" />
+    <ProjectReference Include="..\IviCli.Backends.Replay\IviCli.Backends.Replay.csproj" />
     <ProjectReference Include="..\IviCli.Backends.Fake\IviCli.Backends.Fake.csproj" />
     <ProjectReference Include="..\IviCli.Backends.Socket\IviCli.Backends.Socket.csproj" />
     <ProjectReference Include="..\IviCli.Backends.HiSlip\IviCli.Backends.HiSlip.csproj" />

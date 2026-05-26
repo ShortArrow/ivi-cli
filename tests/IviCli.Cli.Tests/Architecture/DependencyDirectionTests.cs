@@ -36,6 +36,7 @@ public class DependencyDirectionTests
         "IviCli.Backends.Fake",
         "IviCli.Backends.HiSlip",
         "IviCli.Backends.Socket",
+        "IviCli.Backends.Replay",
     ];
 
     [Fact]
@@ -51,6 +52,7 @@ public class DependencyDirectionTests
                 "IviCli.Backends.Fake",
                 "IviCli.Backends.HiSlip",
                 "IviCli.Backends.Socket",
+                "IviCli.Backends.Replay",
                 "IviCli.Server",
                 "IviCli.Cli"
             )
@@ -74,6 +76,7 @@ public class DependencyDirectionTests
                 "IviCli.Backends.Fake",
                 "IviCli.Backends.HiSlip",
                 "IviCli.Backends.Socket",
+                "IviCli.Backends.Replay",
                 "IviCli.Server",
                 "IviCli.Cli"
             )
@@ -96,6 +99,7 @@ public class DependencyDirectionTests
                 "IviCli.Backends.Fake",
                 "IviCli.Backends.HiSlip",
                 "IviCli.Backends.Socket",
+                "IviCli.Backends.Replay",
                 "IviCli.Server",
                 "IviCli.Cli"
             )
@@ -112,6 +116,7 @@ public class DependencyDirectionTests
     [InlineData("IviCli.Backends.Fake")]
     [InlineData("IviCli.Backends.HiSlip")]
     [InlineData("IviCli.Backends.Socket")]
+    [InlineData("IviCli.Backends.Replay")]
     public void Backend_DoesNotDependOnInfrastructureOrServerOrCliOrOtherBackends(
         string assemblyName
     )

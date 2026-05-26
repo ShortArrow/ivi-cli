@@ -202,7 +202,9 @@ The following are deliberately deferred:
 - Scenario import/export beyond manual file copy.
 - Multi-device scenarios where different aliases get different
   behaviour.
-- Recording from a real backend (that is the ReplayBackend scope).
+- Recording from a real backend is handled by ADR 0027
+  (`mock scenario record --from-script`); deterministic playback as a
+  dedicated `IIviBackend` is split out into ADR 0028 (Replay Backend).
 
 Each of these is a candidate for a follow-up ADR once v1 has real users.
 
