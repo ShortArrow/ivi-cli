@@ -226,7 +226,8 @@
           "NSubstitute": "[5.3.0, )",
           "Shouldly": "[4.3.0, )",
           "TestableIO.System.IO.Abstractions": "[22.1.0, )",
-          "TestableIO.System.IO.Abstractions.TestingHelpers": "[22.1.0, )"
+          "TestableIO.System.IO.Abstractions.TestingHelpers": "[22.1.0, )",
+          "xunit": "[2.9.3, )"
         }
       },
       "Microsoft.Extensions.DependencyInjection.Abstractions": {

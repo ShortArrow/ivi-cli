@@ -2,11 +2,23 @@
   <PropertyGroup>
     <RootNamespace>IviCli.TestKit</RootNamespace>
     <AssemblyName>IviCli.TestKit</AssemblyName>
+    <!--
+      Explicitly opt out of IsTestProject auto-detection. TestKit is a
+      reusable library that ships xUnit-aware helpers (RequiresAttribute,
+      etc.) but is not itself a test project — without this, the xUnit
+      runner-stack ItemGroup in tests/Directory.Build.props would inject
+      a second xunit PackageReference and trip NU1504.
+    -->
+    <IsTestProject>false</IsTestProject>
   </PropertyGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\IviCli.Domain\IviCli.Domain.csproj" />
     <ProjectReference Include="..\..\src\IviCli.Application\IviCli.Application.csproj" />
     <ProjectReference Include="..\..\src\IviCli.Backends.Fake\IviCli.Backends.Fake.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="xunit" />
   </ItemGroup>
 </Project>
