@@ -501,6 +501,8 @@ HiSLIP / VXI-11 / Socket は既存 VISA client 互換のために提供する。
 
 **Batch I で HTTP JSON として実装済み**（[ADR 0034](adr/0034-management-api.md)）。ASP.NET Core minimal API を CLI プロセス内に埋め込む形で動作し、`ivicli api start [--port 8080] [--bind 127.0.0.1]` で起動する。v1 エンドポイント: `GET /v1/{devices,servers,scenarios}` + `GET /v1/devices/{name}/status` + `POST /v1/devices/{name}/{query,write}` + `GET /openapi/v1.json` + `GET /healthz`。v1 は既定で loopback バインド。認証 / server lifecycle 系エンドポイント / scenario import / gRPC は v2。
 
+**Batch J で WebSocket サブプロトコルを追加**（[ADR 0035](adr/0035-visa-over-websocket.md)）: `ws://host:port/v1/devices/{name}/visa` は `{op,scpi}` フレームを受け取り `{event:response|ack|error,...}` を返す。ブラウザ / AI agent ランタイム / ダッシュボード向け。
+
 ---
 
 ## 7.6 Remote Access from IVI-CLI
@@ -852,7 +854,6 @@ Phase 3 (オペレータ向け自動化):
 
 * Web UI
 * AI agent integration
-* VISA-over-WebSocket
 
 ---
 

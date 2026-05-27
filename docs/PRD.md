@@ -495,6 +495,8 @@ The following management features, however, are exposed as a proprietary managem
 
 **Shipped in Batch I — HTTP JSON** ([ADR 0034](adr/0034-management-api.md)). ASP.NET Core minimal API embedded inside the CLI process; activate with `ivicli api start [--port 8080] [--bind 127.0.0.1]`. v1 endpoints: `GET /v1/{devices,servers,scenarios}` + `GET /v1/devices/{name}/status` + `POST /v1/devices/{name}/{query,write}` + `GET /openapi/v1.json` + `GET /healthz`. v1 binds to loopback by default; authentication, server-lifecycle endpoints, scenario import, and gRPC are v2.
 
+**Batch J adds the WebSocket subprotocol** ([ADR 0035](adr/0035-visa-over-websocket.md)): `ws://host:port/v1/devices/{name}/visa` carries `{op,scpi}` frames and replies with `{event:response|ack|error,...}` for browsers / AI-agent runtimes / dashboards.
+
 ---
 
 ## 7.6 Remote Access from IVI-CLI
@@ -846,7 +848,6 @@ Phase 3 (operator-facing automation):
 
 * Web UI
 * AI agent integration
-* VISA-over-WebSocket
 
 ---
 
