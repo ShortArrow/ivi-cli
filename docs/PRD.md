@@ -261,6 +261,17 @@ Live, periodically refreshed table of every (or a selected subset of) registered
 
 ---
 
+### visa lint
+
+```bash
+ivicli visa lint smoke.scpi
+ivicli visa lint smoke.scpi --json | jq
+```
+
+Static-analyses a `.scpi` script without running it. Flags unknown SCPI command roots against the IEEE 488.2 + SCPI Volume 1 vocabulary (ADR 0032). v1 reports root-level mismatches only; full colon-path validation and parameter-syntax rules are deferred. Vendor-specific extensions are out of scope. Exit codes: file IO / parse failure → usage error, any `Error`-severity finding → generic failure, warnings only → 0.
+
+---
+
 ## 6.3 Server Operations
 
 The `server` namespace is the control plane for publishing and managing local VISA resources as a remote instrument gateway.
@@ -833,7 +844,6 @@ Phase 3 (operator-facing automation):
 * session recording/replay
 * Web UI
 * AI agent integration
-* SCPI autocomplete
 * VISA-over-WebSocket
 
 ---

@@ -266,6 +266,17 @@ ivicli visa watch --json | jq
 
 ---
 
+### visa lint
+
+```bash
+ivicli visa lint smoke.scpi
+ivicli visa lint smoke.scpi --json | jq
+```
+
+`.scpi` スクリプトを実行せずに静的解析する。IEEE 488.2 + SCPI Volume 1 の語彙（ADR 0032）に対する未知のコマンドルートを検出する。v1 はルートレベルの不整合のみ報告。フルコロンパス検証 / パラメータ構文検証はベンダー固有拡張と合わせて延期。終了コード: ファイル IO / パース失敗 → usage error、`Error` レベルの finding があれば generic failure、warning のみは 0。
+
+---
+
 ## 6.3 Server Operations
 
 `server` namespace は、ローカル VISA resource を remote instrument gateway として公開・管理する control plane として扱う。
@@ -839,7 +850,6 @@ Phase 3 (オペレータ向け自動化):
 * session recording/replay
 * Web UI
 * AI agent integration
-* SCPI autocomplete
 * VISA-over-WebSocket
 
 ---
