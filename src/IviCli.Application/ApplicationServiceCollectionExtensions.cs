@@ -4,6 +4,7 @@ using IviCli.Application.Mock;
 using IviCli.Application.Scripting;
 using IviCli.Application.Servers;
 using IviCli.Application.Session;
+using IviCli.Application.Watch;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace IviCli.Application;
@@ -38,6 +39,7 @@ public static class ApplicationServiceCollectionExtensions
         services.AddSingleton<DiagnoseQueryHandler>();
         services.AddSingleton<ScriptDeviceCommandHandler>();
         services.AddSingleton<MonitorDeviceCommandHandler>();
+        services.AddSingleton<WatchDevicesCommandHandler>();
         return services;
     }
 
