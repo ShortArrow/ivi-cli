@@ -32,6 +32,7 @@ public static class ApplicationServiceCollectionExtensions
         services.AddSingleton<QueryDeviceCommandHandler>();
         services.AddSingleton<WriteDeviceCommandHandler>();
         services.AddSingleton<ReadDeviceCommandHandler>();
+        services.AddSingleton<IDeviceStatusProbe, DefaultDeviceStatusProbe>();
         services.AddSingleton<StatusDeviceCommandHandler>();
         services.AddSingleton<ScanDevicesQueryHandler>();
         services.AddSingleton<DiagnoseQueryHandler>();

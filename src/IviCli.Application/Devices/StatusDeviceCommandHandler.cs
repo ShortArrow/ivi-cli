@@ -1,41 +1,32 @@
-using System.Diagnostics;
-using IviCli.Application.Backends;
 using IviCli.Application.Configuration;
 using IviCli.Application.Session;
 using IviCli.Domain;
 using IviCli.Domain.Devices;
-using IviCli.Domain.Scpi;
 
 namespace IviCli.Application.Devices;
 
 /// <summary>
 /// Application-layer handler for the <c>visa status</c> command (PRD §6.2).
-/// Opens the resolved device, sends <c>*IDN?</c>, and reports the result with
-/// the round-trip time. Transport errors are folded into the returned
-/// <see cref="DeviceStatus"/> as <c>IsOnline = false</c> rather than as a
-/// command-level failure, so the CLI can show an offline state cleanly.
+/// Resolves the requested device alias and delegates the actual probe
+/// (open + <c>*IDN?</c> + close + stopwatch) to <see cref="IDeviceStatusProbe"/>,
+/// so the same probe path is shared with <c>visa watch</c>.
 /// </summary>
 public sealed class StatusDeviceCommandHandler
 {
-    private static readonly ScpiQuery IdnQuery = ScpiQuery.From("*IDN?")
-        is Result<ScpiQuery, ScpiError>.Ok idnOk
-        ? idnOk.Value
-        : throw new InvalidOperationException("*IDN? must be a valid SCPI query");
-
     private readonly IConfigStore _configStore;
     private readonly ISessionStore _sessionStore;
-    private readonly IBackendFactory _backendFactory;
+    private readonly IDeviceStatusProbe _probe;
 
     /// <summary>Creates a new handler.</summary>
     public StatusDeviceCommandHandler(
         IConfigStore configStore,
         ISessionStore sessionStore,
-        IBackendFactory backendFactory
+        IDeviceStatusProbe probe
     )
     {
         _configStore = configStore;
         _sessionStore = sessionStore;
-        _backendFactory = backendFactory;
+        _probe = probe;
     }
 
     /// <summary>Probes the resolved device and returns its status snapshot.</summary>
@@ -55,62 +46,8 @@ public sealed class StatusDeviceCommandHandler
             return MapResolveError(((Result<Device, ResolveError>.Error)resolveResult).Err);
         }
 
-        var backendResult = _backendFactory.CreateFor(device);
-        if (backendResult is not Result<IIviBackend, BackendError>.Ok { Value: var backend })
-        {
-            var err = ((Result<IIviBackend, BackendError>.Error)backendResult).Err;
-            return Fail(new StatusDeviceBackendFailure(err));
-        }
-
-        var stopwatch = Stopwatch.StartNew();
-        var openResult = await backend.OpenAsync(device, ct);
-        if (openResult is not Result<Unit, BackendError>.Ok)
-        {
-            stopwatch.Stop();
-            var err = ((Result<Unit, BackendError>.Error)openResult).Err;
-            return Result.Success<DeviceStatus, StatusDeviceError>(
-                new DeviceStatus(
-                    device,
-                    IsOnline: false,
-                    ResponseTime: stopwatch.Elapsed,
-                    IdnResponse: null,
-                    FailureMessage: err.Message
-                )
-            );
-        }
-
-        try
-        {
-            var queryResult = await backend.QueryAsync(device, IdnQuery, ct);
-            stopwatch.Stop();
-            if (queryResult is not Result<string, BackendError>.Ok { Value: var idn })
-            {
-                var err = ((Result<string, BackendError>.Error)queryResult).Err;
-                return Result.Success<DeviceStatus, StatusDeviceError>(
-                    new DeviceStatus(
-                        device,
-                        IsOnline: false,
-                        ResponseTime: stopwatch.Elapsed,
-                        IdnResponse: null,
-                        FailureMessage: err.Message
-                    )
-                );
-            }
-
-            return Result.Success<DeviceStatus, StatusDeviceError>(
-                new DeviceStatus(
-                    device,
-                    IsOnline: true,
-                    ResponseTime: stopwatch.Elapsed,
-                    IdnResponse: idn,
-                    FailureMessage: null
-                )
-            );
-        }
-        finally
-        {
-            _ = await backend.CloseAsync(device, ct);
-        }
+        var status = await _probe.ProbeAsync(device, ct);
+        return Result.Success<DeviceStatus, StatusDeviceError>(status);
     }
 
     private static Result<DeviceStatus, StatusDeviceError> Fail(StatusDeviceError error) =>

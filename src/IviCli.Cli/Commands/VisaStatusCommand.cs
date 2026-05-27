@@ -106,7 +106,6 @@ public static class VisaStatusCommand
         {
             StatusDeviceInvalidName or StatusDeviceNoTarget => ExitCodeMapper.UsageError,
             StatusDeviceUnknown => ExitCodeMapper.DeviceError,
-            StatusDeviceBackendFailure => ExitCodeMapper.TransportError,
             StatusDeviceConfigFailure or StatusDeviceSessionFailure =>
                 ExitCodeMapper.ConfigurationError,
             _ => ExitCodeMapper.GenericFailure,
@@ -119,7 +118,6 @@ public static class VisaStatusCommand
             StatusDeviceInvalidName n => $"error: invalid device name '{n.Raw}'.",
             StatusDeviceNoTarget => "error: no current device.",
             StatusDeviceUnknown u => $"error: no device named '{u.Name.Value}'.",
-            StatusDeviceBackendFailure => "error: backend not available.",
             StatusDeviceConfigFailure => "error: configuration storage failed.",
             StatusDeviceSessionFailure => "error: session storage failed.",
             _ => "error: status probe failed.",

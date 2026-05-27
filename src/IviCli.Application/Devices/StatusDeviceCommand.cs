@@ -1,9 +1,7 @@
-using IviCli.Application.Backends;
 using IviCli.Application.Configuration;
 using IviCli.Application.Session;
 using IviCli.Domain;
 using IviCli.Domain.Devices;
-using IviCli.Domain.Visa;
 
 namespace IviCli.Application.Devices;
 
@@ -98,22 +96,6 @@ public sealed record StatusDeviceConfigFailure(ConfigStoreError Inner) : StatusD
 
 /// <summary>The session store could not be read.</summary>
 public sealed record StatusDeviceSessionFailure(SessionStoreError Inner) : StatusDeviceError
-{
-    /// <inheritdoc/>
-    public override LogSeverity Severity => Inner.Severity;
-
-    /// <inheritdoc/>
-    public override string Message => Inner.Message;
-
-    /// <inheritdoc/>
-    public override IReadOnlyList<object?> LogArgs => Inner.LogArgs;
-
-    /// <inheritdoc/>
-    public override Exception? Cause => Inner.Cause;
-}
-
-/// <summary>The Backend could not be selected for the resolved device.</summary>
-public sealed record StatusDeviceBackendFailure(BackendError Inner) : StatusDeviceError
 {
     /// <inheritdoc/>
     public override LogSeverity Severity => Inner.Severity;
