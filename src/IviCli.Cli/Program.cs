@@ -186,6 +186,7 @@ internal static class Program
         visa.Subcommands.Add(VisaStatusCommand.Build(services));
         visa.Subcommands.Add(VisaScriptCommand.Build(services));
         visa.Subcommands.Add(VisaMonitorCommand.Build(services));
+        visa.Subcommands.Add(VisaWatchCommand.Build(services));
 
         var mock = new Command("mock", "Manage mock-device behaviour for the Fake Backend.");
         mock.Subcommands.Add(MockScenarioCommand.Build(services));

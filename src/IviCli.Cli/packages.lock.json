@@ -89,6 +89,12 @@
           "Serilog": "4.0.0"
         }
       },
+      "Spectre.Console": {
+        "type": "Direct",
+        "requested": "[0.50.0, )",
+        "resolved": "0.50.0",
+        "contentHash": "gkwYncFqMjlPF6Yz8KeVsKWpdfv15sr6uKm+vXVa/8Q4tvx52LPzMQOO5m+bXwI3AGGFeY3cok3ZJbguYizswg=="
+      },
       "System.CommandLine": {
         "type": "Direct",
         "requested": "[2.0.0-beta5.25306.1, )",

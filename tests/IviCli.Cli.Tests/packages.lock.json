@@ -500,6 +500,7 @@
           "Serilog.Formatting.Compact": "[3.0.0, )",
           "Serilog.Sinks.Console": "[6.0.0, )",
           "Serilog.Sinks.File": "[6.0.0, )",
+          "Spectre.Console": "[0.50.0, )",
           "System.CommandLine": "[2.0.0-beta5.25306.1, )"
         }
       },
@@ -680,6 +681,12 @@
         "dependencies": {
           "Serilog": "4.0.0"
         }
+      },
+      "Spectre.Console": {
+        "type": "CentralTransitive",
+        "requested": "[0.50.0, )",
+        "resolved": "0.50.0",
+        "contentHash": "gkwYncFqMjlPF6Yz8KeVsKWpdfv15sr6uKm+vXVa/8Q4tvx52LPzMQOO5m+bXwI3AGGFeY3cok3ZJbguYizswg=="
       },
       "System.CommandLine": {
         "type": "CentralTransitive",

@@ -26,5 +26,6 @@
     <PackageReference Include="Serilog.Sinks.Console" />
     <PackageReference Include="Serilog.Sinks.File" />
     <PackageReference Include="Serilog.Formatting.Compact" />
+    <PackageReference Include="Spectre.Console" />
   </ItemGroup>
 </Project>
