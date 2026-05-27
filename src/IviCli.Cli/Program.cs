@@ -122,13 +122,53 @@ internal static class Program
                         );
                     }
                 }
-                return new IviCli.Infrastructure.Backends.DefaultBackendFactory(
-                    fallbackBackend: fallback,
-                    localBackend: sp.GetRequiredService<IviCli.Backends.Local.LocalBackend>(),
-                    hislipBackend: sp.GetRequiredService<IviCli.Backends.HiSlip.HiSlipBackend>(),
-                    socketBackend: sp.GetRequiredService<IviCli.Backends.Socket.SocketBackend>(),
-                    vxi11Backend: sp.GetRequiredService<IviCli.Backends.Vxi11.Vxi11Backend>()
-                );
+                IviCli.Application.Backends.IBackendFactory factory =
+                    new IviCli.Infrastructure.Backends.DefaultBackendFactory(
+                        fallbackBackend: fallback,
+                        localBackend: sp.GetRequiredService<IviCli.Backends.Local.LocalBackend>(),
+                        hislipBackend: sp.GetRequiredService<IviCli.Backends.HiSlip.HiSlipBackend>(),
+                        socketBackend: sp.GetRequiredService<IviCli.Backends.Socket.SocketBackend>(),
+                        vxi11Backend: sp.GetRequiredService<IviCli.Backends.Vxi11.Vxi11Backend>()
+                    );
+
+                // IVICLI_CAPTURE=<path> wraps the factory so every backend op
+                // streams into a NDJSON audit log (ADR 0031). Errors here fall
+                // back to the null writer so the CLI never fails because the
+                // capture sink misbehaves.
+                var capturePath = Environment.GetEnvironmentVariable("IVICLI_CAPTURE");
+                if (!string.IsNullOrWhiteSpace(capturePath))
+                {
+                    try
+                    {
+                        var resolved = Path.IsPathRooted(capturePath)
+                            ? capturePath
+                            : Path.Combine(IviPaths.ResolveLogDirectory(), capturePath);
+                        var fileSystem =
+                            sp.GetRequiredService<System.IO.Abstractions.IFileSystem>();
+                        var realWriter = new IviCli.Infrastructure.Capture.NdjsonTrafficWriter(
+                            fileSystem,
+                            resolved
+                        );
+                        var backendLogger = sp.GetService<
+                            ILogger<IviCli.Application.Backends.CapturingBackend>
+                        >();
+                        factory = new IviCli.Application.Backends.CapturingBackendFactory(
+                            factory,
+                            realWriter,
+                            backendLogger
+                        );
+                        Log.Logger.Information("VISA traffic capture enabled → {Path}", resolved);
+                    }
+                    catch (Exception ex)
+                    {
+                        Log.Logger.Warning(
+                            ex,
+                            "IVICLI_CAPTURE={Path}: could not enable traffic capture; continuing without",
+                            capturePath
+                        );
+                    }
+                }
+                return factory;
             });
             services.AddSingleton(
                 new IviCli.Application.Diagnostics.DiagnoseHandlerOptions(
