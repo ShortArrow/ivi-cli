@@ -248,6 +248,19 @@ Shows connection state, response time, and IDN of the VISA target.
 
 ---
 
+### visa watch
+
+```bash
+ivicli visa watch                 # all registered devices, 1 s interval
+ivicli visa watch psu1 dmm1 --interval 500
+ivicli visa watch --plain --count 3
+ivicli visa watch --json | jq
+```
+
+Live, periodically refreshed table of every (or a selected subset of) registered device's online state, latency, and last IDN response. Default render is a Spectre.Console live table; `--plain` emits ANSI-free per-tick snapshots for CI / log capture; `--json` emits one NDJSON object per tick. Ctrl+C exits cleanly.
+
+---
+
 ## 6.3 Server Operations
 
 The `server` namespace is the control plane for publishing and managing local VISA resources as a remote instrument gateway.
@@ -811,16 +824,11 @@ Phase 3 (operator-facing automation):
 
 ## Planned
 
-* monitor
-* watch
-* script execution
 * VISA traffic capture
 * session recording/replay
 * Web UI
 * AI agent integration
 * SCPI autocomplete
-* HiSLIP-compatible server
-* VXI-11-compatible server
 * VISA-over-WebSocket
 
 ---

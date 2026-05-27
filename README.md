@@ -41,7 +41,10 @@ ivicli visa write "OUTP ON"
 # 3. Replay a recorded scenario instead of hitting hardware
 IVICLI_REPLAY=psu1-smoke ivicli visa query "*IDN?"
 
-# 4. Expose the instrument over HiSLIP for remote clients
+# 4. Watch every registered instrument live (Ctrl+C to exit)
+ivicli visa watch --interval 500
+
+# 5. Expose the instrument over HiSLIP for remote clients
 ivicli server add hislip-srv --type hislip --port 4880
 ivicli server route add hislip-srv hislip0 psu1
 ivicli server start hislip-srv
@@ -61,7 +64,7 @@ Override with the `IVICLI_CONFIG` environment variable.
 
 | Group | Verbs | Purpose |
 | --- | --- | --- |
-| `visa` | `add` `remove` `list` `use` `current` `scan` `query` `write` `read` `status` `script` `monitor` | Manage and talk to instruments |
+| `visa` | `add` `remove` `list` `use` `current` `scan` `query` `write` `read` `status` `script` `monitor` `watch` | Manage and talk to instruments |
 | `mock scenario` | `list` `create` `remove` `show` `activate` `deactivate` `record` + `scene add` / `scene remove` | Author and capture mock-device scenarios |
 | `server` | `add` `remove` `list` `route add` / `route remove` / `route list` `start` `stop` `status` `log` | Gateway-server lifecycle |
 | top-level | `diagnose` `completion <shell>` | Environment health + shell autocomplete |

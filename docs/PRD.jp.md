@@ -253,6 +253,19 @@ VISA target の接続状態・応答時間・IDNを表示する。
 
 ---
 
+### visa watch
+
+```bash
+ivicli visa watch                 # 登録された全 device を 1 秒間隔
+ivicli visa watch psu1 dmm1 --interval 500
+ivicli visa watch --plain --count 3
+ivicli visa watch --json | jq
+```
+
+登録された全 device（または指定したサブセット）のオンライン状態・レイテンシ・直近の IDN レスポンスをライブ表示する。既定は Spectre.Console のライブテーブル。`--plain` は CI / ログ取込み向けの ANSI レス・スナップショット、`--json` は 1 tick = 1 NDJSON オブジェクトを stdout に書く。Ctrl+C で終了。
+
+---
+
 ## 6.3 Server Operations
 
 `server` namespace は、ローカル VISA resource を remote instrument gateway として公開・管理する control plane として扱う。
@@ -817,16 +830,11 @@ Phase 3 (オペレータ向け自動化):
 
 ## Planned
 
-* monitor
-* watch
-* script execution
 * VISA traffic capture
 * session recording/replay
 * Web UI
 * AI agent integration
 * SCPI autocomplete
-* HiSLIP-compatible server
-* VXI-11-compatible server
 * VISA-over-WebSocket
 
 ---

@@ -230,7 +230,17 @@ internal static class Program
         // visa verbs that accept a device alias as the first positional
         var visa = root.Subcommands.First(c => c.Name == "visa");
         foreach (
-            var name in new[] { "use", "remove", "current", "status", "query", "write", "read" }
+            var name in new[]
+            {
+                "use",
+                "remove",
+                "current",
+                "status",
+                "query",
+                "write",
+                "read",
+                "watch",
+            }
         )
         {
             var sub = visa.Subcommands.FirstOrDefault(c => c.Name == name);

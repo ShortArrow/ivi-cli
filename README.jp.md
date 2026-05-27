@@ -41,7 +41,10 @@ ivicli visa write "OUTP ON"
 # 3. ハードウェアの代わりに録画済みシナリオを再生
 IVICLI_REPLAY=psu1-smoke ivicli visa query "*IDN?"
 
-# 4. リモートクライアント用に HiSLIP で公開
+# 4. 登録した計測器をライブ表示で監視 (Ctrl+C で終了)
+ivicli visa watch --interval 500
+
+# 5. リモートクライアント用に HiSLIP で公開
 ivicli server add hislip-srv --type hislip --port 4880
 ivicli server route add hislip-srv hislip0 psu1
 ivicli server start hislip-srv
@@ -61,7 +64,7 @@ ivicli server start hislip-srv
 
 | グループ | 動詞 | 用途 |
 | --- | --- | --- |
-| `visa` | `add` `remove` `list` `use` `current` `scan` `query` `write` `read` `status` `script` `monitor` | 計測器の管理と通信 |
+| `visa` | `add` `remove` `list` `use` `current` `scan` `query` `write` `read` `status` `script` `monitor` `watch` | 計測器の管理と通信 |
 | `mock scenario` | `list` `create` `remove` `show` `activate` `deactivate` `record` + `scene add` / `scene remove` | モックデバイス用シナリオの編集と記録 |
 | `server` | `add` `remove` `list` `route add` / `route remove` / `route list` `start` `stop` `status` `log` | ゲートウェイサーバのライフサイクル |
 | top-level | `diagnose` `completion <shell>` | 環境ヘルスチェック + シェル補完 |
