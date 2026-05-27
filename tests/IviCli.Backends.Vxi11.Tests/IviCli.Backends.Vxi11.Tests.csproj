@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <RootNamespace>IviCli.Backends.Vxi11.Tests</RootNamespace>
+    <AssemblyName>IviCli.Backends.Vxi11.Tests</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\IviCli.Backends.Vxi11\IviCli.Backends.Vxi11.csproj" />
+    <ProjectReference Include="..\..\src\IviCli.Server\IviCli.Server.csproj" />
+    <ProjectReference Include="..\..\src\IviCli.Backends.Fake\IviCli.Backends.Fake.csproj" />
+    <ProjectReference Include="..\IviCli.TestKit\IviCli.TestKit.csproj" />
+  </ItemGroup>
+</Project>

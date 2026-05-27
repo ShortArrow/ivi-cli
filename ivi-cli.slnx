@@ -6,6 +6,7 @@
     <Project Path="src/IviCli.Backends.Local/IviCli.Backends.Local.csproj" />
     <Project Path="src/IviCli.Backends.Replay/IviCli.Backends.Replay.csproj" />
     <Project Path="src/IviCli.Backends.Socket/IviCli.Backends.Socket.csproj" />
+    <Project Path="src/IviCli.Backends.Vxi11/IviCli.Backends.Vxi11.csproj" />
     <Project Path="src/IviCli.Cli/IviCli.Cli.csproj" />
     <Project Path="src/IviCli.Domain/IviCli.Domain.csproj" />
     <Project Path="src/IviCli.Infrastructure/IviCli.Infrastructure.csproj" />
@@ -16,6 +17,7 @@
     <Project Path="tests/IviCli.Backends.Fake.Tests/IviCli.Backends.Fake.Tests.csproj" />
     <Project Path="tests/IviCli.Backends.Local.Tests/IviCli.Backends.Local.Tests.csproj" />
     <Project Path="tests/IviCli.Backends.Replay.Tests/IviCli.Backends.Replay.Tests.csproj" />
+    <Project Path="tests/IviCli.Backends.Vxi11.Tests/IviCli.Backends.Vxi11.Tests.csproj" />
     <Project Path="tests/IviCli.Cli.Tests/IviCli.Cli.Tests.csproj" />
     <Project Path="tests/IviCli.Domain.Tests/IviCli.Domain.Tests.csproj" />
     <Project Path="tests/IviCli.Infrastructure.Tests/IviCli.Infrastructure.Tests.csproj" />
