@@ -1,5 +1,6 @@
 using System.IO.Abstractions;
 using IviCli.Application.Backends;
+using IviCli.Application.Capture;
 using IviCli.Application.Configuration;
 using IviCli.Application.Mock;
 using IviCli.Application.Servers;
@@ -46,6 +47,7 @@ public static class InfrastructureServiceCollectionExtensions
             sp.GetRequiredService<IFileSystem>(),
             sessionPath ?? DeriveDefaultSessionPath(configPath)
         ));
+        services.AddSingleton<ITrafficWriter>(NullTrafficWriter.Instance);
         return services;
     }
 
