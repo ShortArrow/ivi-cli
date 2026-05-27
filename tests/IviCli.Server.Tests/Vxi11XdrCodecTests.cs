@@ -1,3 +1,4 @@
+using IviCli.Domain.Protocols;
 using IviCli.Server.Vxi11;
 using Shouldly;
 
@@ -78,7 +79,7 @@ public sealed class Vxi11XdrCodecTests
     {
         var payload = new byte[] { 0x01, 0x02, 0x03, 0x04, 0x05 };
         using var memory = new MemoryStream();
-        await Vxi11XdrCodec.WriteRecordAsync(memory, payload, default);
+        await Vxi11RecordFraming.WriteRecordAsync(memory, payload, default);
 
         var framed = memory.ToArray();
         framed.Length.ShouldBe(4 + payload.Length);
@@ -89,7 +90,7 @@ public sealed class Vxi11XdrCodecTests
         framed[3].ShouldBe((byte)5);
 
         memory.Position = 0;
-        var roundTripped = await Vxi11XdrCodec.ReadRecordAsync(memory, default);
+        var roundTripped = await Vxi11RecordFraming.ReadRecordAsync(memory, default);
         roundTripped.ShouldBe(payload);
     }
 
@@ -105,7 +106,7 @@ public sealed class Vxi11XdrCodecTests
         memory.Position = 0;
 
         await Should.ThrowAsync<NotSupportedException>(() =>
-            Vxi11XdrCodec.ReadRecordAsync(memory, default)
+            Vxi11RecordFraming.ReadRecordAsync(memory, default)
         );
     }
 }

@@ -7,10 +7,11 @@ using IviCli.Application.Servers;
 using IviCli.Domain;
 using IviCli.Domain.Configuration;
 using IviCli.Domain.Devices;
+using IviCli.Domain.Protocols;
 using IviCli.Domain.Scpi;
 using IviCli.Domain.Servers;
 using Microsoft.Extensions.Logging;
-using static IviCli.Server.Vxi11.Vxi11Constants;
+using static IviCli.Domain.Protocols.Vxi11Constants;
 
 namespace IviCli.Server.Vxi11;
 
@@ -125,7 +126,7 @@ public sealed class Vxi11GatewayServer : IGatewayServer
                 byte[] body;
                 try
                 {
-                    body = await Vxi11XdrCodec.ReadRecordAsync(stream, ct);
+                    body = await Vxi11RecordFraming.ReadRecordAsync(stream, ct);
                 }
                 catch (EndOfStreamException)
                 {
@@ -495,7 +496,7 @@ public sealed class Vxi11GatewayServer : IGatewayServer
         {
             writer.AppendRaw(procedureBody);
         }
-        await Vxi11XdrCodec.WriteRecordAsync(stream, writer.ToArray(), ct);
+        await Vxi11RecordFraming.WriteRecordAsync(stream, writer.ToArray(), ct);
     }
 
     private static async Task WriteCreateLinkReplyAsync(

@@ -4,13 +4,14 @@ using System.Net.Sockets;
 using IviCli.Backends.Fake;
 using IviCli.Domain.Configuration;
 using IviCli.Domain.Devices;
+using IviCli.Domain.Protocols;
 using IviCli.Domain.Servers;
 using IviCli.Domain.Visa;
 using IviCli.Server.Vxi11;
 using IviCli.TestKit;
 using Microsoft.Extensions.Logging.Abstractions;
 using Shouldly;
-using static IviCli.Server.Vxi11.Vxi11Constants;
+using static IviCli.Domain.Protocols.Vxi11Constants;
 
 namespace IviCli.Server.Tests;
 
@@ -48,8 +49,8 @@ public sealed class Vxi11EndToEndTests
                 writer.WriteUInt32(0);
             }
         );
-        await Vxi11XdrCodec.WriteRecordAsync(stream, call, cts.Token);
-        var reply = await Vxi11XdrCodec.ReadRecordAsync(stream, cts.Token);
+        await Vxi11RecordFraming.WriteRecordAsync(stream, call, cts.Token);
+        var reply = await Vxi11RecordFraming.ReadRecordAsync(stream, cts.Token);
         var reader = SkipReplyHeader(reply);
         reader.ReadUInt32().ShouldBe((uint)port);
 
@@ -88,8 +89,10 @@ public sealed class Vxi11EndToEndTests
                 writer.WriteString("inst0");
             }
         );
-        await Vxi11XdrCodec.WriteRecordAsync(stream, createCall, cts.Token);
-        var createReply = SkipReplyHeader(await Vxi11XdrCodec.ReadRecordAsync(stream, cts.Token));
+        await Vxi11RecordFraming.WriteRecordAsync(stream, createCall, cts.Token);
+        var createReply = SkipReplyHeader(
+            await Vxi11RecordFraming.ReadRecordAsync(stream, cts.Token)
+        );
         createReply.ReadInt32().ShouldBe(Vxi11NoError);
         var lid = createReply.ReadInt32();
         _ = createReply.ReadUInt32(); // abort port
@@ -111,8 +114,10 @@ public sealed class Vxi11EndToEndTests
                 writer.WriteOpaque(idn);
             }
         );
-        await Vxi11XdrCodec.WriteRecordAsync(stream, writeCall, cts.Token);
-        var writeReply = SkipReplyHeader(await Vxi11XdrCodec.ReadRecordAsync(stream, cts.Token));
+        await Vxi11RecordFraming.WriteRecordAsync(stream, writeCall, cts.Token);
+        var writeReply = SkipReplyHeader(
+            await Vxi11RecordFraming.ReadRecordAsync(stream, cts.Token)
+        );
         writeReply.ReadInt32().ShouldBe(Vxi11NoError);
         writeReply.ReadUInt32().ShouldBe((uint)idn.Length);
 
@@ -132,8 +137,10 @@ public sealed class Vxi11EndToEndTests
                 writer.WriteUInt32((byte)'\n');
             }
         );
-        await Vxi11XdrCodec.WriteRecordAsync(stream, readCall, cts.Token);
-        var readReply = SkipReplyHeader(await Vxi11XdrCodec.ReadRecordAsync(stream, cts.Token));
+        await Vxi11RecordFraming.WriteRecordAsync(stream, readCall, cts.Token);
+        var readReply = SkipReplyHeader(
+            await Vxi11RecordFraming.ReadRecordAsync(stream, cts.Token)
+        );
         readReply.ReadInt32().ShouldBe(Vxi11NoError);
         readReply.ReadInt32().ShouldBe(4); // END reason
         var data = readReply.ReadOpaque();
@@ -147,8 +154,10 @@ public sealed class Vxi11EndToEndTests
             procedure: ProcDestroyLink,
             body: writer => writer.WriteInt32(lid)
         );
-        await Vxi11XdrCodec.WriteRecordAsync(stream, destroyCall, cts.Token);
-        var destroyReply = SkipReplyHeader(await Vxi11XdrCodec.ReadRecordAsync(stream, cts.Token));
+        await Vxi11RecordFraming.WriteRecordAsync(stream, destroyCall, cts.Token);
+        var destroyReply = SkipReplyHeader(
+            await Vxi11RecordFraming.ReadRecordAsync(stream, cts.Token)
+        );
         destroyReply.ReadInt32().ShouldBe(Vxi11NoError);
 
         await cts.CancelAsync();
@@ -185,8 +194,8 @@ public sealed class Vxi11EndToEndTests
                 writer.WriteOpaque("*IDN?\n"u8.ToArray());
             }
         );
-        await Vxi11XdrCodec.WriteRecordAsync(stream, bogusCall, cts.Token);
-        var reply = SkipReplyHeader(await Vxi11XdrCodec.ReadRecordAsync(stream, cts.Token));
+        await Vxi11RecordFraming.WriteRecordAsync(stream, bogusCall, cts.Token);
+        var reply = SkipReplyHeader(await Vxi11RecordFraming.ReadRecordAsync(stream, cts.Token));
         reply.ReadInt32().ShouldBe(Vxi11InvalidLink);
 
         await cts.CancelAsync();
@@ -216,8 +225,8 @@ public sealed class Vxi11EndToEndTests
             procedure: 1,
             body: _ => { }
         );
-        await Vxi11XdrCodec.WriteRecordAsync(stream, call, cts.Token);
-        var reply = await Vxi11XdrCodec.ReadRecordAsync(stream, cts.Token);
+        await Vxi11RecordFraming.WriteRecordAsync(stream, call, cts.Token);
+        var reply = await Vxi11RecordFraming.ReadRecordAsync(stream, cts.Token);
         // verf flavor (4) + verf length (4) + accept_status (4) at offsets
         // 12, 16, 20 inside the reply. Cheaper to read with our reader.
         var reader = new Vxi11XdrCodec.XdrReader(reply);

@@ -1,13 +1,13 @@
-namespace IviCli.Server.Vxi11;
+namespace IviCli.Domain.Protocols;
 
 /// <summary>
-/// Wire-level constants and request/response record shapes for the
-/// VXI-11 Core channel (program 395183 / version 1) and the co-located
-/// portmapper companion (program 100000 / version 2). Wire details
-/// live inside the Server layer because they are protocol-internal
-/// and never cross a layer boundary (ADR 0021 §3).
+/// Wire-level constants for the VXI-11 Core channel
+/// (program 395183 / version 1) and the co-located portmapper
+/// (program 100000 / version 2). Public so both the gateway server
+/// and the client backend can compose calls from the same source of
+/// truth — see ADR 0029.
 /// </summary>
-internal static class Vxi11Constants
+public static class Vxi11Constants
 {
     /// <summary>VXI-11 Core program number.</summary>
     public const uint CoreProgram = 395183;
@@ -74,46 +74,7 @@ internal static class Vxi11Constants
 
     /// <summary>device_write flag bit signalling end of message.</summary>
     public const int WriteEndFlag = 0x08;
+
+    /// <summary>device_read reason flag: END (entire message delivered).</summary>
+    public const int ReadReasonEnd = 4;
 }
-
-/// <summary>
-/// Parsed RPC call header (RFC 1831 §9). Cred / verf are restricted to
-/// <c>AUTH_NONE</c> in this gateway, so we do not surface them; an
-/// attempt to use any other auth flavor is rejected during decode.
-/// </summary>
-internal readonly record struct RpcCallHeader(uint Xid, uint Program, uint Version, uint Procedure);
-
-/// <summary>Result of decoding a Create_LinkParms structure.</summary>
-internal readonly record struct CreateLinkParms(
-    int ClientId,
-    bool LockDevice,
-    uint LockTimeout,
-    string Device
-);
-
-/// <summary>Result of decoding a Device_WriteParms structure.</summary>
-internal readonly record struct DeviceWriteParms(
-    int Lid,
-    uint IoTimeout,
-    uint LockTimeout,
-    int Flags,
-    byte[] Data
-);
-
-/// <summary>Result of decoding a Device_ReadParms structure.</summary>
-internal readonly record struct DeviceReadParms(
-    int Lid,
-    uint RequestSize,
-    uint IoTimeout,
-    uint LockTimeout,
-    int Flags,
-    byte TermChar
-);
-
-/// <summary>Result of decoding a Device_GenericParms structure (used by clear).</summary>
-internal readonly record struct DeviceGenericParms(
-    int Lid,
-    int Flags,
-    uint LockTimeout,
-    uint IoTimeout
-);
