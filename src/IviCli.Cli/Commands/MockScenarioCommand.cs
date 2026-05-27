@@ -24,7 +24,114 @@ public static class MockScenarioCommand
         command.Subcommands.Add(BuildDeactivate(services));
         command.Subcommands.Add(MockSceneCommand.Build(services));
         command.Subcommands.Add(BuildRecord(services));
+        command.Subcommands.Add(BuildImport(services));
         return command;
+    }
+
+    private static Command BuildImport(IServiceProvider services)
+    {
+        var pathArg = new Argument<string>("path")
+        {
+            Description = "Path to the NDJSON capture file (IVICLI_CAPTURE output).",
+        };
+        var nameOpt = new Option<string>("--name")
+        {
+            Description = "Scenario name to store the imported scenes under.",
+            Required = true,
+        };
+        var deviceOpt = new Option<string?>("--device")
+        {
+            Description =
+                "Device alias filter when the capture covers multiple devices (required in that case).",
+        };
+        var forceOpt = new Option<bool>("--force")
+        {
+            Description = "Overwrite an existing scenario with the same name.",
+        };
+
+        var cmd = new Command(
+            "import",
+            "Convert an NDJSON capture into a stored mock scenario (ADR 0033)."
+        );
+        cmd.Arguments.Add(pathArg);
+        cmd.Options.Add(nameOpt);
+        cmd.Options.Add(deviceOpt);
+        cmd.Options.Add(forceOpt);
+
+        cmd.SetAction(
+            async (parseResult, ct) =>
+            {
+                var path = parseResult.GetRequiredValue(pathArg);
+                var name = parseResult.GetRequiredValue(nameOpt);
+                var device = parseResult.GetValue(deviceOpt);
+                var force = parseResult.GetValue(forceOpt);
+
+                var handler =
+                    services.GetRequiredService<ImportScenarioFromTrafficCommandHandler>();
+                var logger = services.GetRequiredService<
+                    ILogger<ImportScenarioFromTrafficCommandHandler>
+                >();
+                var result = await handler.HandleAsync(
+                    new ImportScenarioFromTrafficCommand(path, name, device, force),
+                    ct
+                );
+                return result switch
+                {
+                    Result<ImportSummary, ImportTrafficError>.Ok ok => ImportOk(ok.Value),
+                    Result<ImportSummary, ImportTrafficError>.Error err => ImportFail(
+                        err.Err,
+                        logger
+                    ),
+                    _ => ExitCodeMapper.GenericFailure,
+                };
+            }
+        );
+        return cmd;
+    }
+
+    private static int ImportOk(ImportSummary summary)
+    {
+        Console.WriteLine(
+            $"imported '{summary.Name.Value}' with {summary.Scenes} scene(s) for device '{summary.Device}'"
+        );
+        return ExitCodeMapper.Success;
+    }
+
+    private static int ImportFail(ImportTrafficError error, ILogger logger)
+    {
+        logger.Log(
+            Logging.SerilogConfiguration.ToLogLevel(error.Severity),
+            error.Cause,
+            error.Message,
+            error.LogArgs.ToArray()
+        );
+        Console.Error.WriteLine(
+            error switch
+            {
+                ImportTrafficInvalidName n => $"error: invalid scenario name '{n.Raw}'.",
+                ImportTrafficInvalidDevice d => $"error: invalid device alias '{d.Raw}'.",
+                ImportTrafficIoFailure io => $"error: cannot read capture '{io.Path}': {io.Reason}",
+                ImportTrafficConvert { Inner: ConvertTrafficMultipleDevices md } =>
+                    "error: capture covers multiple devices ("
+                        + string.Join(", ", md.Devices)
+                        + "); rerun with --device to pick one.",
+                ImportTrafficConvert { Inner: ConvertTrafficNoScenes ns } => ns.DeviceFilter is null
+                    ? "error: capture contained no replayable Write/Query events."
+                    : $"error: no Write/Query events for device '{ns.DeviceFilter}'.",
+                ImportTrafficStoreFailure s =>
+                    $"error: scenario store rejected save: {s.Inner.Message}",
+                _ => "error: import failed.",
+            }
+        );
+        return error switch
+        {
+            ImportTrafficInvalidName or ImportTrafficInvalidDevice or ImportTrafficIoFailure =>
+                ExitCodeMapper.UsageError,
+            ImportTrafficConvert { Inner: ConvertTrafficMultipleDevices } =>
+                ExitCodeMapper.UsageError,
+            ImportTrafficStoreFailure => ExitCodeMapper.ConfigurationError,
+            _ => ExitCodeMapper.GenericFailure,
+        };
     }
 
     private static Command BuildRecord(IServiceProvider services)
