@@ -16,6 +16,7 @@
 - **Audit-friendly.** Set `IVICLI_CAPTURE=<path>` and every backend operation streams to an NDJSON log for post-hoc inspection — `tail -f path | jq` or hand it to support.
 - **Lint your scripts.** `visa lint foo.scpi` catches unknown SCPI roots (IEEE 488.2 + SCPI core) before you run them, without touching the instrument.
 - **Record once, replay forever.** Capture a real session with `IVICLI_CAPTURE`, convert it via `mock scenario import`, then drive any verb with `IVICLI_REPLAY=<name>` — no more hardware time burned on regression checks.
+- **Control plane.** `ivicli api start` exposes a JSON HTTP API at `http://127.0.0.1:8080/v1` (with `/openapi/v1.json`) so AI agents, dashboards, and CI scripts can list devices / fire SCPI queries / read status without speaking VISA.
 - **Automation-friendly.** Stdout carries data (including `--json`); stderr carries logs. Exit codes are POSIX-conventional. Shell completion ships for bash / zsh / PowerShell.
 
 ## Install
@@ -70,6 +71,7 @@ Override with the `IVICLI_CONFIG` environment variable.
 | `visa` | `add` `remove` `list` `use` `current` `scan` `query` `write` `read` `status` `script` `monitor` `watch` `lint` | Manage and talk to instruments |
 | `mock scenario` | `list` `create` `remove` `show` `activate` `deactivate` `record` `import` + `scene add` / `scene remove` | Author and capture mock-device scenarios |
 | `server` | `add` `remove` `list` `route add` / `route remove` / `route list` `start` `stop` `status` `log` | Gateway-server lifecycle |
+| `api` | `start` `stop` | Management HTTP JSON API (ADR 0034) |
 | top-level | `diagnose` `completion <shell>` | Environment health + shell autocomplete |
 
 ## Verbosity & format flags

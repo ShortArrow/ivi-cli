@@ -16,6 +16,7 @@
 - **監査向け.** `IVICLI_CAPTURE=<path>` を設定するとすべての backend 操作が NDJSON ログにストリームされ、`tail -f path | jq` で後追い確認やサポート提出に利用できます。
 - **スクリプト Lint.** `visa lint foo.scpi` で IEEE 488.2 / SCPI core の語彙に対する未知のルートを計測器に触らずに検出します。
 - **一度録って何度でも再生.** `IVICLI_CAPTURE` で実機セッションを取り、`mock scenario import` で scenario に変換、以後 `IVICLI_REPLAY=<name>` で同じ動作をハードウェア占有なしに再現できます。
+- **コントロールプレーン.** `ivicli api start` で HTTP JSON API を `http://127.0.0.1:8080/v1` に公開（`/openapi/v1.json` 付き）。AI agent / ダッシュボード / CI スクリプトが VISA を喋らずに device 列挙・SCPI クエリ・status 取得できます。
 - **自動化指向.** stdout はデータ (`--json` 含む)、stderr はログ専用。終了コードは POSIX 慣習に従い、bash / zsh / PowerShell の補完をサポートします。
 
 ## インストール
@@ -70,6 +71,7 @@ ivicli server start hislip-srv
 | `visa` | `add` `remove` `list` `use` `current` `scan` `query` `write` `read` `status` `script` `monitor` `watch` `lint` | 計測器の管理と通信 |
 | `mock scenario` | `list` `create` `remove` `show` `activate` `deactivate` `record` `import` + `scene add` / `scene remove` | モックデバイス用シナリオの編集と記録 |
 | `server` | `add` `remove` `list` `route add` / `route remove` / `route list` `start` `stop` `status` `log` | ゲートウェイサーバのライフサイクル |
+| `api` | `start` `stop` | Management HTTP JSON API (ADR 0034) |
 | top-level | `diagnose` `completion <shell>` | 環境ヘルスチェック + シェル補完 |
 
 ## 詳細度 / フォーマットのフラグ
