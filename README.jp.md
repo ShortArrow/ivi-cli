@@ -15,6 +15,7 @@
 - **シナリオ録画.** `mock scenario record --from-script` でスクリプト実行中の SCPI トラフィックを取得、`IVICLI_REPLAY=<scenario>` で同じスクリプトをハードウェアなしに決定論的に再実行できます。
 - **監査向け.** `IVICLI_CAPTURE=<path>` を設定するとすべての backend 操作が NDJSON ログにストリームされ、`tail -f path | jq` で後追い確認やサポート提出に利用できます。
 - **スクリプト Lint.** `visa lint foo.scpi` で IEEE 488.2 / SCPI core の語彙に対する未知のルートを計測器に触らずに検出します。
+- **一度録って何度でも再生.** `IVICLI_CAPTURE` で実機セッションを取り、`mock scenario import` で scenario に変換、以後 `IVICLI_REPLAY=<name>` で同じ動作をハードウェア占有なしに再現できます。
 - **自動化指向.** stdout はデータ (`--json` 含む)、stderr はログ専用。終了コードは POSIX 慣習に従い、bash / zsh / PowerShell の補完をサポートします。
 
 ## インストール
@@ -67,7 +68,7 @@ ivicli server start hislip-srv
 | グループ | 動詞 | 用途 |
 | --- | --- | --- |
 | `visa` | `add` `remove` `list` `use` `current` `scan` `query` `write` `read` `status` `script` `monitor` `watch` `lint` | 計測器の管理と通信 |
-| `mock scenario` | `list` `create` `remove` `show` `activate` `deactivate` `record` + `scene add` / `scene remove` | モックデバイス用シナリオの編集と記録 |
+| `mock scenario` | `list` `create` `remove` `show` `activate` `deactivate` `record` `import` + `scene add` / `scene remove` | モックデバイス用シナリオの編集と記録 |
 | `server` | `add` `remove` `list` `route add` / `route remove` / `route list` `start` `stop` `status` `log` | ゲートウェイサーバのライフサイクル |
 | top-level | `diagnose` `completion <shell>` | 環境ヘルスチェック + シェル補完 |
 

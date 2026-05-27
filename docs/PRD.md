@@ -819,6 +819,9 @@ Phase 3 (operator-facing automation):
   responses to stdout (and optional structured log file), until interrupted.
 * mock scenario record — append observed query/write traffic into a
   scenario file for later playback, closing the loop with ADR 0026.
+* mock scenario import — convert an NDJSON capture (IVICLI_CAPTURE
+  output) into a stored MockScenario so the existing IVICLI_REPLAY
+  machinery can serve it. ADR 0033.
 * server log — tail the gateway's per-server structured log file with
   optional follow / level filter (operator-facing observability).
 
@@ -841,7 +844,6 @@ Phase 3 (operator-facing automation):
 
 ## Planned
 
-* session recording/replay
 * Web UI
 * AI agent integration
 * VISA-over-WebSocket

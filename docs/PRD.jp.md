@@ -825,6 +825,9 @@ Phase 3 (オペレータ向け自動化):
   および構造化ログに流す。中断まで継続。
 * mock scenario record — 実行中の query/write トラフィックをシナリオファイル
   に追記し、ADR 0026 の再生ループを閉じる。
+* mock scenario import — NDJSON キャプチャ（IVICLI_CAPTURE の出力）を
+  既存の MockScenario に変換し、`IVICLI_REPLAY` 経由でそのまま再生可能に
+  する。ADR 0033。
 * server log — ゲートウェイのサーバ別構造化ログを tail（follow / レベル
   フィルタ）。オペレータ向け観測性。
 
@@ -847,7 +850,6 @@ Phase 3 (オペレータ向け自動化):
 
 ## Planned
 
-* session recording/replay
 * Web UI
 * AI agent integration
 * VISA-over-WebSocket

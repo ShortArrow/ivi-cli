@@ -15,6 +15,7 @@
 - **Recordable scenarios.** `mock scenario record --from-script` captures the SCPI traffic of a script run; `IVICLI_REPLAY=<scenario>` re-runs the same scripts deterministically without hardware.
 - **Audit-friendly.** Set `IVICLI_CAPTURE=<path>` and every backend operation streams to an NDJSON log for post-hoc inspection — `tail -f path | jq` or hand it to support.
 - **Lint your scripts.** `visa lint foo.scpi` catches unknown SCPI roots (IEEE 488.2 + SCPI core) before you run them, without touching the instrument.
+- **Record once, replay forever.** Capture a real session with `IVICLI_CAPTURE`, convert it via `mock scenario import`, then drive any verb with `IVICLI_REPLAY=<name>` — no more hardware time burned on regression checks.
 - **Automation-friendly.** Stdout carries data (including `--json`); stderr carries logs. Exit codes are POSIX-conventional. Shell completion ships for bash / zsh / PowerShell.
 
 ## Install
@@ -67,7 +68,7 @@ Override with the `IVICLI_CONFIG` environment variable.
 | Group | Verbs | Purpose |
 | --- | --- | --- |
 | `visa` | `add` `remove` `list` `use` `current` `scan` `query` `write` `read` `status` `script` `monitor` `watch` `lint` | Manage and talk to instruments |
-| `mock scenario` | `list` `create` `remove` `show` `activate` `deactivate` `record` + `scene add` / `scene remove` | Author and capture mock-device scenarios |
+| `mock scenario` | `list` `create` `remove` `show` `activate` `deactivate` `record` `import` + `scene add` / `scene remove` | Author and capture mock-device scenarios |
 | `server` | `add` `remove` `list` `route add` / `route remove` / `route list` `start` `stop` `status` `log` | Gateway-server lifecycle |
 | top-level | `diagnose` `completion <shell>` | Environment health + shell autocomplete |
 
