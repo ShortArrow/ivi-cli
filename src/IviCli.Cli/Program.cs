@@ -77,6 +77,10 @@ internal static class Program
                 IviCli.Cli.Completion.IDynamicCompleter,
                 IviCli.Cli.Completion.Completers.ScenarioNameCompleter
             >();
+            services.AddSingleton<
+                IviCli.Cli.Completion.IDynamicCompleter,
+                IviCli.Cli.Completion.Completers.ScpiCommandCompleter
+            >();
             // Composition-root wiring of DefaultBackendFactory: route TCPIP
             // HiSLIP -> HiSlipBackend, SOCKET-style TCPIP -> SocketBackend,
             // other TCPIP / USB / GPIB -> LocalBackend, fallback -> FakeBackend.
@@ -227,6 +231,7 @@ internal static class Program
         visa.Subcommands.Add(VisaScriptCommand.Build(services));
         visa.Subcommands.Add(VisaMonitorCommand.Build(services));
         visa.Subcommands.Add(VisaWatchCommand.Build(services));
+        visa.Subcommands.Add(VisaLintCommand.Build(services));
 
         var mock = new Command("mock", "Manage mock-device behaviour for the Fake Backend.");
         mock.Subcommands.Add(MockScenarioCommand.Build(services));
