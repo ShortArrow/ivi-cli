@@ -428,7 +428,7 @@ device = "psu1"
 
 ## 7.3 VXI-11-compatible Server
 
-VXI-11 は将来拡張または調査対象とする。
+VXI-11 はサーバ／クライアント両側を Batch D で実装した。`Vxi11GatewayServer` (サーバ、ADR 0029) と `Vxi11Backend` (クライアント) が `create_link` / `device_write` / `device_read` / `device_clear` / `destroy_link` ＋同一ポート上の portmapper GETPORT をサポートする。Abort / Interrupt チャネル、locking、trigger、本来の port-111 portmapper 通信は引き続き未対応。
 
 ```bash
 ivicli server start --protocol vxi11

@@ -52,8 +52,14 @@ RPC calls to the Core handler when the program number matches.
   15–20, 22).
 - Vendor extensions, TLS, UDP transport, broadcast portmapper queries
   on UDP 111.
-- A client backend (`IviCli.Backends.Vxi11`) — separate task; this
-  ADR covers the **server** only.
+- Real **portmapper-at-111** client conversation — Batch D's client
+  backend connects directly to the configured Core port instead, since
+  the gateway co-locates portmapper + Core on one bind address. v2.
+
+The companion client backend (`IviCli.Backends.Vxi11`) shipped in
+Batch D, sharing the XDR codec / RPC message records uplifted to
+`IviCli.Domain.Protocols` so adding the Abort or Interrupt channels
+later requires no codec duplication.
 
 ### 3. Wire-format guarantees
 

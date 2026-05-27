@@ -422,7 +422,7 @@ device = "psu1"
 
 ## 7.3 VXI-11-compatible Server
 
-VXI-11 is a future extension / investigation target.
+Both halves of VXI-11 ship in Batch D — the `Vxi11GatewayServer` (server side, ADR 0029) and the `Vxi11Backend` (client side). v1 implements create_link / device_write / device_read / device_clear / destroy_link plus a co-located portmapper GETPORT. Abort + interrupt channels, locking, trigger, and the real port-111 portmapper conversation remain deferred.
 
 ```bash
 ivicli server start --protocol vxi11

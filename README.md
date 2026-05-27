@@ -10,7 +10,7 @@
 
 - **Stateful UX.** Register an alias once with `ivicli visa add psu1 ...`; subsequent commands operate on `psu1` without retyping the VISA resource.
 - **VISA-compatible.** Parses standard `TCPIP::`, `USB::`, `GPIB::` resource strings without proprietary syntax.
-- **Multiple backends.** Local NI-VISA, HiSLIP, raw TCP SOCKET, Fake (programmable + scenario playback), Replay (strict deterministic playback) — all behind a single `IIviBackend` port.
+- **Multiple backends.** Local NI-VISA, HiSLIP, VXI-11, raw TCP SOCKET, Fake (programmable + scenario playback), Replay (strict deterministic playback) — all behind a single `IIviBackend` port.
 - **Gateway servers.** Expose a local instrument over HiSLIP (`TCPIP::host::hislip0::INSTR`) or raw socket so remote PyVISA / NI-VISA clients can drive it without redeploying the test.
 - **Recordable scenarios.** `mock scenario record --from-script` captures the SCPI traffic of a script run; `IVICLI_REPLAY=<scenario>` re-runs the same scripts deterministically without hardware.
 - **Automation-friendly.** Stdout carries data (including `--json`); stderr carries logs. Exit codes are POSIX-conventional. Shell completion ships for bash / zsh / PowerShell.
@@ -101,7 +101,7 @@ flowchart LR
     Server --> App
     Cli --> Infra["IviCli.Infrastructure<br/>(TomlConfigStore, FilePidRegistry)"]
     Infra --> App
-    Cli --> Backends["IviCli.Backends.*<br/>(Fake / Local / HiSlip / Socket / Replay)"]
+    Cli --> Backends["IviCli.Backends.*<br/>(Fake / Local / HiSlip / Vxi11 / Socket / Replay)"]
     Backends --> App
     App --> Domain["IviCli.Domain<br/>(value objects, entities, errors)"]
     Server --> Domain
