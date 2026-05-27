@@ -1,6 +1,7 @@
 using System.Net.Http;
 using System.Net.Http.Json;
 using IviCli.Api.Routing;
+using IviCli.Api.WebSockets;
 using IviCli.Application.Backends;
 using IviCli.Application.Configuration;
 using IviCli.Application.Devices;
@@ -37,6 +38,12 @@ internal sealed class ApiTestHost : IAsyncDisposable
 
     public HttpClient Client { get; }
 
+    /// <summary>
+    /// Returns the underlying <see cref="TestServer"/> so tests can open
+    /// WebSocket connections via <see cref="TestServer.CreateWebSocketClient"/>.
+    /// </summary>
+    public TestServer Server => _host.GetTestServer();
+
     public static async Task<ApiTestHost> StartAsync(
         ConfigDocument config,
         FakeBackend? backend = null,
@@ -65,6 +72,7 @@ internal sealed class ApiTestHost : IAsyncDisposable
             });
             web.Configure(app =>
             {
+                app.UseWebSockets();
                 app.UseRouting();
                 app.UseEndpoints(endpoints =>
                 {
@@ -76,6 +84,7 @@ internal sealed class ApiTestHost : IAsyncDisposable
                     endpoints.MapServers();
                     endpoints.MapScenarios();
                     endpoints.MapVisa();
+                    endpoints.MapVisaWebSocket();
                 });
             });
         });

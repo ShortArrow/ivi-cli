@@ -1,5 +1,6 @@
 using System.Net;
 using IviCli.Api.Routing;
+using IviCli.Api.WebSockets;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Server.Kestrel.Core;
@@ -50,12 +51,14 @@ public static class IviCliApiBuilder
         });
 
         var app = builder.Build();
+        app.UseWebSockets();
         app.MapOpenApi("/openapi/v1.json");
         app.MapGet("/healthz", () => Microsoft.AspNetCore.Http.Results.Json(new { status = "ok" }));
         app.MapDevices();
         app.MapServers();
         app.MapScenarios();
         app.MapVisa();
+        app.MapVisaWebSocket();
         return app;
     }
 
