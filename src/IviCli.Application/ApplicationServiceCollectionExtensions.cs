@@ -60,6 +60,8 @@ public static class ApplicationServiceCollectionExtensions
         services.AddSingleton<AddSceneCommandHandler>();
         services.AddSingleton<RemoveSceneCommandHandler>();
         services.AddSingleton<RecordScenarioCommandHandler>();
+        services.AddSingleton<ITrafficScenarioConverter, DefaultTrafficScenarioConverter>();
+        services.AddSingleton<ImportScenarioFromTrafficCommandHandler>();
         return services;
     }
 
