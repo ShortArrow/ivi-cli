@@ -40,6 +40,7 @@ public static class ApiCommand
         var command = new Command("api", "Manage the local Management API (HTTP JSON).");
         command.Subcommands.Add(BuildStart(services));
         command.Subcommands.Add(BuildStop(services));
+        command.Subcommands.Add(ApiTokenCommand.Build(services));
         return command;
     }
 

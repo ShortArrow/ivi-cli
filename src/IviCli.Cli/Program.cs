@@ -57,6 +57,9 @@ internal static class Program
             services.AddIviCliGatewayServers();
             services.AddIviCliInfrastructure(configPath);
             services.AddIviCliServerProcessRegistry(IviPaths.ResolveServerStateDirectory());
+            services.AddIviCliApiTokenStore(
+                Path.Combine(IviPaths.ResolveAuthDirectory(), "api-tokens.toml")
+            );
             services.AddIviCliScenarioStore(configPath);
             services.AddIviCliBackendsFake();
             services.AddIviCliBackendsSocket();

@@ -1,3 +1,4 @@
+using IviCli.Application.Auth;
 using IviCli.Application.Devices;
 using IviCli.Application.Diagnostics;
 using IviCli.Application.Mock;
@@ -41,6 +42,9 @@ public static class ApplicationServiceCollectionExtensions
         services.AddSingleton<MonitorDeviceCommandHandler>();
         services.AddSingleton<IScriptLinter, DefaultScriptLinter>();
         services.AddSingleton<WatchDevicesCommandHandler>();
+        services.AddSingleton<CreateApiTokenCommandHandler>();
+        services.AddSingleton<ListApiTokensQueryHandler>();
+        services.AddSingleton<RevokeApiTokenCommandHandler>();
         return services;
     }
 
