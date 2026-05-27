@@ -10,10 +10,12 @@ public static class IviPaths
     private const string ConfigFileName = "config.toml";
     private const string LogDirectoryName = "logs";
     private const string ServersDirectoryName = "servers";
+    private const string AuthDirectoryName = "auth";
 
     private const string ConfigOverrideEnv = "IVICLI_CONFIG";
     private const string LogDirOverrideEnv = "IVICLI_LOG_DIR";
     private const string ServerStateDirOverrideEnv = "IVICLI_SERVER_STATE_DIR";
+    private const string AuthDirOverrideEnv = "IVICLI_AUTH_DIR";
 
     /// <summary>
     /// Returns the absolute path to <c>config.toml</c>, respecting the
@@ -124,5 +126,40 @@ public static class IviPaths
                 "state"
             );
         return Path.Combine(stateRoot, AppFolderName, ServersDirectoryName);
+    }
+
+    /// <summary>
+    /// Returns the absolute path to the API authentication directory
+    /// (ADR 0036). Hosts the <c>api-tokens.toml</c> file the
+    /// Management API consults. Honours the
+    /// <c>IVICLI_AUTH_DIR</c> environment-variable override.
+    /// </summary>
+    public static string ResolveAuthDirectory()
+    {
+        var overrideValue = Environment.GetEnvironmentVariable(AuthDirOverrideEnv);
+        if (!string.IsNullOrEmpty(overrideValue))
+        {
+            return overrideValue;
+        }
+
+        if (OperatingSystem.IsWindows())
+        {
+            return Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                AppFolderName,
+                AuthDirectoryName
+            );
+        }
+
+        // Linux / macOS: co-located with config.toml under
+        // $XDG_CONFIG_HOME/ivi-cli/auth so users see all CLI state in
+        // one tree.
+        var configRoot =
+            Environment.GetEnvironmentVariable("XDG_CONFIG_HOME")
+            ?? Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+                ".config"
+            );
+        return Path.Combine(configRoot, AppFolderName, AuthDirectoryName);
     }
 }

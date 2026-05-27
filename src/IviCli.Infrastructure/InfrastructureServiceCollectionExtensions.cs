@@ -1,4 +1,5 @@
 using System.IO.Abstractions;
+using IviCli.Application.Auth;
 using IviCli.Application.Backends;
 using IviCli.Application.Capture;
 using IviCli.Application.Configuration;
@@ -110,6 +111,24 @@ public static class InfrastructureServiceCollectionExtensions
         services.AddSingleton<IScenarioStore>(sp => new TomlScenarioStore(
             sp.GetRequiredService<IFileSystem>(),
             directory
+        ));
+        return services;
+    }
+
+    /// <summary>
+    /// Registers <c>TomlApiTokenStore</c> as the production
+    /// <see cref="IApiTokenStore"/>. <paramref name="tokenPath"/> is the
+    /// absolute path to the <c>api-tokens.toml</c> file (typically
+    /// resolved via <c>IviPaths.ResolveAuthDirectory()</c>).
+    /// </summary>
+    public static IServiceCollection AddIviCliApiTokenStore(
+        this IServiceCollection services,
+        string tokenPath
+    )
+    {
+        services.AddSingleton<IApiTokenStore>(sp => new Auth.TomlApiTokenStore(
+            sp.GetRequiredService<IFileSystem>(),
+            tokenPath
         ));
         return services;
     }
