@@ -383,6 +383,13 @@
           "Microsoft.Extensions.DependencyInjection.Abstractions": "[9.0.11, )"
         }
       },
+      "ivicli.backends.vxi11": {
+        "type": "Project",
+        "dependencies": {
+          "IviCli.Application": "[1.0.0, )",
+          "Microsoft.Extensions.DependencyInjection.Abstractions": "[9.0.11, )"
+        }
+      },
       "ivicli.domain": {
         "type": "Project"
       },

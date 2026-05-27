@@ -19,6 +19,7 @@ public sealed class DefaultBackendFactory : IBackendFactory
     private readonly IIviBackend? _localBackend;
     private readonly IIviBackend? _hislipBackend;
     private readonly IIviBackend? _socketBackend;
+    private readonly IIviBackend? _vxi11Backend;
     private readonly IIviBackend _fallbackBackend;
 
     /// <summary>
@@ -30,13 +31,15 @@ public sealed class DefaultBackendFactory : IBackendFactory
         IIviBackend fallbackBackend,
         IIviBackend? localBackend = null,
         IIviBackend? hislipBackend = null,
-        IIviBackend? socketBackend = null
+        IIviBackend? socketBackend = null,
+        IIviBackend? vxi11Backend = null
     )
     {
         _fallbackBackend = fallbackBackend;
         _localBackend = localBackend;
         _hislipBackend = hislipBackend;
         _socketBackend = socketBackend;
+        _vxi11Backend = vxi11Backend;
     }
 
     /// <inheritdoc/>
@@ -45,6 +48,7 @@ public sealed class DefaultBackendFactory : IBackendFactory
         var backend = device.Resource switch
         {
             VisaResource.Tcpip t when LooksLikeHislip(t) => _hislipBackend ?? _fallbackBackend,
+            VisaResource.Tcpip t when LooksLikeVxi11(t) => _vxi11Backend ?? _fallbackBackend,
             VisaResource.Tcpip => _localBackend ?? _hislipBackend ?? _fallbackBackend,
             VisaResource.Usb => _localBackend ?? _fallbackBackend,
             VisaResource.Gpib => _localBackend ?? _fallbackBackend,
@@ -58,4 +62,7 @@ public sealed class DefaultBackendFactory : IBackendFactory
 
     private static bool LooksLikeHislip(VisaResource.Tcpip resource) =>
         resource.LanDevice.StartsWith("hislip", StringComparison.Ordinal);
+
+    private static bool LooksLikeVxi11(VisaResource.Tcpip resource) =>
+        resource.LanDevice.StartsWith("inst", StringComparison.Ordinal);
 }

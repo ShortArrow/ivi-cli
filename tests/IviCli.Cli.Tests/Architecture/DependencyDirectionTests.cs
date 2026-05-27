@@ -28,6 +28,7 @@ public class DependencyDirectionTests
     private static readonly Assembly BackendsSocketAssembly = Assembly.Load(
         "IviCli.Backends.Socket"
     );
+    private static readonly Assembly BackendsVxi11Assembly = Assembly.Load("IviCli.Backends.Vxi11");
     private static readonly Assembly ServerAssembly = Assembly.Load("IviCli.Server");
 
     private static readonly string[] AllBackendAssemblyNames =
@@ -37,6 +38,7 @@ public class DependencyDirectionTests
         "IviCli.Backends.HiSlip",
         "IviCli.Backends.Socket",
         "IviCli.Backends.Replay",
+        "IviCli.Backends.Vxi11",
     ];
 
     [Fact]
@@ -53,6 +55,7 @@ public class DependencyDirectionTests
                 "IviCli.Backends.HiSlip",
                 "IviCli.Backends.Socket",
                 "IviCli.Backends.Replay",
+                "IviCli.Backends.Vxi11",
                 "IviCli.Server",
                 "IviCli.Cli"
             )
@@ -77,6 +80,7 @@ public class DependencyDirectionTests
                 "IviCli.Backends.HiSlip",
                 "IviCli.Backends.Socket",
                 "IviCli.Backends.Replay",
+                "IviCli.Backends.Vxi11",
                 "IviCli.Server",
                 "IviCli.Cli"
             )
@@ -100,6 +104,7 @@ public class DependencyDirectionTests
                 "IviCli.Backends.HiSlip",
                 "IviCli.Backends.Socket",
                 "IviCli.Backends.Replay",
+                "IviCli.Backends.Vxi11",
                 "IviCli.Server",
                 "IviCli.Cli"
             )
@@ -117,6 +122,7 @@ public class DependencyDirectionTests
     [InlineData("IviCli.Backends.HiSlip")]
     [InlineData("IviCli.Backends.Socket")]
     [InlineData("IviCli.Backends.Replay")]
+    [InlineData("IviCli.Backends.Vxi11")]
     public void Backend_DoesNotDependOnInfrastructureOrServerOrCliOrOtherBackends(
         string assemblyName
     )

@@ -6,6 +6,7 @@ using IviCli.Backends.Fake;
 using IviCli.Backends.HiSlip;
 using IviCli.Backends.Local;
 using IviCli.Backends.Socket;
+using IviCli.Backends.Vxi11;
 using IviCli.Cli.Commands;
 using IviCli.Cli.Logging;
 using IviCli.Cli.Paths;
@@ -60,6 +61,7 @@ internal static class Program
             services.AddIviCliBackendsFake();
             services.AddIviCliBackendsSocket();
             services.AddIviCliBackendsHiSlip();
+            services.AddIviCliBackendsVxi11();
             services.AddIviCliBackendsLocal();
             // Dynamic-completion plumbing for the `__complete` verb.
             services.AddSingleton<IviCli.Cli.Completion.CompletionRegistry>();
@@ -124,7 +126,8 @@ internal static class Program
                     fallbackBackend: fallback,
                     localBackend: sp.GetRequiredService<IviCli.Backends.Local.LocalBackend>(),
                     hislipBackend: sp.GetRequiredService<IviCli.Backends.HiSlip.HiSlipBackend>(),
-                    socketBackend: sp.GetRequiredService<IviCli.Backends.Socket.SocketBackend>()
+                    socketBackend: sp.GetRequiredService<IviCli.Backends.Socket.SocketBackend>(),
+                    vxi11Backend: sp.GetRequiredService<IviCli.Backends.Vxi11.Vxi11Backend>()
                 );
             });
             services.AddSingleton(

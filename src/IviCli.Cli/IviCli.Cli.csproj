@@ -13,6 +13,7 @@
     <ProjectReference Include="..\IviCli.Backends.Fake\IviCli.Backends.Fake.csproj" />
     <ProjectReference Include="..\IviCli.Backends.Socket\IviCli.Backends.Socket.csproj" />
     <ProjectReference Include="..\IviCli.Backends.HiSlip\IviCli.Backends.HiSlip.csproj" />
+    <ProjectReference Include="..\IviCli.Backends.Vxi11\IviCli.Backends.Vxi11.csproj" />
     <ProjectReference Include="..\IviCli.Server\IviCli.Server.csproj" />
   </ItemGroup>
 

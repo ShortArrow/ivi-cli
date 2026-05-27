@@ -490,6 +490,7 @@
           "IviCli.Backends.Local": "[1.0.0, )",
           "IviCli.Backends.Replay": "[1.0.0, )",
           "IviCli.Backends.Socket": "[1.0.0, )",
+          "IviCli.Backends.Vxi11": "[1.0.0, )",
           "IviCli.Infrastructure": "[1.0.0, )",
           "IviCli.Server": "[1.0.0, )",
           "Microsoft.Extensions.Hosting": "[9.0.11, )",
@@ -539,6 +540,13 @@
         }
       },
       "ivicli.backends.socket": {
+        "type": "Project",
+        "dependencies": {
+          "IviCli.Application": "[1.0.0, )",
+          "Microsoft.Extensions.DependencyInjection.Abstractions": "[9.0.11, )"
+        }
+      },
+      "ivicli.backends.vxi11": {
         "type": "Project",
         "dependencies": {
           "IviCli.Application": "[1.0.0, )",
