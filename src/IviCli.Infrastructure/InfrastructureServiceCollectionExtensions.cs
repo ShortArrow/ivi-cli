@@ -48,6 +48,9 @@ public static class InfrastructureServiceCollectionExtensions
             sessionPath ?? DeriveDefaultSessionPath(configPath)
         ));
         services.AddSingleton<ITrafficWriter>(NullTrafficWriter.Instance);
+        services.AddSingleton<INdjsonTrafficReader>(sp => new Capture.NdjsonTrafficReader(
+            sp.GetRequiredService<IFileSystem>()
+        ));
         return services;
     }
 
