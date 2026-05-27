@@ -85,11 +85,14 @@ but discarded — TestHost surfaces them inconsistently across .NET
 versions, and the structured `error` event already carries the same
 information in a stable shape.
 
-### 5. Security stance (v1)
+### 5. Security stance
 
-- **No authentication.** Same loopback-default stance as ADR 0034 §5.
-- Loopback bind is the v1 audience; the same future authn ADR that
-  governs the HTTP control plane also covers the WS endpoint.
+- **Token authentication landed in [ADR 0036](0036-management-api-authentication.md).**
+  Browser clients pass the token via the
+  `Sec-WebSocket-Protocol: ivi-cli-pat.<token>` header on the
+  upgrade handshake (browsers can't set custom headers on WS).
+  Server-side validation goes through the same middleware as the
+  HTTP routes — one envelope, one rule set.
 
 ### 6. Layer placement
 

@@ -497,6 +497,8 @@ The following management features, however, are exposed as a proprietary managem
 
 **Batch J adds the WebSocket subprotocol** ([ADR 0035](adr/0035-visa-over-websocket.md)): `ws://host:port/v1/devices/{name}/visa` carries `{op,scpi}` frames and replies with `{event:response|ack|error,...}` for browsers / AI-agent runtimes / dashboards.
 
+**Batch K adds PAT authentication** ([ADR 0036](adr/0036-management-api-authentication.md)): mint tokens with `ivicli api token create`, validate via `Authorization: Bearer <token>` (HTTP) or `Sec-WebSocket-Protocol: ivi-cli-pat.<token>` (WS). Non-loopback bind requires ≥ 1 token (or `--allow-anonymous` to opt out). Token scopes, mTLS, expiry, and audit logging are v2.
+
 ---
 
 ## 7.6 Remote Access from IVI-CLI

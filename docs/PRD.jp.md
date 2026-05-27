@@ -503,6 +503,8 @@ HiSLIP / VXI-11 / Socket は既存 VISA client 互換のために提供する。
 
 **Batch J で WebSocket サブプロトコルを追加**（[ADR 0035](adr/0035-visa-over-websocket.md)）: `ws://host:port/v1/devices/{name}/visa` は `{op,scpi}` フレームを受け取り `{event:response|ack|error,...}` を返す。ブラウザ / AI agent ランタイム / ダッシュボード向け。
 
+**Batch K で PAT 認証を追加**（[ADR 0036](adr/0036-management-api-authentication.md)）: `ivicli api token create` でトークンを生成し、HTTP は `Authorization: Bearer <token>`、WebSocket は `Sec-WebSocket-Protocol: ivi-cli-pat.<token>` で検証する。loopback 以外へバインドする場合は ≥ 1 個のトークン（または `--allow-anonymous` で opt-out）が必須。スコープ / mTLS / 有効期限 / 監査ログは v2。
+
 ---
 
 ## 7.6 Remote Access from IVI-CLI

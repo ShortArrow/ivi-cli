@@ -80,18 +80,17 @@ CLI verbs (`src/IviCli.Cli/Commands/ApiCommand.cs`):
 Default bind = `127.0.0.1`. Non-loopback bind logs a Warning that
 authentication is not implemented in v1 (see §5).
 
-### 5. Security stance (v1)
+### 5. Security stance
 
-- **No authentication or authorization in v1.** The API binds to
-  loopback by default; the operator is the sole trust boundary on the
-  host. Non-loopback bind is permitted (so a container's healthcheck
-  can hit it) but logs a Warning at startup.
+- **Token-based authentication landed in [ADR 0036](0036-management-api-authentication.md).**
+  `Authorization: Bearer <token>` gates HTTP routes;
+  `Sec-WebSocket-Protocol: ivi-cli-pat.<token>` gates the WS handshake.
+  Loopback bind without tokens is still permitted (the local-only
+  stance); non-loopback bind requires ≥ 1 configured token or an
+  explicit `--allow-anonymous` opt-out.
 - The request body cap is the ASP.NET Core / Kestrel default (30 MiB);
   no per-route limit in v1.
 - CORS is not configured (no `AddCors`) — browsers honour same-origin.
-
-ADR-future authn (token / mTLS) lands before any non-loopback
-production deployment.
 
 ### 6. Layer placement
 
