@@ -242,6 +242,7 @@ internal static class Program
         root.Subcommands.Add(visa);
         root.Subcommands.Add(mock);
         root.Subcommands.Add(ServerCommand.Build(services));
+        root.Subcommands.Add(ApiCommand.Build(services));
         root.Subcommands.Add(DiagnoseCommand.Build(services));
         root.Subcommands.Add(CompletionCommand.Build());
         root.Subcommands.Add(CompleteCommand.Build(root, services));

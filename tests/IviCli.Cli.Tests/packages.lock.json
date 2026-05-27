@@ -364,6 +364,11 @@
         "resolved": "9.0.11",
         "contentHash": "rtUNSIhbQTv8iSBTFvtg2b/ZUkoqC9qAH9DdC2hr+xPpoZrxiCITci9UR/ELUGUGnGUrF8Xye+tGVRhCxE+4LA=="
       },
+      "Microsoft.OpenApi": {
+        "type": "Transitive",
+        "resolved": "2.0.0",
+        "contentHash": "GGYLfzV/G/ct80OZ45JxnWP7NvMX1BCugn/lX7TH5o0lcVaviavsLMTxmFV2AybXWjbi3h6FF1vgZiTK6PXndw=="
+      },
       "Microsoft.TestPlatform.ObjectModel": {
         "type": "Transitive",
         "resolved": "17.14.1",
@@ -484,6 +489,7 @@
       "ivicli": {
         "type": "Project",
         "dependencies": {
+          "IviCli.Api": "[1.0.0, )",
           "IviCli.Application": "[1.0.0, )",
           "IviCli.Backends.Fake": "[1.0.0, )",
           "IviCli.Backends.HiSlip": "[1.0.0, )",
@@ -502,6 +508,13 @@
           "Serilog.Sinks.File": "[6.0.0, )",
           "Spectre.Console": "[0.50.0, )",
           "System.CommandLine": "[2.0.0-beta5.25306.1, )"
+        }
+      },
+      "ivicli.api": {
+        "type": "Project",
+        "dependencies": {
+          "IviCli.Application": "[1.0.0, )",
+          "Microsoft.AspNetCore.OpenApi": "[10.0.0, )"
         }
       },
       "ivicli.application": {
@@ -588,6 +601,15 @@
           "TestableIO.System.IO.Abstractions": "[22.1.0, )",
           "TestableIO.System.IO.Abstractions.TestingHelpers": "[22.1.0, )",
           "xunit": "[2.9.3, )"
+        }
+      },
+      "Microsoft.AspNetCore.OpenApi": {
+        "type": "CentralTransitive",
+        "requested": "[10.0.0, )",
+        "resolved": "10.0.0",
+        "contentHash": "0aqIF1t+sA2T62LIeMtXGSiaV7keGQaJnvwwmu+htQdjCaKYARfXAeqp4nHH9y2etpilyZ/tnQzZg4Ilmo/c4Q==",
+        "dependencies": {
+          "Microsoft.OpenApi": "2.0.0"
         }
       },
       "Microsoft.Extensions.DependencyInjection.Abstractions": {

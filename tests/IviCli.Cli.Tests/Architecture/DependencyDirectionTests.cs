@@ -57,6 +57,7 @@ public class DependencyDirectionTests
                 "IviCli.Backends.Replay",
                 "IviCli.Backends.Vxi11",
                 "IviCli.Server",
+                "IviCli.Api",
                 "IviCli.Cli"
             )
             .GetResult();
@@ -82,6 +83,7 @@ public class DependencyDirectionTests
                 "IviCli.Backends.Replay",
                 "IviCli.Backends.Vxi11",
                 "IviCli.Server",
+                "IviCli.Api",
                 "IviCli.Cli"
             )
             .GetResult();
@@ -106,6 +108,7 @@ public class DependencyDirectionTests
                 "IviCli.Backends.Replay",
                 "IviCli.Backends.Vxi11",
                 "IviCli.Server",
+                "IviCli.Api",
                 "IviCli.Cli"
             )
             .GetResult();

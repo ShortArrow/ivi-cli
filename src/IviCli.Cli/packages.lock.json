@@ -327,6 +327,11 @@
         "resolved": "9.0.11",
         "contentHash": "rtUNSIhbQTv8iSBTFvtg2b/ZUkoqC9qAH9DdC2hr+xPpoZrxiCITci9UR/ELUGUGnGUrF8Xye+tGVRhCxE+4LA=="
       },
+      "Microsoft.OpenApi": {
+        "type": "Transitive",
+        "resolved": "2.0.0",
+        "contentHash": "GGYLfzV/G/ct80OZ45JxnWP7NvMX1BCugn/lX7TH5o0lcVaviavsLMTxmFV2AybXWjbi3h6FF1vgZiTK6PXndw=="
+      },
       "Serilog.Extensions.Logging": {
         "type": "Transitive",
         "resolved": "9.0.0",
@@ -345,6 +350,13 @@
         "type": "Transitive",
         "resolved": "10.0.0",
         "contentHash": "tZOXFLGjkh8TxgMgKeEcM2HAlz9DwndGl6TFLo6ISHcszFX3FkuPMrtVbmqVjhooWNXrgJ/a9cH9ym5MZL1LAg=="
+      },
+      "ivicli.api": {
+        "type": "Project",
+        "dependencies": {
+          "IviCli.Application": "[1.0.0, )",
+          "Microsoft.AspNetCore.OpenApi": "[10.0.0, )"
+        }
       },
       "ivicli.application": {
         "type": "Project",
@@ -416,6 +428,15 @@
           "IviCli.Application": "[1.0.0, )",
           "Microsoft.Extensions.DependencyInjection.Abstractions": "[9.0.11, )",
           "Microsoft.Extensions.Logging.Abstractions": "[9.0.11, )"
+        }
+      },
+      "Microsoft.AspNetCore.OpenApi": {
+        "type": "CentralTransitive",
+        "requested": "[10.0.0, )",
+        "resolved": "10.0.0",
+        "contentHash": "0aqIF1t+sA2T62LIeMtXGSiaV7keGQaJnvwwmu+htQdjCaKYARfXAeqp4nHH9y2etpilyZ/tnQzZg4Ilmo/c4Q==",
+        "dependencies": {
+          "Microsoft.OpenApi": "2.0.0"
         }
       },
       "Microsoft.Extensions.DependencyInjection.Abstractions": {
