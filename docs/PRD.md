@@ -347,6 +347,12 @@ Diagnoses the following:
 
 ---
 
+### visa traffic capture
+
+Set `IVICLI_CAPTURE=<path>` (absolute, or relative to the rolling-log directory) and every backend operation across the CLI streams to a UTF-8 NDJSON file: one event per line carrying `timestamp` / `device` / `op` (`Open` / `Close` / `Write` / `Query` / `Read`) / `data` / `response` / `ok` / `latencyMs` / `error`. Activation is opt-in (no env var → null sink, zero overhead). Sink failures are swallowed so the operator's verbs never break because the audit sink does. See [ADR 0031](adr/0031-visa-traffic-capture.md).
+
+---
+
 ## 6.5 Driver / IVI Features
 
 The `visa` namespace handles VISA transport / SCPI operation.
@@ -824,7 +830,6 @@ Phase 3 (operator-facing automation):
 
 ## Planned
 
-* VISA traffic capture
 * session recording/replay
 * Web UI
 * AI agent integration

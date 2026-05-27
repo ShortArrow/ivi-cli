@@ -352,6 +352,12 @@ ivicli diagnose
 
 ---
 
+### visa traffic capture
+
+`IVICLI_CAPTURE=<path>`（絶対パス、または rolling-log ディレクトリからの相対パス）を設定すると、CLI 全体の backend 操作が UTF-8 NDJSON ファイルにストリームされる。1 行 1 イベントで、`timestamp` / `device` / `op` (`Open` / `Close` / `Write` / `Query` / `Read`) / `data` / `response` / `ok` / `latencyMs` / `error` を含む。環境変数未設定なら null sink（ゼロオーバヘッド）。sink 失敗は飲み込まれ、verb は audit sink の失敗で落ちない。詳細は [ADR 0031](adr/0031-visa-traffic-capture.md)。
+
+---
+
 ## 6.5 Driver / IVI Features
 
 `visa` namespace は VISA transport / SCPI operation を担当する。
@@ -830,7 +836,6 @@ Phase 3 (オペレータ向け自動化):
 
 ## Planned
 
-* VISA traffic capture
 * session recording/replay
 * Web UI
 * AI agent integration
