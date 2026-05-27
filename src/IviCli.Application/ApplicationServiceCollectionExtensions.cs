@@ -39,6 +39,7 @@ public static class ApplicationServiceCollectionExtensions
         services.AddSingleton<DiagnoseQueryHandler>();
         services.AddSingleton<ScriptDeviceCommandHandler>();
         services.AddSingleton<MonitorDeviceCommandHandler>();
+        services.AddSingleton<IScriptLinter, DefaultScriptLinter>();
         services.AddSingleton<WatchDevicesCommandHandler>();
         return services;
     }

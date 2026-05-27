@@ -121,7 +121,7 @@ public static class ScpiVocabulary
     /// in upper case, stripped of a trailing <c>?</c> and any leading
     /// <c>:</c>. Returns <see langword="null"/> on null / whitespace.
     /// </summary>
-    internal static string? ExtractRoot(string? mnemonic)
+    public static string? ExtractRoot(string? mnemonic)
     {
         if (string.IsNullOrWhiteSpace(mnemonic))
         {
