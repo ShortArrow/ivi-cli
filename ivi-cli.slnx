@@ -1,5 +1,6 @@
 <Solution>
   <Folder Name="/src/">
+    <Project Path="src/IviCli.Api/IviCli.Api.csproj" />
     <Project Path="src/IviCli.Application/IviCli.Application.csproj" />
     <Project Path="src/IviCli.Backends.Fake/IviCli.Backends.Fake.csproj" />
     <Project Path="src/IviCli.Backends.HiSlip/IviCli.Backends.HiSlip.csproj" />
@@ -13,6 +14,7 @@
     <Project Path="src/IviCli.Server/IviCli.Server.csproj" />
   </Folder>
   <Folder Name="/tests/">
+    <Project Path="tests/IviCli.Api.Tests/IviCli.Api.Tests.csproj" />
     <Project Path="tests/IviCli.Application.Tests/IviCli.Application.Tests.csproj" />
     <Project Path="tests/IviCli.Backends.Fake.Tests/IviCli.Backends.Fake.Tests.csproj" />
     <Project Path="tests/IviCli.Backends.Local.Tests/IviCli.Backends.Local.Tests.csproj" />

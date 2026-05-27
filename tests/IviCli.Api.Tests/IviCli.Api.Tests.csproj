@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <RootNamespace>IviCli.Api.Tests</RootNamespace>
+    <AssemblyName>IviCli.Api.Tests</AssemblyName>
+    <!--
+      Microsoft.AspNetCore.App (added via FrameworkReference below)
+      already provides Microsoft.Extensions.Logging.Abstractions; the
+      base tests/Directory.Build.props adds the explicit PackageReference
+      for non-Web test projects so suppress the NU1510 (redundant) error
+      it raises here.
+    -->
+    <NoWarn>$(NoWarn);NU1510</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\IviCli.Api\IviCli.Api.csproj" />
+    <ProjectReference Include="..\..\src\IviCli.Backends.Fake\IviCli.Backends.Fake.csproj" />
+    <ProjectReference Include="..\..\src\IviCli.Infrastructure\IviCli.Infrastructure.csproj" />
+    <ProjectReference Include="..\IviCli.TestKit\IviCli.TestKit.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <PackageReference Include="Microsoft.AspNetCore.TestHost" />
+  </ItemGroup>
+</Project>

@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <PropertyGroup>
+    <RootNamespace>IviCli.Api</RootNamespace>
+    <AssemblyName>IviCli.Api</AssemblyName>
+    <!--
+      The Api library does not produce a CLI / host of its own. Suppress the
+      Web SDK's default static-files content discovery so referencing this
+      project from IviCli.Cli does not pull wwwroot expectations into the
+      console layer.
+    -->
+    <EnableDefaultContentItems>false</EnableDefaultContentItems>
+    <IsPackable>false</IsPackable>
+    <OutputType>Library</OutputType>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\IviCli.Application\IviCli.Application.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" />
+  </ItemGroup>
+</Project>
