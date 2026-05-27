@@ -3,8 +3,11 @@ using System.Diagnostics;
 using System.Net;
 using System.Runtime.InteropServices;
 using IviCli.Api;
+using IviCli.Api.Authentication;
+using IviCli.Application.Auth;
 using IviCli.Application.Servers;
 using IviCli.Domain;
+using IviCli.Domain.Auth;
 using IviCli.Domain.Servers;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -56,28 +59,55 @@ public static class ApiCommand
             Description = $"Listen address (default {DefaultBind}).",
             DefaultValueFactory = _ => DefaultBind,
         };
+        var allowAnonOpt = new Option<bool>("--allow-anonymous")
+        {
+            Description =
+                "Allow requests without an API token. Required when binding non-loopback "
+                + "with no tokens configured (ADR 0036).",
+        };
 
         var cmd = new Command("start", "Start the Management API listener in the foreground.");
         cmd.Options.Add(portOpt);
         cmd.Options.Add(bindOpt);
+        cmd.Options.Add(allowAnonOpt);
 
         cmd.SetAction(
             async (parseResult, ct) =>
             {
                 var port = parseResult.GetValue(portOpt);
                 var bindRaw = parseResult.GetValue(bindOpt) ?? DefaultBind;
+                var allowAnon = parseResult.GetValue(allowAnonOpt);
                 if (!IPAddress.TryParse(bindRaw, out var bindAddr))
                 {
                     Console.Error.WriteLine($"error: invalid --bind value '{bindRaw}'.");
                     return ExitCodeMapper.UsageError;
                 }
-                if (!IPAddress.IsLoopback(bindAddr))
+                var isLoopback = IPAddress.IsLoopback(bindAddr);
+
+                // Non-loopback gate (ADR 0036 §4): require at least one
+                // configured token unless the operator opts out explicitly.
+                var tokenStore = services.GetRequiredService<IApiTokenStore>();
+                var tokenLoad = await tokenStore.LoadAsync(ct);
+                var tokensConfigured =
+                    tokenLoad is Result<ApiTokenDocument, ApiTokenStoreError>.Ok { Value: var doc }
+                    && !doc.Tokens.IsDefaultOrEmpty;
+                if (!isLoopback && !tokensConfigured && !allowAnon)
                 {
-                    Serilog.Log.Logger.Warning(
-                        "Management API bound to {Bind}; authentication is not implemented in v1 (ADR 0034).",
-                        bindAddr
+                    Console.Error.WriteLine(
+                        "error: non-loopback bind requires at least one API token "
+                            + "(create one with 'ivicli api token create') "
+                            + "or pass --allow-anonymous to opt out (ADR 0036)."
                     );
+                    return ExitCodeMapper.UsageError;
                 }
+
+                // The middleware reads these flags via the API builder's
+                // forwarded ApiAuthenticationOptions registration. We
+                // mutate the singleton in place so the API process sees
+                // the runtime values without a rebuild.
+                var authOptions = services.GetRequiredService<ApiAuthenticationOptions>();
+                authOptions.IsLoopback = isLoopback;
+                authOptions.AllowAnonymous = (isLoopback && !tokensConfigured) || allowAnon;
 
                 var registry = services.GetRequiredService<IServerProcessRegistry>();
                 var loggerFactory = services.GetRequiredService<ILoggerFactory>();

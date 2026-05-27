@@ -60,6 +60,7 @@ internal static class Program
             services.AddIviCliApiTokenStore(
                 Path.Combine(IviPaths.ResolveAuthDirectory(), "api-tokens.toml")
             );
+            services.AddSingleton<IviCli.Api.Authentication.ApiAuthenticationOptions>();
             services.AddIviCliScenarioStore(configPath);
             services.AddIviCliBackendsFake();
             services.AddIviCliBackendsSocket();

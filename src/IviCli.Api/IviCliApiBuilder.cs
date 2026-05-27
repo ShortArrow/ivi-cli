@@ -1,4 +1,5 @@
 using System.Net;
+using IviCli.Api.Authentication;
 using IviCli.Api.Routing;
 using IviCli.Api.WebSockets;
 using Microsoft.AspNetCore.Builder;
@@ -52,6 +53,7 @@ public static class IviCliApiBuilder
 
         var app = builder.Build();
         app.UseWebSockets();
+        app.UseApiTokenAuthentication();
         app.MapOpenApi("/openapi/v1.json");
         app.MapGet("/healthz", () => Microsoft.AspNetCore.Http.Results.Json(new { status = "ok" }));
         app.MapDevices();
@@ -80,6 +82,15 @@ public static class IviCliApiBuilder
         yield return Forward<Application.Mock.ListScenariosQueryHandler>(parent);
         yield return Forward<Application.Devices.QueryDeviceCommandHandler>(parent);
         yield return Forward<Application.Devices.WriteDeviceCommandHandler>(parent);
+        yield return Forward<Application.Auth.IApiTokenStore>(parent);
+        // ApiAuthenticationOptions is populated by the CLI `api start` verb
+        // before app.Run(); forward whatever the parent registered.
+        var optsDescriptor = ServiceDescriptor.Singleton<Authentication.ApiAuthenticationOptions>(
+            sp =>
+                parent.GetService<Authentication.ApiAuthenticationOptions>()
+                ?? new Authentication.ApiAuthenticationOptions()
+        );
+        yield return optsDescriptor;
     }
 
     private static ServiceDescriptor Forward<T>(IServiceProvider parent)
