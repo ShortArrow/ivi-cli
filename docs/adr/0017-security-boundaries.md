@@ -101,6 +101,7 @@ When the management API and HiSLIP-compatible gateway are introduced, the follow
 | Audit log | Append-only NDJSON via [ADR 0043](0043-audit-log.md). v1 emits auth + API-request events; config-mutation + gateway-lifecycle emissions accrete in follow-ups |
 | Rate limiting | Per-source connection caps; details deferred |
 | Privilege model | The CLI process runs as the invoking user; no setuid / setcap requirements |
+| Plugin loading | [`[plugins] enabled = false`](0013-plugin-system.md) default-off; opt-in opens an in-process full-trust path for vendor DLLs. Allowlist gating; signature validation deferred to v2 |
 
 ### 7. Miscellaneous Phase 1 rules
 
