@@ -103,7 +103,25 @@ public sealed class TomlApiTokenStore : IApiTokenStore
         {
             lastUsedAt = DateTimeOffset.Parse(luStr, CultureInfo.InvariantCulture);
         }
-        return new ApiToken(id, hash, label, createdAt, lastUsedAt);
+        var scopes = ImmutableArray<string>.Empty;
+        if (table.TryGetValue("scopes", out var scopesObj) && scopesObj is TomlArray scopesArray)
+        {
+            var builder = ImmutableArray.CreateBuilder<string>();
+            foreach (var entry in scopesArray)
+            {
+                if (entry is string s)
+                {
+                    builder.Add(s);
+                }
+            }
+            scopes = builder.ToImmutable();
+        }
+        DateTimeOffset? expiresAt = null;
+        if (table.TryGetValue("expiresAt", out var expObj) && expObj is string expStr)
+        {
+            expiresAt = DateTimeOffset.Parse(expStr, CultureInfo.InvariantCulture);
+        }
+        return new ApiToken(id, hash, label, createdAt, lastUsedAt, scopes, expiresAt);
     }
 
     private static string Serialize(ApiTokenDocument document)
@@ -122,6 +140,19 @@ public sealed class TomlApiTokenStore : IApiTokenStore
             if (t.LastUsedAt is { } lu)
             {
                 table["lastUsedAt"] = lu.ToString("O", CultureInfo.InvariantCulture);
+            }
+            if (!t.Scopes.IsDefaultOrEmpty)
+            {
+                var scopesArr = new TomlArray();
+                foreach (var s in t.Scopes)
+                {
+                    scopesArr.Add(s);
+                }
+                table["scopes"] = scopesArr;
+            }
+            if (t.ExpiresAt is { } exp)
+            {
+                table["expiresAt"] = exp.ToString("O", CultureInfo.InvariantCulture);
             }
             array.Add(table);
         }

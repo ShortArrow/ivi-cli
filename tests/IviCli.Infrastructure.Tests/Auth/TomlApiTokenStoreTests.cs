@@ -86,4 +86,55 @@ public sealed class TomlApiTokenStoreTests
 
         loaded.Tokens[0].LastUsedAt.ShouldBeNull();
     }
+
+    [Fact]
+    public async Task Round_trip_preserves_scopes_and_expires_at()
+    {
+        var fs = new MockFileSystem();
+        var store = new TomlApiTokenStore(fs, Path);
+        var token = new ApiToken(
+            Id: "abc123",
+            HashHex: "hashhex",
+            Label: "scoped",
+            CreatedAt: new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero),
+            LastUsedAt: null,
+            Scopes: ImmutableArray.Create("read:devices", "write:scpi"),
+            ExpiresAt: new DateTimeOffset(2027, 1, 1, 0, 0, 0, TimeSpan.Zero)
+        );
+        await store.SaveAsync(new ApiTokenDocument(ImmutableArray.Create(token)), default);
+
+        var loaded = (await store.LoadAsync(default)).ShouldBeOk();
+        var rt = loaded.Tokens[0];
+        rt.Scopes.Length.ShouldBe(2);
+        rt.Scopes.ShouldContain("read:devices");
+        rt.Scopes.ShouldContain("write:scpi");
+        rt.ExpiresAt.ShouldBe(token.ExpiresAt);
+    }
+
+    [Fact]
+    public async Task Load_legacy_token_without_scopes_or_expiry_defaults_to_unrestricted()
+    {
+        var fs = new MockFileSystem();
+        fs.AddFile(
+            Path,
+            new MockFileData(
+                """
+                [[token]]
+                id = "old123"
+                hash = "abc"
+                label = "legacy"
+                createdAt = "2025-01-01T00:00:00+00:00"
+                """
+            )
+        );
+        var store = new TomlApiTokenStore(fs, Path);
+
+        var loaded = (await store.LoadAsync(default)).ShouldBeOk();
+
+        loaded.Tokens.Length.ShouldBe(1);
+        loaded.Tokens[0].Scopes.IsDefaultOrEmpty.ShouldBeTrue();
+        loaded.Tokens[0].ExpiresAt.ShouldBeNull();
+        // Backward-compat: legacy token grants every scope.
+        loaded.Tokens[0].HasScope("anything").ShouldBeTrue();
+    }
 }
