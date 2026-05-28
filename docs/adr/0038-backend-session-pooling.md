@@ -182,8 +182,10 @@ as `NegativeIdleTimeout` / `NegativeMaxDevices` (subtypes of
   ambiguity.
 - CLI flag overrides (`--pool-idle`, `--pool-disabled`). Config-
   file only for v1.
-- Pool-aware metrics emission. ADR 0011 (OpenTelemetry exporter)
-  is the natural pairing — wait for that batch.
+- ~~Pool-aware metrics emission~~ — landed in
+  [ADR 0040](0040-opentelemetry-exporter.md): `ivi.pool.evictions`,
+  `ivi.pool.lease_wait_timeouts`, and `ivi.pool.cached_entries`
+  flow through the OTel pipeline when `[telemetry] enabled = true`.
 - Per-backend custom pool policies (e.g. "never close idle Local
   sessions"). v1 has one global policy.
 - Migration of the existing inline `TimeProvider.System` references

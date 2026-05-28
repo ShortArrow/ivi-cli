@@ -119,7 +119,7 @@ Hot-path call sites declare partial methods annotated with `[LoggerMessage]`, el
 ### 10. Tracing
 
 - **Phase 1: not adopted.** CLI invocations are short-lived and single-purpose; introducing `Activity`-based tracing or correlation IDs has no return on investment at this stage.
-- **Phase 2: OpenTelemetry-compatible tracing** is introduced together with the gateway server. Trace and span identifiers are automatically attached to log records (the JSON file sink gains `trace_id` / `span_id` fields). The OpenTelemetry exporter remains optional and disabled by default. The full design lives in ADR 0019.
+- **Phase 2: OpenTelemetry-compatible tracing** lands in [ADR 0040](0040-opentelemetry-exporter.md). The exporter is fully opt-in via `[telemetry] enabled = true`; ActivitySources (`IviCli.Backend`, `IviCli.Gateway`) and the `IviCli` Meter are defined unconditionally but pay near-zero cost when no listener attaches. Logs stay on Serilog; OTel handles traces + metrics. Operators who need log export can add the Serilog OTel sink as a follow-up.
 
 ### 11. Stdout vs stderr / log separation
 

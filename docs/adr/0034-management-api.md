@@ -98,6 +98,11 @@ authentication is not implemented in v1 (see §5).
   `[api.tls]` (config) or `--tls*` (CLI) enable HTTPS / mTLS. TLS is
   opt-in; the historical plaintext default still applies for trusted
   LANs. PAT and TLS compose orthogonally.
+- **OpenTelemetry traces + metrics landed in [ADR 0040](0040-opentelemetry-exporter.md).**
+  `[telemetry] enabled = true` installs OTLP exporters and
+  `AddAspNetCoreInstrumentation()`; every HTTP request through the
+  Management API produces a parent span that nests the backend op
+  span — useful for AI-agent end-to-end tracing.
 - The request body cap is the ASP.NET Core / Kestrel default (30 MiB);
   no per-route limit in v1.
 - CORS is not configured (no `AddCors`) — browsers honour same-origin.
