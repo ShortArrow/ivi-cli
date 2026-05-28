@@ -24,6 +24,14 @@ public static class PrereqProbe
     public static bool HasPyVisa => _pyvisa.Value;
 
     /// <summary>
+    /// True when <c>Ivi.Visa</c> can be reflection-loaded from the
+    /// current process. Indicates that the IVI Shared Components
+    /// (NI-VISA, Keysight IO Libraries, or compatible) are installed
+    /// and discoverable on the assembly resolution path (ADR 0037).
+    /// </summary>
+    public static bool HasNiVisa => _niVisa.Value;
+
+    /// <summary>
     /// Returns the names of every prerequisite in <paramref name="names"/>
     /// that is currently missing. Returns an empty array when all are
     /// satisfied. The order of the returned names matches the input.
@@ -47,6 +55,7 @@ public static class PrereqProbe
         {
             "python" => HasPython,
             "pyvisa" => HasPyVisa,
+            "ni-visa" => HasNiVisa,
             _ => false,
         };
 
@@ -55,6 +64,19 @@ public static class PrereqProbe
     private static readonly Lazy<bool> _pyvisa = new(() =>
         _python.Value && Probe(PythonExecutable, "-c", "import pyvisa")
     );
+
+    private static readonly Lazy<bool> _niVisa = new(() =>
+    {
+        try
+        {
+            var assembly = System.Reflection.Assembly.Load("Ivi.Visa");
+            return assembly is not null;
+        }
+        catch
+        {
+            return false;
+        }
+    });
 
     private static string PythonExecutable =>
         RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? "python" : "python3";
