@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using IviCli.Application.Telemetry;
 using IviCli.Domain;
 using IviCli.Domain.Configuration;
 using IviCli.Domain.Devices;
@@ -113,6 +114,10 @@ public sealed class PoolingBackendFactory : IBackendFactory, IAsyncDisposable
             }
             if (!acquired)
             {
+                IviCliTelemetry.PoolLeaseWaitTimeouts.Add(
+                    1,
+                    new KeyValuePair<string, object?>("ivi.device", device.Name.Value)
+                );
                 return Result.Failure<Lease, BackendError>(
                     new PoolWaitTimeout(device.Name, device.Timeout.Value)
                 );
@@ -192,6 +197,10 @@ public sealed class PoolingBackendFactory : IBackendFactory, IAsyncDisposable
     {
         if (_entries.TryRemove(new KeyValuePair<DeviceName, PoolEntry>(name, entry)))
         {
+            IviCliTelemetry.PoolEvictions.Add(
+                1,
+                new KeyValuePair<string, object?>("ivi.device", name.Value)
+            );
             _ = Task.Run(async () =>
             {
                 try
