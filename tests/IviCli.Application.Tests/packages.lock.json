@@ -17,6 +17,12 @@
           "Microsoft.Extensions.DependencyInjection.Abstractions": "9.0.11"
         }
       },
+      "Microsoft.Extensions.TimeProvider.Testing": {
+        "type": "Direct",
+        "requested": "[9.7.0, )",
+        "resolved": "9.7.0",
+        "contentHash": "iJndztsYoK/o8W0P9uLTquHQ2UD8qJZH5S5ccL2WnyIcEo0uV8IbUBCCpKOXQX5Ygb2Nh2lh9yg2o7ggA+BPYg=="
+      },
       "Microsoft.NET.Test.Sdk": {
         "type": "Direct",
         "requested": "[17.14.1, )",

@@ -47,4 +47,8 @@
   <ItemGroup Label="Logging abstractions for tests">
     <PackageVersion Include="Microsoft.Extensions.Logging.Abstractions" Version="9.0.11" />
   </ItemGroup>
+
+  <ItemGroup Label="Time abstractions for tests">
+    <PackageVersion Include="Microsoft.Extensions.TimeProvider.Testing" Version="9.7.0" />
+  </ItemGroup>
 </Project>

@@ -91,6 +91,7 @@ public sealed class FakeBackend : IIviBackend
             return Task.FromResult(Result.Failure<Unit, BackendError>(failure));
         }
         state.IsOpen = true;
+        state.OpenCount++;
         return Task.FromResult(Result.Success<Unit, BackendError>(Unit.Value));
     }
 
@@ -101,9 +102,18 @@ public sealed class FakeBackend : IIviBackend
         if (_devices.TryGetValue(device.Name, out var state))
         {
             state.IsOpen = false;
+            state.CloseCount++;
         }
         return Task.FromResult(Result.Success<Unit, BackendError>(Unit.Value));
     }
+
+    /// <summary>Number of times <see cref="OpenAsync"/> was called for <paramref name="name"/>.</summary>
+    public int OpenCountFor(DeviceName name) =>
+        _devices.TryGetValue(name, out var state) ? state.OpenCount : 0;
+
+    /// <summary>Number of times <see cref="CloseAsync"/> was called for <paramref name="name"/>.</summary>
+    public int CloseCountFor(DeviceName name) =>
+        _devices.TryGetValue(name, out var state) ? state.CloseCount : 0;
 
     /// <inheritdoc/>
     public Task<Result<Unit, BackendError>> WriteAsync(
@@ -233,6 +243,8 @@ public sealed class FakeBackend : IIviBackend
         public string? IdnResponse { get; set; }
         public string? LastWritten { get; set; }
         public bool IsOpen { get; set; }
+        public int OpenCount { get; set; }
+        public int CloseCount { get; set; }
         public BackendError? OpenFailure { get; set; }
         public Dictionary<string, string> QueryResponses { get; } = new(StringComparer.Ordinal);
         public Dictionary<string, BackendError> QueryFailures { get; } =
