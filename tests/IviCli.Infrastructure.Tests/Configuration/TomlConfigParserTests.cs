@@ -316,4 +316,34 @@ public class TomlConfigParserTests
         var rt = TomlConfigParser.Parse(serialized).ShouldBeOk();
         rt.Telemetry.ShouldBe(t);
     }
+
+    [Fact]
+    public void Parse_AuditTable_RoundTrips_Fields()
+    {
+        var toml = """
+            [audit]
+            enabled = false
+            path = "/var/log/ivi/audit.ndjson"
+            """;
+        var cfg = TomlConfigParser.Parse(toml).ShouldBeOk();
+        cfg.Audit.Enabled.ShouldBeFalse();
+        cfg.Audit.Path.ShouldBe("/var/log/ivi/audit.ndjson");
+    }
+
+    [Fact]
+    public void Parse_MissingAuditTable_DefaultsToAuditDefault()
+    {
+        var cfg = TomlConfigParser.Parse("").ShouldBeOk();
+        cfg.Audit.ShouldBe(AuditConfig.Default);
+    }
+
+    [Fact]
+    public void Serialize_RoundTrips_NonDefaultAudit()
+    {
+        var a = AuditConfig.From(false, "/var/log/ivi.ndjson").ShouldBeOk();
+        var original = ConfigDocument.Empty.WithAudit(a);
+        var serialized = TomlConfigParser.Serialize(original);
+        var rt = TomlConfigParser.Parse(serialized).ShouldBeOk();
+        rt.Audit.ShouldBe(a);
+    }
 }

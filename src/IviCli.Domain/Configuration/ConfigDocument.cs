@@ -25,7 +25,8 @@ public sealed record ConfigDocument
             defaults: Defaults.None,
             pool: PoolConfig.Default,
             api: ApiConfig.Default,
-            telemetry: TelemetryConfig.Default
+            telemetry: TelemetryConfig.Default,
+            audit: AuditConfig.Default
         );
 
     /// <summary>The configured devices, in insertion order.</summary>
@@ -49,6 +50,9 @@ public sealed record ConfigDocument
     /// <summary>The <c>[telemetry]</c> section (ADR 0040).</summary>
     public TelemetryConfig Telemetry { get; }
 
+    /// <summary>The <c>[audit]</c> section (ADR 0043).</summary>
+    public AuditConfig Audit { get; }
+
     private ConfigDocument(
         ImmutableArray<Device> devices,
         ImmutableArray<Server> servers,
@@ -56,7 +60,8 @@ public sealed record ConfigDocument
         Defaults defaults,
         PoolConfig pool,
         ApiConfig api,
-        TelemetryConfig telemetry
+        TelemetryConfig telemetry,
+        AuditConfig audit
     )
     {
         Devices = devices;
@@ -66,6 +71,7 @@ public sealed record ConfigDocument
         Pool = pool;
         Api = api;
         Telemetry = telemetry;
+        Audit = audit;
     }
 
     /// <summary>Structural equality across every collection.</summary>
@@ -75,6 +81,7 @@ public sealed record ConfigDocument
         && Pool == other.Pool
         && Api == other.Api
         && Telemetry == other.Telemetry
+        && Audit == other.Audit
         && Devices.SequenceEqual(other.Devices)
         && Servers.SequenceEqual(other.Servers)
         && Routes.SequenceEqual(other.Routes);
@@ -87,6 +94,7 @@ public sealed record ConfigDocument
         hash.Add(Pool);
         hash.Add(Api);
         hash.Add(Telemetry);
+        hash.Add(Audit);
         foreach (var d in Devices)
         {
             hash.Add(d);
@@ -110,6 +118,9 @@ public sealed record ConfigDocument
 
     /// <summary>Replaces the <see cref="Telemetry"/> section.</summary>
     public ConfigDocument WithTelemetry(TelemetryConfig telemetry) => With(telemetry: telemetry);
+
+    /// <summary>Replaces the <see cref="Audit"/> section.</summary>
+    public ConfigDocument WithAudit(AuditConfig audit) => With(audit: audit);
 
     // -------- Devices ----------------------------------------------------
 
@@ -279,7 +290,8 @@ public sealed record ConfigDocument
         Defaults? defaults = null,
         PoolConfig? pool = null,
         ApiConfig? api = null,
-        TelemetryConfig? telemetry = null
+        TelemetryConfig? telemetry = null,
+        AuditConfig? audit = null
     ) =>
         new(
             devices ?? Devices,
@@ -288,6 +300,7 @@ public sealed record ConfigDocument
             defaults ?? Defaults,
             pool ?? Pool,
             api ?? Api,
-            telemetry ?? Telemetry
+            telemetry ?? Telemetry,
+            audit ?? Audit
         );
 }

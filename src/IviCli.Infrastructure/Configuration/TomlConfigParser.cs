@@ -49,6 +49,9 @@ public static class TomlConfigParser
     private const string TelemetryServiceNameField = "service_name";
     private const string TelemetryTracesEnabledField = "traces_enabled";
     private const string TelemetryMetricsEnabledField = "metrics_enabled";
+    private const string AuditTable = "audit";
+    private const string AuditEnabledField = "enabled";
+    private const string AuditPathField = "path";
 
     /// <summary>
     /// Parses a TOML document into a validated <see cref="ConfigDocument"/>.
@@ -204,6 +207,23 @@ public static class TomlConfigParser
             config = config.WithTelemetry(tOk.Value);
         }
 
+        // Audit (optional, ADR 0043).
+        if (model.TryGetValue(AuditTable, out var auditValue))
+        {
+            if (auditValue is not TomlTable auditTable)
+            {
+                return Fail($"expected [{AuditTable}] to be a TOML table");
+            }
+            var aResult = ParseAudit(auditTable);
+            if (aResult is not Result<AuditConfig, ConfigStoreError>.Ok aOk)
+            {
+                return Result.Failure<ConfigDocument, ConfigStoreError>(
+                    ((Result<AuditConfig, ConfigStoreError>.Error)aResult).Err
+                );
+            }
+            config = config.WithAudit(aOk.Value);
+        }
+
         // Defaults (optional).
         if (model.TryGetValue(DefaultsTable, out var defaultsValue))
         {
@@ -319,6 +339,18 @@ public static class TomlConfigParser
                 inv,
                 $"{TelemetryMetricsEnabledField} = {(t.MetricsEnabled ? "true" : "false")}"
             );
+            builder.AppendLine();
+        }
+
+        if (document.Audit != AuditConfig.Default)
+        {
+            var a = document.Audit;
+            builder.AppendLine(inv, $"[{AuditTable}]");
+            builder.AppendLine(inv, $"{AuditEnabledField} = {(a.Enabled ? "true" : "false")}");
+            if (a.Path is not null)
+            {
+                builder.AppendLine(inv, $"{AuditPathField} = \"{a.Path}\"");
+            }
             builder.AppendLine();
         }
 
@@ -730,6 +762,21 @@ public static class TomlConfigParser
 
     private static Result<TelemetryConfig, ConfigStoreError> FailTelemetry(string reason) =>
         Result.Failure<TelemetryConfig, ConfigStoreError>(new ConfigStoreParseFailure(reason));
+
+    private static Result<AuditConfig, ConfigStoreError> ParseAudit(TomlTable table)
+    {
+        var enabled = ReadBool(table, AuditEnabledField, true);
+        var path = ReadString(table, AuditPathField);
+        var built = AuditConfig.From(enabled, path);
+        if (built is not Result<AuditConfig, AuditConfigError>.Ok ok)
+        {
+            var err = ((Result<AuditConfig, AuditConfigError>.Error)built).Err;
+            return Result.Failure<AuditConfig, ConfigStoreError>(
+                new ConfigStoreParseFailure(err.Message)
+            );
+        }
+        return Result.Success<AuditConfig, ConfigStoreError>(ok.Value);
+    }
 
     private static Result<ConfigDocument, ConfigStoreError> Fail(string reason) =>
         Result.Failure<ConfigDocument, ConfigStoreError>(new ConfigStoreParseFailure(reason));
