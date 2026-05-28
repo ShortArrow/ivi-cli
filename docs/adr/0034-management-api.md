@@ -49,6 +49,12 @@ intentionally **distinct from CLI stdout shapes** — the OpenAPI
 document is the API surface and stays stable independently of CLI
 output formatting.
 
+When the operator leaves `[pool] enabled = true` (the default,
+ADR 0038), repeated `POST /devices/{name}/query` requests against
+the same device share a single underlying wire session and pay no
+re-open cost — relevant for AI-agent loops and dashboards that
+poll an instrument at high frequency.
+
 ### 3. Error envelope
 
 Every non-2xx response carries `{ "error": { "code": "<stable>", "message": "<text>" } }`.

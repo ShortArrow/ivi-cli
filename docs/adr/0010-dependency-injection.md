@@ -20,7 +20,7 @@ The goal is to keep the FP shape of the code as far as it scales and to fall bac
 **In the container** (DI-managed):
 
 - Ports with multiple implementations: `IIviBackend` and its `IBackendFactory`.
-- Framework-crossing services: `ILogger<T>` (via Serilog bridge per ADR 0011), `IClock`, `IRandom` (when needed).
+- Framework-crossing services: `ILogger<T>` (via Serilog bridge per ADR 0011), `TimeProvider` (singleton — used by `PoolingBackendFactory` per ADR 0038 and by Phase 3 monitor/server commands), `IClock`, `IRandom` (when needed).
 - I/O adapters expressed as ports: `IConfigStore`, `ISessionStore`.
 - Use-case handlers: `AddDeviceCommandHandler`, `ListDevicesQueryHandler`, etc. — single implementation each, but injecting them keeps Cli-level wiring uniform.
 - Domain Services with cross-entity validation: `ConfigValidator`, `AliasResolver` — registered as concretes (no extra interface, see §5).
