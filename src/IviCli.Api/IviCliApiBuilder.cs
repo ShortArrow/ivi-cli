@@ -77,6 +77,39 @@ public static class IviCliApiBuilder
 
         var app = builder.Build();
         app.UseWebSockets();
+        // Audit middleware sits OUTSIDE the auth middleware so successful
+        // PAT validations on the inside still get recorded as ApiRequest
+        // events here (ADR 0043). Auth-level events (success/fail) come
+        // from the inner middleware directly.
+        app.Use(
+            async (context, next) =>
+            {
+                var sw = System.Diagnostics.Stopwatch.StartNew();
+                await next();
+                sw.Stop();
+                var audit = context.RequestServices.GetService<Application.Audit.IAuditLog>();
+                if (audit is not null)
+                {
+                    try
+                    {
+                        await audit.AppendAsync(
+                            new Application.Audit.ApiRequest(
+                                DateTimeOffset.UtcNow,
+                                Method: context.Request.Method,
+                                Path: context.Request.Path.Value ?? "",
+                                Status: context.Response.StatusCode,
+                                Subject: null,
+                                LatencyMs: (int)sw.Elapsed.TotalMilliseconds
+                            ),
+                            CancellationToken.None
+                        );
+                    }
+                    catch
+                    { /* audit failures must not break the request */
+                    }
+                }
+            }
+        );
         app.UseApiTokenAuthentication();
         app.MapOpenApi("/openapi/v1.json");
         app.MapGet("/healthz", () => Microsoft.AspNetCore.Http.Results.Json(new { status = "ok" }));
@@ -107,6 +140,13 @@ public static class IviCliApiBuilder
         yield return Forward<Application.Devices.QueryDeviceCommandHandler>(parent);
         yield return Forward<Application.Devices.WriteDeviceCommandHandler>(parent);
         yield return Forward<Application.Auth.IApiTokenStore>(parent);
+        // Audit log (ADR 0043) — middleware emits AuthSucceeded /
+        // AuthFailed / ApiRequest through this port. When the parent
+        // didn't register one (e.g. tests), use the singleton no-op.
+        yield return ServiceDescriptor.Singleton<Application.Audit.IAuditLog>(_ =>
+            parent.GetService<Application.Audit.IAuditLog>()
+            ?? Application.Audit.NullAuditLog.Instance
+        );
         // ApiAuthenticationOptions is populated by the CLI `api start` verb
         // before app.Run(); forward whatever the parent registered.
         var optsDescriptor = ServiceDescriptor.Singleton<Authentication.ApiAuthenticationOptions>(

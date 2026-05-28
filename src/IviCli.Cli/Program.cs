@@ -83,6 +83,22 @@ internal static class Program
             services.AddIviCliApiTokenStore(
                 Path.Combine(IviPaths.ResolveAuthDirectory(), "api-tokens.toml")
             );
+
+            // Audit log (ADR 0043). Default-on; the path comes from the
+            // [audit] override when supplied, otherwise IviPaths-derived.
+            if (bootstrapConfig.Audit.Enabled)
+            {
+                var auditPath =
+                    bootstrapConfig.Audit.Path
+                    ?? Path.Combine(IviPaths.ResolveAuditDirectory(), "audit.ndjson");
+                services.AddIviCliAuditLog(auditPath);
+            }
+            else
+            {
+                services.AddSingleton<IviCli.Application.Audit.IAuditLog>(
+                    IviCli.Application.Audit.NullAuditLog.Instance
+                );
+            }
             services.AddSingleton<IviCli.Api.Authentication.ApiAuthenticationOptions>();
             services.AddIviCliScenarioStore(configPath);
             services.AddIviCliBackendsFake();

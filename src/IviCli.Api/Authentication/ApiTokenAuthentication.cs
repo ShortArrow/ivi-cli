@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using IviCli.Application.Audit;
 using IviCli.Application.Auth;
 using IviCli.Domain;
 using IviCli.Domain.Auth;
@@ -61,12 +62,16 @@ public static class ApiTokenAuthentication
                     context.RequestServices.GetService<ApiAuthenticationOptions>()
                     ?? new ApiAuthenticationOptions();
                 var store = context.RequestServices.GetRequiredService<IApiTokenStore>();
+                var audit =
+                    context.RequestServices.GetService<IAuditLog>() ?? NullAuditLog.Instance;
+                var transport = context.WebSockets.IsWebSocketRequest ? "websocket" : "http";
                 var loaded = await store.LoadAsync(context.RequestAborted);
                 if (
                     loaded
                     is not Result<ApiTokenDocument, ApiTokenStoreError>.Ok { Value: var document }
                 )
                 {
+                    await EmitAuthFailedAsync(audit, "pat", "token_store_unavailable", transport);
                     await WriteUnauthorizedAsync(
                         context,
                         "token_store_unavailable",
@@ -82,9 +87,11 @@ public static class ApiTokenAuthentication
                 {
                     if (options.AllowAnonymous)
                     {
+                        await EmitAuthSucceededAsync(audit, "anonymous", "(loopback)", transport);
                         await next();
                         return;
                     }
+                    await EmitAuthFailedAsync(audit, "pat", "no_tokens_configured", transport);
                     await WriteUnauthorizedAsync(
                         context,
                         "unauthorized",
@@ -96,6 +103,7 @@ public static class ApiTokenAuthentication
                 var candidate = ExtractToken(context);
                 if (string.IsNullOrEmpty(candidate))
                 {
+                    await EmitAuthFailedAsync(audit, "pat", "missing_token", transport);
                     await WriteUnauthorizedAsync(
                         context,
                         "unauthorized",
@@ -116,9 +124,12 @@ public static class ApiTokenAuthentication
                 }
                 if (match is null)
                 {
+                    await EmitAuthFailedAsync(audit, "pat", "invalid_token", transport);
                     await WriteUnauthorizedAsync(context, "unauthorized", "invalid API token.");
                     return;
                 }
+
+                await EmitAuthSucceededAsync(audit, "pat", match.Label, transport);
 
                 // Best-effort last-used update — never fail the request if
                 // the touch save fails.
@@ -192,6 +203,28 @@ public static class ApiTokenAuthentication
 
         return null;
     }
+
+    private static Task EmitAuthSucceededAsync(
+        IAuditLog audit,
+        string mechanism,
+        string subject,
+        string transport
+    ) =>
+        audit.AppendAsync(
+            new AuthSucceeded(DateTimeOffset.UtcNow, mechanism, subject, transport),
+            CancellationToken.None
+        );
+
+    private static Task EmitAuthFailedAsync(
+        IAuditLog audit,
+        string mechanism,
+        string reason,
+        string transport
+    ) =>
+        audit.AppendAsync(
+            new AuthFailed(DateTimeOffset.UtcNow, mechanism, reason, transport),
+            CancellationToken.None
+        );
 
     private static bool FixedTimeHashEquals(string a, string b)
     {

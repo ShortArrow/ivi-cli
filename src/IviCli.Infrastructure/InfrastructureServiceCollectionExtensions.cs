@@ -1,4 +1,5 @@
 using System.IO.Abstractions;
+using IviCli.Application.Audit;
 using IviCli.Application.Auth;
 using IviCli.Application.Backends;
 using IviCli.Application.Capture;
@@ -6,6 +7,7 @@ using IviCli.Application.Configuration;
 using IviCli.Application.Mock;
 using IviCli.Application.Servers;
 using IviCli.Application.Session;
+using IviCli.Infrastructure.Audit;
 using IviCli.Infrastructure.Backends;
 using IviCli.Infrastructure.Configuration;
 using IviCli.Infrastructure.Mock;
@@ -129,6 +131,23 @@ public static class InfrastructureServiceCollectionExtensions
         services.AddSingleton<IApiTokenStore>(sp => new Auth.TomlApiTokenStore(
             sp.GetRequiredService<IFileSystem>(),
             tokenPath
+        ));
+        return services;
+    }
+
+    /// <summary>
+    /// Registers <see cref="NdjsonAuditLog"/> at <paramref name="auditPath"/>
+    /// as the production <see cref="IAuditLog"/> (ADR 0043). Pass a
+    /// <see cref="NullAuditLog"/> instead when <c>[audit] enabled = false</c>.
+    /// </summary>
+    public static IServiceCollection AddIviCliAuditLog(
+        this IServiceCollection services,
+        string auditPath
+    )
+    {
+        services.AddSingleton<IAuditLog>(sp => new NdjsonAuditLog(
+            sp.GetRequiredService<IFileSystem>(),
+            auditPath
         ));
         return services;
     }

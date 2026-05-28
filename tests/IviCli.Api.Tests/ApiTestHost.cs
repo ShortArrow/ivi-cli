@@ -52,7 +52,8 @@ internal sealed class ApiTestHost : IAsyncDisposable
         IEnumerable<MockScenario>? scenarios = null,
         FakeApiTokenStore? tokenStore = null,
         ApiAuthenticationOptions? authOptions = null,
-        PoolConfig? poolConfig = null
+        PoolConfig? poolConfig = null,
+        IviCli.Application.Audit.IAuditLog? auditLog = null
     )
     {
         var resolvedAuthOptions =
@@ -69,6 +70,9 @@ internal sealed class ApiTestHost : IAsyncDisposable
                 services.AddSingleton<IScenarioStore>(new FakeScenarioStore(scenarios ?? []));
                 services.AddSingleton<IApiTokenStore>(tokenStore ?? new FakeApiTokenStore());
                 services.AddSingleton(resolvedAuthOptions);
+                services.AddSingleton<IviCli.Application.Audit.IAuditLog>(
+                    auditLog ?? IviCli.Application.Audit.NullAuditLog.Instance
+                );
                 var fake = backend ?? new FakeBackend();
                 services.AddSingleton(fake);
                 IBackendFactory baseFactory = new FakeBackendFactory(fake);
@@ -92,6 +96,36 @@ internal sealed class ApiTestHost : IAsyncDisposable
             web.Configure(app =>
             {
                 app.UseWebSockets();
+                // Audit middleware (ADR 0043) — outer-most so it observes
+                // both authenticated and unauthorized requests.
+                app.Use(
+                    async (context, next) =>
+                    {
+                        var sw = System.Diagnostics.Stopwatch.StartNew();
+                        await next();
+                        sw.Stop();
+                        var audit =
+                            context.RequestServices.GetService<IviCli.Application.Audit.IAuditLog>();
+                        if (audit is not null)
+                        {
+                            try
+                            {
+                                await audit.AppendAsync(
+                                    new IviCli.Application.Audit.ApiRequest(
+                                        DateTimeOffset.UtcNow,
+                                        Method: context.Request.Method,
+                                        Path: context.Request.Path.Value ?? "",
+                                        Status: context.Response.StatusCode,
+                                        Subject: null,
+                                        LatencyMs: (int)sw.Elapsed.TotalMilliseconds
+                                    ),
+                                    CancellationToken.None
+                                );
+                            }
+                            catch { }
+                        }
+                    }
+                );
                 // Test pipeline: stand-alone middleware that mirrors the
                 // production ApiTokenAuthentication module. Inline lambda
                 // because IApplicationBuilder.Use* extensions don't expose
@@ -114,6 +148,11 @@ internal sealed class ApiTestHost : IAsyncDisposable
                             return;
                         }
                         var store = context.RequestServices.GetRequiredService<IApiTokenStore>();
+                        var auditLog =
+                            context.RequestServices.GetService<IviCli.Application.Audit.IAuditLog>();
+                        var transport = context.WebSockets.IsWebSocketRequest
+                            ? "websocket"
+                            : "http";
                         var loaded = await store.LoadAsync(context.RequestAborted);
                         if (
                             loaded
@@ -132,6 +171,18 @@ internal sealed class ApiTestHost : IAsyncDisposable
                         {
                             if (opts.AllowAnonymous)
                             {
+                                if (auditLog is not null)
+                                {
+                                    await auditLog.AppendAsync(
+                                        new IviCli.Application.Audit.AuthSucceeded(
+                                            DateTimeOffset.UtcNow,
+                                            "anonymous",
+                                            "(loopback)",
+                                            transport
+                                        ),
+                                        CancellationToken.None
+                                    );
+                                }
                                 await next();
                                 return;
                             }
@@ -141,23 +192,59 @@ internal sealed class ApiTestHost : IAsyncDisposable
                         string? candidate = ExtractToken(context);
                         if (string.IsNullOrEmpty(candidate))
                         {
+                            if (auditLog is not null)
+                            {
+                                await auditLog.AppendAsync(
+                                    new IviCli.Application.Audit.AuthFailed(
+                                        DateTimeOffset.UtcNow,
+                                        "pat",
+                                        "missing_token",
+                                        transport
+                                    ),
+                                    CancellationToken.None
+                                );
+                            }
                             await WriteUnauthorizedAsync(context);
                             return;
                         }
                         var hash = CreateApiTokenCommandHandler.HashHex(candidate);
-                        var matched = false;
+                        IviCli.Domain.Auth.ApiToken? matched = null;
                         foreach (var t in document.Tokens)
                         {
                             if (string.Equals(t.HashHex, hash, StringComparison.OrdinalIgnoreCase))
                             {
-                                matched = true;
+                                matched = t;
                                 break;
                             }
                         }
-                        if (!matched)
+                        if (matched is null)
                         {
+                            if (auditLog is not null)
+                            {
+                                await auditLog.AppendAsync(
+                                    new IviCli.Application.Audit.AuthFailed(
+                                        DateTimeOffset.UtcNow,
+                                        "pat",
+                                        "invalid_token",
+                                        transport
+                                    ),
+                                    CancellationToken.None
+                                );
+                            }
                             await WriteUnauthorizedAsync(context);
                             return;
+                        }
+                        if (auditLog is not null)
+                        {
+                            await auditLog.AppendAsync(
+                                new IviCli.Application.Audit.AuthSucceeded(
+                                    DateTimeOffset.UtcNow,
+                                    "pat",
+                                    matched.Label,
+                                    transport
+                                ),
+                                CancellationToken.None
+                            );
                         }
                         await next();
                     }
