@@ -251,6 +251,20 @@ public sealed class HiSlipGatewayServer : IGatewayServer
                         await DispatchScpiAsync(stream, backend, device, scpi, ct);
                     }
                 }
+                else if (header.Type == HiSlipMessageType.Trigger)
+                {
+                    // IVI-6.1 §10.4: servers MAY ignore Trigger when the
+                    // backend has no trigger capability. v1 backends don't
+                    // expose TriggerAsync yet — drain any payload and log.
+                    if (header.PayloadLength > 0)
+                    {
+                        var drain = new byte[header.PayloadLength];
+                        await ReadExactlyAsync(stream, drain, ct);
+                    }
+                    _logger.LogInformation(
+                        "HiSLIP Trigger received (no backend trigger capability — acknowledged with no-op)"
+                    );
+                }
                 else if (header.Type == HiSlipMessageType.FatalError)
                 {
                     break;
@@ -380,18 +394,11 @@ public sealed class HiSlipGatewayServer : IGatewayServer
         }
         else
         {
-            lock (_lockGate)
-            {
-                if (_lockHolder == 0 || _lockHolder == sessionId)
-                {
-                    _lockHolder = sessionId;
-                    responseControl = 1; // granted
-                }
-                else
-                {
-                    responseControl = 0; // denied (someone else holds it)
-                }
-            }
+            // IVI-6.1 §10 carries lock_timeout (ms) in MessageParameter.
+            // Zero is "fail immediately if contended" — original v2 behaviour.
+            // Non-zero polls _lockHolder every 50 ms until the deadline.
+            var timeoutMs = request.MessageParameter;
+            responseControl = await TryAcquireLockAsync(sessionId, timeoutMs, ct);
         }
         var resp = new byte[HiSlipMessage.HeaderSize];
         HiSlipMessage.WriteHeader(
@@ -411,6 +418,44 @@ public sealed class HiSlipGatewayServer : IGatewayServer
             if (_lockHolder == sessionId)
             {
                 _lockHolder = 0;
+            }
+        }
+    }
+
+    private async Task<byte> TryAcquireLockAsync(
+        ushort sessionId,
+        uint timeoutMs,
+        CancellationToken ct
+    )
+    {
+        const int PollIntervalMs = 50;
+        var deadline = timeoutMs == 0 ? (long?)null : Environment.TickCount64 + timeoutMs;
+        while (true)
+        {
+            lock (_lockGate)
+            {
+                if (_lockHolder == 0 || _lockHolder == sessionId)
+                {
+                    _lockHolder = sessionId;
+                    return 1;
+                }
+            }
+            if (deadline is null || Environment.TickCount64 >= deadline.Value)
+            {
+                return 0;
+            }
+            var remaining = (int)Math.Min(PollIntervalMs, deadline.Value - Environment.TickCount64);
+            if (remaining <= 0)
+            {
+                return 0;
+            }
+            try
+            {
+                await Task.Delay(remaining, ct);
+            }
+            catch (OperationCanceledException)
+            {
+                return 0;
             }
         }
     }

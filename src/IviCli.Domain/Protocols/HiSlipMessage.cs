@@ -74,10 +74,10 @@ public readonly record struct HiSlipHeader(
 /// <summary>HiSLIP message type codes per IVI-6.1 §10.</summary>
 public enum HiSlipMessageType : byte
 {
-    // ----- HiSLIP v1 / v2 (IVI-6.1 §10 message-type table) -----
-    // Values below match the IVI-6.1 specification. Implementations
-    // 10-14 / 21-22 / 24-26 are reserved for v3 (remote/local, trigger,
-    // status query, lock-info, etc.) and intentionally absent here so
+    // ----- HiSLIP v1 / v2 / v3 (IVI-6.1 §10 message-type table) -----
+    // Values below match the IVI-6.1 specification. v3 codes not yet
+    // honoured by this server (10-14, 21-22, 25-26 — remote/local,
+    // status query, lock-info, etc.) remain intentionally absent so
     // a stray enum cast to one of those bytes cannot silently succeed.
 
     /// <summary>Initialize request from client (handshake start). Spec value 0.</summary>
@@ -130,4 +130,7 @@ public enum HiSlipMessageType : byte
 
     /// <summary>Async-channel device-clear acknowledgement (server -> client). Spec value 23.</summary>
     AsyncDeviceClearAcknowledge = 23,
+
+    /// <summary>Trigger (IVI-6.1 §10.4 — v3). Sync-channel only. Spec value 24.</summary>
+    Trigger = 24,
 }
