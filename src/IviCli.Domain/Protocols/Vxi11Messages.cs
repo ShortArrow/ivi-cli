@@ -41,3 +41,30 @@ public readonly record struct DeviceGenericParms(
     uint LockTimeout,
     uint IoTimeout
 );
+
+/// <summary>
+/// Decoded <c>Device_RemoteFunc</c> structure (VXI-11 §B.6.32 /
+/// device_create_intr_chan).
+/// </summary>
+public readonly record struct DeviceRemoteFunc(
+    uint HostAddr,
+    uint HostPort,
+    uint ProgNum,
+    uint ProgVers,
+    int ProgFamily
+);
+
+/// <summary>
+/// Decoded <c>Device_EnableSrqParms</c> structure (VXI-11 §B.6.31 /
+/// device_enable_srq). The handle is up to 40 bytes the client picks;
+/// the server echoes it back on every SRQ delivery so the client can
+/// correlate which link raised the request.
+/// </summary>
+public readonly record struct DeviceEnableSrqParms(int Lid, bool Enable, byte[] Handle);
+
+/// <summary>
+/// Decoded <c>Device_SrqParms</c> structure (VXI-11 §B.6.40 /
+/// device_intr_srq, server → client). Carries the same handle the
+/// client passed into <see cref="DeviceEnableSrqParms"/>.
+/// </summary>
+public readonly record struct DeviceSrqParms(byte[] Handle);

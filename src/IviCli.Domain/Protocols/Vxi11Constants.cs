@@ -24,6 +24,27 @@ public static class Vxi11Constants
     /// <summary>Abort: device_abort (proc 1). Sole procedure on the abort channel.</summary>
     public const uint ProcDeviceAbort = 1;
 
+    /// <summary>VXI-11 Interrupt program (server → client SRQ delivery, ADR 0042).</summary>
+    public const uint InterruptProgram = 395185;
+
+    /// <summary>VXI-11 Interrupt program version.</summary>
+    public const uint InterruptVersion = 1;
+
+    /// <summary>Interrupt: device_intr_srq (proc 30). Sole procedure, server → client.</summary>
+    public const uint ProcDeviceIntrSrq = 30;
+
+    /// <summary>Core: device_enable_srq (proc 18).</summary>
+    public const uint ProcDeviceEnableSrq = 18;
+
+    /// <summary>Core: device_create_intr_chan (proc 25).</summary>
+    public const uint ProcCreateIntrChan = 25;
+
+    /// <summary>Core: device_destroy_intr_chan (proc 26).</summary>
+    public const uint ProcDestroyIntrChan = 26;
+
+    /// <summary>ONC RPC progFamily for TCP transport (per RFC 5531).</summary>
+    public const int ProgFamilyTcp = 6;
+
     /// <summary>ONC portmapper program number.</summary>
     public const uint PortmapProgram = 100000;
 
