@@ -92,11 +92,11 @@ A future Roslyn analyzer rule may enforce that `ILogger` placeholder arguments o
 
 When the management API and HiSLIP-compatible gateway are introduced, the following baseline applies. Each item will be elaborated when the corresponding feature is implemented:
 
-| Concern | Phase 2 baseline |
-| --- | --- |
-| Management API authentication | mTLS preferred; token-based authentication as a fallback for lab convenience |
-| Management API transport | TLS 1.3 required; no plaintext mode |
-| HiSLIP transport | Follows the HiSLIP specification (plain by default); operators are expected to deploy on a trusted LAN. Plain-text mode is documented as a deployment constraint |
+| Concern | Phase 2 baseline | Shipped |
+| --- | --- | --- |
+| Management API authentication | mTLS preferred; PAT token-based authentication as a lab-convenience fallback | PAT (ADR 0036), mTLS (ADR 0039) |
+| Management API transport | TLS opt-in via `[api.tls]`; plaintext HTTP remains the historical default for trusted LANs (ADR 0039) | ADR 0039 |
+| HiSLIP transport | Follows the HiSLIP specification (plain by default); operators are expected to deploy on a trusted LAN. Plain-text mode is documented as a deployment constraint | ADR 0007 §1 |
 | Secret storage | OS-native keychain (Windows Credential Manager / macOS Keychain / Linux Secret Service via libsecret). No plaintext credentials in `config.toml` |
 | Audit log | Append-only file; events include server start/stop, route add/remove, authentication success/failure, gateway client connect/disconnect |
 | Rate limiting | Per-source connection caps; details deferred |

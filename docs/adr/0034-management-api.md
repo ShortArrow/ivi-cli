@@ -94,6 +94,10 @@ authentication is not implemented in v1 (see §5).
   Loopback bind without tokens is still permitted (the local-only
   stance); non-loopback bind requires ≥ 1 configured token or an
   explicit `--allow-anonymous` opt-out.
+- **Transport-layer security landed in [ADR 0039](0039-management-api-tls.md).**
+  `[api.tls]` (config) or `--tls*` (CLI) enable HTTPS / mTLS. TLS is
+  opt-in; the historical plaintext default still applies for trusted
+  LANs. PAT and TLS compose orthogonally.
 - The request body cap is the ASP.NET Core / Kestrel default (30 MiB);
   no per-route limit in v1.
 - CORS is not configured (no `AddCors`) — browsers honour same-origin.

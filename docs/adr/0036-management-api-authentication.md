@@ -112,8 +112,10 @@ Codes:
   revoked; v2 adds `expiresAt`.
 - **Scopes / per-route permissions** (`read:devices`, `write:visa`).
   v1 = every valid token reaches every route.
-- **mTLS** — TLS client certificates as a sibling auth mode; separate
-  ADR.
+- **TLS / mTLS** — landed in [ADR 0039](0039-management-api-tls.md).
+  TLS is opt-in (`[api.tls] enabled = false` by default). PAT and
+  mTLS compose: mTLS gates *who* can connect to the listener, PAT
+  gates *what* they can do.
 - **OIDC / SSO** federation — separate ADR.
 - **Audit log of auth events** — Batch F's `IVICLI_CAPTURE` records
   SCPI traffic but not auth. v2 adds an `IAuditLog` port.
