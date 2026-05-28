@@ -98,7 +98,7 @@ When the management API and HiSLIP-compatible gateway are introduced, the follow
 | Management API transport | TLS opt-in via `[api.tls]`; plaintext HTTP remains the historical default for trusted LANs (ADR 0039) | ADR 0039 |
 | HiSLIP transport | Follows the HiSLIP specification (plain by default); operators are expected to deploy on a trusted LAN. Plain-text mode is documented as a deployment constraint | ADR 0007 §1 |
 | Secret storage | OS-native keychain (Windows Credential Manager / macOS Keychain / Linux Secret Service via libsecret). No plaintext credentials in `config.toml` |
-| Audit log | Append-only file; events include server start/stop, route add/remove, authentication success/failure, gateway client connect/disconnect |
+| Audit log | Append-only NDJSON via [ADR 0043](0043-audit-log.md). v1 emits auth + API-request events; config-mutation + gateway-lifecycle emissions accrete in follow-ups |
 | Rate limiting | Per-source connection caps; details deferred |
 | Privilege model | The CLI process runs as the invoking user; no setuid / setcap requirements |
 

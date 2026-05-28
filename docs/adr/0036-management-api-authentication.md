@@ -117,8 +117,11 @@ Codes:
   mTLS compose: mTLS gates *who* can connect to the listener, PAT
   gates *what* they can do.
 - **OIDC / SSO** federation — separate ADR.
-- **Audit log of auth events** — Batch F's `IVICLI_CAPTURE` records
-  SCPI traffic but not auth. v2 adds an `IAuditLog` port.
+- ~~**Audit log of auth events**~~ — landed in
+  [ADR 0043](0043-audit-log.md). The middleware emits
+  `AuthSucceeded` / `AuthFailed` events with stable reason codes
+  (`missing_token`, `invalid_token`, `no_tokens_configured`,
+  `token_store_unavailable`) per request.
 - **Rate limiting / brute-force protection** — v1 stance is
   loopback-default + opt-in non-loopback; v2 can layer in IP
   throttling once concrete deployments emerge.
