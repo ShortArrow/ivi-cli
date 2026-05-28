@@ -41,17 +41,56 @@ public static class ApiTokenCommand
         {
             Description = "Human-readable label for the token (max 64 chars).",
         };
+        var scopeOpt = new Option<string[]>("--scope")
+        {
+            Description =
+                "Capability scope (repeatable). Allowed: read:devices / read:servers / "
+                + "read:scenarios / write:scpi. Omit for a legacy unrestricted token (ADR 0044).",
+            AllowMultipleArgumentsPerToken = true,
+            Arity = ArgumentArity.ZeroOrMore,
+        };
+        var expiresOpt = new Option<string?>("--expires")
+        {
+            Description =
+                "Token expiry: a duration suffix (30d / 12h / 5m), or an ISO-8601 absolute "
+                + "instant. Omit for a token that never expires (ADR 0044).",
+        };
         var cmd = new Command(
             "create",
             "Mint a new API token. The raw token is printed once and never recoverable."
         );
         cmd.Options.Add(labelOpt);
+        cmd.Options.Add(scopeOpt);
+        cmd.Options.Add(expiresOpt);
         cmd.SetAction(
             async (parseResult, ct) =>
             {
                 var label = parseResult.GetValue(labelOpt) ?? string.Empty;
+                var scopes = parseResult.GetValue(scopeOpt) ?? Array.Empty<string>();
+                var expiresRaw = parseResult.GetValue(expiresOpt);
+                DateTimeOffset? expiresAt = null;
+                if (!string.IsNullOrWhiteSpace(expiresRaw))
+                {
+                    var parsed = ParseExpiresAt(expiresRaw);
+                    if (parsed is null)
+                    {
+                        Console.Error.WriteLine(
+                            $"error: --expires '{expiresRaw}' is not a duration (30d/12h/5m) "
+                                + "or an ISO-8601 instant."
+                        );
+                        return ExitCodeMapper.UsageError;
+                    }
+                    expiresAt = parsed;
+                }
                 var handler = services.GetRequiredService<CreateApiTokenCommandHandler>();
-                var result = await handler.HandleAsync(new CreateApiTokenCommand(label), ct);
+                var result = await handler.HandleAsync(
+                    new CreateApiTokenCommand(
+                        label,
+                        Scopes: ImmutableArray.Create(scopes),
+                        ExpiresAt: expiresAt
+                    ),
+                    ct
+                );
                 if (
                     result
                     is not Result<CreateApiTokenReport, ApiTokenStoreError>.Ok { Value: var report }
@@ -65,6 +104,16 @@ public static class ApiTokenCommand
                     ? "(no label)"
                     : $"'{report.Stored.Label}'";
                 Console.WriteLine($"created token {displayLabel} (id {report.Stored.Id})");
+                if (!report.Stored.Scopes.IsDefaultOrEmpty)
+                {
+                    Console.WriteLine($"scopes: {string.Join(", ", report.Stored.Scopes)}");
+                }
+                if (report.Stored.ExpiresAt is { } exp)
+                {
+                    Console.WriteLine(
+                        $"expires: {exp.ToString("u", CultureInfo.InvariantCulture)}"
+                    );
+                }
                 Console.WriteLine(report.Token);
                 Console.WriteLine();
                 Console.WriteLine("Save it now — it cannot be recovered later. Hash is stored;");
@@ -73,6 +122,55 @@ public static class ApiTokenCommand
             }
         );
         return cmd;
+    }
+
+    /// <summary>
+    /// Parses an <c>--expires</c> argument as either a relative duration
+    /// (<c>30d</c>, <c>12h</c>, <c>5m</c>, <c>120s</c>) added to the
+    /// current UTC time, or an absolute ISO-8601 instant. Returns null
+    /// when the input matches neither shape.
+    /// </summary>
+    public static DateTimeOffset? ParseExpiresAt(string raw)
+    {
+        raw = raw.Trim();
+        if (raw.Length >= 2)
+        {
+            var unit = raw[^1];
+            var nPart = raw[..^1];
+            if (
+                (unit == 's' || unit == 'm' || unit == 'h' || unit == 'd')
+                && int.TryParse(
+                    nPart,
+                    NumberStyles.Integer,
+                    CultureInfo.InvariantCulture,
+                    out var n
+                )
+                && n > 0
+            )
+            {
+                var now = DateTimeOffset.UtcNow;
+                return unit switch
+                {
+                    's' => now.AddSeconds(n),
+                    'm' => now.AddMinutes(n),
+                    'h' => now.AddHours(n),
+                    'd' => now.AddDays(n),
+                    _ => null,
+                };
+            }
+        }
+        if (
+            DateTimeOffset.TryParse(
+                raw,
+                CultureInfo.InvariantCulture,
+                DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal,
+                out var abs
+            )
+        )
+        {
+            return abs;
+        }
+        return null;
     }
 
     private static Command BuildList(IServiceProvider services)
@@ -150,13 +248,17 @@ public static class ApiTokenCommand
             writer.WriteLine("(no API tokens)");
             return;
         }
-        writer.WriteLine($"{"ID", -8} {"LABEL", -20} {"CREATED", -25} LAST USED");
+        writer.WriteLine(
+            $"{"ID", -8} {"LABEL", -20} {"CREATED", -22} {"EXPIRES", -22} {"SCOPES", -28} LAST USED"
+        );
         foreach (var t in tokens)
         {
             var lastUsed = t.LastUsedAt?.ToString("u", CultureInfo.InvariantCulture) ?? "(never)";
             var label = string.IsNullOrEmpty(t.Label) ? "(no label)" : t.Label;
+            var expires = t.ExpiresAt?.ToString("u", CultureInfo.InvariantCulture) ?? "(never)";
+            var scopes = t.Scopes.IsDefaultOrEmpty ? "(unrestricted)" : string.Join(",", t.Scopes);
             writer.WriteLine(
-                $"{t.Id, -8} {Truncate(label, 20), -20} {t.CreatedAt.ToString("u", CultureInfo.InvariantCulture), -25} {lastUsed}"
+                $"{t.Id, -8} {Truncate(label, 20), -20} {t.CreatedAt.ToString("u", CultureInfo.InvariantCulture), -22} {expires, -22} {Truncate(scopes, 28), -28} {lastUsed}"
             );
         }
     }
@@ -171,6 +273,8 @@ public static class ApiTokenCommand
                     label = t.Label,
                     createdAt = t.CreatedAt,
                     lastUsedAt = t.LastUsedAt,
+                    scopes = t.Scopes.IsDefaultOrEmpty ? Array.Empty<string>() : t.Scopes.ToArray(),
+                    expiresAt = t.ExpiresAt,
                 })
                 .ToArray(),
             JsonOptions

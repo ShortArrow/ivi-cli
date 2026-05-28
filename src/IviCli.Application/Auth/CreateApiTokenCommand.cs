@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Security.Cryptography;
 using System.Text;
 using IviCli.Domain;
@@ -5,9 +6,15 @@ using IviCli.Domain.Auth;
 
 namespace IviCli.Application.Auth;
 
-/// <summary>Command DTO for <c>ivicli api token create</c> (ADR 0036).</summary>
+/// <summary>Command DTO for <c>ivicli api token create</c> (ADR 0036, scopes + expiry per ADR 0044).</summary>
 /// <param name="Label">Human-readable label for the token (truncated to 64 chars).</param>
-public sealed record CreateApiTokenCommand(string Label);
+/// <param name="Scopes">Optional capability list. Empty = legacy unrestricted (all scopes granted).</param>
+/// <param name="ExpiresAt">Optional absolute expiry. Null = never expires.</param>
+public sealed record CreateApiTokenCommand(
+    string Label,
+    ImmutableArray<string> Scopes = default,
+    DateTimeOffset? ExpiresAt = null
+);
 
 /// <summary>
 /// Outcome of a successful mint. The raw token string is surfaced to
@@ -58,7 +65,15 @@ public sealed class CreateApiTokenCommandHandler
         var hashHex = HashHex(token);
         var id = hashHex[..6];
         var label = TrimLabel(command.Label);
-        var stored = new ApiToken(id, hashHex, label, _now(), LastUsedAt: null);
+        var stored = new ApiToken(
+            id,
+            hashHex,
+            label,
+            _now(),
+            LastUsedAt: null,
+            Scopes: command.Scopes.IsDefault ? ImmutableArray<string>.Empty : command.Scopes,
+            ExpiresAt: command.ExpiresAt
+        );
 
         var save = await _store.SaveAsync(document.Add(stored), ct);
         if (save is Result<Unit, ApiTokenStoreError>.Error err)
