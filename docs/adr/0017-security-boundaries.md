@@ -94,7 +94,7 @@ When the management API and HiSLIP-compatible gateway are introduced, the follow
 
 | Concern | Phase 2 baseline | Shipped |
 | --- | --- | --- |
-| Management API authentication | mTLS preferred; PAT token-based authentication as a lab-convenience fallback | PAT (ADR 0036), mTLS (ADR 0039) |
+| Management API authentication | mTLS preferred; PAT token-based authentication as a lab-convenience fallback | PAT (ADR 0036), mTLS (ADR 0039), PAT scopes + expiry (ADR 0044) |
 | Management API transport | TLS opt-in via `[api.tls]`; plaintext HTTP remains the historical default for trusted LANs (ADR 0039) | ADR 0039 |
 | HiSLIP transport | Follows the HiSLIP specification (plain by default); operators are expected to deploy on a trusted LAN. Plain-text mode is documented as a deployment constraint | ADR 0007 §1 |
 | Secret storage | OS-native keychain (Windows Credential Manager / macOS Keychain / Linux Secret Service via libsecret). No plaintext credentials in `config.toml` |

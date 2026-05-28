@@ -108,10 +108,16 @@ Codes:
 
 ## Out of scope (v2 candidates)
 
-- **Token expiry / rotation policy** — v1 tokens live until manually
-  revoked; v2 adds `expiresAt`.
-- **Scopes / per-route permissions** (`read:devices`, `write:visa`).
-  v1 = every valid token reaches every route.
+- ~~**Token expiry / rotation policy**~~ — landed in
+  [ADR 0044](0044-pat-scopes-and-expiry.md). `--expires` accepts
+  duration shortcuts or ISO-8601; expired tokens audit
+  `AuthFailed("expired_token")` and 401. Refresh-token flow stays
+  deferred.
+- ~~**Scopes / per-route permissions**~~ — landed in
+  [ADR 0044](0044-pat-scopes-and-expiry.md). Four v1 scopes
+  (`read:devices`, `read:servers`, `read:scenarios`, `write:scpi`);
+  `RoutePermissions` static table maps method+path to required
+  scope; mismatches return 403 + `insufficient_scope` audit.
 - **TLS / mTLS** — landed in [ADR 0039](0039-management-api-tls.md).
   TLS is opt-in (`[api.tls] enabled = false` by default). PAT and
   mTLS compose: mTLS gates *who* can connect to the listener, PAT
