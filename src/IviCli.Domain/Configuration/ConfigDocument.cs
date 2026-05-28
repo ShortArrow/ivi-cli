@@ -22,7 +22,8 @@ public sealed record ConfigDocument
             devices: ImmutableArray<Device>.Empty,
             servers: ImmutableArray<Server>.Empty,
             routes: ImmutableArray<Route>.Empty,
-            defaults: Defaults.None
+            defaults: Defaults.None,
+            pool: PoolConfig.Default
         );
 
     /// <summary>The configured devices, in insertion order.</summary>
@@ -37,23 +38,29 @@ public sealed record ConfigDocument
     /// <summary>The <c>[defaults]</c> section.</summary>
     public Defaults Defaults { get; }
 
+    /// <summary>The <c>[pool]</c> section (ADR 0038).</summary>
+    public PoolConfig Pool { get; }
+
     private ConfigDocument(
         ImmutableArray<Device> devices,
         ImmutableArray<Server> servers,
         ImmutableArray<Route> routes,
-        Defaults defaults
+        Defaults defaults,
+        PoolConfig pool
     )
     {
         Devices = devices;
         Servers = servers;
         Routes = routes;
         Defaults = defaults;
+        Pool = pool;
     }
 
     /// <summary>Structural equality across every collection.</summary>
     public bool Equals(ConfigDocument? other) =>
         other is not null
         && Defaults == other.Defaults
+        && Pool == other.Pool
         && Devices.SequenceEqual(other.Devices)
         && Servers.SequenceEqual(other.Servers)
         && Routes.SequenceEqual(other.Routes);
@@ -63,6 +70,7 @@ public sealed record ConfigDocument
     {
         var hash = new HashCode();
         hash.Add(Defaults);
+        hash.Add(Pool);
         foreach (var d in Devices)
         {
             hash.Add(d);
@@ -77,6 +85,9 @@ public sealed record ConfigDocument
         }
         return hash.ToHashCode();
     }
+
+    /// <summary>Replaces the <see cref="Pool"/> section.</summary>
+    public ConfigDocument WithPool(PoolConfig pool) => With(pool: pool);
 
     // -------- Devices ----------------------------------------------------
 
@@ -243,6 +254,14 @@ public sealed record ConfigDocument
         ImmutableArray<Device>? devices = null,
         ImmutableArray<Server>? servers = null,
         ImmutableArray<Route>? routes = null,
-        Defaults? defaults = null
-    ) => new(devices ?? Devices, servers ?? Servers, routes ?? Routes, defaults ?? Defaults);
+        Defaults? defaults = null,
+        PoolConfig? pool = null
+    ) =>
+        new(
+            devices ?? Devices,
+            servers ?? Servers,
+            routes ?? Routes,
+            defaults ?? Defaults,
+            pool ?? Pool
+        );
 }

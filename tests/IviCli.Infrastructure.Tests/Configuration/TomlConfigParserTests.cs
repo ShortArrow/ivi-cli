@@ -166,4 +166,51 @@ public class TomlConfigParserTests
         // Then
         roundtripped.ShouldBe(original);
     }
+
+    [Fact]
+    public void Parse_PoolTable_RoundTripsAllFields()
+    {
+        var toml = """
+            [pool]
+            enabled = false
+            idle_timeout = "30s"
+            max_devices = 8
+            """;
+
+        var config = TomlConfigParser.Parse(toml).ShouldBeOk();
+
+        config.Pool.Enabled.ShouldBeFalse();
+        config.Pool.IdleTimeout.ShouldBe(TimeSpan.FromSeconds(30));
+        config.Pool.MaxDevices.ShouldBe(8);
+    }
+
+    [Fact]
+    public void Parse_MissingPoolTable_DefaultsToPoolConfigDefault()
+    {
+        var config = TomlConfigParser.Parse("").ShouldBeOk();
+        config.Pool.ShouldBe(PoolConfig.Default);
+    }
+
+    [Fact]
+    public void Parse_NegativePoolIdleTimeout_ReturnsParseFailure()
+    {
+        var toml = """
+            [pool]
+            idle_timeout = "-5s"
+            """;
+        var result = TomlConfigParser.Parse(toml);
+        result.ShouldBeError();
+    }
+
+    [Fact]
+    public void Serialize_RoundTrips_NonDefaultPool()
+    {
+        var pool = PoolConfig.From(false, TimeSpan.FromSeconds(120), 4).ShouldBeOk();
+        var original = ConfigDocument.Empty.WithPool(pool);
+
+        var serialized = TomlConfigParser.Serialize(original);
+        var roundtripped = TomlConfigParser.Parse(serialized).ShouldBeOk();
+
+        roundtripped.Pool.ShouldBe(pool);
+    }
 }

@@ -91,6 +91,28 @@ public sealed record UnsupportedTransport(DeviceName DeviceName) : BackendError
 }
 
 /// <summary>
+/// The backend session pool (ADR 0038) waited longer than the device's
+/// configured timeout for an in-use entry to be released. Distinct from
+/// <see cref="TransportTimeout"/> (which means the wire didn't respond)
+/// so logs and callers can tell "queued behind another op" apart from
+/// "instrument silent."
+/// </summary>
+/// <param name="Device">The device whose lease wait expired.</param>
+/// <param name="Waited">How long the caller waited before giving up.</param>
+public sealed record PoolWaitTimeout(DeviceName Device, TimeSpan Waited) : BackendError
+{
+    /// <inheritdoc/>
+    public override LogSeverity Severity => LogSeverity.Warning;
+
+    /// <inheritdoc/>
+    public override string Message =>
+        "pool wait exceeded {Waited} for device {Device}; another op is in flight";
+
+    /// <inheritdoc/>
+    public override IReadOnlyList<object?> LogArgs => new object?[] { Waited, Device };
+}
+
+/// <summary>
 /// A mock scenario scene contradicted the operation being performed (e.g. a
 /// <c>respond</c> scene matched a <c>WriteAsync</c> call, or an <c>ack</c>
 /// scene matched a <c>QueryAsync</c>). Surfaced loudly to make scenario

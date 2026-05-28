@@ -21,6 +21,7 @@ public static class TomlConfigParser
     private const string DevicesArray = "devices";
     private const string ServersArray = "servers";
     private const string RoutesArray = "routes";
+    private const string PoolTable = "pool";
     private const string DeviceField = "device";
     private const string NameField = "name";
     private const string TypeField = "type";
@@ -30,6 +31,9 @@ public static class TomlConfigParser
     private const string EndpointField = "endpoint";
     private const string ResourceField = "resource";
     private const string TimeoutMillisecondsField = "timeout_ms";
+    private const string PoolEnabledField = "enabled";
+    private const string PoolIdleTimeoutField = "idle_timeout";
+    private const string PoolMaxDevicesField = "max_devices";
 
     /// <summary>
     /// Parses a TOML document into a validated <see cref="ConfigDocument"/>.
@@ -134,6 +138,23 @@ public static class TomlConfigParser
             }
         }
 
+        // Pool (optional).
+        if (model.TryGetValue(PoolTable, out var poolValue))
+        {
+            if (poolValue is not TomlTable poolTable)
+            {
+                return Fail($"expected [{PoolTable}] to be a TOML table");
+            }
+            var poolResult = ParsePool(poolTable);
+            if (poolResult is not Result<PoolConfig, ConfigStoreError>.Ok poolOk)
+            {
+                return Result.Failure<ConfigDocument, ConfigStoreError>(
+                    ((Result<PoolConfig, ConfigStoreError>.Error)poolResult).Err
+                );
+            }
+            config = config.WithPool(poolOk.Value);
+        }
+
         // Defaults (optional).
         if (model.TryGetValue(DefaultsTable, out var defaultsValue))
         {
@@ -181,6 +202,21 @@ public static class TomlConfigParser
         {
             builder.AppendLine(inv, $"[{DefaultsTable}]");
             builder.AppendLine(inv, $"{DeviceField} = \"{defaultDevice.Value}\"");
+            builder.AppendLine();
+        }
+
+        if (document.Pool != PoolConfig.Default)
+        {
+            builder.AppendLine(inv, $"[{PoolTable}]");
+            builder.AppendLine(
+                inv,
+                $"{PoolEnabledField} = {(document.Pool.Enabled ? "true" : "false")}"
+            );
+            builder.AppendLine(
+                inv,
+                $"{PoolIdleTimeoutField} = \"{FormatDuration(document.Pool.IdleTimeout)}\""
+            );
+            builder.AppendLine(inv, $"{PoolMaxDevicesField} = {document.Pool.MaxDevices}");
             builder.AppendLine();
         }
 
@@ -386,6 +422,126 @@ public static class TomlConfigParser
             new Device(nameOk.Value, resourceOk.Value, timeoutOk.Value)
         );
     }
+
+    private static Result<PoolConfig, ConfigStoreError> ParsePool(TomlTable table)
+    {
+        var enabled = true;
+        if (table.TryGetValue(PoolEnabledField, out var enabledValue))
+        {
+            if (enabledValue is not bool b)
+            {
+                return FailPool($"[{PoolTable}].{PoolEnabledField} must be a boolean");
+            }
+            enabled = b;
+        }
+
+        var idle = PoolConfig.Default.IdleTimeout;
+        if (table.TryGetValue(PoolIdleTimeoutField, out var idleValue))
+        {
+            // Accept either "60s" / "500ms" / "1m" string form or an integer
+            // number of seconds. The string form is canonical when serialised.
+            if (idleValue is string idleString)
+            {
+                var parsed = ParseDurationString(idleString);
+                if (parsed is null)
+                {
+                    return FailPool(
+                        $"[{PoolTable}].{PoolIdleTimeoutField}: cannot parse duration '{idleString}'"
+                    );
+                }
+                idle = parsed.Value;
+            }
+            else if (idleValue is long idleLong)
+            {
+                idle = TimeSpan.FromSeconds(idleLong);
+            }
+            else
+            {
+                return FailPool(
+                    $"[{PoolTable}].{PoolIdleTimeoutField} must be a duration string (e.g. \"60s\") or integer seconds"
+                );
+            }
+        }
+
+        var maxDevices = PoolConfig.Default.MaxDevices;
+        if (table.TryGetValue(PoolMaxDevicesField, out var maxValue))
+        {
+            if (maxValue is not long maxLong)
+            {
+                return FailPool($"[{PoolTable}].{PoolMaxDevicesField} must be an integer");
+            }
+            maxDevices = (int)maxLong;
+        }
+
+        var built = PoolConfig.From(enabled, idle, maxDevices);
+        if (built is not Result<PoolConfig, PoolConfigError>.Ok ok)
+        {
+            var err = ((Result<PoolConfig, PoolConfigError>.Error)built).Err;
+            return FailPool(err.Message);
+        }
+        return Result.Success<PoolConfig, ConfigStoreError>(ok.Value);
+    }
+
+    private static TimeSpan? ParseDurationString(string text)
+    {
+        var inv = System.Globalization.CultureInfo.InvariantCulture;
+        text = text.Trim();
+        if (text.Length == 0)
+        {
+            return null;
+        }
+        // Split numeric prefix from unit suffix.
+        var i = 0;
+        while (i < text.Length && (char.IsDigit(text[i]) || text[i] == '.'))
+        {
+            i++;
+        }
+        if (i == 0)
+        {
+            return null;
+        }
+        if (
+            !double.TryParse(
+                text.AsSpan(0, i),
+                System.Globalization.NumberStyles.Float,
+                inv,
+                out var n
+            )
+        )
+        {
+            return null;
+        }
+        var unit = text[i..].Trim();
+        return unit switch
+        {
+            "ms" => TimeSpan.FromMilliseconds(n),
+            "s" or "" => TimeSpan.FromSeconds(n),
+            "m" => TimeSpan.FromMinutes(n),
+            "h" => TimeSpan.FromHours(n),
+            _ => null,
+        };
+    }
+
+    private static string FormatDuration(TimeSpan value)
+    {
+        var inv = System.Globalization.CultureInfo.InvariantCulture;
+        if (value.TotalMilliseconds < 1000 && value != TimeSpan.Zero)
+        {
+            return string.Create(inv, $"{(long)value.TotalMilliseconds}ms");
+        }
+        if (value.TotalSeconds < 60)
+        {
+            return string.Create(inv, $"{(long)value.TotalSeconds}s");
+        }
+        if (value.TotalMinutes < 60)
+        {
+            return string.Create(inv, $"{(long)value.TotalMinutes}m");
+        }
+        return string.Create(inv, $"{(long)value.TotalHours}h");
+    }
+
+    private static Result<PoolConfig, ConfigStoreError> FailPool(string reason) =>
+        Result.Failure<PoolConfig, ConfigStoreError>(new ConfigStoreParseFailure(reason));
 
     private static Result<ConfigDocument, ConfigStoreError> Fail(string reason) =>
         Result.Failure<ConfigDocument, ConfigStoreError>(new ConfigStoreParseFailure(reason));
