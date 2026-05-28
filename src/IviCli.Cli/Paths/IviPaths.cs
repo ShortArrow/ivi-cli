@@ -11,11 +11,13 @@ public static class IviPaths
     private const string LogDirectoryName = "logs";
     private const string ServersDirectoryName = "servers";
     private const string AuthDirectoryName = "auth";
+    private const string AuditDirectoryName = "audit";
 
     private const string ConfigOverrideEnv = "IVICLI_CONFIG";
     private const string LogDirOverrideEnv = "IVICLI_LOG_DIR";
     private const string ServerStateDirOverrideEnv = "IVICLI_SERVER_STATE_DIR";
     private const string AuthDirOverrideEnv = "IVICLI_AUTH_DIR";
+    private const string AuditDirOverrideEnv = "IVICLI_AUDIT_DIR";
 
     /// <summary>
     /// Returns the absolute path to <c>config.toml</c>, respecting the
@@ -161,5 +163,37 @@ public static class IviPaths
                 ".config"
             );
         return Path.Combine(configRoot, AppFolderName, AuthDirectoryName);
+    }
+
+    /// <summary>
+    /// Returns the absolute path to the audit-log directory
+    /// (ADR 0043). Hosts the append-only <c>audit.ndjson</c> file
+    /// the security middleware writes to. Honours the
+    /// <c>IVICLI_AUDIT_DIR</c> environment-variable override.
+    /// </summary>
+    public static string ResolveAuditDirectory()
+    {
+        var overrideValue = Environment.GetEnvironmentVariable(AuditDirOverrideEnv);
+        if (!string.IsNullOrEmpty(overrideValue))
+        {
+            return overrideValue;
+        }
+
+        if (OperatingSystem.IsWindows())
+        {
+            return Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                AppFolderName,
+                AuditDirectoryName
+            );
+        }
+
+        var configRoot =
+            Environment.GetEnvironmentVariable("XDG_CONFIG_HOME")
+            ?? Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+                ".config"
+            );
+        return Path.Combine(configRoot, AppFolderName, AuditDirectoryName);
     }
 }
