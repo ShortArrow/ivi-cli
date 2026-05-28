@@ -58,6 +58,28 @@ internal static class Program
             services.AddIviCliGatewayServers();
             services.AddIviCliInfrastructure(configPath);
             services.AddIviCliServerProcessRegistry(IviPaths.ResolveServerStateDirectory());
+
+            // Eager config load for the OTel bootstrap (ADR 0040) — OTel
+            // pipelines must be registered against the service collection
+            // before BuildServiceProvider, so we cannot wait for the
+            // factory-builder lambda below to surface the loaded
+            // ConfigDocument.
+            var bootstrapStore = new IviCli.Infrastructure.Configuration.TomlConfigStore(
+                new System.IO.Abstractions.FileSystem(),
+                configPath
+            );
+            var bootstrapLoad = bootstrapStore
+                .LoadAsync(CancellationToken.None)
+                .GetAwaiter()
+                .GetResult();
+            var bootstrapConfig = bootstrapLoad
+                is Result<
+                    IviCli.Domain.Configuration.ConfigDocument,
+                    IviCli.Application.Configuration.ConfigStoreError
+                >.Ok { Value: var bootCfg }
+                ? bootCfg
+                : IviCli.Domain.Configuration.ConfigDocument.Empty;
+            IviCli.Cli.Telemetry.TelemetryBootstrapper.Install(services, bootstrapConfig.Telemetry);
             services.AddIviCliApiTokenStore(
                 Path.Combine(IviPaths.ResolveAuthDirectory(), "api-tokens.toml")
             );
@@ -139,6 +161,11 @@ internal static class Program
                         socketBackend: sp.GetRequiredService<IviCli.Backends.Socket.SocketBackend>(),
                         vxi11Backend: sp.GetRequiredService<IviCli.Backends.Vxi11.Vxi11Backend>()
                     );
+
+                // Instrumenting layer always wraps Default — Activity /
+                // Meter calls are near-free without listeners, so this
+                // is cheap even when [telemetry] is disabled (ADR 0040).
+                factory = new IviCli.Application.Backends.InstrumentingBackendFactory(factory);
 
                 // Pool layer wraps the default factory when [pool] enabled.
                 // Capture wraps Pool so logical Open/Close events still
