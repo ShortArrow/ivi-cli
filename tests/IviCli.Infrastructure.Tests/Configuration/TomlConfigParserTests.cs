@@ -213,4 +213,57 @@ public class TomlConfigParserTests
 
         roundtripped.Pool.ShouldBe(pool);
     }
+
+    [Fact]
+    public void Parse_ApiTlsTable_RoundTripsAllFields()
+    {
+        var toml = """
+            [api.tls]
+            enabled = true
+            cert_path = "/etc/ivi/cert.pfx"
+            password_env = "IVI_TLS_PASS"
+            client_required = true
+            client_ca_path = "/etc/ivi/clients.crt"
+            """;
+
+        var config = TomlConfigParser.Parse(toml).ShouldBeOk();
+
+        config.Api.Tls.Enabled.ShouldBeTrue();
+        config.Api.Tls.CertPath.ShouldBe("/etc/ivi/cert.pfx");
+        config.Api.Tls.PasswordEnv.ShouldBe("IVI_TLS_PASS");
+        config.Api.Tls.ClientRequired.ShouldBeTrue();
+        config.Api.Tls.ClientCaPath.ShouldBe("/etc/ivi/clients.crt");
+    }
+
+    [Fact]
+    public void Parse_MissingApiTable_DefaultsToApiDefault()
+    {
+        var config = TomlConfigParser.Parse("").ShouldBeOk();
+        config.Api.ShouldBe(ApiConfig.Default);
+    }
+
+    [Fact]
+    public void Parse_TlsEnabledWithoutCertOrSelfSigned_Fails()
+    {
+        var toml = """
+            [api.tls]
+            enabled = true
+            """;
+        var result = TomlConfigParser.Parse(toml);
+        result.ShouldBeError();
+    }
+
+    [Fact]
+    public void Serialize_RoundTrips_NonDefaultApiTls()
+    {
+        var tls = TlsConfig
+            .From(true, "/etc/ivi/cert.pfx", null, "IVI_TLS_PASS", false, false, null)
+            .ShouldBeOk();
+        var original = ConfigDocument.Empty.WithApi(new ApiConfig(tls));
+
+        var serialized = TomlConfigParser.Serialize(original);
+        var roundtripped = TomlConfigParser.Parse(serialized).ShouldBeOk();
+
+        roundtripped.Api.Tls.ShouldBe(tls);
+    }
 }

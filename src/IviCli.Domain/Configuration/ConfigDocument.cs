@@ -23,7 +23,8 @@ public sealed record ConfigDocument
             servers: ImmutableArray<Server>.Empty,
             routes: ImmutableArray<Route>.Empty,
             defaults: Defaults.None,
-            pool: PoolConfig.Default
+            pool: PoolConfig.Default,
+            api: ApiConfig.Default
         );
 
     /// <summary>The configured devices, in insertion order.</summary>
@@ -41,12 +42,16 @@ public sealed record ConfigDocument
     /// <summary>The <c>[pool]</c> section (ADR 0038).</summary>
     public PoolConfig Pool { get; }
 
+    /// <summary>The <c>[api]</c> section (ADR 0039).</summary>
+    public ApiConfig Api { get; }
+
     private ConfigDocument(
         ImmutableArray<Device> devices,
         ImmutableArray<Server> servers,
         ImmutableArray<Route> routes,
         Defaults defaults,
-        PoolConfig pool
+        PoolConfig pool,
+        ApiConfig api
     )
     {
         Devices = devices;
@@ -54,6 +59,7 @@ public sealed record ConfigDocument
         Routes = routes;
         Defaults = defaults;
         Pool = pool;
+        Api = api;
     }
 
     /// <summary>Structural equality across every collection.</summary>
@@ -61,6 +67,7 @@ public sealed record ConfigDocument
         other is not null
         && Defaults == other.Defaults
         && Pool == other.Pool
+        && Api == other.Api
         && Devices.SequenceEqual(other.Devices)
         && Servers.SequenceEqual(other.Servers)
         && Routes.SequenceEqual(other.Routes);
@@ -71,6 +78,7 @@ public sealed record ConfigDocument
         var hash = new HashCode();
         hash.Add(Defaults);
         hash.Add(Pool);
+        hash.Add(Api);
         foreach (var d in Devices)
         {
             hash.Add(d);
@@ -88,6 +96,9 @@ public sealed record ConfigDocument
 
     /// <summary>Replaces the <see cref="Pool"/> section.</summary>
     public ConfigDocument WithPool(PoolConfig pool) => With(pool: pool);
+
+    /// <summary>Replaces the <see cref="Api"/> section.</summary>
+    public ConfigDocument WithApi(ApiConfig api) => With(api: api);
 
     // -------- Devices ----------------------------------------------------
 
@@ -255,13 +266,15 @@ public sealed record ConfigDocument
         ImmutableArray<Server>? servers = null,
         ImmutableArray<Route>? routes = null,
         Defaults? defaults = null,
-        PoolConfig? pool = null
+        PoolConfig? pool = null,
+        ApiConfig? api = null
     ) =>
         new(
             devices ?? Devices,
             servers ?? Servers,
             routes ?? Routes,
             defaults ?? Defaults,
-            pool ?? Pool
+            pool ?? Pool,
+            api ?? Api
         );
 }

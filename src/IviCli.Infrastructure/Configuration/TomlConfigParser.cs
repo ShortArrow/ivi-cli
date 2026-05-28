@@ -34,6 +34,15 @@ public static class TomlConfigParser
     private const string PoolEnabledField = "enabled";
     private const string PoolIdleTimeoutField = "idle_timeout";
     private const string PoolMaxDevicesField = "max_devices";
+    private const string ApiTable = "api";
+    private const string ApiTlsTable = "tls";
+    private const string TlsEnabledField = "enabled";
+    private const string TlsCertPathField = "cert_path";
+    private const string TlsKeyPathField = "key_path";
+    private const string TlsPasswordEnvField = "password_env";
+    private const string TlsSelfSignedField = "self_signed";
+    private const string TlsClientRequiredField = "client_required";
+    private const string TlsClientCaPathField = "client_ca_path";
 
     /// <summary>
     /// Parses a TOML document into a validated <see cref="ConfigDocument"/>.
@@ -155,6 +164,23 @@ public static class TomlConfigParser
             config = config.WithPool(poolOk.Value);
         }
 
+        // API (optional, with nested [api.tls]).
+        if (model.TryGetValue(ApiTable, out var apiValue))
+        {
+            if (apiValue is not TomlTable apiTable)
+            {
+                return Fail($"expected [{ApiTable}] to be a TOML table");
+            }
+            var apiResult = ParseApi(apiTable);
+            if (apiResult is not Result<ApiConfig, ConfigStoreError>.Ok apiOk)
+            {
+                return Result.Failure<ConfigDocument, ConfigStoreError>(
+                    ((Result<ApiConfig, ConfigStoreError>.Error)apiResult).Err
+                );
+            }
+            config = config.WithApi(apiOk.Value);
+        }
+
         // Defaults (optional).
         if (model.TryGetValue(DefaultsTable, out var defaultsValue))
         {
@@ -217,6 +243,38 @@ public static class TomlConfigParser
                 $"{PoolIdleTimeoutField} = \"{FormatDuration(document.Pool.IdleTimeout)}\""
             );
             builder.AppendLine(inv, $"{PoolMaxDevicesField} = {document.Pool.MaxDevices}");
+            builder.AppendLine();
+        }
+
+        if (document.Api != ApiConfig.Default)
+        {
+            var tls = document.Api.Tls;
+            builder.AppendLine(inv, $"[{ApiTable}.{ApiTlsTable}]");
+            builder.AppendLine(inv, $"{TlsEnabledField} = {(tls.Enabled ? "true" : "false")}");
+            if (tls.CertPath is not null)
+            {
+                builder.AppendLine(inv, $"{TlsCertPathField} = \"{tls.CertPath}\"");
+            }
+            if (tls.KeyPath is not null)
+            {
+                builder.AppendLine(inv, $"{TlsKeyPathField} = \"{tls.KeyPath}\"");
+            }
+            if (tls.PasswordEnv is not null)
+            {
+                builder.AppendLine(inv, $"{TlsPasswordEnvField} = \"{tls.PasswordEnv}\"");
+            }
+            if (tls.SelfSigned)
+            {
+                builder.AppendLine(inv, $"{TlsSelfSignedField} = true");
+            }
+            if (tls.ClientRequired)
+            {
+                builder.AppendLine(inv, $"{TlsClientRequiredField} = true");
+            }
+            if (tls.ClientCaPath is not null)
+            {
+                builder.AppendLine(inv, $"{TlsClientCaPathField} = \"{tls.ClientCaPath}\"");
+            }
             builder.AppendLine();
         }
 
@@ -542,6 +600,66 @@ public static class TomlConfigParser
 
     private static Result<PoolConfig, ConfigStoreError> FailPool(string reason) =>
         Result.Failure<PoolConfig, ConfigStoreError>(new ConfigStoreParseFailure(reason));
+
+    private static Result<ApiConfig, ConfigStoreError> ParseApi(TomlTable table)
+    {
+        var tls = TlsConfig.Default;
+        if (table.TryGetValue(ApiTlsTable, out var tlsValue))
+        {
+            if (tlsValue is not TomlTable tlsTable)
+            {
+                return FailApi($"expected [{ApiTable}.{ApiTlsTable}] to be a TOML table");
+            }
+            var tlsResult = ParseTls(tlsTable);
+            if (tlsResult is not Result<TlsConfig, ConfigStoreError>.Ok tlsOk)
+            {
+                return Result.Failure<ApiConfig, ConfigStoreError>(
+                    ((Result<TlsConfig, ConfigStoreError>.Error)tlsResult).Err
+                );
+            }
+            tls = tlsOk.Value;
+        }
+        return Result.Success<ApiConfig, ConfigStoreError>(new ApiConfig(tls));
+    }
+
+    private static Result<TlsConfig, ConfigStoreError> ParseTls(TomlTable table)
+    {
+        var enabled = ReadBool(table, TlsEnabledField, false);
+        var selfSigned = ReadBool(table, TlsSelfSignedField, false);
+        var clientRequired = ReadBool(table, TlsClientRequiredField, false);
+        var certPath = ReadString(table, TlsCertPathField);
+        var keyPath = ReadString(table, TlsKeyPathField);
+        var passwordEnv = ReadString(table, TlsPasswordEnvField);
+        var clientCaPath = ReadString(table, TlsClientCaPathField);
+
+        var built = TlsConfig.From(
+            enabled,
+            certPath,
+            keyPath,
+            passwordEnv,
+            selfSigned,
+            clientRequired,
+            clientCaPath
+        );
+        if (built is not Result<TlsConfig, TlsConfigError>.Ok ok)
+        {
+            var err = ((Result<TlsConfig, TlsConfigError>.Error)built).Err;
+            return FailTls(err.Message);
+        }
+        return Result.Success<TlsConfig, ConfigStoreError>(ok.Value);
+    }
+
+    private static bool ReadBool(TomlTable table, string field, bool defaultValue) =>
+        table.TryGetValue(field, out var value) && value is bool b ? b : defaultValue;
+
+    private static string? ReadString(TomlTable table, string field) =>
+        table.TryGetValue(field, out var value) && value is string s ? s : null;
+
+    private static Result<ApiConfig, ConfigStoreError> FailApi(string reason) =>
+        Result.Failure<ApiConfig, ConfigStoreError>(new ConfigStoreParseFailure(reason));
+
+    private static Result<TlsConfig, ConfigStoreError> FailTls(string reason) =>
+        Result.Failure<TlsConfig, ConfigStoreError>(new ConfigStoreParseFailure(reason));
 
     private static Result<ConfigDocument, ConfigStoreError> Fail(string reason) =>
         Result.Failure<ConfigDocument, ConfigStoreError>(new ConfigStoreParseFailure(reason));
