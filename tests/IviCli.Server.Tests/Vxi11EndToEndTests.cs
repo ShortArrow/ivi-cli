@@ -207,6 +207,133 @@ public sealed class Vxi11EndToEndTests
     }
 
     [Fact]
+    public async Task Portmap_GetPort_returns_bound_port_for_abort_program()
+    {
+        var (gateway, server, config, port, _) = BuildHarness();
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        var serverTask = gateway.RunAsync(server, config, cts.Token);
+        await WaitForListenerAsync(port, cts.Token);
+
+        using var tcp = new TcpClient();
+        await tcp.ConnectAsync(IPAddress.Loopback, port, cts.Token);
+        using var stream = tcp.GetStream();
+
+        var call = BuildRpcCall(
+            xid: 11,
+            program: PortmapProgram,
+            version: PortmapVersion,
+            procedure: PortmapGetPort,
+            body: writer =>
+            {
+                writer.WriteUInt32(AbortProgram);
+                writer.WriteUInt32(AbortVersion);
+                writer.WriteUInt32(6); // TCP
+                writer.WriteUInt32(0);
+            }
+        );
+        await Vxi11RecordFraming.WriteRecordAsync(stream, call, cts.Token);
+        var reply = SkipReplyHeader(await Vxi11RecordFraming.ReadRecordAsync(stream, cts.Token));
+        reply.ReadUInt32().ShouldBe((uint)port);
+
+        await cts.CancelAsync();
+        try
+        {
+            await serverTask;
+        }
+        catch (OperationCanceledException) { }
+    }
+
+    [Fact]
+    public async Task DeviceAbort_on_valid_lid_returns_NoError()
+    {
+        var (gateway, server, config, port, _) = BuildHarness();
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        var serverTask = gateway.RunAsync(server, config, cts.Token);
+        await WaitForListenerAsync(port, cts.Token);
+
+        using var tcp = new TcpClient();
+        await tcp.ConnectAsync(IPAddress.Loopback, port, cts.Token);
+        using var stream = tcp.GetStream();
+
+        var createCall = BuildRpcCall(
+            xid: 400,
+            program: CoreProgram,
+            version: CoreVersion,
+            procedure: ProcCreateLink,
+            body: writer =>
+            {
+                writer.WriteInt32(1);
+                writer.WriteUInt32(0);
+                writer.WriteUInt32(0);
+                writer.WriteString("inst0");
+            }
+        );
+        await Vxi11RecordFraming.WriteRecordAsync(stream, createCall, cts.Token);
+        var createReply = SkipReplyHeader(
+            await Vxi11RecordFraming.ReadRecordAsync(stream, cts.Token)
+        );
+        createReply.ReadInt32().ShouldBe(Vxi11NoError);
+        var lid = createReply.ReadInt32();
+        var abortPort = createReply.ReadUInt32();
+        abortPort.ShouldBe((uint)port); // abort co-locates with core
+
+        // Open a SEPARATE TCP connection (the abort channel) and send device_abort.
+        using var abortTcp = new TcpClient();
+        await abortTcp.ConnectAsync(IPAddress.Loopback, (int)abortPort, cts.Token);
+        using var abortStream = abortTcp.GetStream();
+        var abortCall = BuildRpcCall(
+            xid: 401,
+            program: AbortProgram,
+            version: AbortVersion,
+            procedure: ProcDeviceAbort,
+            body: writer => writer.WriteInt32(lid)
+        );
+        await Vxi11RecordFraming.WriteRecordAsync(abortStream, abortCall, cts.Token);
+        var abortReply = SkipReplyHeader(
+            await Vxi11RecordFraming.ReadRecordAsync(abortStream, cts.Token)
+        );
+        abortReply.ReadInt32().ShouldBe(Vxi11NoError);
+
+        await cts.CancelAsync();
+        try
+        {
+            await serverTask;
+        }
+        catch (OperationCanceledException) { }
+    }
+
+    [Fact]
+    public async Task DeviceAbort_on_unknown_lid_returns_InvalidLink()
+    {
+        var (gateway, server, config, port, _) = BuildHarness();
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        var serverTask = gateway.RunAsync(server, config, cts.Token);
+        await WaitForListenerAsync(port, cts.Token);
+
+        using var tcp = new TcpClient();
+        await tcp.ConnectAsync(IPAddress.Loopback, port, cts.Token);
+        using var stream = tcp.GetStream();
+
+        var abortCall = BuildRpcCall(
+            xid: 500,
+            program: AbortProgram,
+            version: AbortVersion,
+            procedure: ProcDeviceAbort,
+            body: writer => writer.WriteInt32(424242) // never minted
+        );
+        await Vxi11RecordFraming.WriteRecordAsync(stream, abortCall, cts.Token);
+        var reply = SkipReplyHeader(await Vxi11RecordFraming.ReadRecordAsync(stream, cts.Token));
+        reply.ReadInt32().ShouldBe(Vxi11InvalidLink);
+
+        await cts.CancelAsync();
+        try
+        {
+            await serverTask;
+        }
+        catch (OperationCanceledException) { }
+    }
+
+    [Fact]
     public async Task Unknown_program_returns_PROG_UNAVAIL()
     {
         var (gateway, server, config, port, _) = BuildHarness();

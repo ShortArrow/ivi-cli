@@ -28,6 +28,7 @@ public sealed class Vxi11GatewayServer : IGatewayServer
 {
     private readonly IBackendFactory _backendFactory;
     private readonly ILogger<Vxi11GatewayServer> _logger;
+    private readonly ConcurrentDictionary<int, LinkState> _links = new();
     private int _linkCounter;
 
     /// <summary>Creates a new VXI-11 gateway.</summary>
@@ -112,10 +113,10 @@ public sealed class Vxi11GatewayServer : IGatewayServer
             }
         );
 
-        // Per-connection link state. v1 supports one link per session;
-        // additional create_link calls just overwrite the previous link
-        // after closing the prior backend session.
-        var links = new ConcurrentDictionary<int, LinkState>();
+        // Per-connection ownership of lids in the shared link map.
+        // The map itself is gateway-scoped (ADR 0029 §2a) so abort
+        // requests on a separate TCP connection can find this link.
+        var ownedLinks = new HashSet<int>();
 
         try
         {
@@ -141,7 +142,20 @@ public sealed class Vxi11GatewayServer : IGatewayServer
                 }
                 else if (rpc.Program == CoreProgram)
                 {
-                    await HandleCoreAsync(stream, rpc, body, links, server, config, ct);
+                    await HandleCoreAsync(
+                        stream,
+                        rpc,
+                        body,
+                        ownedLinks,
+                        boundPort,
+                        server,
+                        config,
+                        ct
+                    );
+                }
+                else if (rpc.Program == AbortProgram)
+                {
+                    await HandleAbortAsync(stream, rpc, body, ct);
                 }
                 else
                 {
@@ -159,15 +173,19 @@ public sealed class Vxi11GatewayServer : IGatewayServer
         }
         finally
         {
-            foreach (var (_, state) in links)
+            foreach (var lid in ownedLinks)
             {
-                try
+                if (_links.TryRemove(lid, out var state))
                 {
-                    _ = await state.Backend.CloseAsync(state.Device, CancellationToken.None);
-                }
-                catch
-                {
-                    // Best-effort cleanup; channel is already tearing down.
+                    try
+                    {
+                        _ = await state.Backend.CloseAsync(state.Device, CancellationToken.None);
+                    }
+                    catch
+                    {
+                        // Best-effort cleanup; channel is already tearing down.
+                    }
+                    state.Dispose();
                 }
             }
         }
@@ -215,17 +233,56 @@ public sealed class Vxi11GatewayServer : IGatewayServer
         _ = reader.ReadUInt32(); // protocol (6 = TCP)
         _ = reader.ReadUInt32(); // port (ignored on lookup)
 
-        var responsePort = queriedProgram == CoreProgram ? (uint)boundPort : 0u;
+        // Core + Abort co-locate on the same bound port (ADR 0029 §2a).
+        var responsePort =
+            queriedProgram == CoreProgram || queriedProgram == AbortProgram ? (uint)boundPort : 0u;
         var writer = new Vxi11XdrCodec.XdrWriter();
         writer.WriteUInt32(responsePort);
         await WriteAcceptedReplyAsync(stream, rpc.Xid, AcceptSuccess, writer.ToArray(), ct);
+    }
+
+    private async Task HandleAbortAsync(
+        Stream stream,
+        RpcCallHeader rpc,
+        byte[] body,
+        CancellationToken ct
+    )
+    {
+        if (rpc.Version != AbortVersion)
+        {
+            await WriteAcceptedReplyAsync(stream, rpc.Xid, AcceptProgMismatch, null, ct);
+            return;
+        }
+        if (rpc.Procedure != ProcDeviceAbort)
+        {
+            await WriteAcceptedReplyAsync(stream, rpc.Xid, AcceptProcUnavail, null, ct);
+            return;
+        }
+        var reader = SkipRpcHeader(body);
+        var lid = reader.ReadInt32();
+        if (!_links.TryGetValue(lid, out var state))
+        {
+            await WriteErrorReplyAsync(stream, rpc.Xid, Vxi11InvalidLink, ct);
+            return;
+        }
+        try
+        {
+            state.Cts.Cancel();
+        }
+        catch (ObjectDisposedException)
+        {
+            // Link disposed between lookup and cancel; treat as no-op.
+        }
+        _logger.LogInformation("VXI-11 device_abort signalled for link {Lid}", lid);
+        await WriteErrorReplyAsync(stream, rpc.Xid, Vxi11NoError, ct);
     }
 
     private async Task HandleCoreAsync(
         Stream stream,
         RpcCallHeader rpc,
         byte[] body,
-        ConcurrentDictionary<int, LinkState> links,
+        HashSet<int> ownedLinks,
+        int boundPort,
         Domain.Servers.Server server,
         ConfigDocument config,
         CancellationToken ct
@@ -246,19 +303,28 @@ public sealed class Vxi11GatewayServer : IGatewayServer
         switch (rpc.Procedure)
         {
             case ProcCreateLink:
-                await DoCreateLinkAsync(stream, rpc.Xid, procReader, links, server, config, ct);
+                await DoCreateLinkAsync(
+                    stream,
+                    rpc.Xid,
+                    procReader,
+                    ownedLinks,
+                    boundPort,
+                    server,
+                    config,
+                    ct
+                );
                 break;
             case ProcDeviceWrite:
-                await DoDeviceWriteAsync(stream, rpc.Xid, procReader, links, ct);
+                await DoDeviceWriteAsync(stream, rpc.Xid, procReader, ct);
                 break;
             case ProcDeviceRead:
-                await DoDeviceReadAsync(stream, rpc.Xid, procReader, links, ct);
+                await DoDeviceReadAsync(stream, rpc.Xid, procReader, ct);
                 break;
             case ProcDeviceClear:
-                await DoDeviceClearAsync(stream, rpc.Xid, procReader, links, ct);
+                await DoDeviceClearAsync(stream, rpc.Xid, procReader, ct);
                 break;
             case ProcDestroyLink:
-                await DoDestroyLinkAsync(stream, rpc.Xid, procReader, links, ct);
+                await DoDestroyLinkAsync(stream, rpc.Xid, procReader, ownedLinks, ct);
                 break;
             default:
                 await WriteAcceptedReplyAsync(stream, rpc.Xid, AcceptProcUnavail, null, ct);
@@ -270,7 +336,8 @@ public sealed class Vxi11GatewayServer : IGatewayServer
         Stream stream,
         uint xid,
         Vxi11XdrCodec.XdrReader reader,
-        ConcurrentDictionary<int, LinkState> links,
+        HashSet<int> ownedLinks,
+        int boundPort,
         Domain.Servers.Server server,
         ConfigDocument config,
         CancellationToken ct
@@ -314,15 +381,22 @@ public sealed class Vxi11GatewayServer : IGatewayServer
         }
 
         var lid = System.Threading.Interlocked.Increment(ref _linkCounter);
-        links[lid] = new LinkState(backend, device);
-        await WriteCreateLinkReplyAsync(stream, xid, Vxi11NoError, lid, abortPort: 0, ct);
+        _links[lid] = new LinkState(backend, device);
+        ownedLinks.Add(lid);
+        await WriteCreateLinkReplyAsync(
+            stream,
+            xid,
+            Vxi11NoError,
+            lid,
+            abortPort: (uint)boundPort,
+            ct
+        );
     }
 
-    private static async Task DoDeviceWriteAsync(
+    private async Task DoDeviceWriteAsync(
         Stream stream,
         uint xid,
         Vxi11XdrCodec.XdrReader reader,
-        ConcurrentDictionary<int, LinkState> links,
         CancellationToken ct
     )
     {
@@ -333,7 +407,7 @@ public sealed class Vxi11GatewayServer : IGatewayServer
             reader.ReadInt32(),
             reader.ReadOpaque()
         );
-        if (!links.TryGetValue(parms.Lid, out var state))
+        if (!_links.TryGetValue(parms.Lid, out var state))
         {
             await WriteWriteReplyAsync(stream, xid, Vxi11InvalidLink, size: 0, ct);
             return;
@@ -347,6 +421,8 @@ public sealed class Vxi11GatewayServer : IGatewayServer
         }
         var scpi = Encoding.ASCII.GetString(pendingWrite).TrimEnd('\r', '\n');
         state.ClearPendingWrite();
+        using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(ct, state.Cts.Token);
+        var opCt = linkedCts.Token;
         if (scpi.EndsWith('?'))
         {
             var queryResult = ScpiQuery.From(scpi);
@@ -355,7 +431,7 @@ public sealed class Vxi11GatewayServer : IGatewayServer
                 await WriteWriteReplyAsync(stream, xid, Vxi11SyntaxError, size: 0, ct);
                 return;
             }
-            var resp = await state.Backend.QueryAsync(state.Device, q, ct);
+            var resp = await state.Backend.QueryAsync(state.Device, q, opCt);
             if (resp is Result<string, BackendError>.Ok { Value: var responseText })
             {
                 state.PendingRead = Encoding.ASCII.GetBytes(responseText);
@@ -374,7 +450,7 @@ public sealed class Vxi11GatewayServer : IGatewayServer
                 await WriteWriteReplyAsync(stream, xid, Vxi11SyntaxError, size: 0, ct);
                 return;
             }
-            var wrote = await state.Backend.WriteAsync(state.Device, c, ct);
+            var wrote = await state.Backend.WriteAsync(state.Device, c, opCt);
             if (wrote is Result<Unit, BackendError>.Ok)
             {
                 await WriteWriteReplyAsync(stream, xid, Vxi11NoError, (uint)parms.Data.Length, ct);
@@ -386,11 +462,10 @@ public sealed class Vxi11GatewayServer : IGatewayServer
         }
     }
 
-    private static async Task DoDeviceReadAsync(
+    private async Task DoDeviceReadAsync(
         Stream stream,
         uint xid,
         Vxi11XdrCodec.XdrReader reader,
-        ConcurrentDictionary<int, LinkState> links,
         CancellationToken ct
     )
     {
@@ -402,7 +477,7 @@ public sealed class Vxi11GatewayServer : IGatewayServer
             reader.ReadInt32(),
             (byte)(reader.ReadUInt32() & 0xFF)
         );
-        if (!links.TryGetValue(parms.Lid, out var state))
+        if (!_links.TryGetValue(parms.Lid, out var state))
         {
             await WriteReadReplyAsync(stream, xid, Vxi11InvalidLink, reason: 0, [], ct);
             return;
@@ -413,11 +488,10 @@ public sealed class Vxi11GatewayServer : IGatewayServer
         await WriteReadReplyAsync(stream, xid, Vxi11NoError, reason: 4, data, ct);
     }
 
-    private static async Task DoDeviceClearAsync(
+    private async Task DoDeviceClearAsync(
         Stream stream,
         uint xid,
         Vxi11XdrCodec.XdrReader reader,
-        ConcurrentDictionary<int, LinkState> links,
         CancellationToken ct
     )
     {
@@ -427,7 +501,7 @@ public sealed class Vxi11GatewayServer : IGatewayServer
             reader.ReadUInt32(),
             reader.ReadUInt32()
         );
-        if (!links.TryGetValue(parms.Lid, out var state))
+        if (!_links.TryGetValue(parms.Lid, out var state))
         {
             await WriteErrorReplyAsync(stream, xid, Vxi11InvalidLink, ct);
             return;
@@ -437,21 +511,23 @@ public sealed class Vxi11GatewayServer : IGatewayServer
         await WriteErrorReplyAsync(stream, xid, Vxi11NoError, ct);
     }
 
-    private static async Task DoDestroyLinkAsync(
+    private async Task DoDestroyLinkAsync(
         Stream stream,
         uint xid,
         Vxi11XdrCodec.XdrReader reader,
-        ConcurrentDictionary<int, LinkState> links,
+        HashSet<int> ownedLinks,
         CancellationToken ct
     )
     {
         var lid = reader.ReadInt32();
-        if (!links.TryRemove(lid, out var state))
+        if (!_links.TryRemove(lid, out var state))
         {
             await WriteErrorReplyAsync(stream, xid, Vxi11InvalidLink, ct);
             return;
         }
+        ownedLinks.Remove(lid);
         _ = await state.Backend.CloseAsync(state.Device, ct);
+        state.Dispose();
         await WriteErrorReplyAsync(stream, xid, Vxi11NoError, ct);
     }
 
@@ -558,7 +634,7 @@ public sealed class Vxi11GatewayServer : IGatewayServer
         await WriteAcceptedReplyAsync(stream, xid, AcceptSuccess, inner.ToArray(), ct);
     }
 
-    private sealed class LinkState
+    private sealed class LinkState : IDisposable
     {
         private readonly List<byte> _pendingWrite = new();
 
@@ -566,11 +642,15 @@ public sealed class Vxi11GatewayServer : IGatewayServer
         {
             Backend = backend;
             Device = device;
+            Cts = new CancellationTokenSource();
         }
 
         public IIviBackend Backend { get; }
         public Device Device { get; }
         public byte[]? PendingRead { get; set; }
+
+        /// <summary>Cancellation source signalled by VXI-11 device_abort.</summary>
+        public CancellationTokenSource Cts { get; }
 
         public byte[] AppendPendingWrite(ReadOnlySpan<byte> fragment)
         {
@@ -579,5 +659,7 @@ public sealed class Vxi11GatewayServer : IGatewayServer
         }
 
         public void ClearPendingWrite() => _pendingWrite.Clear();
+
+        public void Dispose() => Cts.Dispose();
     }
 }

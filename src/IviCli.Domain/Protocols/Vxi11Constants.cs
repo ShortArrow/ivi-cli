@@ -15,6 +15,15 @@ public static class Vxi11Constants
     /// <summary>VXI-11 Core program version.</summary>
     public const uint CoreVersion = 1;
 
+    /// <summary>VXI-11 Abort program number.</summary>
+    public const uint AbortProgram = 395184;
+
+    /// <summary>VXI-11 Abort program version.</summary>
+    public const uint AbortVersion = 1;
+
+    /// <summary>Abort: device_abort (proc 1). Sole procedure on the abort channel.</summary>
+    public const uint ProcDeviceAbort = 1;
+
     /// <summary>ONC portmapper program number.</summary>
     public const uint PortmapProgram = 100000;
 
