@@ -43,6 +43,12 @@ public static class TomlConfigParser
     private const string TlsSelfSignedField = "self_signed";
     private const string TlsClientRequiredField = "client_required";
     private const string TlsClientCaPathField = "client_ca_path";
+    private const string TelemetryTable = "telemetry";
+    private const string TelemetryEnabledField = "enabled";
+    private const string TelemetryOtlpEndpointField = "otlp_endpoint";
+    private const string TelemetryServiceNameField = "service_name";
+    private const string TelemetryTracesEnabledField = "traces_enabled";
+    private const string TelemetryMetricsEnabledField = "metrics_enabled";
 
     /// <summary>
     /// Parses a TOML document into a validated <see cref="ConfigDocument"/>.
@@ -181,6 +187,23 @@ public static class TomlConfigParser
             config = config.WithApi(apiOk.Value);
         }
 
+        // Telemetry (optional, ADR 0040).
+        if (model.TryGetValue(TelemetryTable, out var telemetryValue))
+        {
+            if (telemetryValue is not TomlTable telemetryTable)
+            {
+                return Fail($"expected [{TelemetryTable}] to be a TOML table");
+            }
+            var tResult = ParseTelemetry(telemetryTable);
+            if (tResult is not Result<TelemetryConfig, ConfigStoreError>.Ok tOk)
+            {
+                return Result.Failure<ConfigDocument, ConfigStoreError>(
+                    ((Result<TelemetryConfig, ConfigStoreError>.Error)tResult).Err
+                );
+            }
+            config = config.WithTelemetry(tOk.Value);
+        }
+
         // Defaults (optional).
         if (model.TryGetValue(DefaultsTable, out var defaultsValue))
         {
@@ -275,6 +298,27 @@ public static class TomlConfigParser
             {
                 builder.AppendLine(inv, $"{TlsClientCaPathField} = \"{tls.ClientCaPath}\"");
             }
+            builder.AppendLine();
+        }
+
+        if (document.Telemetry != TelemetryConfig.Default)
+        {
+            var t = document.Telemetry;
+            builder.AppendLine(inv, $"[{TelemetryTable}]");
+            builder.AppendLine(inv, $"{TelemetryEnabledField} = {(t.Enabled ? "true" : "false")}");
+            if (t.OtlpEndpoint is not null)
+            {
+                builder.AppendLine(inv, $"{TelemetryOtlpEndpointField} = \"{t.OtlpEndpoint}\"");
+            }
+            builder.AppendLine(inv, $"{TelemetryServiceNameField} = \"{t.ServiceName}\"");
+            builder.AppendLine(
+                inv,
+                $"{TelemetryTracesEnabledField} = {(t.TracesEnabled ? "true" : "false")}"
+            );
+            builder.AppendLine(
+                inv,
+                $"{TelemetryMetricsEnabledField} = {(t.MetricsEnabled ? "true" : "false")}"
+            );
             builder.AppendLine();
         }
 
@@ -660,6 +704,32 @@ public static class TomlConfigParser
 
     private static Result<TlsConfig, ConfigStoreError> FailTls(string reason) =>
         Result.Failure<TlsConfig, ConfigStoreError>(new ConfigStoreParseFailure(reason));
+
+    private static Result<TelemetryConfig, ConfigStoreError> ParseTelemetry(TomlTable table)
+    {
+        var enabled = ReadBool(table, TelemetryEnabledField, false);
+        var otlpEndpoint = ReadString(table, TelemetryOtlpEndpointField);
+        var serviceName = ReadString(table, TelemetryServiceNameField) ?? "ivi-cli";
+        var tracesEnabled = ReadBool(table, TelemetryTracesEnabledField, true);
+        var metricsEnabled = ReadBool(table, TelemetryMetricsEnabledField, true);
+
+        var built = TelemetryConfig.From(
+            enabled,
+            otlpEndpoint,
+            serviceName,
+            tracesEnabled,
+            metricsEnabled
+        );
+        if (built is not Result<TelemetryConfig, TelemetryConfigError>.Ok ok)
+        {
+            var err = ((Result<TelemetryConfig, TelemetryConfigError>.Error)built).Err;
+            return FailTelemetry(err.Message);
+        }
+        return Result.Success<TelemetryConfig, ConfigStoreError>(ok.Value);
+    }
+
+    private static Result<TelemetryConfig, ConfigStoreError> FailTelemetry(string reason) =>
+        Result.Failure<TelemetryConfig, ConfigStoreError>(new ConfigStoreParseFailure(reason));
 
     private static Result<ConfigDocument, ConfigStoreError> Fail(string reason) =>
         Result.Failure<ConfigDocument, ConfigStoreError>(new ConfigStoreParseFailure(reason));

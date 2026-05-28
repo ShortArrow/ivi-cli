@@ -266,4 +266,54 @@ public class TomlConfigParserTests
 
         roundtripped.Api.Tls.ShouldBe(tls);
     }
+
+    [Fact]
+    public void Parse_TelemetryTable_RoundTripsAllFields()
+    {
+        var toml = """
+            [telemetry]
+            enabled = true
+            otlp_endpoint = "http://otel-collector:4317"
+            service_name = "ivi-cli-lab"
+            traces_enabled = true
+            metrics_enabled = false
+            """;
+        var cfg = TomlConfigParser.Parse(toml).ShouldBeOk();
+        cfg.Telemetry.Enabled.ShouldBeTrue();
+        cfg.Telemetry.OtlpEndpoint.ShouldBe("http://otel-collector:4317");
+        cfg.Telemetry.ServiceName.ShouldBe("ivi-cli-lab");
+        cfg.Telemetry.TracesEnabled.ShouldBeTrue();
+        cfg.Telemetry.MetricsEnabled.ShouldBeFalse();
+    }
+
+    [Fact]
+    public void Parse_MissingTelemetryTable_DefaultsToTelemetryDefault()
+    {
+        var cfg = TomlConfigParser.Parse("").ShouldBeOk();
+        cfg.Telemetry.ShouldBe(TelemetryConfig.Default);
+    }
+
+    [Fact]
+    public void Parse_InvalidOtlpEndpoint_Fails()
+    {
+        var toml = """
+            [telemetry]
+            enabled = true
+            otlp_endpoint = "not a uri"
+            """;
+        TomlConfigParser.Parse(toml).ShouldBeError();
+    }
+
+    [Fact]
+    public void Serialize_RoundTrips_NonDefaultTelemetry()
+    {
+        var t = TelemetryConfig
+            .From(true, "http://otel:4317", "ivi-cli-lab", true, true)
+            .ShouldBeOk();
+        var original = ConfigDocument.Empty.WithTelemetry(t);
+
+        var serialized = TomlConfigParser.Serialize(original);
+        var rt = TomlConfigParser.Parse(serialized).ShouldBeOk();
+        rt.Telemetry.ShouldBe(t);
+    }
 }

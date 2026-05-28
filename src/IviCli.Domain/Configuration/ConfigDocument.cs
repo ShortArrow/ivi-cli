@@ -24,7 +24,8 @@ public sealed record ConfigDocument
             routes: ImmutableArray<Route>.Empty,
             defaults: Defaults.None,
             pool: PoolConfig.Default,
-            api: ApiConfig.Default
+            api: ApiConfig.Default,
+            telemetry: TelemetryConfig.Default
         );
 
     /// <summary>The configured devices, in insertion order.</summary>
@@ -45,13 +46,17 @@ public sealed record ConfigDocument
     /// <summary>The <c>[api]</c> section (ADR 0039).</summary>
     public ApiConfig Api { get; }
 
+    /// <summary>The <c>[telemetry]</c> section (ADR 0040).</summary>
+    public TelemetryConfig Telemetry { get; }
+
     private ConfigDocument(
         ImmutableArray<Device> devices,
         ImmutableArray<Server> servers,
         ImmutableArray<Route> routes,
         Defaults defaults,
         PoolConfig pool,
-        ApiConfig api
+        ApiConfig api,
+        TelemetryConfig telemetry
     )
     {
         Devices = devices;
@@ -60,6 +65,7 @@ public sealed record ConfigDocument
         Defaults = defaults;
         Pool = pool;
         Api = api;
+        Telemetry = telemetry;
     }
 
     /// <summary>Structural equality across every collection.</summary>
@@ -68,6 +74,7 @@ public sealed record ConfigDocument
         && Defaults == other.Defaults
         && Pool == other.Pool
         && Api == other.Api
+        && Telemetry == other.Telemetry
         && Devices.SequenceEqual(other.Devices)
         && Servers.SequenceEqual(other.Servers)
         && Routes.SequenceEqual(other.Routes);
@@ -79,6 +86,7 @@ public sealed record ConfigDocument
         hash.Add(Defaults);
         hash.Add(Pool);
         hash.Add(Api);
+        hash.Add(Telemetry);
         foreach (var d in Devices)
         {
             hash.Add(d);
@@ -99,6 +107,9 @@ public sealed record ConfigDocument
 
     /// <summary>Replaces the <see cref="Api"/> section.</summary>
     public ConfigDocument WithApi(ApiConfig api) => With(api: api);
+
+    /// <summary>Replaces the <see cref="Telemetry"/> section.</summary>
+    public ConfigDocument WithTelemetry(TelemetryConfig telemetry) => With(telemetry: telemetry);
 
     // -------- Devices ----------------------------------------------------
 
@@ -267,7 +278,8 @@ public sealed record ConfigDocument
         ImmutableArray<Route>? routes = null,
         Defaults? defaults = null,
         PoolConfig? pool = null,
-        ApiConfig? api = null
+        ApiConfig? api = null,
+        TelemetryConfig? telemetry = null
     ) =>
         new(
             devices ?? Devices,
@@ -275,6 +287,7 @@ public sealed record ConfigDocument
             routes ?? Routes,
             defaults ?? Defaults,
             pool ?? Pool,
-            api ?? Api
+            api ?? Api,
+            telemetry ?? Telemetry
         );
 }
