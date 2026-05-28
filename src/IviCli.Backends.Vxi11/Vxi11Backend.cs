@@ -1,5 +1,9 @@
+using System.Buffers.Binary;
+using System.Net;
 using System.Net.Sockets;
+using System.Runtime.CompilerServices;
 using System.Text;
+using System.Threading.Channels;
 using IviCli.Application.Backends;
 using IviCli.Domain;
 using IviCli.Domain.Devices;
@@ -81,7 +85,7 @@ public sealed class Vxi11Backend : IIviBackend
             );
         }
 
-        var session = new Vxi11Session(client);
+        var session = new Vxi11Session(client, device.Name);
         try
         {
             var lid = await CreateLinkAsync(session, tcpip.LanDevice, ct);
@@ -93,6 +97,22 @@ public sealed class Vxi11Backend : IIviBackend
             return Result.Failure<Unit, BackendError>(
                 new TransportDisconnected($"VXI-11 create_link failed: {ex.Message}", ex)
             );
+        }
+
+        // Bring up the Interrupt channel (ADR 0042) so ServiceRequestStream
+        // delivers SRQ events. The listener accepts inbound TCP from the
+        // gateway and decodes device_intr_srq.
+        try
+        {
+            session.StartInterruptListener();
+            await CreateIntrChanAsync(session, ct);
+            await DeviceEnableSrqAsync(session, enable: true, ct);
+        }
+        catch (Exception ex) when (ex is SocketException or IOException or InvalidDataException)
+        {
+            // SRQ setup failed but SCPI session is fine — log the failure
+            // through the BackendError chain on a subsequent stream read.
+            session.MarkInterruptSetupFailed(ex);
         }
 
         lock (_gate)
@@ -121,6 +141,24 @@ public sealed class Vxi11Backend : IIviBackend
         }
         try
         {
+            // Best-effort SRQ teardown before destroying the link.
+            if (!session.InterruptSetupFailed)
+            {
+                try
+                {
+                    await DeviceEnableSrqAsync(session, enable: false, ct);
+                }
+                catch
+                { /* swallow — session is closing */
+                }
+                try
+                {
+                    await DestroyIntrChanAsync(session, ct);
+                }
+                catch
+                { /* swallow */
+                }
+            }
             await DestroyLinkAsync(session, ct);
         }
         catch (Exception ex) when (ex is SocketException or IOException or InvalidDataException)
@@ -241,18 +279,25 @@ public sealed class Vxi11Backend : IIviBackend
     }
 
     /// <inheritdoc/>
-#pragma warning disable CS1998
     public async IAsyncEnumerable<ServiceRequest> ServiceRequestStream(
         Device device,
-        [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct
+        [EnumeratorCancellation] CancellationToken ct
     )
     {
-        // VXI-11 Interrupt channel (program 395185) is explicitly deferred
-        // to v2 — see ADR 0041 §5 / ADR 0029 §2. v1 stream completes
-        // immediately.
-        yield break;
+        var session = TryGetSession(device);
+        if (session is null)
+        {
+            yield break;
+        }
+        var reader = session.ServiceRequests.Reader;
+        while (await reader.WaitToReadAsync(ct))
+        {
+            while (reader.TryRead(out var srq))
+            {
+                yield return srq;
+            }
+        }
     }
-#pragma warning restore CS1998
 
     private Vxi11Session? TryGetSession(Device device)
     {
@@ -315,6 +360,74 @@ public sealed class Vxi11Backend : IIviBackend
         if (error != Vxi11NoError)
         {
             throw new InvalidDataException($"device_trigger returned error {error}");
+        }
+    }
+
+    private static async Task CreateIntrChanAsync(Vxi11Session session, CancellationToken ct)
+    {
+        var call = BuildCall(
+            session.NextXid(),
+            CoreProgram,
+            CoreVersion,
+            ProcCreateIntrChan,
+            body =>
+                Vxi11InterruptCodec.WriteRemoteFunc(
+                    body,
+                    new DeviceRemoteFunc(
+                        HostAddr: session.InterruptHostAddr,
+                        HostPort: session.InterruptPort,
+                        ProgNum: InterruptProgram,
+                        ProgVers: InterruptVersion,
+                        ProgFamily: ProgFamilyTcp
+                    )
+                )
+        );
+        await Vxi11RecordFraming.WriteRecordAsync(session.Stream, call, ct);
+        var reply = SkipReplyHeader(await Vxi11RecordFraming.ReadRecordAsync(session.Stream, ct));
+        var error = reply.ReadInt32();
+        if (error != Vxi11NoError)
+        {
+            throw new InvalidDataException($"device_create_intr_chan returned error {error}");
+        }
+    }
+
+    private static async Task DestroyIntrChanAsync(Vxi11Session session, CancellationToken ct)
+    {
+        var call = BuildCall(
+            session.NextXid(),
+            CoreProgram,
+            CoreVersion,
+            ProcDestroyIntrChan,
+            body => { }
+        );
+        await Vxi11RecordFraming.WriteRecordAsync(session.Stream, call, ct);
+        var reply = SkipReplyHeader(await Vxi11RecordFraming.ReadRecordAsync(session.Stream, ct));
+        _ = reply.ReadInt32(); // tolerate non-zero error on teardown
+    }
+
+    private static async Task DeviceEnableSrqAsync(
+        Vxi11Session session,
+        bool enable,
+        CancellationToken ct
+    )
+    {
+        var call = BuildCall(
+            session.NextXid(),
+            CoreProgram,
+            CoreVersion,
+            ProcDeviceEnableSrq,
+            body =>
+                Vxi11InterruptCodec.WriteEnableSrqParms(
+                    body,
+                    new DeviceEnableSrqParms(session.LinkId, enable, session.InterruptHandle)
+                )
+        );
+        await Vxi11RecordFraming.WriteRecordAsync(session.Stream, call, ct);
+        var reply = SkipReplyHeader(await Vxi11RecordFraming.ReadRecordAsync(session.Stream, ct));
+        var error = reply.ReadInt32();
+        if (error != Vxi11NoError)
+        {
+            throw new InvalidDataException($"device_enable_srq returned error {error}");
         }
     }
 

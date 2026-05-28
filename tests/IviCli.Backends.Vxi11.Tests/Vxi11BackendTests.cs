@@ -21,6 +21,21 @@ namespace IviCli.Backends.Vxi11.Tests;
 /// </summary>
 public sealed class Vxi11BackendTests
 {
+    /// <summary>
+    /// After Batch Q OpenAsync issues device_create_intr_chan +
+    /// device_enable_srq right after create_link. Test stubs that don't
+    /// drive SRQ semantics call this helper to drain + ack both RPCs.
+    /// </summary>
+    private static void AckInterruptSetup(StubSession session)
+    {
+        var createIntr = session.ReadCall();
+        createIntr.Procedure.ShouldBe(ProcCreateIntrChan);
+        session.WriteReply(createIntr.Xid, w => w.WriteInt32(Vxi11NoError));
+        var enableSrq = session.ReadCall();
+        enableSrq.Procedure.ShouldBe(ProcDeviceEnableSrq);
+        session.WriteReply(enableSrq.Xid, w => w.WriteInt32(Vxi11NoError));
+    }
+
     [Fact]
     public async Task OpenAsync_succeeds_when_stub_returns_no_error()
     {
@@ -39,6 +54,7 @@ public sealed class Vxi11BackendTests
                     writer.WriteUInt32(16 * 1024 * 1024); // maxRecvSize
                 }
             );
+            AckInterruptSetup(session);
         });
 
         var backend = new Vxi11Backend(stub.Port);
@@ -66,6 +82,7 @@ public sealed class Vxi11BackendTests
                     writer.WriteUInt32(16 * 1024 * 1024);
                 }
             );
+            AckInterruptSetup(session);
 
             var write = session.ReadCall();
             write.Procedure.ShouldBe(ProcDeviceWrite);
@@ -118,6 +135,7 @@ public sealed class Vxi11BackendTests
                     writer.WriteUInt32(16 * 1024 * 1024);
                 }
             );
+            AckInterruptSetup(session);
             var write = session.ReadCall();
             session.WriteReply(
                 write.Xid,

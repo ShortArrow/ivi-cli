@@ -7,6 +7,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\IviCli.Server\IviCli.Server.csproj" />
     <ProjectReference Include="..\..\src\IviCli.Backends.HiSlip\IviCli.Backends.HiSlip.csproj" />
+    <ProjectReference Include="..\..\src\IviCli.Backends.Vxi11\IviCli.Backends.Vxi11.csproj" />
     <ProjectReference Include="..\..\src\IviCli.Backends.Fake\IviCli.Backends.Fake.csproj" />
     <ProjectReference Include="..\IviCli.TestKit\IviCli.TestKit.csproj" />
   </ItemGroup>
