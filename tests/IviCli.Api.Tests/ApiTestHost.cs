@@ -234,6 +234,52 @@ internal sealed class ApiTestHost : IAsyncDisposable
                             await WriteUnauthorizedAsync(context);
                             return;
                         }
+                        // Expiry check (ADR 0044).
+                        if (matched.IsExpired(DateTimeOffset.UtcNow))
+                        {
+                            if (auditLog is not null)
+                            {
+                                await auditLog.AppendAsync(
+                                    new IviCli.Application.Audit.AuthFailed(
+                                        DateTimeOffset.UtcNow,
+                                        "pat",
+                                        "expired_token",
+                                        transport
+                                    ),
+                                    CancellationToken.None
+                                );
+                            }
+                            await WriteUnauthorizedAsync(context);
+                            return;
+                        }
+                        // Scope check (ADR 0044).
+                        var requiredScope =
+                            IviCli.Api.Authentication.RoutePermissions.RequiredScope(
+                                context.Request.Method,
+                                context.Request.Path.Value ?? ""
+                            );
+                        if (requiredScope is not null && !matched.HasScope(requiredScope))
+                        {
+                            if (auditLog is not null)
+                            {
+                                await auditLog.AppendAsync(
+                                    new IviCli.Application.Audit.AuthFailed(
+                                        DateTimeOffset.UtcNow,
+                                        "pat",
+                                        "insufficient_scope",
+                                        transport
+                                    ),
+                                    CancellationToken.None
+                                );
+                            }
+                            context.Response.StatusCode = 403;
+                            context.Response.ContentType = "application/json";
+                            var body = System.Text.Encoding.UTF8.GetBytes(
+                                "{\"error\":{\"code\":\"insufficient_scope\",\"message\":\"token lacks required scope\"}}"
+                            );
+                            await context.Response.Body.WriteAsync(body);
+                            return;
+                        }
                         if (auditLog is not null)
                         {
                             await auditLog.AppendAsync(

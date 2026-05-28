@@ -129,6 +129,31 @@ public static class ApiTokenAuthentication
                     return;
                 }
 
+                // Expiry check (ADR 0044).
+                if (match.IsExpired(DateTimeOffset.UtcNow))
+                {
+                    await EmitAuthFailedAsync(audit, "pat", "expired_token", transport);
+                    await WriteUnauthorizedAsync(context, "unauthorized", "API token has expired.");
+                    return;
+                }
+
+                // Scope check (ADR 0044). Bypass paths are handled above;
+                // unmapped routes return null and skip the check.
+                var requiredScope = RoutePermissions.RequiredScope(
+                    context.Request.Method,
+                    context.Request.Path.Value ?? ""
+                );
+                if (requiredScope is not null && !match.HasScope(requiredScope))
+                {
+                    await EmitAuthFailedAsync(audit, "pat", "insufficient_scope", transport);
+                    await WriteForbiddenAsync(
+                        context,
+                        "insufficient_scope",
+                        $"token does not have the '{requiredScope}' scope."
+                    );
+                    return;
+                }
+
                 await EmitAuthSucceededAsync(audit, "pat", match.Label, transport);
 
                 // Best-effort last-used update — never fail the request if
@@ -244,6 +269,14 @@ public static class ApiTokenAuthentication
     )
     {
         context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+        context.Response.ContentType = "application/json";
+        var body = JsonSerializer.Serialize(new { error = new { code, message } }, JsonOptions);
+        await context.Response.WriteAsync(body);
+    }
+
+    private static async Task WriteForbiddenAsync(HttpContext context, string code, string message)
+    {
+        context.Response.StatusCode = StatusCodes.Status403Forbidden;
         context.Response.ContentType = "application/json";
         var body = JsonSerializer.Serialize(new { error = new { code, message } }, JsonOptions);
         await context.Response.WriteAsync(body);
