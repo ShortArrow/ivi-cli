@@ -51,6 +51,7 @@ internal static class Program
 
             var services = new ServiceCollection();
             services.AddLogging(b => b.AddSerilog(Log.Logger, dispose: false));
+            services.AddSingleton<TimeProvider>(TimeProvider.System);
             services.AddIviCliApplication();
             services.AddIviCliMock();
             services.AddIviCliServers();
@@ -138,6 +139,35 @@ internal static class Program
                         socketBackend: sp.GetRequiredService<IviCli.Backends.Socket.SocketBackend>(),
                         vxi11Backend: sp.GetRequiredService<IviCli.Backends.Vxi11.Vxi11Backend>()
                     );
+
+                // Pool layer wraps the default factory when [pool] enabled.
+                // Capture wraps Pool so logical Open/Close events still
+                // appear 1:1 in the audit trail even when the pool elides
+                // the underlying wire opens (ADR 0038 §5).
+                var loadedConfig =
+                    sp.GetRequiredService<IviCli.Application.Configuration.IConfigStore>()
+                        .LoadAsync(CancellationToken.None)
+                        .GetAwaiter()
+                        .GetResult();
+                if (
+                    loadedConfig
+                        is Result<
+                            IviCli.Domain.Configuration.ConfigDocument,
+                            IviCli.Application.Configuration.ConfigStoreError
+                        >.Ok { Value: var cfg }
+                    && cfg.Pool.Enabled
+                )
+                {
+                    var poolLogger = sp.GetService<
+                        ILogger<IviCli.Application.Backends.PoolingBackendFactory>
+                    >();
+                    factory = new IviCli.Application.Backends.PoolingBackendFactory(
+                        factory,
+                        cfg.Pool,
+                        sp.GetRequiredService<TimeProvider>(),
+                        poolLogger
+                    );
+                }
 
                 // IVICLI_CAPTURE=<path> wraps the factory so every backend op
                 // streams into a NDJSON audit log (ADR 0031). Errors here fall

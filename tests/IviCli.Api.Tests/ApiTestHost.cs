@@ -51,7 +51,8 @@ internal sealed class ApiTestHost : IAsyncDisposable
         FakeBackend? backend = null,
         IEnumerable<MockScenario>? scenarios = null,
         FakeApiTokenStore? tokenStore = null,
-        ApiAuthenticationOptions? authOptions = null
+        ApiAuthenticationOptions? authOptions = null,
+        PoolConfig? poolConfig = null
     )
     {
         var resolvedAuthOptions =
@@ -70,7 +71,16 @@ internal sealed class ApiTestHost : IAsyncDisposable
                 services.AddSingleton(resolvedAuthOptions);
                 var fake = backend ?? new FakeBackend();
                 services.AddSingleton(fake);
-                services.AddSingleton<IBackendFactory>(new FakeBackendFactory(fake));
+                IBackendFactory baseFactory = new FakeBackendFactory(fake);
+                if (poolConfig is { Enabled: true })
+                {
+                    baseFactory = new PoolingBackendFactory(
+                        baseFactory,
+                        poolConfig,
+                        TimeProvider.System
+                    );
+                }
+                services.AddSingleton<IBackendFactory>(baseFactory);
                 services.AddSingleton<IDeviceStatusProbe, DefaultDeviceStatusProbe>();
                 services.AddSingleton<ListDevicesQueryHandler>();
                 services.AddSingleton<StatusDeviceCommandHandler>();
