@@ -218,18 +218,26 @@ public sealed class Vxi11Backend : IIviBackend
     }
 
     /// <inheritdoc/>
-    public Task<Result<Unit, BackendError>> TriggerAsync(Device device, CancellationToken ct)
+    public async Task<Result<Unit, BackendError>> TriggerAsync(Device device, CancellationToken ct)
     {
-        // VXI-11 device_trigger (proc 17) wiring lands in Batch P Task 3.
-        return Task.FromResult(
-            Result.Failure<Unit, BackendError>(
-                new BackendOperationNotSupported(
-                    "trigger",
-                    device.Name,
-                    "Vxi11Backend device_trigger lands in Batch P Task 3"
-                )
-            )
-        );
+        var session = TryGetSession(device);
+        if (session is null)
+        {
+            return Result.Failure<Unit, BackendError>(
+                new TransportDisconnected("VXI-11 session not open")
+            );
+        }
+        try
+        {
+            await DeviceTriggerAsync(session, ct);
+            return Result.Success<Unit, BackendError>(Unit.Value);
+        }
+        catch (Exception ex) when (ex is SocketException or IOException or InvalidDataException)
+        {
+            return Result.Failure<Unit, BackendError>(
+                new TransportDisconnected($"VXI-11 device_trigger failed: {ex.Message}", ex)
+            );
+        }
     }
 
     /// <inheritdoc/>
@@ -284,6 +292,30 @@ public sealed class Vxi11Backend : IIviBackend
         _ = reply.ReadUInt32(); // abortPort
         _ = reply.ReadUInt32(); // maxRecvSize
         return lid;
+    }
+
+    private static async Task DeviceTriggerAsync(Vxi11Session session, CancellationToken ct)
+    {
+        var call = BuildCall(
+            session.NextXid(),
+            CoreProgram,
+            CoreVersion,
+            ProcDeviceTrigger,
+            body =>
+            {
+                body.WriteInt32(session.LinkId);
+                body.WriteInt32(0); // flags (0 = no special semantics)
+                body.WriteUInt32(5000); // io_timeout
+                body.WriteUInt32(0); // lock_timeout
+            }
+        );
+        await Vxi11RecordFraming.WriteRecordAsync(session.Stream, call, ct);
+        var reply = SkipReplyHeader(await Vxi11RecordFraming.ReadRecordAsync(session.Stream, ct));
+        var error = reply.ReadInt32();
+        if (error != Vxi11NoError)
+        {
+            throw new InvalidDataException($"device_trigger returned error {error}");
+        }
     }
 
     private static async Task DestroyLinkAsync(Vxi11Session session, CancellationToken ct)

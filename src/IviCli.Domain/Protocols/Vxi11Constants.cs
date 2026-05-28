@@ -45,6 +45,9 @@ public static class Vxi11Constants
     /// <summary>Core: device_clear.</summary>
     public const uint ProcDeviceClear = 14;
 
+    /// <summary>Core: device_trigger (proc 17, ADR 0041).</summary>
+    public const uint ProcDeviceTrigger = 17;
+
     /// <summary>Core: destroy_link.</summary>
     public const uint ProcDestroyLink = 23;
 

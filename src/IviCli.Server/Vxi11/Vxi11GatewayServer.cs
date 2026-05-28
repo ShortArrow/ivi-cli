@@ -323,6 +323,9 @@ public sealed class Vxi11GatewayServer : IGatewayServer
             case ProcDeviceClear:
                 await DoDeviceClearAsync(stream, rpc.Xid, procReader, ct);
                 break;
+            case ProcDeviceTrigger:
+                await DoDeviceTriggerAsync(stream, rpc.Xid, procReader, ct);
+                break;
             case ProcDestroyLink:
                 await DoDestroyLinkAsync(stream, rpc.Xid, procReader, ownedLinks, ct);
                 break;
@@ -509,6 +512,37 @@ public sealed class Vxi11GatewayServer : IGatewayServer
         state.ClearPendingWrite();
         state.PendingRead = null;
         await WriteErrorReplyAsync(stream, xid, Vxi11NoError, ct);
+    }
+
+    private async Task DoDeviceTriggerAsync(
+        Stream stream,
+        uint xid,
+        Vxi11XdrCodec.XdrReader reader,
+        CancellationToken ct
+    )
+    {
+        var parms = new DeviceGenericParms(
+            reader.ReadInt32(),
+            reader.ReadInt32(),
+            reader.ReadUInt32(),
+            reader.ReadUInt32()
+        );
+        if (!_links.TryGetValue(parms.Lid, out var state))
+        {
+            await WriteErrorReplyAsync(stream, xid, Vxi11InvalidLink, ct);
+            return;
+        }
+        // Forward the trigger to the backend. A BackendOperationNotSupported
+        // result (typical for Socket / Replay) is mapped to Vxi11NotSupported
+        // so the client gets the standard VXI-11 status code rather than a
+        // soft success — operators see why the trigger didn't fire.
+        var triggerResult = await state.Backend.TriggerAsync(state.Device, ct);
+        var error =
+            triggerResult is Result<Unit, BackendError>.Ok ? Vxi11NoError
+            : ((Result<Unit, BackendError>.Error)triggerResult).Err is BackendOperationNotSupported
+                ? Vxi11NotSupported
+            : Vxi11IoError;
+        await WriteErrorReplyAsync(stream, xid, error, ct);
     }
 
     private async Task DoDestroyLinkAsync(

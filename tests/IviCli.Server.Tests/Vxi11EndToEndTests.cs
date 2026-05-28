@@ -334,6 +334,69 @@ public sealed class Vxi11EndToEndTests
     }
 
     [Fact]
+    public async Task DeviceTrigger_lands_at_FakeBackend()
+    {
+        var (gateway, server, config, port, fake) = BuildHarness();
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        var serverTask = gateway.RunAsync(server, config, cts.Token);
+        await WaitForListenerAsync(port, cts.Token);
+
+        using var tcp = new TcpClient();
+        await tcp.ConnectAsync(IPAddress.Loopback, port, cts.Token);
+        using var stream = tcp.GetStream();
+
+        var createCall = BuildRpcCall(
+            xid: 600,
+            program: CoreProgram,
+            version: CoreVersion,
+            procedure: ProcCreateLink,
+            body: writer =>
+            {
+                writer.WriteInt32(1);
+                writer.WriteUInt32(0);
+                writer.WriteUInt32(0);
+                writer.WriteString("inst0");
+            }
+        );
+        await Vxi11RecordFraming.WriteRecordAsync(stream, createCall, cts.Token);
+        var createReply = SkipReplyHeader(
+            await Vxi11RecordFraming.ReadRecordAsync(stream, cts.Token)
+        );
+        createReply.ReadInt32().ShouldBe(Vxi11NoError);
+        var lid = createReply.ReadInt32();
+        _ = createReply.ReadUInt32();
+        _ = createReply.ReadUInt32();
+
+        var triggerCall = BuildRpcCall(
+            xid: 601,
+            program: CoreProgram,
+            version: CoreVersion,
+            procedure: ProcDeviceTrigger,
+            body: writer =>
+            {
+                writer.WriteInt32(lid);
+                writer.WriteInt32(0); // flags
+                writer.WriteUInt32(1000);
+                writer.WriteUInt32(0);
+            }
+        );
+        await Vxi11RecordFraming.WriteRecordAsync(stream, triggerCall, cts.Token);
+        var triggerReply = SkipReplyHeader(
+            await Vxi11RecordFraming.ReadRecordAsync(stream, cts.Token)
+        );
+        triggerReply.ReadInt32().ShouldBe(Vxi11NoError);
+
+        fake.TriggerCountFor(DeviceName.From("dut").ShouldBeOk()).ShouldBe(1);
+
+        await cts.CancelAsync();
+        try
+        {
+            await serverTask;
+        }
+        catch (OperationCanceledException) { }
+    }
+
+    [Fact]
     public async Task Unknown_program_returns_PROG_UNAVAIL()
     {
         var (gateway, server, config, port, _) = BuildHarness();
