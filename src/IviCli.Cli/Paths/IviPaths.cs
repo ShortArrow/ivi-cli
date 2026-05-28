@@ -12,12 +12,14 @@ public static class IviPaths
     private const string ServersDirectoryName = "servers";
     private const string AuthDirectoryName = "auth";
     private const string AuditDirectoryName = "audit";
+    private const string PluginsDirectoryName = "plugins";
 
     private const string ConfigOverrideEnv = "IVICLI_CONFIG";
     private const string LogDirOverrideEnv = "IVICLI_LOG_DIR";
     private const string ServerStateDirOverrideEnv = "IVICLI_SERVER_STATE_DIR";
     private const string AuthDirOverrideEnv = "IVICLI_AUTH_DIR";
     private const string AuditDirOverrideEnv = "IVICLI_AUDIT_DIR";
+    private const string PluginsDirOverrideEnv = "IVICLI_PLUGINS_DIR";
 
     /// <summary>
     /// Returns the absolute path to <c>config.toml</c>, respecting the
@@ -195,5 +197,38 @@ public static class IviPaths
                 ".config"
             );
         return Path.Combine(configRoot, AppFolderName, AuditDirectoryName);
+    }
+
+    /// <summary>
+    /// Returns the absolute path to the plugins directory
+    /// (ADR 0013). Hosts subdirectories named after each plugin;
+    /// each contains a <c>plugin.toml</c> manifest + the plugin DLL.
+    /// Honours the <c>IVICLI_PLUGINS_DIR</c> environment-variable
+    /// override.
+    /// </summary>
+    public static string ResolvePluginsDirectory()
+    {
+        var overrideValue = Environment.GetEnvironmentVariable(PluginsDirOverrideEnv);
+        if (!string.IsNullOrEmpty(overrideValue))
+        {
+            return overrideValue;
+        }
+
+        if (OperatingSystem.IsWindows())
+        {
+            return Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                AppFolderName,
+                PluginsDirectoryName
+            );
+        }
+
+        var configRoot =
+            Environment.GetEnvironmentVariable("XDG_CONFIG_HOME")
+            ?? Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+                ".config"
+            );
+        return Path.Combine(configRoot, AppFolderName, PluginsDirectoryName);
     }
 }

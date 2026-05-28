@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <RootNamespace>IviCli.Plugin.Sample</RootNamespace>
+    <AssemblyName>IviCli.Plugin.Sample</AssemblyName>
+    <IsPackable>false</IsPackable>
+    <!-- Sample plugins ship as plain class libraries — no test runner. -->
+    <IsTestProject>false</IsTestProject>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\IviCli.Plugin\IviCli.Plugin.csproj" />
+  </ItemGroup>
+</Project>

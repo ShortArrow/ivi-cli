@@ -24,6 +24,7 @@
     <Project Path="tests/IviCli.Cli.Tests/IviCli.Cli.Tests.csproj" />
     <Project Path="tests/IviCli.Domain.Tests/IviCli.Domain.Tests.csproj" />
     <Project Path="tests/IviCli.Infrastructure.Tests/IviCli.Infrastructure.Tests.csproj" />
+    <Project Path="tests/IviCli.Plugin.Sample/IviCli.Plugin.Sample.csproj" />
     <Project Path="tests/IviCli.Plugin.Tests/IviCli.Plugin.Tests.csproj" />
     <Project Path="tests/IviCli.Server.Tests/IviCli.Server.Tests.csproj" />
     <Project Path="tests/IviCli.TestKit/IviCli.TestKit.csproj" />

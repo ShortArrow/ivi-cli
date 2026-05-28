@@ -8,6 +8,15 @@
         "resolved": "6.0.4",
         "contentHash": "lkhqpF8Pu2Y7IiN7OntbsTtdbpR1syMsm2F3IgX6ootA4ffRqWL5jF7XipHuZQTdVuWG/gVAAcf8mjk8Tz0xPg=="
       },
+      "Microsoft.Extensions.DependencyInjection": {
+        "type": "Direct",
+        "requested": "[10.0.0, )",
+        "resolved": "10.0.0",
+        "contentHash": "f0RBabswJq+gRu5a+hWIobrLWiUYPKMhCD9WO3sYBAdSy3FFH14LMvLVFZc2kPSCimBLxSuitUhsd6tb0TAY6A==",
+        "dependencies": {
+          "Microsoft.Extensions.DependencyInjection.Abstractions": "10.0.0"
+        }
+      },
       "Microsoft.Extensions.Logging.Abstractions": {
         "type": "Direct",
         "requested": "[10.0.0, )",
@@ -214,10 +223,29 @@
         "type": "Project",
         "dependencies": {
           "IviCli.Application": "[1.0.0, )",
+          "IviCli.Plugin": "[1.0.0, )",
           "Microsoft.Extensions.DependencyInjection.Abstractions": "[10.0.0, )",
+          "Microsoft.Extensions.Logging.Abstractions": "[10.0.0, )",
           "TestableIO.System.IO.Abstractions": "[22.1.0, )",
           "TestableIO.System.IO.Abstractions.Wrappers": "[22.1.0, )",
           "Tomlyn": "[0.19.0, )"
+        }
+      },
+      "ivicli.plugin": {
+        "type": "Project",
+        "dependencies": {
+          "IviCli.Application": "[1.0.0, )"
+        }
+      },
+      "ivicli.plugin.sample": {
+        "type": "Project",
+        "dependencies": {
+          "IviCli.Plugin": "[1.0.0, )",
+          "Microsoft.Extensions.Logging.Abstractions": "[10.0.0, )",
+          "NSubstitute": "[5.3.0, )",
+          "Shouldly": "[4.3.0, )",
+          "TestableIO.System.IO.Abstractions": "[22.1.0, )",
+          "TestableIO.System.IO.Abstractions.TestingHelpers": "[22.1.0, )"
         }
       },
       "ivicli.testkit": {

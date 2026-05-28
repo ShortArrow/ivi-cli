@@ -218,9 +218,16 @@
         "type": "Project",
         "dependencies": {
           "IviCli.Application": "[1.0.0, )",
+          "IviCli.Plugin": "[1.0.0, )",
           "TestableIO.System.IO.Abstractions": "[22.1.0, )",
           "TestableIO.System.IO.Abstractions.Wrappers": "[22.1.0, )",
           "Tomlyn": "[0.19.0, )"
+        }
+      },
+      "ivicli.plugin": {
+        "type": "Project",
+        "dependencies": {
+          "IviCli.Application": "[1.0.0, )"
         }
       },
       "ivicli.testkit": {

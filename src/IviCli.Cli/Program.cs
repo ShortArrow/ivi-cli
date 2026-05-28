@@ -99,6 +99,45 @@ internal static class Program
                     IviCli.Application.Audit.NullAuditLog.Instance
                 );
             }
+
+            // Plugin discovery (ADR 0013) — opt-in. When enabled, each
+            // loaded plugin's Register call adds its IIviBackend types as
+            // DI singletons; the PluginBackendFactory decorator (below)
+            // dispatches to them by VisaResource matcher.
+            var pluginRegistrations =
+                new List<IviCli.Infrastructure.Plugins.PluginBackendRegistration>();
+            if (bootstrapConfig.Plugins.Enabled)
+            {
+                var pluginLoader = new IviCli.Infrastructure.Plugins.PluginLoader(
+                    new System.IO.Abstractions.FileSystem()
+                );
+                var loaded = pluginLoader.LoadAll(
+                    bootstrapConfig.Plugins,
+                    IviPaths.ResolvePluginsDirectory()
+                );
+                var pluginServices = new IviCli.Infrastructure.Plugins.PluginServices(services);
+                foreach (var plugin in loaded)
+                {
+                    try
+                    {
+                        plugin.Instance.Register(pluginServices);
+                        Log.Logger.Information(
+                            "loaded plugin {Name} v{Version}",
+                            plugin.Manifest.Name,
+                            plugin.Manifest.Version
+                        );
+                    }
+                    catch (Exception ex)
+                    {
+                        Log.Logger.Warning(
+                            ex,
+                            "plugin {Name} Register() threw; skipping",
+                            plugin.Manifest.Name
+                        );
+                    }
+                }
+                pluginRegistrations.AddRange(pluginServices.Registrations);
+            }
             services.AddSingleton<IviCli.Api.Authentication.ApiAuthenticationOptions>();
             services.AddIviCliScenarioStore(configPath);
             services.AddIviCliBackendsFake();
@@ -182,6 +221,18 @@ internal static class Program
                 // Meter calls are near-free without listeners, so this
                 // is cheap even when [telemetry] is disabled (ADR 0040).
                 factory = new IviCli.Application.Backends.InstrumentingBackendFactory(factory);
+
+                // Plugin layer consults plugin-registered backends before
+                // delegating to the built-in routing (ADR 0013). Only
+                // active when [plugins].enabled was true at startup.
+                if (pluginRegistrations.Count > 0)
+                {
+                    factory = new IviCli.Infrastructure.Plugins.PluginBackendFactory(
+                        factory,
+                        sp,
+                        pluginRegistrations
+                    );
+                }
 
                 // Pool layer wraps the default factory when [pool] enabled.
                 // Capture wraps Pool so logical Open/Close events still
