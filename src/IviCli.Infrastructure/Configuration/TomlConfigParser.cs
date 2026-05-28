@@ -52,6 +52,9 @@ public static class TomlConfigParser
     private const string AuditTable = "audit";
     private const string AuditEnabledField = "enabled";
     private const string AuditPathField = "path";
+    private const string PluginsTable = "plugins";
+    private const string PluginsEnabledField = "enabled";
+    private const string PluginsAllowedField = "allowed";
 
     /// <summary>
     /// Parses a TOML document into a validated <see cref="ConfigDocument"/>.
@@ -224,6 +227,23 @@ public static class TomlConfigParser
             config = config.WithAudit(aOk.Value);
         }
 
+        // Plugins (optional, ADR 0013).
+        if (model.TryGetValue(PluginsTable, out var pluginsValue))
+        {
+            if (pluginsValue is not TomlTable pluginsTable)
+            {
+                return Fail($"expected [{PluginsTable}] to be a TOML table");
+            }
+            var pResult = ParsePlugins(pluginsTable);
+            if (pResult is not Result<PluginsConfig, ConfigStoreError>.Ok pOk)
+            {
+                return Result.Failure<ConfigDocument, ConfigStoreError>(
+                    ((Result<PluginsConfig, ConfigStoreError>.Error)pResult).Err
+                );
+            }
+            config = config.WithPlugins(pOk.Value);
+        }
+
         // Defaults (optional).
         if (model.TryGetValue(DefaultsTable, out var defaultsValue))
         {
@@ -350,6 +370,19 @@ public static class TomlConfigParser
             if (a.Path is not null)
             {
                 builder.AppendLine(inv, $"{AuditPathField} = \"{a.Path}\"");
+            }
+            builder.AppendLine();
+        }
+
+        if (document.Plugins != PluginsConfig.Default)
+        {
+            var p = document.Plugins;
+            builder.AppendLine(inv, $"[{PluginsTable}]");
+            builder.AppendLine(inv, $"{PluginsEnabledField} = {(p.Enabled ? "true" : "false")}");
+            if (!p.Allowed.IsDefaultOrEmpty)
+            {
+                var entries = string.Join(", ", p.Allowed.Select(n => $"\"{n}\""));
+                builder.AppendLine(inv, $"{PluginsAllowedField} = [{entries}]");
             }
             builder.AppendLine();
         }
@@ -776,6 +809,46 @@ public static class TomlConfigParser
             );
         }
         return Result.Success<AuditConfig, ConfigStoreError>(ok.Value);
+    }
+
+    private static Result<PluginsConfig, ConfigStoreError> ParsePlugins(TomlTable table)
+    {
+        var enabled = ReadBool(table, PluginsEnabledField, false);
+        var allowed = System.Collections.Immutable.ImmutableArray<string>.Empty;
+        if (table.TryGetValue(PluginsAllowedField, out var allowedValue))
+        {
+            if (allowedValue is not TomlArray allowedArray)
+            {
+                return Result.Failure<PluginsConfig, ConfigStoreError>(
+                    new ConfigStoreParseFailure(
+                        $"expected [{PluginsTable}].{PluginsAllowedField} to be an array"
+                    )
+                );
+            }
+            var builder = System.Collections.Immutable.ImmutableArray.CreateBuilder<string>();
+            foreach (var entry in allowedArray)
+            {
+                if (entry is not string s)
+                {
+                    return Result.Failure<PluginsConfig, ConfigStoreError>(
+                        new ConfigStoreParseFailure(
+                            $"[{PluginsTable}].{PluginsAllowedField} entries must be strings"
+                        )
+                    );
+                }
+                builder.Add(s);
+            }
+            allowed = builder.ToImmutable();
+        }
+        var built = PluginsConfig.From(enabled, allowed);
+        if (built is not Result<PluginsConfig, PluginsConfigError>.Ok ok)
+        {
+            var err = ((Result<PluginsConfig, PluginsConfigError>.Error)built).Err;
+            return Result.Failure<PluginsConfig, ConfigStoreError>(
+                new ConfigStoreParseFailure(err.Message)
+            );
+        }
+        return Result.Success<PluginsConfig, ConfigStoreError>(ok.Value);
     }
 
     private static Result<ConfigDocument, ConfigStoreError> Fail(string reason) =>

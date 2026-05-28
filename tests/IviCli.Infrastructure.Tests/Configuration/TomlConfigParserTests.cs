@@ -346,4 +346,38 @@ public class TomlConfigParserTests
         var rt = TomlConfigParser.Parse(serialized).ShouldBeOk();
         rt.Audit.ShouldBe(a);
     }
+
+    [Fact]
+    public void Parse_PluginsTable_RoundTrips_Fields()
+    {
+        var toml = """
+            [plugins]
+            enabled = true
+            allowed = ["acme", "vendor-x"]
+            """;
+        var cfg = TomlConfigParser.Parse(toml).ShouldBeOk();
+        cfg.Plugins.Enabled.ShouldBeTrue();
+        cfg.Plugins.Allowed.Length.ShouldBe(2);
+        cfg.Plugins.Allowed.ShouldContain("acme");
+        cfg.Plugins.Allowed.ShouldContain("vendor-x");
+    }
+
+    [Fact]
+    public void Parse_MissingPluginsTable_DefaultsToDisabled()
+    {
+        var cfg = TomlConfigParser.Parse("").ShouldBeOk();
+        cfg.Plugins.ShouldBe(PluginsConfig.Default);
+    }
+
+    [Fact]
+    public void Serialize_RoundTrips_NonDefaultPlugins()
+    {
+        var p = PluginsConfig
+            .From(true, System.Collections.Immutable.ImmutableArray.Create("acme"))
+            .ShouldBeOk();
+        var original = ConfigDocument.Empty.WithPlugins(p);
+        var serialized = TomlConfigParser.Serialize(original);
+        var rt = TomlConfigParser.Parse(serialized).ShouldBeOk();
+        rt.Plugins.ShouldBe(p);
+    }
 }

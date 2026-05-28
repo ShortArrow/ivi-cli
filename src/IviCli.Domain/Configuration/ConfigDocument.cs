@@ -26,7 +26,8 @@ public sealed record ConfigDocument
             pool: PoolConfig.Default,
             api: ApiConfig.Default,
             telemetry: TelemetryConfig.Default,
-            audit: AuditConfig.Default
+            audit: AuditConfig.Default,
+            plugins: PluginsConfig.Default
         );
 
     /// <summary>The configured devices, in insertion order.</summary>
@@ -53,6 +54,9 @@ public sealed record ConfigDocument
     /// <summary>The <c>[audit]</c> section (ADR 0043).</summary>
     public AuditConfig Audit { get; }
 
+    /// <summary>The <c>[plugins]</c> section (ADR 0013).</summary>
+    public PluginsConfig Plugins { get; }
+
     private ConfigDocument(
         ImmutableArray<Device> devices,
         ImmutableArray<Server> servers,
@@ -61,7 +65,8 @@ public sealed record ConfigDocument
         PoolConfig pool,
         ApiConfig api,
         TelemetryConfig telemetry,
-        AuditConfig audit
+        AuditConfig audit,
+        PluginsConfig plugins
     )
     {
         Devices = devices;
@@ -72,6 +77,7 @@ public sealed record ConfigDocument
         Api = api;
         Telemetry = telemetry;
         Audit = audit;
+        Plugins = plugins;
     }
 
     /// <summary>Structural equality across every collection.</summary>
@@ -82,6 +88,7 @@ public sealed record ConfigDocument
         && Api == other.Api
         && Telemetry == other.Telemetry
         && Audit == other.Audit
+        && Plugins == other.Plugins
         && Devices.SequenceEqual(other.Devices)
         && Servers.SequenceEqual(other.Servers)
         && Routes.SequenceEqual(other.Routes);
@@ -95,6 +102,7 @@ public sealed record ConfigDocument
         hash.Add(Api);
         hash.Add(Telemetry);
         hash.Add(Audit);
+        hash.Add(Plugins);
         foreach (var d in Devices)
         {
             hash.Add(d);
@@ -121,6 +129,9 @@ public sealed record ConfigDocument
 
     /// <summary>Replaces the <see cref="Audit"/> section.</summary>
     public ConfigDocument WithAudit(AuditConfig audit) => With(audit: audit);
+
+    /// <summary>Replaces the <see cref="Plugins"/> section.</summary>
+    public ConfigDocument WithPlugins(PluginsConfig plugins) => With(plugins: plugins);
 
     // -------- Devices ----------------------------------------------------
 
@@ -291,7 +302,8 @@ public sealed record ConfigDocument
         PoolConfig? pool = null,
         ApiConfig? api = null,
         TelemetryConfig? telemetry = null,
-        AuditConfig? audit = null
+        AuditConfig? audit = null,
+        PluginsConfig? plugins = null
     ) =>
         new(
             devices ?? Devices,
@@ -301,6 +313,7 @@ public sealed record ConfigDocument
             pool ?? Pool,
             api ?? Api,
             telemetry ?? Telemetry,
-            audit ?? Audit
+            audit ?? Audit,
+            plugins ?? Plugins
         );
 }
