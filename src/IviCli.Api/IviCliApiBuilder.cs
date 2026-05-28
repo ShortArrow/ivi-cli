@@ -1,10 +1,13 @@
 using System.Net;
 using IviCli.Api.Authentication;
 using IviCli.Api.Routing;
+using IviCli.Api.Tls;
 using IviCli.Api.WebSockets;
+using IviCli.Domain.Configuration;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Server.Kestrel.Core;
+using Microsoft.AspNetCore.Server.Kestrel.Https;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 
@@ -22,9 +25,16 @@ public static class IviCliApiBuilder
     /// <summary>
     /// Configures and returns a Kestrel-hosted minimal-API application
     /// listening on <paramref name="bind"/>:<paramref name="port"/>. The
-    /// application is not started — the caller owns the lifecycle.
+    /// application is not started — the caller owns the lifecycle. When
+    /// <paramref name="tls"/> is supplied, the listener serves HTTPS
+    /// (and optionally enforces mTLS) per ADR 0039.
     /// </summary>
-    public static WebApplication Build(IServiceProvider hostingServices, IPAddress bind, int port)
+    public static WebApplication Build(
+        IServiceProvider hostingServices,
+        IPAddress bind,
+        int port,
+        TlsCertificateBundle? tls = null
+    )
     {
         var builder = WebApplication.CreateSlimBuilder();
         // Replace the slim builder's default DI with the CLI's container so
@@ -46,6 +56,20 @@ public static class IviCliApiBuilder
                 lo =>
                 {
                     lo.Protocols = HttpProtocols.Http1;
+                    if (tls is not null)
+                    {
+                        lo.UseHttps(httpsOptions =>
+                        {
+                            httpsOptions.ServerCertificate = tls.ServerCertificate;
+                            if (tls.ClientCaBundle is { } caBundle)
+                            {
+                                httpsOptions.ClientCertificateMode =
+                                    ClientCertificateMode.RequireCertificate;
+                                httpsOptions.ClientCertificateValidation = (cert, chain, _) =>
+                                    chain is not null && ValidateClientChain(cert, chain, caBundle);
+                            }
+                        });
+                    }
                 }
             );
             o.AddServerHeader = false;
@@ -95,4 +119,32 @@ public static class IviCliApiBuilder
 
     private static ServiceDescriptor Forward<T>(IServiceProvider parent)
         where T : class => ServiceDescriptor.Singleton<T>(_ => parent.GetRequiredService<T>());
+
+    /// <summary>
+    /// Custom mTLS client-cert validation: re-roots the supplied chain
+    /// against the configured trust bundle instead of the OS store, so
+    /// operators can pin a private CA without modifying machine trust.
+    /// </summary>
+    private static bool ValidateClientChain(
+        System.Security.Cryptography.X509Certificates.X509Certificate2 clientCert,
+        System.Security.Cryptography.X509Certificates.X509Chain chain,
+        System.Security.Cryptography.X509Certificates.X509Certificate2Collection trustBundle
+    )
+    {
+        chain.ChainPolicy.TrustMode = System
+            .Security
+            .Cryptography
+            .X509Certificates
+            .X509ChainTrustMode
+            .CustomRootTrust;
+        chain.ChainPolicy.CustomTrustStore.Clear();
+        chain.ChainPolicy.CustomTrustStore.AddRange(trustBundle);
+        chain.ChainPolicy.RevocationMode = System
+            .Security
+            .Cryptography
+            .X509Certificates
+            .X509RevocationMode
+            .NoCheck;
+        return chain.Build(clientCert);
+    }
 }

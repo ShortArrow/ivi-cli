@@ -4,10 +4,13 @@ using System.Net;
 using System.Runtime.InteropServices;
 using IviCli.Api;
 using IviCli.Api.Authentication;
+using IviCli.Api.Tls;
 using IviCli.Application.Auth;
+using IviCli.Application.Configuration;
 using IviCli.Application.Servers;
 using IviCli.Domain;
 using IviCli.Domain.Auth;
+using IviCli.Domain.Configuration;
 using IviCli.Domain.Servers;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -31,8 +34,11 @@ public static class ApiCommand
         ? ok.Value
         : throw new InvalidOperationException("ivi-management-api must be a valid ServerName");
 
-    /// <summary>Default port the listener binds to when <c>--port</c> is not supplied.</summary>
+    /// <summary>Default port for plaintext HTTP when <c>--port</c> is not supplied.</summary>
     public const int DefaultPort = 8080;
+
+    /// <summary>Default port for HTTPS when <c>--port</c> is not supplied and TLS is enabled.</summary>
+    public const int DefaultTlsPort = 8443;
 
     /// <summary>Default bind address (loopback only — non-loopback warns at startup).</summary>
     public const string DefaultBind = "127.0.0.1";
@@ -49,10 +55,10 @@ public static class ApiCommand
 
     private static Command BuildStart(IServiceProvider services)
     {
-        var portOpt = new Option<int>("--port")
+        var portOpt = new Option<int?>("--port")
         {
-            Description = $"TCP port to bind on (default {DefaultPort}).",
-            DefaultValueFactory = _ => DefaultPort,
+            Description =
+                $"TCP port to bind on (default {DefaultPort} HTTP, {DefaultTlsPort} HTTPS).",
         };
         var bindOpt = new Option<string>("--bind")
         {
@@ -65,16 +71,51 @@ public static class ApiCommand
                 "Allow requests without an API token. Required when binding non-loopback "
                 + "with no tokens configured (ADR 0036).",
         };
+        var tlsOpt = new Option<bool>("--tls")
+        {
+            Description = "Serve HTTPS instead of HTTP (ADR 0039).",
+        };
+        var tlsCertOpt = new Option<string?>("--tls-cert")
+        {
+            Description = "Path to the server certificate (PFX or PEM).",
+        };
+        var tlsKeyOpt = new Option<string?>("--tls-key")
+        {
+            Description = "Path to the PEM private key (when --tls-cert is a PEM file).",
+        };
+        var tlsPasswordEnvOpt = new Option<string?>("--tls-password-env")
+        {
+            Description = "Environment variable holding the PFX password.",
+        };
+        var tlsSelfSignedOpt = new Option<bool>("--tls-self-signed")
+        {
+            Description = "Generate an ephemeral self-signed cert (dev only).",
+        };
+        var tlsClientRequiredOpt = new Option<bool>("--tls-client-required")
+        {
+            Description = "Require client certificate (mTLS).",
+        };
+        var tlsClientCaOpt = new Option<string?>("--tls-client-ca")
+        {
+            Description =
+                "Path to PEM bundle of trusted client CAs (required with --tls-client-required).",
+        };
 
         var cmd = new Command("start", "Start the Management API listener in the foreground.");
         cmd.Options.Add(portOpt);
         cmd.Options.Add(bindOpt);
         cmd.Options.Add(allowAnonOpt);
+        cmd.Options.Add(tlsOpt);
+        cmd.Options.Add(tlsCertOpt);
+        cmd.Options.Add(tlsKeyOpt);
+        cmd.Options.Add(tlsPasswordEnvOpt);
+        cmd.Options.Add(tlsSelfSignedOpt);
+        cmd.Options.Add(tlsClientRequiredOpt);
+        cmd.Options.Add(tlsClientCaOpt);
 
         cmd.SetAction(
             async (parseResult, ct) =>
             {
-                var port = parseResult.GetValue(portOpt);
                 var bindRaw = parseResult.GetValue(bindOpt) ?? DefaultBind;
                 var allowAnon = parseResult.GetValue(allowAnonOpt);
                 if (!IPAddress.TryParse(bindRaw, out var bindAddr))
@@ -83,6 +124,37 @@ public static class ApiCommand
                     return ExitCodeMapper.UsageError;
                 }
                 var isLoopback = IPAddress.IsLoopback(bindAddr);
+
+                // Resolve the effective TlsConfig from CLI flags + config
+                // file. CLI flags fully override the config file when
+                // --tls / --tls-cert / --tls-self-signed are present.
+                var configStore = services.GetRequiredService<IConfigStore>();
+                var configLoad = await configStore.LoadAsync(ct);
+                var configDoc = configLoad
+                    is Result<ConfigDocument, ConfigStoreError>.Ok { Value: var cfg }
+                    ? cfg
+                    : ConfigDocument.Empty;
+                var tlsResult = BuildEffectiveTlsConfig(
+                    parseResult,
+                    configDoc.Api.Tls,
+                    tlsOpt,
+                    tlsCertOpt,
+                    tlsKeyOpt,
+                    tlsPasswordEnvOpt,
+                    tlsSelfSignedOpt,
+                    tlsClientRequiredOpt,
+                    tlsClientCaOpt
+                );
+                if (tlsResult is not Result<TlsConfig, TlsConfigError>.Ok { Value: var tlsCfg })
+                {
+                    var err = ((Result<TlsConfig, TlsConfigError>.Error)tlsResult).Err;
+                    Console.Error.WriteLine($"error: {err.Message}");
+                    return ExitCodeMapper.UsageError;
+                }
+
+                var port =
+                    parseResult.GetValue(portOpt)
+                    ?? (tlsCfg.Enabled ? DefaultTlsPort : DefaultPort);
 
                 // Non-loopback gate (ADR 0036 §4): require at least one
                 // configured token unless the operator opts out explicitly.
@@ -112,18 +184,44 @@ public static class ApiCommand
                 var registry = services.GetRequiredService<IServerProcessRegistry>();
                 var loggerFactory = services.GetRequiredService<ILoggerFactory>();
                 var logger = loggerFactory.CreateLogger("IviCli.Cli.Commands.ApiCommand");
+
+                TlsCertificateBundle? bundle = null;
+                if (tlsCfg.Enabled)
+                {
+                    var loaded = TlsCertificateLoader.Load(tlsCfg);
+                    if (
+                        loaded is not Result<TlsCertificateBundle, TlsLoadError>.Ok { Value: var b }
+                    )
+                    {
+                        var loadErr = (
+                            (Result<TlsCertificateBundle, TlsLoadError>.Error)loaded
+                        ).Err;
+                        Console.Error.WriteLine($"error: {loadErr.Message}");
+                        return ExitCodeMapper.DeviceError;
+                    }
+                    bundle = b;
+                    if (b.SelfSigned)
+                    {
+                        logger.LogWarning(
+                            "TLS enabled with a self-signed certificate — DO NOT use --tls-self-signed in production."
+                        );
+                    }
+                }
+
                 var pid = Environment.ProcessId;
                 _ = await registry.WriteAsync(ReservedName, pid, DateTimeOffset.UtcNow, ct);
 
+                var scheme = tlsCfg.Enabled ? "https" : "http";
                 logger.LogInformation(
-                    "Management API listening on http://{Bind}:{Port}",
+                    "Management API listening on {Scheme}://{Bind}:{Port}",
+                    scheme,
                     bindAddr,
                     port
                 );
 
                 try
                 {
-                    var app = IviCliApiBuilder.Build(services, bindAddr, port);
+                    var app = IviCliApiBuilder.Build(services, bindAddr, port, bundle);
                     await ((IHost)app).RunAsync(ct);
                     return ExitCodeMapper.Success;
                 }
@@ -138,6 +236,54 @@ public static class ApiCommand
             }
         );
         return cmd;
+    }
+
+    private static Result<TlsConfig, TlsConfigError> BuildEffectiveTlsConfig(
+        System.CommandLine.ParseResult parseResult,
+        TlsConfig fromConfig,
+        Option<bool> tlsOpt,
+        Option<string?> tlsCertOpt,
+        Option<string?> tlsKeyOpt,
+        Option<string?> tlsPasswordEnvOpt,
+        Option<bool> tlsSelfSignedOpt,
+        Option<bool> tlsClientRequiredOpt,
+        Option<string?> tlsClientCaOpt
+    )
+    {
+        // When any --tls* flag is present, the CLI fully replaces the
+        // config-file TLS section (single source of truth for one run).
+        // Otherwise the config file wins.
+        var cliTls = parseResult.GetValue(tlsOpt);
+        var cliCert = parseResult.GetValue(tlsCertOpt);
+        var cliKey = parseResult.GetValue(tlsKeyOpt);
+        var cliPasswordEnv = parseResult.GetValue(tlsPasswordEnvOpt);
+        var cliSelfSigned = parseResult.GetValue(tlsSelfSignedOpt);
+        var cliClientRequired = parseResult.GetValue(tlsClientRequiredOpt);
+        var cliClientCa = parseResult.GetValue(tlsClientCaOpt);
+
+        var anyCliTls =
+            cliTls
+            || cliCert is not null
+            || cliKey is not null
+            || cliPasswordEnv is not null
+            || cliSelfSigned
+            || cliClientRequired
+            || cliClientCa is not null;
+        if (!anyCliTls)
+        {
+            return Result.Success<TlsConfig, TlsConfigError>(fromConfig);
+        }
+
+        var enabled = cliTls || cliCert is not null || cliSelfSigned;
+        return TlsConfig.From(
+            enabled,
+            cliCert,
+            cliKey,
+            cliPasswordEnv,
+            cliSelfSigned,
+            cliClientRequired,
+            cliClientCa
+        );
     }
 
     private static Command BuildStop(IServiceProvider services)
