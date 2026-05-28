@@ -118,6 +118,10 @@ public sealed class Vxi11GatewayServer : IGatewayServer
         // requests on a separate TCP connection can find this link.
         var ownedLinks = new HashSet<int>();
 
+        // Connection-scoped interrupt target — set by device_create_intr_chan,
+        // shared across every link on this connection (ADR 0042).
+        var connState = new ConnectionInterruptState();
+
         try
         {
             using var tcp = client;
@@ -147,6 +151,7 @@ public sealed class Vxi11GatewayServer : IGatewayServer
                         rpc,
                         body,
                         ownedLinks,
+                        connState,
                         boundPort,
                         server,
                         config,
@@ -282,6 +287,7 @@ public sealed class Vxi11GatewayServer : IGatewayServer
         RpcCallHeader rpc,
         byte[] body,
         HashSet<int> ownedLinks,
+        ConnectionInterruptState connState,
         int boundPort,
         Domain.Servers.Server server,
         ConfigDocument config,
@@ -325,6 +331,15 @@ public sealed class Vxi11GatewayServer : IGatewayServer
                 break;
             case ProcDeviceTrigger:
                 await DoDeviceTriggerAsync(stream, rpc.Xid, procReader, ct);
+                break;
+            case ProcCreateIntrChan:
+                await DoCreateIntrChanAsync(stream, rpc.Xid, procReader, connState, ct);
+                break;
+            case ProcDestroyIntrChan:
+                await DoDestroyIntrChanAsync(stream, rpc.Xid, connState, ct);
+                break;
+            case ProcDeviceEnableSrq:
+                await DoDeviceEnableSrqAsync(stream, rpc.Xid, procReader, connState, ct);
                 break;
             case ProcDestroyLink:
                 await DoDestroyLinkAsync(stream, rpc.Xid, procReader, ownedLinks, ct);
@@ -545,6 +560,158 @@ public sealed class Vxi11GatewayServer : IGatewayServer
         await WriteErrorReplyAsync(stream, xid, error, ct);
     }
 
+    private async Task DoCreateIntrChanAsync(
+        Stream stream,
+        uint xid,
+        Vxi11XdrCodec.XdrReader reader,
+        ConnectionInterruptState connState,
+        CancellationToken ct
+    )
+    {
+        var remote = Vxi11InterruptCodec.ReadRemoteFunc(ref reader);
+        if (
+            remote.ProgFamily != ProgFamilyTcp
+            || remote.ProgNum != InterruptProgram
+            || remote.ProgVers != InterruptVersion
+        )
+        {
+            await WriteErrorReplyAsync(stream, xid, Vxi11NotSupported, ct);
+            return;
+        }
+        connState.Target = remote;
+        _logger.LogInformation(
+            "VXI-11 device_create_intr_chan target {Host}:{Port}",
+            remote.HostAddr,
+            remote.HostPort
+        );
+        await WriteErrorReplyAsync(stream, xid, Vxi11NoError, ct);
+    }
+
+    private async Task DoDestroyIntrChanAsync(
+        Stream stream,
+        uint xid,
+        ConnectionInterruptState connState,
+        CancellationToken ct
+    )
+    {
+        connState.Target = null;
+        foreach (var lid in connState.ForwardingLinks.ToArray())
+        {
+            if (_links.TryGetValue(lid, out var state))
+            {
+                state.StopSrqForwarder();
+            }
+            connState.ForwardingLinks.Remove(lid);
+        }
+        await WriteErrorReplyAsync(stream, xid, Vxi11NoError, ct);
+    }
+
+    private async Task DoDeviceEnableSrqAsync(
+        Stream stream,
+        uint xid,
+        Vxi11XdrCodec.XdrReader reader,
+        ConnectionInterruptState connState,
+        CancellationToken ct
+    )
+    {
+        var parms = Vxi11InterruptCodec.ReadEnableSrqParms(ref reader);
+        if (!_links.TryGetValue(parms.Lid, out var state))
+        {
+            await WriteErrorReplyAsync(stream, xid, Vxi11InvalidLink, ct);
+            return;
+        }
+        if (!parms.Enable)
+        {
+            state.StopSrqForwarder();
+            connState.ForwardingLinks.Remove(parms.Lid);
+            await WriteErrorReplyAsync(stream, xid, Vxi11NoError, ct);
+            return;
+        }
+        if (connState.Target is not { } target)
+        {
+            // Client asked to enable SRQ without first creating the
+            // interrupt channel — VXI-11 OPERATION_NOT_SUPPORTED.
+            await WriteErrorReplyAsync(stream, xid, Vxi11NotSupported, ct);
+            return;
+        }
+        state.SrqHandle = parms.Handle;
+        state.InterruptTarget = target;
+        connState.ForwardingLinks.Add(parms.Lid);
+        state.StartSrqForwarder(token => RunSrqForwarderAsync(state, target, token));
+        await WriteErrorReplyAsync(stream, xid, Vxi11NoError, ct);
+    }
+
+    private async Task RunSrqForwarderAsync(
+        LinkState state,
+        DeviceRemoteFunc target,
+        CancellationToken ct
+    )
+    {
+        try
+        {
+            await foreach (var _ in state.Backend.ServiceRequestStream(state.Device, ct))
+            {
+                try
+                {
+                    await DeliverInterruptSrqAsync(target, state.SrqHandle, ct);
+                }
+                catch (Exception ex) when (ex is SocketException or IOException)
+                {
+                    _logger.LogWarning(
+                        ex,
+                        "VXI-11 device_intr_srq delivery to {Host}:{Port} failed; SRQ dropped",
+                        target.HostAddr,
+                        target.HostPort
+                    );
+                }
+            }
+        }
+        catch (OperationCanceledException)
+        { /* graceful shutdown */
+        }
+    }
+
+    private static async Task DeliverInterruptSrqAsync(
+        DeviceRemoteFunc target,
+        byte[] handle,
+        CancellationToken ct
+    )
+    {
+        var ip = new IPAddress(
+            System.Buffers.Binary.BinaryPrimitives.ReverseEndianness(target.HostAddr)
+        );
+        using var client = new TcpClient();
+        await client.ConnectAsync(ip, (int)target.HostPort, ct);
+        using var stream = client.GetStream();
+
+        var body = new Vxi11XdrCodec.XdrWriter();
+        Vxi11InterruptCodec.WriteSrqParms(body, new DeviceSrqParms(handle));
+
+        var rpc = new Vxi11XdrCodec.XdrWriter();
+        rpc.WriteUInt32(0); // xid — server-initiated, client doesn't reply distinctively
+        rpc.WriteUInt32(0); // mtype = CALL
+        rpc.WriteUInt32(2); // rpcvers
+        rpc.WriteUInt32(InterruptProgram);
+        rpc.WriteUInt32(InterruptVersion);
+        rpc.WriteUInt32(ProcDeviceIntrSrq);
+        rpc.WriteUInt32(0); // cred flavor AUTH_NONE
+        rpc.WriteOpaque(Array.Empty<byte>());
+        rpc.WriteUInt32(0); // verf flavor
+        rpc.WriteOpaque(Array.Empty<byte>());
+        rpc.AppendRaw(body.ToArray());
+
+        await Vxi11RecordFraming.WriteRecordAsync(stream, rpc.ToArray(), ct);
+        // Per VXI-11 §B.7 the response is empty; we don't strictly need
+        // to read it, but draining keeps the client side clean.
+        try
+        {
+            _ = await Vxi11RecordFraming.ReadRecordAsync(stream, ct);
+        }
+        catch
+        { /* swallow */
+        }
+    }
+
     private async Task DoDestroyLinkAsync(
         Stream stream,
         uint xid,
@@ -668,9 +835,24 @@ public sealed class Vxi11GatewayServer : IGatewayServer
         await WriteAcceptedReplyAsync(stream, xid, AcceptSuccess, inner.ToArray(), ct);
     }
 
+    /// <summary>
+    /// Per-connection state for the VXI-11 Interrupt channel (ADR 0042).
+    /// `Target` holds the most recent <c>device_create_intr_chan</c>
+    /// payload; `ForwardingLinks` tracks which lids on this connection
+    /// have an active forwarder so disconnect / destroy_intr_chan can
+    /// stop them in bulk.
+    /// </summary>
+    private sealed class ConnectionInterruptState
+    {
+        public DeviceRemoteFunc? Target { get; set; }
+        public HashSet<int> ForwardingLinks { get; } = new();
+    }
+
     private sealed class LinkState : IDisposable
     {
         private readonly List<byte> _pendingWrite = new();
+        private CancellationTokenSource? _srqForwarderCts;
+        private Task? _srqForwarderTask;
 
         public LinkState(IIviBackend backend, Device device)
         {
@@ -686,6 +868,12 @@ public sealed class Vxi11GatewayServer : IGatewayServer
         /// <summary>Cancellation source signalled by VXI-11 device_abort.</summary>
         public CancellationTokenSource Cts { get; }
 
+        /// <summary>Remote host:port the client published via device_create_intr_chan (ADR 0042).</summary>
+        public DeviceRemoteFunc? InterruptTarget { get; set; }
+
+        /// <summary>Handle bytes echoed back to the client on every device_intr_srq delivery.</summary>
+        public byte[] SrqHandle { get; set; } = Array.Empty<byte>();
+
         public byte[] AppendPendingWrite(ReadOnlySpan<byte> fragment)
         {
             _pendingWrite.AddRange(fragment.ToArray());
@@ -694,6 +882,40 @@ public sealed class Vxi11GatewayServer : IGatewayServer
 
         public void ClearPendingWrite() => _pendingWrite.Clear();
 
-        public void Dispose() => Cts.Dispose();
+        /// <summary>Starts the background task forwarding SRQ events to the client.</summary>
+        public void StartSrqForwarder(Func<CancellationToken, Task> runner)
+        {
+            StopSrqForwarder();
+            _srqForwarderCts = new CancellationTokenSource();
+            _srqForwarderTask = Task.Run(() => runner(_srqForwarderCts.Token));
+        }
+
+        /// <summary>Cancels and awaits the SRQ forwarder, if any.</summary>
+        public void StopSrqForwarder()
+        {
+            try
+            {
+                _srqForwarderCts?.Cancel();
+            }
+            catch
+            { /* swallow */
+            }
+            try
+            {
+                _srqForwarderTask?.Wait(TimeSpan.FromMilliseconds(200));
+            }
+            catch
+            { /* swallow */
+            }
+            _srqForwarderCts?.Dispose();
+            _srqForwarderCts = null;
+            _srqForwarderTask = null;
+        }
+
+        public void Dispose()
+        {
+            StopSrqForwarder();
+            Cts.Dispose();
+        }
     }
 }
