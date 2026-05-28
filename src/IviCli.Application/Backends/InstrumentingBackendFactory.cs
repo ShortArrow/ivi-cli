@@ -101,6 +101,27 @@ public sealed class InstrumentingBackendFactory : IBackendFactory
             return result;
         }
 
+        public async Task<Result<Unit, BackendError>> TriggerAsync(
+            Device device,
+            CancellationToken ct
+        )
+        {
+            var sw = Stopwatch.StartNew();
+            using var activity = StartActivity("backend.trigger", device);
+            var result = await _inner.TriggerAsync(device, ct);
+            Finalize(activity, sw, "trigger", device, result is Result<Unit, BackendError>.Ok);
+            return result;
+        }
+
+        public IAsyncEnumerable<ServiceRequest> ServiceRequestStream(
+            Device device,
+            CancellationToken ct
+        ) =>
+            // SRQ delivery is server-push and out-of-band — instrumenting
+            // each yield would inflate trace volume without per-event
+            // semantic value. Pass through transparently for v1.
+            _inner.ServiceRequestStream(device, ct);
+
         private static Activity? StartActivity(string name, Device device)
         {
             var activity = IviCliTelemetry.Backend.StartActivity(name, ActivityKind.Client);

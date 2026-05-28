@@ -413,5 +413,46 @@ public sealed class PoolingBackendFactory : IBackendFactory, IAsyncDisposable
             }
             return result;
         }
+
+        public async Task<Result<Unit, BackendError>> TriggerAsync(
+            Device device,
+            CancellationToken ct
+        )
+        {
+            if (_lease is not { } lease)
+            {
+                return Result.Failure<Unit, BackendError>(
+                    new TransportDisconnected("backend not opened")
+                );
+            }
+            var result = await lease.Entry.Backend.TriggerAsync(device, ct);
+            if (result is Result<Unit, BackendError>.Error)
+            {
+                _broken = true;
+            }
+            return result;
+        }
+
+        public IAsyncEnumerable<ServiceRequest> ServiceRequestStream(
+            Device device,
+            CancellationToken ct
+        ) =>
+            // SRQ stream spans the lifetime of the lease — pass through
+            // the lease's underlying backend stream. The pool entry stays
+            // alive because the lease holds the semaphore; releasing the
+            // lease while the stream is still active is a caller bug we
+            // don't try to defend against in v1.
+            _lease is { } lease
+                ? lease.Entry.Backend.ServiceRequestStream(device, ct)
+                : EmptyServiceRequestStream(ct);
+
+#pragma warning disable CS1998
+        private static async IAsyncEnumerable<ServiceRequest> EmptyServiceRequestStream(
+            [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct
+        )
+        {
+            yield break;
+        }
+#pragma warning restore CS1998
     }
 }

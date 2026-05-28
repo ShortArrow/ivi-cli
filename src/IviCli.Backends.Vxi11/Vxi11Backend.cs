@@ -217,6 +217,35 @@ public sealed class Vxi11Backend : IIviBackend
         }
     }
 
+    /// <inheritdoc/>
+    public Task<Result<Unit, BackendError>> TriggerAsync(Device device, CancellationToken ct)
+    {
+        // VXI-11 device_trigger (proc 17) wiring lands in Batch P Task 3.
+        return Task.FromResult(
+            Result.Failure<Unit, BackendError>(
+                new BackendOperationNotSupported(
+                    "trigger",
+                    device.Name,
+                    "Vxi11Backend device_trigger lands in Batch P Task 3"
+                )
+            )
+        );
+    }
+
+    /// <inheritdoc/>
+#pragma warning disable CS1998
+    public async IAsyncEnumerable<ServiceRequest> ServiceRequestStream(
+        Device device,
+        [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct
+    )
+    {
+        // VXI-11 Interrupt channel (program 395185) is explicitly deferred
+        // to v2 — see ADR 0041 §5 / ADR 0029 §2. v1 stream completes
+        // immediately.
+        yield break;
+    }
+#pragma warning restore CS1998
+
     private Vxi11Session? TryGetSession(Device device)
     {
         lock (_gate)

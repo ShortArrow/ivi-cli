@@ -1,5 +1,7 @@
 using System.Collections.Concurrent;
 using System.Globalization;
+using System.Runtime.CompilerServices;
+using System.Threading.Channels;
 using IviCli.Application.Backends;
 using IviCli.Domain;
 using IviCli.Domain.Devices;
@@ -115,6 +117,23 @@ public sealed class FakeBackend : IIviBackend
     public int CloseCountFor(DeviceName name) =>
         _devices.TryGetValue(name, out var state) ? state.CloseCount : 0;
 
+    /// <summary>Number of times <see cref="TriggerAsync"/> was called for <paramref name="name"/>.</summary>
+    public int TriggerCountFor(DeviceName name) =>
+        _devices.TryGetValue(name, out var state) ? state.TriggerCount : 0;
+
+    /// <summary>
+    /// Pushes a synthetic Service Request onto the per-device SRQ channel
+    /// so any <see cref="ServiceRequestStream"/> consumer observes it
+    /// (test affordance — production code does not call this).
+    /// </summary>
+    public void RaiseServiceRequest(DeviceName name, byte statusByte = 0x40)
+    {
+        var state = _devices.GetOrAdd(name, _ => new FakeDeviceState());
+        state.ServiceRequestChannel.Writer.TryWrite(
+            new ServiceRequest(name, statusByte, DateTimeOffset.UtcNow)
+        );
+    }
+
     /// <inheritdoc/>
     public Task<Result<Unit, BackendError>> WriteAsync(
         Device device,
@@ -215,6 +234,32 @@ public sealed class FakeBackend : IIviBackend
         );
     }
 
+    /// <inheritdoc/>
+    public Task<Result<Unit, BackendError>> TriggerAsync(Device device, CancellationToken ct)
+    {
+        ct.ThrowIfCancellationRequested();
+        var state = _devices.GetOrAdd(device.Name, _ => new FakeDeviceState());
+        state.TriggerCount++;
+        return Task.FromResult(Result.Success<Unit, BackendError>(Unit.Value));
+    }
+
+    /// <inheritdoc/>
+    public async IAsyncEnumerable<ServiceRequest> ServiceRequestStream(
+        Device device,
+        [EnumeratorCancellation] CancellationToken ct
+    )
+    {
+        var state = _devices.GetOrAdd(device.Name, _ => new FakeDeviceState());
+        var reader = state.ServiceRequestChannel.Reader;
+        while (await reader.WaitToReadAsync(ct))
+        {
+            while (reader.TryRead(out var srq))
+            {
+                yield return srq;
+            }
+        }
+    }
+
     private static BackendError BuildFailure(string match, SceneAction.Fail fail) =>
         fail.Variant.ToLowerInvariant() switch
         {
@@ -245,9 +290,12 @@ public sealed class FakeBackend : IIviBackend
         public bool IsOpen { get; set; }
         public int OpenCount { get; set; }
         public int CloseCount { get; set; }
+        public int TriggerCount { get; set; }
         public BackendError? OpenFailure { get; set; }
         public Dictionary<string, string> QueryResponses { get; } = new(StringComparer.Ordinal);
         public Dictionary<string, BackendError> QueryFailures { get; } =
             new(StringComparer.Ordinal);
+        public Channel<ServiceRequest> ServiceRequestChannel { get; } =
+            Channel.CreateUnbounded<ServiceRequest>();
     }
 }

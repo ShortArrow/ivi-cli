@@ -136,6 +136,45 @@ public sealed class LocalBackend : IIviBackend
         };
     }
 
+    /// <inheritdoc/>
+    public Task<Result<Unit, BackendError>> TriggerAsync(Device device, CancellationToken ct)
+    {
+        ct.ThrowIfCancellationRequested();
+        var handle = TryGetHandle(device);
+        if (handle is null)
+        {
+            return Task.FromResult(
+                Result.Failure<Unit, BackendError>(new TransportDisconnected("session not open"))
+            );
+        }
+        // v1 sends the SCPI *TRG common-command through the existing
+        // Write path — works against every IEEE-488.2 instrument. A v2
+        // can switch to IMessageBasedSession.AssertTrigger via
+        // reflection once the IVisaSessionHandle port grows a Trigger()
+        // method (ADR 0041 §4).
+        var write = handle.Write("*TRG");
+        if (write is Result<Unit, LocalVisaError>.Error err)
+        {
+            return Task.FromResult(Fail(err.Err));
+        }
+        return Task.FromResult(Result.Success<Unit, BackendError>(Unit.Value));
+    }
+
+    /// <inheritdoc/>
+#pragma warning disable CS1998
+    public async IAsyncEnumerable<ServiceRequest> ServiceRequestStream(
+        Device device,
+        [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct
+    )
+    {
+        // v1 returns an empty stream — wiring Ivi.Visa's ServiceRequest
+        // event through the reflection-based IVisaSessionHandle takes a
+        // dedicated batch. Operators who need real SRQ today drive the
+        // instrument over HiSlip / VXI-11 instead.
+        yield break;
+    }
+#pragma warning restore CS1998
+
     private IVisaSessionHandle? TryGetHandle(Device device)
     {
         lock (_gate)

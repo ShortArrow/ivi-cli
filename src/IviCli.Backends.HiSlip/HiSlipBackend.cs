@@ -222,6 +222,35 @@ public sealed class HiSlipBackend : IIviBackend
         }
     }
 
+    /// <inheritdoc/>
+    public Task<Result<Unit, BackendError>> TriggerAsync(Device device, CancellationToken ct)
+    {
+        // Concrete Trigger / ServiceRequest wiring lands in Batch P
+        // Task 2 — this stub keeps the new IIviBackend port satisfied so
+        // existing HiSLIP tests still compile.
+        return Task.FromResult(
+            Result.Failure<Unit, BackendError>(
+                new BackendOperationNotSupported(
+                    "trigger",
+                    device.Name,
+                    "HiSlipBackend Trigger wiring lands in Batch P Task 2"
+                )
+            )
+        );
+    }
+
+    /// <inheritdoc/>
+#pragma warning disable CS1998
+    public async IAsyncEnumerable<ServiceRequest> ServiceRequestStream(
+        Device device,
+        [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct
+    )
+    {
+        // Async-channel ServiceRequest receive lands in Batch P Task 2.
+        yield break;
+    }
+#pragma warning restore CS1998
+
     private HiSlipSession? TryGetSession(Device device)
     {
         lock (_gate)

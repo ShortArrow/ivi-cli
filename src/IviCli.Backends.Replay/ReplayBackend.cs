@@ -118,6 +118,33 @@ public sealed class ReplayBackend : IIviBackend
             ),
         };
 
+    /// <inheritdoc/>
+    public Task<Result<Unit, BackendError>> TriggerAsync(Device device, CancellationToken ct)
+    {
+        ct.ThrowIfCancellationRequested();
+        return Task.FromResult(
+            Result.Failure<Unit, BackendError>(
+                new BackendOperationNotSupported(
+                    "trigger",
+                    device.Name,
+                    "replay backend has no recorded trigger scenes"
+                )
+            )
+        );
+    }
+
+    /// <inheritdoc/>
+#pragma warning disable CS1998 // empty async iterator is intentional
+    public async IAsyncEnumerable<ServiceRequest> ServiceRequestStream(
+        Device device,
+        [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct
+    )
+    {
+        // Pure replay has no SRQ semantics; the stream completes immediately.
+        yield break;
+    }
+#pragma warning restore CS1998
+
     private static Result<Unit, BackendError> Fail(string scpi) =>
         Result.Failure<Unit, BackendError>(new ReplayMiss(scpi));
 

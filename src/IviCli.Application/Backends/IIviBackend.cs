@@ -44,4 +44,20 @@ public interface IIviBackend
     /// caller knows produces a response.
     /// </summary>
     Task<Result<string, BackendError>> ReadAsync(Device device, CancellationToken ct);
+
+    /// <summary>
+    /// Asserts a hardware trigger on <paramref name="device"/> (the IEEE
+    /// 488 / SCPI <c>*TRG</c> equivalent). Backends that cannot raise a
+    /// trigger return <see cref="BackendOperationNotSupported"/> rather
+    /// than throwing (ADR 0041).
+    /// </summary>
+    Task<Result<Unit, BackendError>> TriggerAsync(Device device, CancellationToken ct);
+
+    /// <summary>
+    /// A push stream of Service Request (SRQ) events from
+    /// <paramref name="device"/>. Backends without SRQ capability return
+    /// an empty enumerable that completes when <paramref name="ct"/> is
+    /// cancelled (ADR 0041).
+    /// </summary>
+    IAsyncEnumerable<ServiceRequest> ServiceRequestStream(Device device, CancellationToken ct);
 }

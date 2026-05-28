@@ -90,5 +90,18 @@ public sealed class DefaultBackendFactoryTests
 
         public Task<Result<string, BackendError>> ReadAsync(Device device, CancellationToken ct) =>
             Task.FromResult(Result.Success<string, BackendError>(Tag));
+
+        public Task<Result<Unit, BackendError>> TriggerAsync(Device device, CancellationToken ct) =>
+            Task.FromResult(Result.Success<Unit, BackendError>(Unit.Value));
+
+#pragma warning disable CS1998
+        public async IAsyncEnumerable<ServiceRequest> ServiceRequestStream(
+            Device device,
+            [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct
+        )
+        {
+            yield break;
+        }
+#pragma warning restore CS1998
     }
 }

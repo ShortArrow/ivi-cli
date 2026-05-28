@@ -98,6 +98,28 @@ public sealed class CapturingBackend : IIviBackend
     }
 
     /// <inheritdoc/>
+    public async Task<Result<Unit, BackendError>> TriggerAsync(Device device, CancellationToken ct)
+    {
+        var result = await _inner.TriggerAsync(device, ct);
+        await TryAppendAsync(
+            BuildEvent(device, TrafficOp.Trigger, data: null, response: null, result, null),
+            ct
+        );
+        return result;
+    }
+
+    /// <inheritdoc/>
+    public IAsyncEnumerable<ServiceRequest> ServiceRequestStream(
+        Device device,
+        CancellationToken ct
+    ) =>
+        // Capture observes RPCs the operator issued; SRQ is server-pushed
+        // and rare enough that an event-level NDJSON entry per SRQ adds
+        // little. v1 passes through transparently — operators who want to
+        // record SRQs can do so by tee'ing the stream in their handler.
+        _inner.ServiceRequestStream(device, ct);
+
+    /// <inheritdoc/>
     public async Task<Result<string, BackendError>> ReadAsync(Device device, CancellationToken ct)
     {
         var sw = Stopwatch.StartNew();

@@ -50,6 +50,9 @@ public enum TrafficOp
 
     /// <summary>Read whatever the backend has buffered.</summary>
     Read,
+
+    /// <summary>Assert a hardware trigger (ADR 0041).</summary>
+    Trigger,
 }
 
 /// <summary>

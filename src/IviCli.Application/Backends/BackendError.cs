@@ -76,6 +76,28 @@ public sealed record DeviceNotResponding(VisaResource Resource) : BackendError
     public override IReadOnlyList<object?> LogArgs => new object?[] { Resource.ToLogString() };
 }
 
+/// <summary>The Backend cannot perform the requested operation against this device.</summary>
+/// <param name="OperationName">Logical op name (e.g. "trigger", "service_request").</param>
+/// <param name="DeviceName">The device the op was attempted on.</param>
+/// <param name="Reason">Human-readable detail (e.g. "not supported by the SOCKET backend").</param>
+public sealed record BackendOperationNotSupported(
+    string OperationName,
+    DeviceName DeviceName,
+    string Reason
+) : BackendError
+{
+    /// <inheritdoc/>
+    public override LogSeverity Severity => LogSeverity.Warning;
+
+    /// <inheritdoc/>
+    public override string Message =>
+        "backend does not support {OperationName} on {DeviceName}: {Reason}";
+
+    /// <inheritdoc/>
+    public override IReadOnlyList<object?> LogArgs =>
+        new object?[] { OperationName, DeviceName, Reason };
+}
+
 /// <summary>The Backend cannot route the request to a compatible transport for this device.</summary>
 /// <param name="DeviceName">The device whose transport could not be resolved.</param>
 public sealed record UnsupportedTransport(DeviceName DeviceName) : BackendError

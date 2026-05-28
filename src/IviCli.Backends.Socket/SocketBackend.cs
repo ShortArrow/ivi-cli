@@ -194,6 +194,33 @@ public sealed class SocketBackend : IIviBackend
         }
     }
 
+    /// <inheritdoc/>
+    public Task<Result<Unit, BackendError>> TriggerAsync(Device device, CancellationToken ct)
+    {
+        ct.ThrowIfCancellationRequested();
+        return Task.FromResult(
+            Result.Failure<Unit, BackendError>(
+                new BackendOperationNotSupported(
+                    "trigger",
+                    device.Name,
+                    "raw SOCKET transport has no out-of-band trigger; send '*TRG' via WriteAsync instead"
+                )
+            )
+        );
+    }
+
+    /// <inheritdoc/>
+#pragma warning disable CS1998
+    public async IAsyncEnumerable<ServiceRequest> ServiceRequestStream(
+        Device device,
+        [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct
+    )
+    {
+        // Raw SOCKET has no SRQ — stream completes immediately.
+        yield break;
+    }
+#pragma warning restore CS1998
+
     private sealed class SocketSession : IDisposable
     {
         private readonly TcpClient _client;
