@@ -1,5 +1,7 @@
 using System.Net.Sockets;
+using System.Runtime.CompilerServices;
 using System.Text;
+using System.Threading.Channels;
 using IviCli.Application.Backends;
 using IviCli.Domain;
 using IviCli.Domain.Devices;
@@ -109,6 +111,38 @@ public sealed class HiSlipBackend : IIviBackend
                 var ignored = new byte[respHeader.PayloadLength];
                 await ReadExactlyAsync(stream, ignored, ct);
             }
+
+            // Session id is the low 16 bits of the InitializeResponse
+            // message parameter (gateway encodes version << 16 | sessionId).
+            var sessionId = (ushort)(respHeader.MessageParameter & 0xFFFF);
+
+            // Open the async channel so we can receive ServiceRequest
+            // notifications and (in a future batch) send AsyncDeviceClear /
+            // AsyncLock without blocking the sync channel.
+            var asyncChannel = await OpenAsyncChannelAsync(tcpip.Host, sessionId, ct);
+            if (
+                asyncChannel
+                is not Result<(TcpClient client, NetworkStream stream), BackendError>.Ok asyncOk
+            )
+            {
+                client.Dispose();
+                return Result.Failure<Unit, BackendError>(
+                    ((Result<(TcpClient, NetworkStream), BackendError>.Error)asyncChannel).Err
+                );
+            }
+            var (asyncClient, asyncStream) = asyncOk.Value;
+            var session = new HiSlipSession(client, asyncClient, asyncStream, device.Name);
+            session.StartAsyncReader();
+
+            lock (_gate)
+            {
+                if (_sessions.TryGetValue(device.Name, out var existing))
+                {
+                    existing.Dispose();
+                }
+                _sessions[device.Name] = session;
+            }
+            return Result.Success<Unit, BackendError>(Unit.Value);
         }
         catch (Exception ex) when (ex is SocketException or IOException or EndOfStreamException)
         {
@@ -117,16 +151,54 @@ public sealed class HiSlipBackend : IIviBackend
                 new TransportDisconnected($"HiSLIP handshake failed: {ex.Message}", ex)
             );
         }
+    }
 
-        lock (_gate)
+    private async Task<Result<(TcpClient, NetworkStream), BackendError>> OpenAsyncChannelAsync(
+        string host,
+        ushort sessionId,
+        CancellationToken ct
+    )
+    {
+        var client = new TcpClient();
+        try
         {
-            if (_sessions.TryGetValue(device.Name, out var existing))
+            await client.ConnectAsync(host, _port, ct);
+            var stream = client.GetStream();
+            var header = new byte[HiSlipMessage.HeaderSize];
+            HiSlipMessage.WriteHeader(
+                header,
+                HiSlipMessageType.AsyncInitialize,
+                controlCode: 0,
+                messageParameter: sessionId,
+                payloadLength: 0
+            );
+            await stream.WriteAsync(header, ct);
+            await ReadExactlyAsync(stream, header, ct);
+            var resp = HiSlipMessage.ReadHeader(header);
+            if (resp.PayloadLength > 0)
             {
-                existing.Dispose();
+                var drain = new byte[resp.PayloadLength];
+                await ReadExactlyAsync(stream, drain, ct);
             }
-            _sessions[device.Name] = new HiSlipSession(client);
+            if (resp.Type != HiSlipMessageType.AsyncInitializeResponse)
+            {
+                client.Dispose();
+                return Result.Failure<(TcpClient, NetworkStream), BackendError>(
+                    new TransportDisconnected($"unexpected async response: {resp.Type}")
+                );
+            }
+            return Result.Success<(TcpClient, NetworkStream), BackendError>((client, stream));
         }
-        return Result.Success<Unit, BackendError>(Unit.Value);
+        catch (Exception ex) when (ex is SocketException or IOException or EndOfStreamException)
+        {
+            client.Dispose();
+            return Result.Failure<(TcpClient, NetworkStream), BackendError>(
+                new TransportDisconnected(
+                    $"HiSLIP async-channel handshake failed: {ex.Message}",
+                    ex
+                )
+            );
+        }
     }
 
     /// <inheritdoc/>
@@ -223,33 +295,56 @@ public sealed class HiSlipBackend : IIviBackend
     }
 
     /// <inheritdoc/>
-    public Task<Result<Unit, BackendError>> TriggerAsync(Device device, CancellationToken ct)
+    public async Task<Result<Unit, BackendError>> TriggerAsync(Device device, CancellationToken ct)
     {
-        // Concrete Trigger / ServiceRequest wiring lands in Batch P
-        // Task 2 — this stub keeps the new IIviBackend port satisfied so
-        // existing HiSLIP tests still compile.
-        return Task.FromResult(
-            Result.Failure<Unit, BackendError>(
-                new BackendOperationNotSupported(
-                    "trigger",
-                    device.Name,
-                    "HiSlipBackend Trigger wiring lands in Batch P Task 2"
-                )
-            )
+        var session = TryGetSession(device);
+        if (session is null)
+        {
+            return Result.Failure<Unit, BackendError>(
+                new TransportDisconnected("HiSLIP session not open")
+            );
+        }
+        var header = new byte[HiSlipMessage.HeaderSize];
+        HiSlipMessage.WriteHeader(
+            header,
+            HiSlipMessageType.Trigger,
+            controlCode: 0,
+            messageParameter: 0,
+            payloadLength: 0
         );
+        try
+        {
+            await session.Stream.WriteAsync(header, ct);
+        }
+        catch (Exception ex) when (ex is SocketException or IOException)
+        {
+            return Result.Failure<Unit, BackendError>(
+                new TransportDisconnected($"HiSLIP Trigger write failed: {ex.Message}", ex)
+            );
+        }
+        return Result.Success<Unit, BackendError>(Unit.Value);
     }
 
     /// <inheritdoc/>
-#pragma warning disable CS1998
     public async IAsyncEnumerable<ServiceRequest> ServiceRequestStream(
         Device device,
-        [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct
+        [EnumeratorCancellation] CancellationToken ct
     )
     {
-        // Async-channel ServiceRequest receive lands in Batch P Task 2.
-        yield break;
+        var session = TryGetSession(device);
+        if (session is null)
+        {
+            yield break;
+        }
+        var reader = session.ServiceRequests.Reader;
+        while (await reader.WaitToReadAsync(ct))
+        {
+            while (reader.TryRead(out var srq))
+            {
+                yield return srq;
+            }
+        }
     }
-#pragma warning restore CS1998
 
     private HiSlipSession? TryGetSession(Device device)
     {
@@ -344,26 +439,114 @@ public sealed class HiSlipBackend : IIviBackend
 
     private sealed class HiSlipSession : IDisposable
     {
-        private readonly TcpClient _client;
+        private readonly TcpClient _syncClient;
+        private readonly TcpClient _asyncClient;
+        private readonly NetworkStream _asyncStream;
+        private readonly CancellationTokenSource _readerCts = new();
+        private readonly DeviceName _deviceName;
+        private Task? _readerTask;
+
+        public HiSlipSession(
+            TcpClient syncClient,
+            TcpClient asyncClient,
+            NetworkStream asyncStream,
+            DeviceName deviceName
+        )
+        {
+            _syncClient = syncClient;
+            Stream = syncClient.GetStream();
+            _asyncClient = asyncClient;
+            _asyncStream = asyncStream;
+            _deviceName = deviceName;
+        }
+
         public NetworkStream Stream { get; }
 
-        public HiSlipSession(TcpClient client)
+        public Channel<ServiceRequest> ServiceRequests { get; } =
+            Channel.CreateUnbounded<ServiceRequest>();
+
+        public void StartAsyncReader()
         {
-            _client = client;
-            Stream = client.GetStream();
+            _readerTask = Task.Run(() => RunAsyncReaderAsync(_readerCts.Token));
+        }
+
+        private async Task RunAsyncReaderAsync(CancellationToken ct)
+        {
+            var header = new byte[HiSlipMessage.HeaderSize];
+            try
+            {
+                while (!ct.IsCancellationRequested)
+                {
+                    await ReadExactlyAsync(_asyncStream, header, ct);
+                    var parsed = HiSlipMessage.ReadHeader(header);
+                    if (parsed.PayloadLength > 0)
+                    {
+                        var drain = new byte[parsed.PayloadLength];
+                        await ReadExactlyAsync(_asyncStream, drain, ct);
+                    }
+                    if (parsed.Type == HiSlipMessageType.ServiceRequest)
+                    {
+                        // Per IVI-6.1 §10, the ServiceRequest control byte
+                        // carries the STB value the server polled from the
+                        // instrument.
+                        ServiceRequests.Writer.TryWrite(
+                            new ServiceRequest(
+                                _deviceName,
+                                parsed.ControlCode,
+                                DateTimeOffset.UtcNow
+                            )
+                        );
+                    }
+                    // Other async-channel message types (AsyncLockResponse,
+                    // AsyncDeviceClearAcknowledge, ...) get ignored — the
+                    // client backend doesn't currently issue async requests.
+                }
+            }
+            catch (OperationCanceledException)
+            { /* graceful shutdown */
+            }
+            catch (Exception)
+            { /* connection closed under us; nothing to do */
+            }
+            finally
+            {
+                ServiceRequests.Writer.TryComplete();
+            }
         }
 
         public void Dispose()
         {
             try
             {
+                _readerCts.Cancel();
+            }
+            catch
+            { /* swallow */
+            }
+            try
+            {
                 Stream.Dispose();
             }
             catch
-            {
-                /* swallow */
+            { /* swallow */
             }
-            _client.Dispose();
+            try
+            {
+                _asyncStream.Dispose();
+            }
+            catch
+            { /* swallow */
+            }
+            _syncClient.Dispose();
+            _asyncClient.Dispose();
+            try
+            {
+                _readerTask?.Wait(TimeSpan.FromMilliseconds(200));
+            }
+            catch
+            { /* swallow */
+            }
+            _readerCts.Dispose();
         }
     }
 }

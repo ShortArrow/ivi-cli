@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
@@ -5,6 +6,7 @@ using IviCli.Application.Backends;
 using IviCli.Application.Servers;
 using IviCli.Domain;
 using IviCli.Domain.Configuration;
+using IviCli.Domain.Devices;
 using IviCli.Domain.Protocols;
 using IviCli.Domain.Scpi;
 using IviCli.Domain.Servers;
@@ -32,6 +34,11 @@ public sealed class HiSlipGatewayServer : IGatewayServer
     private readonly ILogger<HiSlipGatewayServer> _logger;
     private readonly object _lockGate = new();
     private ushort _lockHolder; // 0 = unlocked, otherwise the session id holding the lock
+
+    // Sync→async correlation by session id: the sync handler stores the
+    // opened backend / device pair after the handshake; the async handler
+    // looks it up by the session id its AsyncInitialize carries (ADR 0041).
+    private readonly ConcurrentDictionary<ushort, SessionBinding> _sessionBindings = new();
 
     /// <summary>Creates a new HiSLIP gateway.</summary>
     public HiSlipGatewayServer(IBackendFactory backendFactory, ILogger<HiSlipGatewayServer> logger)
@@ -224,6 +231,10 @@ public sealed class HiSlipGatewayServer : IGatewayServer
             return;
         }
 
+        // Publish the bound backend so an upcoming AsyncInitialize on this
+        // session id can subscribe to ServiceRequestStream (ADR 0041).
+        _sessionBindings[sessionId] = new SessionBinding(backend, device);
+
         try
         {
             var assembled = new StringBuilder();
@@ -253,17 +264,19 @@ public sealed class HiSlipGatewayServer : IGatewayServer
                 }
                 else if (header.Type == HiSlipMessageType.Trigger)
                 {
-                    // IVI-6.1 §10.4: servers MAY ignore Trigger when the
-                    // backend has no trigger capability. v1 backends don't
-                    // expose TriggerAsync yet — drain any payload and log.
                     if (header.PayloadLength > 0)
                     {
                         var drain = new byte[header.PayloadLength];
                         await ReadExactlyAsync(stream, drain, ct);
                     }
-                    _logger.LogInformation(
-                        "HiSLIP Trigger received (no backend trigger capability — acknowledged with no-op)"
-                    );
+                    var triggerResult = await backend.TriggerAsync(device, ct);
+                    if (triggerResult is Result<Unit, BackendError>.Error triggerErr)
+                    {
+                        _logger.LogInformation(
+                            "HiSLIP Trigger forwarded but backend declined: {Reason}",
+                            triggerErr.Err.Message
+                        );
+                    }
                 }
                 else if (header.Type == HiSlipMessageType.FatalError)
                 {
@@ -278,6 +291,7 @@ public sealed class HiSlipGatewayServer : IGatewayServer
         }
         finally
         {
+            _sessionBindings.TryRemove(sessionId, out _);
             _ = await backend.CloseAsync(device, ct);
         }
     }
@@ -307,6 +321,16 @@ public sealed class HiSlipGatewayServer : IGatewayServer
             payloadLength: 0
         );
         await stream.WriteAsync(resp, ct);
+
+        // Spawn the SRQ forwarder once the sync handler has published its
+        // SessionBinding for this session id (ADR 0041). Time-bounded poll
+        // so a client that opens the async channel before the sync
+        // channel finishes its handshake does not deadlock.
+        using var forwarderCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        var forwarderTask = Task.Run(
+            () => ForwardServiceRequestsAsync(stream, sessionId, forwarderCts.Token),
+            forwarderCts.Token
+        );
 
         try
         {
@@ -353,8 +377,73 @@ public sealed class HiSlipGatewayServer : IGatewayServer
         {
             // Release any lock this session was holding on disconnect.
             ReleaseLock(sessionId);
+            try
+            {
+                forwarderCts.Cancel();
+                await forwarderTask;
+            }
+            catch
+            { /* swallow */
+            }
         }
     }
+
+    private async Task ForwardServiceRequestsAsync(
+        NetworkStream stream,
+        ushort sessionId,
+        CancellationToken ct
+    )
+    {
+        // Wait up to 2 s for the sync handler to publish the binding.
+        SessionBinding? binding = null;
+        for (var i = 0; i < 40 && !ct.IsCancellationRequested; i++)
+        {
+            if (_sessionBindings.TryGetValue(sessionId, out binding))
+            {
+                break;
+            }
+            try
+            {
+                await Task.Delay(50, ct);
+            }
+            catch (OperationCanceledException)
+            {
+                return;
+            }
+        }
+        if (binding is null)
+        {
+            return;
+        }
+
+        try
+        {
+            await foreach (var srq in binding.Backend.ServiceRequestStream(binding.Device, ct))
+            {
+                var header = new byte[HiSlipMessage.HeaderSize];
+                HiSlipMessage.WriteHeader(
+                    header,
+                    HiSlipMessageType.ServiceRequest,
+                    controlCode: srq.StatusByte,
+                    messageParameter: 0,
+                    payloadLength: 0
+                );
+                try
+                {
+                    await stream.WriteAsync(header, ct);
+                }
+                catch (Exception ex) when (ex is SocketException or IOException)
+                {
+                    return;
+                }
+            }
+        }
+        catch (OperationCanceledException)
+        { /* graceful shutdown */
+        }
+    }
+
+    private sealed record SessionBinding(IIviBackend Backend, Device Device);
 
     private static async Task SendMaximumMessageSizeResponseAsync(
         NetworkStream stream,
