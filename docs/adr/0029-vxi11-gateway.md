@@ -46,9 +46,10 @@ RPC calls to the Core handler when the program number matches.
 ### 2. Out of scope (deferred)
 
 - VXI-11 **Interrupt channel** (program 395185), SRQ delivery.
-- `device_lock` / `device_unlock` / `device_trigger` / `device_remote`
-  / `device_local` / `device_readstb` / `device_docmd` (procedures 13,
-  15–20, 22).
+- `device_lock` / `device_unlock` / `device_remote` / `device_local`
+  / `device_readstb` / `device_docmd` (procedures 13, 18-20, 22).
+  `device_trigger` (proc 17) shipped in
+  [ADR 0041](0041-trigger-and-srq-ports.md).
 - Vendor extensions, TLS, UDP transport, broadcast portmapper queries
   on UDP 111.
 - Real **portmapper-at-111** client conversation — Batch D's client

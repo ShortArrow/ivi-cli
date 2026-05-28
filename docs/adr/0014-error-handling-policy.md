@@ -26,6 +26,8 @@ public sealed record TransportTimeout(TimeSpan Elapsed, Exception? Cause = null)
 public sealed record TransportDisconnected(string Reason, Exception? Cause = null) : BackendError;
 public sealed record DeviceNotResponding(VisaResource Resource) : BackendError;
 public sealed record PoolWaitTimeout(DeviceName Device, TimeSpan Waited) : BackendError; // ADR 0038
+public sealed record BackendOperationNotSupported(
+    string OperationName, DeviceName Device, string Reason) : BackendError; // ADR 0041
 
 public abstract record ConfigError : IviError;
 public sealed record DefaultDeviceMissing(DeviceName Name) : ConfigError;

@@ -57,10 +57,11 @@ R&S, PyVISA) interoperate at the wire level:
   automatically on disconnect.
 - **Service Request (SRQ)** — server → client notification on the
   async channel that the underlying instrument raised its STB bit.
-  Message type `ServiceRequest` (20). v2 implements the framing; the
-  actual STB polling against the backend is best-effort (the local
-  backend may not expose it). The framing is enough to let real VISA
-  clients install an SRQ handler without crashing.
+  Message type `ServiceRequest` (20). v2 implemented the framing;
+  v3.1 ([ADR 0041](0041-trigger-and-srq-ports.md)) wires the
+  gateway to subscribe to `IIviBackend.ServiceRequestStream` and
+  forward each event as a `ServiceRequest` message (StatusByte in
+  the control byte).
 
 TLS, vendor extensions, the remote/local control pair, and async
 status query remain deferred. Lock-timeout semantics and the trigger
@@ -112,12 +113,12 @@ unreliable polling against this gateway:
   weight.
 - **Trigger** — message type `Trigger` (24, sync channel). v1 / v2
   treated it as unsupported and tore the connection down with
-  FatalError. v3 accepts the message and emits an Info-level log
-  entry without forwarding it to the backend (`IIviBackend` has no
-  `TriggerAsync` port yet — adding one is a Tidy-First ADR). The
-  no-op stance matches the spec's "MAY ignore" allowance in §10.4
-  and matches v2's SRQ posture: keep the framing honest, defer the
-  semantic.
+  FatalError. v3 accepts the message; v3.1
+  ([ADR 0041](0041-trigger-and-srq-ports.md)) adds an
+  `IIviBackend.TriggerAsync` port and the gateway now forwards
+  the message to it. `BackendOperationNotSupported` results log at
+  Info instead of teaching down the sync channel — matches the
+  spec's "MAY ignore" allowance in §10.4.
 
 TLS, vendor extensions, the remote/local control pair, async status
 query, and the lock-string-based contention model remain deferred
