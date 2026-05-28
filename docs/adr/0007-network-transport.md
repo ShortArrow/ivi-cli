@@ -62,9 +62,9 @@ R&S, PyVISA) interoperate at the wire level:
   backend may not expose it). The framing is enough to let real VISA
   clients install an SRQ handler without crashing.
 
-TLS, full lock-timeout semantics, vendor extensions, the trigger
-sub-protocol, the remote/local control pair, and async status query
-remain deferred to v3.
+TLS, vendor extensions, the remote/local control pair, and async
+status query remain deferred. Lock-timeout semantics and the trigger
+sub-protocol land in v3 (§1.6 below).
 
 #### Spec values (IVI-6.1 §10)
 
@@ -87,24 +87,54 @@ remain deferred to v3.
 | AsyncDeviceClear | 19 |
 | ServiceRequest | 20 |
 | AsyncDeviceClearAcknowledge | 23 |
+| Trigger | 24 |
 
-Values 10–14, 21–22, 24–26 are reserved by the spec for messages we
-defer to v3 (remote/local control, trigger, async interrupted, async
-status query, lock info) and intentionally absent from
-`HiSlipMessageType` so an enum cast to one of those bytes cannot
-silently succeed.
+Values 10–14, 21–22, 25–26 are reserved by the spec for messages we
+defer (remote/local control, async interrupted, async status query,
+lock info) and intentionally absent from `HiSlipMessageType` so an
+enum cast to one of those bytes cannot silently succeed.
+
+### 1.6 HiSLIP v3 — protocol-depth additions (this revision)
+
+v3 adds two of the items v2 deferred. Together they remove the most
+common reasons a real VISA client falls back to FatalError or to
+unreliable polling against this gateway:
+
+- **Lock timeout** — `AsyncLock` (acquire) requests carry the lock
+  timeout in milliseconds in the header's MessageParameter field
+  (IVI-6.1 §10). v1 / v2 ignored that field and rejected immediately
+  under contention. v3 polls the per-server lock holder every 50 ms
+  until the deadline expires and grants the lock on the first
+  observed release. `lock_timeout == 0` keeps the original
+  immediate-deny behaviour, so clients that don't ask to wait are
+  unaffected. Polling is honest about the per-server scope; a
+  signal-based release notification can land in v4 if it earns its
+  weight.
+- **Trigger** — message type `Trigger` (24, sync channel). v1 / v2
+  treated it as unsupported and tore the connection down with
+  FatalError. v3 accepts the message and emits an Info-level log
+  entry without forwarding it to the backend (`IIviBackend` has no
+  `TriggerAsync` port yet — adding one is a Tidy-First ADR). The
+  no-op stance matches the spec's "MAY ignore" allowance in §10.4
+  and matches v2's SRQ posture: keep the framing honest, defer the
+  semantic.
+
+TLS, vendor extensions, the remote/local control pair, async status
+query, and the lock-string-based contention model remain deferred
+to a future v4 ADR.
 
 ### 2. Phase 2 deferred (future ADRs / revisions)
 
 - **VXI-11** — moved to [ADR 0029](0029-vxi11-gateway.md). Wire-level
   subset (Core program 395183/v1 + portmapper GETPORT) lands so legacy
   VISA clients on a `TCPIP::host::inst0::INSTR` resource can drive the
-  same routed backend the HiSLIP gateway already serves.
+  same routed backend the HiSLIP gateway already serves. The abort
+  channel (program 395184) lands with §2a of ADR 0029.
 - **Management API** (gRPC / HTTP JSON) — declared in PRD §7.5; the
   surface is out of scope for Phase 2 v1. When it lands, it gets its
   own ADR (0019 area).
-- **HiSLIP v3** — TLS wrap, lock timeout / lock string semantics,
-  trigger sub-protocol, vendor extension messages.
+- **HiSLIP v4** — TLS wrap, lock-string semantics, remote/local
+  control, async status query, vendor extension messages.
 
 ### 3. Wire-format guarantees per transport
 

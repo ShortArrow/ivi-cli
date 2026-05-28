@@ -45,7 +45,6 @@ RPC calls to the Core handler when the program number matches.
 
 ### 2. Out of scope (deferred)
 
-- VXI-11 **Abort channel** (program 395184) and async cancellation.
 - VXI-11 **Interrupt channel** (program 395185), SRQ delivery.
 - `device_lock` / `device_unlock` / `device_trigger` / `device_remote`
   / `device_local` / `device_readstb` / `device_docmd` (procedures 13,
@@ -58,8 +57,56 @@ RPC calls to the Core handler when the program number matches.
 
 The companion client backend (`IviCli.Backends.Vxi11`) shipped in
 Batch D, sharing the XDR codec / RPC message records uplifted to
-`IviCli.Domain.Protocols` so adding the Abort or Interrupt channels
-later requires no codec duplication.
+`IviCli.Domain.Protocols` so adding the Interrupt channel later
+requires no codec duplication.
+
+### 2a. Abort channel (program 395184)
+
+The abort channel was originally listed under §2 as out-of-scope.
+This revision lands a minimum-viable subset because real VXI-11
+clients (NI-VISA `viTerminate`, pyvisa-py's `device_abort`) reach
+for it as soon as a session blocks long enough to matter — closing
+the TCP socket is the only alternative today, and that takes the
+whole session with it.
+
+**Wire surface**
+
+- Program: `395184`. Version: `1`. Procedure: `device_abort` (1).
+- Argument: `Device_Link { i32 lid }`. Response:
+  `Device_Error { i32 error }`.
+- Port co-location: the abort channel shares the bound TCP port with
+  the Core channel and the co-located portmapper. The portmapper's
+  `PMAPPROC_GETPORT` returns the same port number for both
+  `CoreProgram (395183)` and `AbortProgram (395184)`. The `create_link`
+  reply's `abort_port` field advertises that same port.
+- Transport: clients open a SECOND TCP connection to that port and
+  send the abort RPC there, mirroring the IVI-6.2 contract.
+
+**Behaviour**
+
+- The gateway's link map is now process-wide
+  (`ConcurrentDictionary<int, LinkState>` on the gateway instance)
+  so abort traffic on a separate connection can find the target
+  link. Each connection still tracks a `HashSet<int>` of lids it
+  owns, so disconnect teardown only closes its own sessions.
+- Each `LinkState` carries a `CancellationTokenSource`. On
+  `device_abort` for a known lid: the CTS is cancelled and the
+  reply returns `NO_ERROR (0)`. On an unknown lid:
+  `INVALID_LINK_IDENTIFIER (4)`.
+- Operation paths (`device_write`'s backend `QueryAsync` /
+  `WriteAsync` calls) take a token linked from the connection token
+  and the link's per-link CTS. A polite backend stops promptly on
+  abort; a backend that ignores its token will only stop when its
+  current operation finishes — we test the protocol contract, not
+  the backend's cancellation fidelity.
+
+**Out of scope (still deferred)**
+
+- The Interrupt channel (program 395185 / SRQ delivery). Same
+  blocker as HiSLIP Trigger forwarding: no backend port for SRQ
+  yet.
+- Routing the abort beyond the per-link CTS (e.g. cancelling a
+  pending Read response that's already been queued).
 
 ### 3. Wire-format guarantees
 
@@ -117,7 +164,7 @@ subset:
 - The XDR codec ships hand-rolled; no third-party RPC NuGet enters the
   graph (ADR 0014 cost-of-deps argument). The codec is small (≈ 200
   LoC) and fully unit-tested at the byte level.
-- Out-of-scope procedures (lock, trigger, abort, SRQ) become future
+- Out-of-scope procedures (lock, trigger, SRQ) become future
   extensions; the per-connection task structure leaves room to add
   them without touching the wire framing.
 - A future `IviCli.Backends.Vxi11` client gets to reuse the codec and
