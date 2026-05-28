@@ -70,7 +70,7 @@ default to zero.
 | Socket | `BackendOperationNotSupported` | empty |
 | Local | `Write("*TRG")` via existing IVisaSessionHandle | empty (reflection event subscription = v2) |
 | HiSlip | Send `Trigger` (type 24) on sync channel | Read `ServiceRequest` (type 20) on async channel |
-| VXI-11 | `device_trigger` (proc 17) on Core channel | empty (Interrupt channel = v2, §5) |
+| VXI-11 | `device_trigger` (proc 17) on Core channel | Interrupt channel ([ADR 0042](0042-vxi11-interrupt-channel.md)) — gateway reverse-connects via `device_intr_srq` |
 
 Decorator chain pass-through:
 
@@ -125,13 +125,11 @@ Decorator chain pass-through:
 
 ### 5. Out of scope (v1)
 
-- **VXI-11 Interrupt channel (program 395185)**. The Interrupt
-  channel inverts the TCP direction — the gateway connects out
-  to a port the client listens on. Implementing both sides is a
-  fair chunk of work (`device_enable_srq` plumbing on the Core
-  channel, separate Interrupt connection lifecycle on the
-  client). Deferred to a dedicated batch. `Vxi11Backend.ServiceRequestStream`
-  returns an empty stream until then.
+- ~~**VXI-11 Interrupt channel (program 395185)**.~~ Shipped in
+  [ADR 0042](0042-vxi11-interrupt-channel.md). The Interrupt channel
+  inverts the TCP direction — the gateway connects out to a port
+  the client listens on. Both sides land together with codec +
+  forwarder + accept loop + e2e test.
 - **`IVisaSessionHandle.Trigger()`** as a first-class port method.
   v1 maps `LocalBackend.TriggerAsync` to `Write("*TRG")` —
   works against every IEEE-488.2 instrument. Adding a reflection-
@@ -159,7 +157,8 @@ Decorator chain pass-through:
 - `BackendOperationNotSupported` extends the `BackendError` sum
   with a distinct shape so the Management API + CLI surface
   layers can render a clear error per ADR 0014.
-- VXI-11 Interrupt channel is a known limitation, documented here
+- ~~VXI-11 Interrupt channel is a known limitation, documented here~~
+  resolved in [ADR 0042](0042-vxi11-interrupt-channel.md)
   and pointed to from ADR 0029.
 
 ## Verification

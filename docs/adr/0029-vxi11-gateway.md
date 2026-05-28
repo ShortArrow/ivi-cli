@@ -45,7 +45,11 @@ RPC calls to the Core handler when the program number matches.
 
 ### 2. Out of scope (deferred)
 
-- VXI-11 **Interrupt channel** (program 395185), SRQ delivery.
+- ~~VXI-11 **Interrupt channel** (program 395185), SRQ delivery.~~
+  Shipped in [ADR 0042](0042-vxi11-interrupt-channel.md):
+  `device_create_intr_chan` / `device_enable_srq` /
+  `device_destroy_intr_chan` on the Core channel, plus an outbound
+  `device_intr_srq` from the gateway to the client.
 - `device_lock` / `device_unlock` / `device_remote` / `device_local`
   / `device_readstb` / `device_docmd` (procedures 13, 18-20, 22).
   `device_trigger` (proc 17) shipped in
