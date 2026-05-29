@@ -13,7 +13,13 @@
 # Run:
 #   docker run --rm -p 4880:4880 -p 5025:5025 ivi-cli-mock:dev
 
-ARG RID=linux-x64
+# RID selects the self-contained publish directory under
+# ./artifacts/<RID>-selfcontained/. For multi-arch buildx invocations
+# we honor the standard $TARGETARCH (amd64 / arm64) and remap to the
+# matching .NET RID; single-arch local builds can override directly
+# via `--build-arg RID=linux-x64`.
+ARG TARGETARCH=amd64
+ARG RID=
 ARG RUNTIME_DEPS_TAG=9.0-bookworm-slim
 
 # Microsoft `runtime-deps` ships the exact native dependencies a
@@ -30,7 +36,20 @@ ARG RUNTIME_DEPS_TAG=9.0-bookworm-slim
 # Switch to 10.0-bookworm-slim once Microsoft publishes that tag.
 FROM mcr.microsoft.com/dotnet/runtime-deps:${RUNTIME_DEPS_TAG}
 
+ARG TARGETARCH
 ARG RID
+
+# Resolve RID from TARGETARCH when not supplied explicitly.
+# Buildx sets TARGETARCH=amd64 / arm64; .NET RIDs are linux-x64 / linux-arm64.
+RUN RID_RESOLVED="${RID}"; \
+    if [ -z "$RID_RESOLVED" ]; then \
+        case "${TARGETARCH}" in \
+            amd64) RID_RESOLVED="linux-x64" ;; \
+            arm64) RID_RESOLVED="linux-arm64" ;; \
+            *) echo "unsupported TARGETARCH: ${TARGETARCH}" >&2; exit 1 ;; \
+        esac; \
+    fi; \
+    echo "${RID_RESOLVED}" > /tmp/RID
 
 # `netcat-openbsd` provides the `nc` HEALTHCHECK probe; `bash` is the
 # entrypoint shell. `--no-install-recommends` keeps the layer minimal.
@@ -40,11 +59,23 @@ RUN apt-get update \
 
 WORKDIR /opt/ivi-cli
 
-# Copy the self-contained publish output. The release.yml `publish` job
-# emits into `./artifacts/<rid>-selfcontained/`; local invocations follow
-# the same convention.
-COPY artifacts/${RID}-selfcontained/ ./
-RUN chmod +x ./ivicli
+# COPY cannot expand $TARGETARCH directly, so we stage all per-RID
+# publish outputs and pick the right one at runtime of the build step.
+# Both amd64 and arm64 publish directories must be present under
+# ./artifacts/ for multi-arch builds; single-arch builds need only the
+# matching one.
+COPY artifacts/ /staging/
+RUN set -eu; \
+    rid="$(cat /tmp/RID)"; \
+    src="/staging/${rid}-selfcontained"; \
+    if [ ! -d "$src" ]; then \
+        echo "missing publish directory: $src" >&2; \
+        ls -la /staging/ >&2; \
+        exit 1; \
+    fi; \
+    cp -a "$src"/. /opt/ivi-cli/; \
+    chmod +x /opt/ivi-cli/ivicli; \
+    rm -rf /staging
 
 # Pre-baked configuration + sample scenario. Operators override at
 # runtime via `-v ./my-config.toml:/etc/ivi-cli/config.toml` or

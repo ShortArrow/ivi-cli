@@ -127,11 +127,120 @@ jobs:
           name: ivicli-nupkg
           path: ./artifacts/nupkg
 
+  docker:
+    name: docker / mock-VISA container
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: publish
+    env:
+      IMAGE_NAME: ghcr.io/${{ github.repository_owner }}/ivi-cli-mock
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Download linux-x64 self-contained artifact
+        uses: actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16 # v4.1.8
+        with:
+          name: ivicli-linux-x64
+          path: ./artifacts
+
+      - name: Download linux-arm64 self-contained artifact
+        uses: actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16 # v4.1.8
+        with:
+          name: ivicli-linux-arm64
+          path: ./artifacts
+
+      - name: Compute image tags
+        id: tags
+        run: |
+          version="${{ github.ref_name }}"
+          version_no_v="${version#v}"
+          minor="$(echo "$version_no_v" | awk -F. '{print "v"$1"."$2}')"
+          sha7="$(git rev-parse --short=7 HEAD)"
+          {
+            echo "version=$version"
+            echo "minor=$minor"
+            echo "sha7=sha-$sha7"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@49b3bc8e6bdd4a60e6116a5414239cba5943d3cf # v3.2.0
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@988b5a0280414f521da01fcc63a27aeeb4b104db # v3.6.1
+
+      - name: Log in to ghcr.io
+        uses: docker/login-action@9780b0c442fbb1117ed29e0efdff1e18412f7567 # v3.3.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Smoke gate (single-arch, native amd64) before pushing the
+      # multi-arch manifest. dog-foods ivicli as the SCPI client
+      # against its own gateway running inside the container.
+      - name: Build single-arch (amd64) for smoke
+        run: |
+          docker build -f docker/Dockerfile \
+            --build-arg RID=linux-x64 \
+            --tag ivi-cli-mock:smoke .
+
+      - name: Run smoke test
+        run: |
+          set -euo pipefail
+          docker run -d --name mock-smoke -p 4880:4880 -p 5025:5025 ivi-cli-mock:smoke
+          # Wait until the HEALTHCHECK reports healthy (max 30 s).
+          for i in $(seq 1 30); do
+            status="$(docker inspect --format '{{.State.Health.Status}}' mock-smoke)"
+            if [ "$status" = "healthy" ]; then
+              echo "container healthy after ${i}s"
+              break
+            fi
+            sleep 1
+          done
+          if [ "$(docker inspect --format '{{.State.Health.Status}}' mock-smoke)" != "healthy" ]; then
+            echo "container failed to become healthy"
+            docker logs mock-smoke
+            exit 1
+          fi
+          # SCPI round-trip over the SOCKET gateway (no client framing
+          # required). Expect the baked default IDN response.
+          response="$(docker exec mock-smoke bash -c 'echo "*IDN?" | nc -w 2 127.0.0.1 5025')"
+          echo "got: $response"
+          case "$response" in
+            *IVICLI-MOCK*)
+              echo "smoke passed"
+              ;;
+            *)
+              echo "smoke FAILED — unexpected response"
+              docker logs mock-smoke
+              exit 1
+              ;;
+          esac
+          docker rm -f mock-smoke
+
+      - name: Build + push multi-arch manifest
+        uses: docker/build-push-action@4f58ea79222b3b9dc2c8bbdd6debcef730109a75 # v6.9.0
+        with:
+          context: .
+          file: docker/Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: true
+          # The Dockerfile remaps the standard $TARGETARCH (amd64 /
+          # arm64) to the matching .NET RID (linux-x64 / linux-arm64)
+          # and selects the publish directory under ./artifacts/.
+          # Both per-RID artifacts are staged earlier so each platform
+          # build picks its own.
+          tags: |
+            ${{ env.IMAGE_NAME }}:${{ steps.tags.outputs.version }}
+            ${{ env.IMAGE_NAME }}:${{ steps.tags.outputs.minor }}
+            ${{ env.IMAGE_NAME }}:${{ steps.tags.outputs.sha7 }}
+            ${{ env.IMAGE_NAME }}:latest
+
   release:
     name: github release
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    needs: [publish, pack]
+    needs: [publish, pack, docker]
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
