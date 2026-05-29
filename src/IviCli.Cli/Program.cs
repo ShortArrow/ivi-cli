@@ -5,6 +5,7 @@ using IviCli.Application.Session;
 using IviCli.Backends.Fake;
 using IviCli.Backends.HiSlip;
 using IviCli.Backends.Local;
+using IviCli.Backends.Lxi;
 using IviCli.Backends.Socket;
 using IviCli.Backends.Vxi11;
 using IviCli.Cli.Commands;
@@ -153,6 +154,15 @@ internal static class Program
             services.AddIviCliBackendsHiSlip();
             services.AddIviCliBackendsVxi11();
             services.AddIviCliBackendsLocal();
+
+            // Discovery scanners (ADR 0008, Batch W). Registered as
+            // additional IBackendScanner implementations alongside the
+            // FakeBackendScanner so `ivicli visa scan` lights up
+            // without per-batch CLI changes. Safe to register in the
+            // mock-only container too — the LAN probes simply return
+            // nothing when the container is alone on its network.
+            services.AddIviCliLxiScanner();
+            services.AddIviCliVxi11Scanner();
             // Dynamic-completion plumbing for the `__complete` verb.
             services.AddSingleton<IviCli.Cli.Completion.CompletionRegistry>();
             services.AddSingleton<

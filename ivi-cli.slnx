@@ -5,6 +5,7 @@
     <Project Path="src/IviCli.Backends.Fake/IviCli.Backends.Fake.csproj" />
     <Project Path="src/IviCli.Backends.HiSlip/IviCli.Backends.HiSlip.csproj" />
     <Project Path="src/IviCli.Backends.Local/IviCli.Backends.Local.csproj" />
+    <Project Path="src/IviCli.Backends.Lxi/IviCli.Backends.Lxi.csproj" />
     <Project Path="src/IviCli.Backends.Replay/IviCli.Backends.Replay.csproj" />
     <Project Path="src/IviCli.Backends.Socket/IviCli.Backends.Socket.csproj" />
     <Project Path="src/IviCli.Backends.Vxi11/IviCli.Backends.Vxi11.csproj" />

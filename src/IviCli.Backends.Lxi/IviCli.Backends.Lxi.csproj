@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <RootNamespace>IviCli.Backends.Vxi11</RootNamespace>
-    <AssemblyName>IviCli.Backends.Vxi11</AssemblyName>
+    <RootNamespace>IviCli.Backends.Lxi</RootNamespace>
+    <AssemblyName>IviCli.Backends.Lxi</AssemblyName>
   </PropertyGroup>
 
   <ItemGroup>
@@ -9,6 +9,8 @@
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="Makaretu.Dns" />
+    <PackageReference Include="Makaretu.Dns.Multicast" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
   </ItemGroup>

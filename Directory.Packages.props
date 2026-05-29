@@ -24,6 +24,13 @@
     <PackageVersion Include="Microsoft.AspNetCore.TestHost" Version="10.0.0" />
   </ItemGroup>
 
+  <ItemGroup Label="LXI discovery (ADR 0008, Batch W)">
+    <!-- Makaretu.Dns is a pure-managed mDNS / DNS-SD client; .Multicast
+         pulls in the wire-level UDP transport bits. -->
+    <PackageVersion Include="Makaretu.Dns" Version="2.0.1" />
+    <PackageVersion Include="Makaretu.Dns.Multicast" Version="0.27.0" />
+  </ItemGroup>
+
   <ItemGroup Label="OpenTelemetry (ADR 0040)">
     <PackageVersion Include="OpenTelemetry.Extensions.Hosting" Version="1.15.3" />
     <PackageVersion Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.15.3" />
