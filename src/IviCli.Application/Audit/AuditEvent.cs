@@ -42,8 +42,16 @@ public sealed record AuthFailed(
 }
 
 /// <summary>A mutation against the <c>config.toml</c> document.</summary>
-public sealed record ConfigMutated(DateTimeOffset Timestamp, string Operation, string Target)
-    : AuditEvent(Timestamp)
+/// <param name="Timestamp">UTC instant the event was observed.</param>
+/// <param name="Operation">Dotted <c>{entity}.{verb}</c> (e.g. <c>device.add</c>, <c>scene.remove</c>).</param>
+/// <param name="Target">Entity primary key, slash-joined for nested entities (e.g. <c>scenario1/sceneA</c>).</param>
+/// <param name="Subject">Actor that initiated the mutation (e.g. <c>cli/alice</c>); null in legacy callers (ADR 0044/0043 follow-up, Batch U).</param>
+public sealed record ConfigMutated(
+    DateTimeOffset Timestamp,
+    string Operation,
+    string Target,
+    string? Subject = null
+) : AuditEvent(Timestamp)
 {
     /// <inheritdoc/>
     public override string Kind => "config.mutated";
@@ -63,9 +71,17 @@ public sealed record ApiRequest(
     public override string Kind => "api.request";
 }
 
-/// <summary>A gateway server lifecycle transition (start / stop).</summary>
-public sealed record ServerLifecycle(DateTimeOffset Timestamp, string Server, string Action)
-    : AuditEvent(Timestamp)
+/// <summary>A gateway server lifecycle transition (start / stop / crashed).</summary>
+/// <param name="Timestamp">UTC instant the transition was observed.</param>
+/// <param name="Server">Server name (matches <c>[[server]] name</c> in config.toml).</param>
+/// <param name="Action">One of <c>start</c> / <c>stop</c> / <c>crashed</c>. <c>crashed</c> ⇔ the gateway's RunAsync returned an error; cancellation maps to <c>stop</c>.</param>
+/// <param name="Subject">Actor that started the process (e.g. <c>cli/alice</c>); null in legacy callers (ADR 0043 follow-up, Batch U).</param>
+public sealed record ServerLifecycle(
+    DateTimeOffset Timestamp,
+    string Server,
+    string Action,
+    string? Subject = null
+) : AuditEvent(Timestamp)
 {
     /// <inheritdoc/>
     public override string Kind => "server.lifecycle";

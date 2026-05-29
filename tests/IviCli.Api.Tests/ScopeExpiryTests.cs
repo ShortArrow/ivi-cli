@@ -43,7 +43,7 @@ public sealed class ScopeExpiryTests
             MakeToken(expiresAt: DateTimeOffset.UtcNow.AddDays(-1))
         );
         var store = new FakeApiTokenStore(doc);
-        var audit = new TestAuditLog();
+        var audit = new FakeAuditLog();
         await using var host = await ApiTestHost.StartAsync(
             ConfigDocument.Empty,
             tokenStore: store,
@@ -67,7 +67,7 @@ public sealed class ScopeExpiryTests
             MakeToken(scopes: ImmutableArray.Create("read:devices"))
         );
         var store = new FakeApiTokenStore(doc);
-        var audit = new TestAuditLog();
+        var audit = new FakeAuditLog();
         await using var host = await ApiTestHost.StartAsync(
             ConfigDocument.Empty,
             tokenStore: store,
@@ -138,19 +138,5 @@ public sealed class ScopeExpiryTests
         (
             await host.Client.PostAsJsonAsync("/v1/devices/psu1/query", new ScpiRequestDto("*IDN?"))
         ).IsSuccessStatusCode.ShouldBeTrue();
-    }
-
-    private sealed class TestAuditLog : IviCli.Application.Audit.IAuditLog
-    {
-        public List<IviCli.Application.Audit.AuditEvent> Events { get; } = new();
-
-        public Task AppendAsync(IviCli.Application.Audit.AuditEvent ev, CancellationToken ct)
-        {
-            lock (Events)
-            {
-                Events.Add(ev);
-            }
-            return Task.CompletedTask;
-        }
     }
 }
