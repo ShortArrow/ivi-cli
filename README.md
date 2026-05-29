@@ -33,6 +33,22 @@ dotnet tool install -g ivi-cli
 
 Releases ship for `win-x64`, `win-arm64`, `linux-x64`, `linux-arm64`, `osx-x64`, and `osx-arm64`.
 
+## Quick start with Docker (mock-VISA e2e)
+
+For 3rd-party app developers who need a scriptable VISA instrument to point their app under test at — no hardware, no .NET install, no manual config:
+
+```sh
+docker run --rm -p 4880:4880 -p 5025:5025 \
+    ghcr.io/shortarrow/ivi-cli-mock:latest
+
+# In another terminal — using ivicli itself, or any SCPI client:
+ivicli visa add mock TCPIP::localhost::hislip0::INSTR
+ivicli visa query mock "*IDN?"
+# → IVICLI-MOCK,gateway,1,0.1.0
+```
+
+The container exposes a HiSlip gateway on `4880` and a raw SOCKET gateway on `5025`. Both are backed by a scenario-driven mock (`*IDN?` / `*RST` / `*OPC?` / `SYST:ERR?` out of the box). Mount your own scenarios via `-v ./scenarios:/etc/ivi-cli/scenarios` or arm the mock at runtime with `docker exec mock ivicli mock scene add …`. See [ADR 0018](docs/adr/0018-deployment-strategy.md) for the full container reference.
+
 ## Quick start
 
 ```sh

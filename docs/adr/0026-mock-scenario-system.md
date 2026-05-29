@@ -208,6 +208,34 @@ The following are deliberately deferred:
 
 Each of these is a candidate for a follow-up ADR once v1 has real users.
 
+### 12. Container packaging (Batch V follow-up)
+
+[ADR 0018](0018-deployment-strategy.md) ships a mock-VISA container
+(`ghcr.io/<owner>/ivi-cli-mock`) that bakes the FakeBackend +
+scenario stack behind the gateway servers (HiSlip 4880, SOCKET
+5025) for 3rd-party VISA-app e2e testing.
+
+Runtime mock-control inside the container reuses every CLI verb
+defined here via `docker exec`:
+
+```
+docker exec mock ivicli mock scenario create per-test
+docker exec mock ivicli mock scene add per-test \
+    --match "*MEAS?" --respond "1.234"
+docker exec mock ivicli mock scenario activate per-test
+```
+
+This is the canonical entry point for unit-test-style "arm the
+mock between assertions" flows. Adding HTTP endpoints for mock
+CRUD over the Management API is a deferred follow-up if external
+demand surfaces — see ADR 0018 §8 for the rationale.
+
+The container also relies on a small composition-root env
+`IVICLI_MOCK_ONLY=1` (introduced by Batch V) that collapses every
+transport-specific backend to the FakeBackend fallback so the
+gateway servers serve scenario responses without attempting any
+outbound connection. The env is documented in ADR 0018 §10.
+
 ## Consequences
 
 **Pros**

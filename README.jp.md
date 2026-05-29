@@ -33,6 +33,22 @@ dotnet tool install -g ivi-cli
 
 リリースは `win-x64` / `win-arm64` / `linux-x64` / `linux-arm64` / `osx-x64` / `osx-arm64` を提供します。
 
+## Docker でクイックスタート (mock-VISA e2e)
+
+開発中の VISA アプリの e2e テスト用に「スクリプト可能な VISA 計測器」を立てたい開発者向け — ハードウェア不要、.NET インストール不要、設定不要:
+
+```sh
+docker run --rm -p 4880:4880 -p 5025:5025 \
+    ghcr.io/shortarrow/ivi-cli-mock:latest
+
+# 別ターミナルから ivicli 自身 (or 任意の SCPI クライアント) で:
+ivicli visa add mock TCPIP::localhost::hislip0::INSTR
+ivicli visa query mock "*IDN?"
+# → IVICLI-MOCK,gateway,1,0.1.0
+```
+
+コンテナは HiSlip gateway を `4880`、raw SOCKET gateway を `5025` で公開します。両方とも scenario 駆動の mock backend (`*IDN?` / `*RST` / `*OPC?` / `SYST:ERR?` が初期対応済) でバックエンドされます。独自シナリオは `-v ./scenarios:/etc/ivi-cli/scenarios` でマウント、テスト中に動的に状態を arm するには `docker exec mock ivicli mock scene add …` を使います。詳細は [ADR 0018](docs/adr/0018-deployment-strategy.md) を参照してください。
+
 ## クイックスタート
 
 ```sh

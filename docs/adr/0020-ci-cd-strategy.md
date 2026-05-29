@@ -28,8 +28,9 @@ Four workflows live in `.github/workflows/`:
 | Workflow | Trigger | Purpose |
 | --- | --- | --- |
 | `pr.yml` | `pull_request` (opened, synchronize, reopened) | Gate for merging into `main` |
+| `pr-docker-smoke.yml` | `pull_request` with `paths: docker/**, src/IviCli.Cli/**, .dockerignore` | Paths-filtered mock-VISA container smoke ([ADR 0018](0018-deployment-strategy.md) §9) — runs only on PRs that can break the container image |
 | `nightly.yml` | `schedule` (`02:00 UTC`) + `workflow_dispatch` | Integration tests, dependency vulnerability scan, OS matrix |
-| `release.yml` | `push` on tag `v*` | Build artifacts, publish GitHub Release, push `dotnet tool` to NuGet |
+| `release.yml` | `push` on tag `v*` | Build artifacts, publish GitHub Release, push `dotnet tool` to NuGet, build + push multi-arch mock-VISA container to ghcr.io ([ADR 0018](0018-deployment-strategy.md)) |
 | `.github/dependabot.yml` | weekly grouped PRs | NuGet / GitHub Actions / `dotnet-tools.json` updates (config file, not a workflow) |
 
 ### 3. `pr.yml` — jobs and gating
