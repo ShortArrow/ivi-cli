@@ -1,0 +1,92 @@
+name: pr docker smoke
+
+# Paths-filtered companion to pr.yml — runs only when a PR touches
+# the container image artifacts or the CLI entrypoint code that can
+# break the mock-container behaviour (ADR 0018 §Verification).
+# Other PRs do not trigger this workflow, so 99% of changes stay on
+# the fast build-and-test path in pr.yml.
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    branches: [main]
+    paths:
+      - 'docker/**'
+      - '.dockerignore'
+      - 'src/IviCli.Cli/**'
+      - '.github/workflows/pr-docker-smoke.yml'
+
+permissions:
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: pr-docker-smoke-${{ github.head_ref }}
+  cancel-in-progress: true
+
+jobs:
+  docker-smoke:
+    name: docker / mock-VISA smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      DOTNET_NOLOGO: true
+      DOTNET_CLI_TELEMETRY_OPTOUT: true
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@3e891b0cb619bf60e2c25674b222b8940e2c1c25 # v4.1.0
+        with:
+          global-json-file: global.json
+          cache: true
+          cache-dependency-path: '**/packages.lock.json'
+
+      - name: Restore (locked)
+        run: dotnet restore --locked-mode
+
+      - name: Publish self-contained linux-x64
+        run: |
+          dotnet publish src/IviCli.Cli/IviCli.Cli.csproj \
+            -c Release -r linux-x64 \
+            --self-contained true \
+            -p:PublishSingleFile=true \
+            -p:IncludeNativeLibrariesForSelfExtract=true \
+            -o ./artifacts/linux-x64-selfcontained
+
+      - name: Build single-arch image (no push)
+        run: |
+          docker build -f docker/Dockerfile \
+            --build-arg RID=linux-x64 \
+            --tag ivi-cli-mock:pr-smoke .
+
+      - name: Smoke test (HEALTHCHECK + SCPI roundtrip)
+        run: |
+          set -euo pipefail
+          docker run -d --name mock-smoke ivi-cli-mock:pr-smoke
+          for i in $(seq 1 30); do
+            status="$(docker inspect --format '{{.State.Health.Status}}' mock-smoke)"
+            if [ "$status" = "healthy" ]; then
+              echo "container healthy after ${i}s"
+              break
+            fi
+            sleep 1
+          done
+          if [ "$(docker inspect --format '{{.State.Health.Status}}' mock-smoke)" != "healthy" ]; then
+            echo "container failed to become healthy"
+            docker logs mock-smoke
+            exit 1
+          fi
+          response="$(docker exec mock-smoke bash -c 'echo "*IDN?" | nc -w 2 127.0.0.1 5025')"
+          echo "got: $response"
+          case "$response" in
+            *IVICLI-MOCK*)
+              echo "smoke passed"
+              ;;
+            *)
+              echo "smoke FAILED — unexpected response"
+              docker logs mock-smoke
+              exit 1
+              ;;
+          esac
+          docker rm -f mock-smoke
