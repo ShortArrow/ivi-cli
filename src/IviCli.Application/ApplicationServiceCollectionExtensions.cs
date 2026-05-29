@@ -1,6 +1,7 @@
 using IviCli.Application.Auth;
 using IviCli.Application.Devices;
 using IviCli.Application.Diagnostics;
+using IviCli.Application.Drivers;
 using IviCli.Application.Mock;
 using IviCli.Application.Scripting;
 using IviCli.Application.Servers;
@@ -45,6 +46,8 @@ public static class ApplicationServiceCollectionExtensions
         services.AddSingleton<CreateApiTokenCommandHandler>();
         services.AddSingleton<ListApiTokensQueryHandler>();
         services.AddSingleton<RevokeApiTokenCommandHandler>();
+        services.AddSingleton<ListDriversQueryHandler>();
+        services.AddSingleton<ListLogicalNamesQueryHandler>();
         return services;
     }
 

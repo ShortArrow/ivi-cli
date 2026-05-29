@@ -58,6 +58,7 @@ internal static class Program
             services.AddIviCliServers();
             services.AddIviCliGatewayServers();
             services.AddIviCliInfrastructure(configPath);
+            services.AddIviCliIviConfigurationStore();
             services.AddIviCliServerProcessRegistry(IviPaths.ResolveServerStateDirectory());
 
             // Eager config load for the OTel bootstrap (ADR 0040) — OTel
@@ -412,6 +413,8 @@ internal static class Program
         root.Subcommands.Add(ServerCommand.Build(services));
         root.Subcommands.Add(ApiCommand.Build(services));
         root.Subcommands.Add(DiagnoseCommand.Build(services));
+        root.Subcommands.Add(DriverCommand.Build(services));
+        root.Subcommands.Add(LogicalCommand.Build(services));
         root.Subcommands.Add(CompletionCommand.Build());
         root.Subcommands.Add(CompleteCommand.Build(root, services));
 

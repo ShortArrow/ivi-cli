@@ -11,6 +11,7 @@
 - **状態保持型 UX.** `ivicli visa add psu1 ...` で alias を一度登録すれば、以降は `psu1` だけで操作できます。
 - **VISA 互換.** 標準的な `TCPIP::` / `USB::` / `GPIB::` のリソース文字列を独自構文なしで扱います。
 - **自動 discovery.** `ivicli visa scan` で LAN 上の機器を LXI mDNS / DNS-SD + VXI-11 portmapper broadcast で発見、`--add` を付ければそのまま `visa add` でまとめて登録します。
+- **IVI Configuration Store の中身を覗く.** `ivicli driver list` / `ivicli logical list` で `IviConfigurationStore.xml` を読み、インストール済み IVI ドライバ / 論理名を列挙。「機器とは通信できるけどドライバが合ってない」系のデバッグを Configuration Server GUI を開かずに片付けられます ([ADR 0045](docs/adr/0045-ivi-configuration-store.md))。
 - **複数バックエンド.** Local NI-VISA / HiSLIP / VXI-11 / raw TCP SOCKET / Fake (プログラム可能 + scenario 再生) / Replay (厳密な決定論的再生) を単一の `IIviBackend` port 越しに提供します。
 - **ゲートウェイサーバ.** ローカル計測器を HiSLIP (`TCPIP::host::hislip0::INSTR`) または raw socket で公開し、リモートの PyVISA / NI-VISA クライアントから駆動できます。
 - **シナリオ録画.** `mock scenario record --from-script` でスクリプト実行中の SCPI トラフィックを取得、`IVICLI_REPLAY=<scenario>` で同じスクリプトをハードウェアなしに決定論的に再実行できます。

@@ -59,6 +59,18 @@ Initial public release. Covers Phase 1 (CLI core), Phase 2 (gateway servers
   of every auth attempt, API request, config mutation, and gateway
   lifecycle transition.
 
+### Added — IVI ecosystem introspection (Batch Y)
+
+- `ivicli driver list` — enumerates `<SoftwareModule>` entries in
+  the local `IviConfigurationStore.xml` (name, description, module
+  path, prefix). Pure-managed XML parsing; no vendor SDK / no COM
+  interop. Non-Windows hosts get a friendly
+  `(no IVI Configuration Store at …)` instead of an error.
+- `ivicli logical list` — enumerates `<LogicalName>` entries
+  (name, description, bound driver-session). Same parser, same
+  graceful-degradation rules. See ADR 0045 for the full
+  integration design.
+
 ### Added — Phase 3 follow-ups
 
 - **Mock-VISA container** (ADR 0018) — `ghcr.io/<owner>/ivi-cli-mock`

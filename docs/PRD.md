@@ -805,6 +805,13 @@ Phase 1:
 * visa query/write/read
 * visa status
 * diagnose
+* driver list — enumerate installed IVI drivers from the local IVI
+  Configuration Store (ADR 0045). Essential for debugging when an
+  instrument is online but the driver assembly is missing or mis-
+  versioned.
+* logical list — enumerate IVI logical names from the same store.
+  Operators use this to confirm which alias maps to which driver
+  session before reaching for `visa add`.
 * config.toml
 * --json
 

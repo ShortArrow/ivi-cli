@@ -811,6 +811,12 @@ Phase 1:
 * visa query/write/read
 * visa status
 * diagnose
+* driver list — ローカルの IVI Configuration Store からインストール
+  済み IVI ドライバを列挙 (ADR 0045)。機器は通信できているのにドライ
+  バ DLL が無い / バージョン不一致、といったデバッグで必須。
+* logical list — 同じストアから IVI 論理名を列挙。alias を
+  `visa add` する前にどの論理名がどの driver session に紐付いている
+  か確認するのに使う。
 * config.toml
 * --json
 

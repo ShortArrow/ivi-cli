@@ -4,12 +4,14 @@ using IviCli.Application.Auth;
 using IviCli.Application.Backends;
 using IviCli.Application.Capture;
 using IviCli.Application.Configuration;
+using IviCli.Application.Drivers;
 using IviCli.Application.Mock;
 using IviCli.Application.Servers;
 using IviCli.Application.Session;
 using IviCli.Infrastructure.Audit;
 using IviCli.Infrastructure.Backends;
 using IviCli.Infrastructure.Configuration;
+using IviCli.Infrastructure.Drivers;
 using IviCli.Infrastructure.Mock;
 using IviCli.Infrastructure.Servers;
 using IviCli.Infrastructure.Session;
@@ -150,6 +152,46 @@ public static class InfrastructureServiceCollectionExtensions
             auditPath
         ));
         return services;
+    }
+
+    /// <summary>
+    /// Registers <see cref="XmlIviConfigurationStore"/> as the
+    /// production <see cref="IIviConfigurationStore"/> (ADR 0045).
+    /// The store path defaults to the OS-standard IVI Configuration
+    /// Store location (Windows
+    /// <c>%PROGRAMDATA%\IVI Foundation\IVI\IviConfigurationStore.xml</c>);
+    /// non-Windows hosts resolve to a fixed conventional path so the
+    /// subsequent <see cref="IIviConfigurationStore.ListDriversAsync"/>
+    /// call surfaces a friendly <see cref="IviConfigurationStoreNotFound"/>
+    /// rather than an exception. Tests substitute a different path
+    /// via the optional <paramref name="storePath"/> parameter.
+    /// </summary>
+    public static IServiceCollection AddIviCliIviConfigurationStore(
+        this IServiceCollection services,
+        string? storePath = null
+    )
+    {
+        var resolved = storePath ?? DeriveDefaultIviStorePath();
+        services.AddSingleton<IIviConfigurationStore>(sp => new XmlIviConfigurationStore(
+            sp.GetRequiredService<IFileSystem>(),
+            resolved
+        ));
+        return services;
+    }
+
+    private static string DeriveDefaultIviStorePath()
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            var programData = Environment.GetFolderPath(
+                Environment.SpecialFolder.CommonApplicationData
+            );
+            return Path.Combine(programData, "IVI Foundation", "IVI", "IviConfigurationStore.xml");
+        }
+        // Non-Windows: the IVI Shared Components are Windows-only; we
+        // still return a deterministic path so the "not found" error
+        // names a stable location.
+        return Path.Combine("/etc", "ivi-foundation", "IviConfigurationStore.xml");
     }
 
     private static string DeriveDefaultScenarioDirectory(string configPath)
