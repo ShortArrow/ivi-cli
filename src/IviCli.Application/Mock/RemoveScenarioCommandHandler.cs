@@ -1,3 +1,4 @@
+using IviCli.Application.Audit;
 using IviCli.Domain;
 using IviCli.Domain.Mock;
 
@@ -7,11 +8,22 @@ namespace IviCli.Application.Mock;
 public sealed class RemoveScenarioCommandHandler
 {
     private readonly IScenarioStore _store;
+    private readonly IAuditLog _audit;
+    private readonly IAuditSubject _subject;
+    private readonly TimeProvider _time;
 
     /// <summary>Creates a new handler.</summary>
-    public RemoveScenarioCommandHandler(IScenarioStore store)
+    public RemoveScenarioCommandHandler(
+        IScenarioStore store,
+        IAuditLog? audit = null,
+        IAuditSubject? subject = null,
+        TimeProvider? time = null
+    )
     {
         _store = store;
+        _audit = audit ?? NullAuditLog.Instance;
+        _subject = subject ?? new StaticAuditSubject("unknown");
+        _time = time ?? TimeProvider.System;
     }
 
     /// <summary>Executes the removal.</summary>
@@ -31,12 +43,16 @@ public sealed class RemoveScenarioCommandHandler
         }
 
         var deleteResult = await _store.DeleteAsync(name, ct);
+        if (deleteResult is Result<Unit, ScenarioStoreError>.Ok)
+        {
+            await _audit.AppendAsync(
+                new ConfigMutated(_time.GetUtcNow(), "scenario.remove", name.Value, _subject.Get()),
+                ct
+            );
+            return Result.Success<ScenarioName, RemoveScenarioError>(name);
+        }
         return deleteResult switch
         {
-            Result<Unit, ScenarioStoreError>.Ok => Result.Success<
-                ScenarioName,
-                RemoveScenarioError
-            >(name),
             Result<Unit, ScenarioStoreError>.Error { Err: ScenarioNotFound } => Result.Failure<
                 ScenarioName,
                 RemoveScenarioError

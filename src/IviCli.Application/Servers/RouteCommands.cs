@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using IviCli.Application.Audit;
 using IviCli.Application.Configuration;
 using IviCli.Domain;
 using IviCli.Domain.Configuration;
@@ -156,9 +157,23 @@ public sealed record ListRoutesStoreFailure(ConfigStoreError Inner) : ListRoutes
 public sealed class AddRouteCommandHandler
 {
     private readonly IConfigStore _store;
+    private readonly IAuditLog _audit;
+    private readonly IAuditSubject _subject;
+    private readonly TimeProvider _time;
 
     /// <summary>Creates a new handler.</summary>
-    public AddRouteCommandHandler(IConfigStore store) => _store = store;
+    public AddRouteCommandHandler(
+        IConfigStore store,
+        IAuditLog? audit = null,
+        IAuditSubject? subject = null,
+        TimeProvider? time = null
+    )
+    {
+        _store = store;
+        _audit = audit ?? NullAuditLog.Instance;
+        _subject = subject ?? new StaticAuditSubject("unknown");
+        _time = time ?? TimeProvider.System;
+    }
 
     /// <summary>Validates, parses, and persists the new route.</summary>
     public async Task<Result<Route, AddRouteError>> HandleAsync(
@@ -221,6 +236,16 @@ public sealed class AddRouteCommandHandler
             return Result.Failure<Route, AddRouteError>(new AddRouteStoreFailure(err));
         }
 
+        await _audit.AppendAsync(
+            new ConfigMutated(
+                _time.GetUtcNow(),
+                "route.add",
+                $"{serverName.Value}/{endpoint.Value}",
+                _subject.Get()
+            ),
+            ct
+        );
+
         return Result.Success<Route, AddRouteError>(route);
     }
 }
@@ -229,9 +254,23 @@ public sealed class AddRouteCommandHandler
 public sealed class RemoveRouteCommandHandler
 {
     private readonly IConfigStore _store;
+    private readonly IAuditLog _audit;
+    private readonly IAuditSubject _subject;
+    private readonly TimeProvider _time;
 
     /// <summary>Creates a new handler.</summary>
-    public RemoveRouteCommandHandler(IConfigStore store) => _store = store;
+    public RemoveRouteCommandHandler(
+        IConfigStore store,
+        IAuditLog? audit = null,
+        IAuditSubject? subject = null,
+        TimeProvider? time = null
+    )
+    {
+        _store = store;
+        _audit = audit ?? NullAuditLog.Instance;
+        _subject = subject ?? new StaticAuditSubject("unknown");
+        _time = time ?? TimeProvider.System;
+    }
 
     /// <summary>Persists the removal.</summary>
     public async Task<Result<Unit, RemoveRouteError>> HandleAsync(
@@ -279,6 +318,16 @@ public sealed class RemoveRouteCommandHandler
             var err = ((Result<Unit, ConfigStoreError>.Error)saveResult).Err;
             return Result.Failure<Unit, RemoveRouteError>(new RemoveRouteStoreFailure(err));
         }
+
+        await _audit.AppendAsync(
+            new ConfigMutated(
+                _time.GetUtcNow(),
+                "route.remove",
+                $"{serverName.Value}/{endpoint.Value}",
+                _subject.Get()
+            ),
+            ct
+        );
 
         return Result.Success<Unit, RemoveRouteError>(Unit.Value);
     }

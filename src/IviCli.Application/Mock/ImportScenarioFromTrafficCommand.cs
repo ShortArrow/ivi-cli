@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using IviCli.Application.Audit;
 using IviCli.Application.Capture;
 using IviCli.Domain;
 using IviCli.Domain.Devices;
@@ -39,17 +40,26 @@ public sealed class ImportScenarioFromTrafficCommandHandler
     private readonly INdjsonTrafficReader _reader;
     private readonly ITrafficScenarioConverter _converter;
     private readonly IScenarioStore _store;
+    private readonly IAuditLog _audit;
+    private readonly IAuditSubject _subject;
+    private readonly TimeProvider _time;
 
     /// <summary>Creates a new handler.</summary>
     public ImportScenarioFromTrafficCommandHandler(
         INdjsonTrafficReader reader,
         ITrafficScenarioConverter converter,
-        IScenarioStore store
+        IScenarioStore store,
+        IAuditLog? audit = null,
+        IAuditSubject? subject = null,
+        TimeProvider? time = null
     )
     {
         _reader = reader;
         _converter = converter;
         _store = store;
+        _audit = audit ?? NullAuditLog.Instance;
+        _subject = subject ?? new StaticAuditSubject("unknown");
+        _time = time ?? TimeProvider.System;
     }
 
     /// <summary>Runs the import pipeline end to end.</summary>
@@ -126,6 +136,11 @@ public sealed class ImportScenarioFromTrafficCommandHandler
                 new ImportTrafficStoreFailure(storeErr.Err)
             );
         }
+
+        await _audit.AppendAsync(
+            new ConfigMutated(_time.GetUtcNow(), "scenario.import", name.Value, _subject.Get()),
+            ct
+        );
 
         var device =
             deviceFilter?.Value

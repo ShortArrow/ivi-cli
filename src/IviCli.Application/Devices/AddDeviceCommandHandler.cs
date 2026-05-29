@@ -1,3 +1,4 @@
+using IviCli.Application.Audit;
 using IviCli.Application.Configuration;
 using IviCli.Domain;
 using IviCli.Domain.Configuration;
@@ -20,11 +21,26 @@ namespace IviCli.Application.Devices;
 public sealed class AddDeviceCommandHandler
 {
     private readonly IConfigStore _store;
+    private readonly IAuditLog _audit;
+    private readonly IAuditSubject _subject;
+    private readonly TimeProvider _time;
 
-    /// <summary>Creates a new handler bound to the supplied configuration store.</summary>
-    public AddDeviceCommandHandler(IConfigStore store)
+    /// <summary>
+    /// Creates a new handler bound to the supplied configuration store.
+    /// <paramref name="audit"/> + <paramref name="subject"/> emit a
+    /// <see cref="ConfigMutated"/> event on successful save (ADR 0043).
+    /// </summary>
+    public AddDeviceCommandHandler(
+        IConfigStore store,
+        IAuditLog? audit = null,
+        IAuditSubject? subject = null,
+        TimeProvider? time = null
+    )
     {
         _store = store;
+        _audit = audit ?? NullAuditLog.Instance;
+        _subject = subject ?? new StaticAuditSubject("unknown");
+        _time = time ?? TimeProvider.System;
     }
 
     /// <summary>
@@ -85,6 +101,11 @@ public sealed class AddDeviceCommandHandler
             var saveErr = ((Result<Unit, ConfigStoreError>.Error)saveResult).Err;
             return Fail(new AddDeviceStorageFailure(saveErr));
         }
+
+        await _audit.AppendAsync(
+            new ConfigMutated(_time.GetUtcNow(), "device.add", name.Value, _subject.Get()),
+            ct
+        );
 
         return Result.Success<DeviceName, AddDeviceError>(name);
     }

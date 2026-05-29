@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using IviCli.Application.Audit;
 using IviCli.Application.Configuration;
 using IviCli.Domain;
 using IviCli.Domain.Configuration;
@@ -145,9 +146,23 @@ public sealed record ListServersStoreFailure(ConfigStoreError Inner) : ListServe
 public sealed class AddServerCommandHandler
 {
     private readonly IConfigStore _store;
+    private readonly IAuditLog _audit;
+    private readonly IAuditSubject _subject;
+    private readonly TimeProvider _time;
 
     /// <summary>Creates a new handler.</summary>
-    public AddServerCommandHandler(IConfigStore store) => _store = store;
+    public AddServerCommandHandler(
+        IConfigStore store,
+        IAuditLog? audit = null,
+        IAuditSubject? subject = null,
+        TimeProvider? time = null
+    )
+    {
+        _store = store;
+        _audit = audit ?? NullAuditLog.Instance;
+        _subject = subject ?? new StaticAuditSubject("unknown");
+        _time = time ?? TimeProvider.System;
+    }
 
     /// <summary>Validates, parses, and persists the new server.</summary>
     public async Task<Result<ServerName, AddServerError>> HandleAsync(
@@ -225,6 +240,11 @@ public sealed class AddServerCommandHandler
             return Result.Failure<ServerName, AddServerError>(new AddServerStoreFailure(err));
         }
 
+        await _audit.AppendAsync(
+            new ConfigMutated(_time.GetUtcNow(), "server.add", name.Value, _subject.Get()),
+            ct
+        );
+
         return Result.Success<ServerName, AddServerError>(name);
     }
 }
@@ -233,9 +253,23 @@ public sealed class AddServerCommandHandler
 public sealed class RemoveServerCommandHandler
 {
     private readonly IConfigStore _store;
+    private readonly IAuditLog _audit;
+    private readonly IAuditSubject _subject;
+    private readonly TimeProvider _time;
 
     /// <summary>Creates a new handler.</summary>
-    public RemoveServerCommandHandler(IConfigStore store) => _store = store;
+    public RemoveServerCommandHandler(
+        IConfigStore store,
+        IAuditLog? audit = null,
+        IAuditSubject? subject = null,
+        TimeProvider? time = null
+    )
+    {
+        _store = store;
+        _audit = audit ?? NullAuditLog.Instance;
+        _subject = subject ?? new StaticAuditSubject("unknown");
+        _time = time ?? TimeProvider.System;
+    }
 
     /// <summary>Validates and persists the removal.</summary>
     public async Task<Result<ServerName, RemoveServerError>> HandleAsync(
@@ -272,6 +306,11 @@ public sealed class RemoveServerCommandHandler
             var err = ((Result<Unit, ConfigStoreError>.Error)saveResult).Err;
             return Result.Failure<ServerName, RemoveServerError>(new RemoveServerStoreFailure(err));
         }
+
+        await _audit.AppendAsync(
+            new ConfigMutated(_time.GetUtcNow(), "server.remove", name.Value, _subject.Get()),
+            ct
+        );
 
         return Result.Success<ServerName, RemoveServerError>(name);
     }

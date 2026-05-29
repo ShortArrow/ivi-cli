@@ -41,7 +41,13 @@ public sealed record AuthFailed(
     public override string Kind => "auth.failed";
 }
 
-/// <summary>A mutation against the <c>config.toml</c> document.</summary>
+/// <summary>
+/// A mutation against operator-managed persistent configuration —
+/// covers <c>config.toml</c> (devices, servers, routes) and the
+/// scenario directory (mock scenarios + scenes). Token storage
+/// (<c>api-tokens.toml</c>) is intentionally tracked separately
+/// (ADR 0036) and does not emit this variant.
+/// </summary>
 /// <param name="Timestamp">UTC instant the event was observed.</param>
 /// <param name="Operation">Dotted <c>{entity}.{verb}</c> (e.g. <c>device.add</c>, <c>scene.remove</c>).</param>
 /// <param name="Target">Entity primary key, slash-joined for nested entities (e.g. <c>scenario1/sceneA</c>).</param>

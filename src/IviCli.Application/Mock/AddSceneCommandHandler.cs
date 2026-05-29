@@ -1,3 +1,4 @@
+using IviCli.Application.Audit;
 using IviCli.Domain;
 using IviCli.Domain.Mock;
 
@@ -7,11 +8,22 @@ namespace IviCli.Application.Mock;
 public sealed class AddSceneCommandHandler
 {
     private readonly IScenarioStore _store;
+    private readonly IAuditLog _audit;
+    private readonly IAuditSubject _subject;
+    private readonly TimeProvider _time;
 
     /// <summary>Creates a new handler.</summary>
-    public AddSceneCommandHandler(IScenarioStore store)
+    public AddSceneCommandHandler(
+        IScenarioStore store,
+        IAuditLog? audit = null,
+        IAuditSubject? subject = null,
+        TimeProvider? time = null
+    )
     {
         _store = store;
+        _audit = audit ?? NullAuditLog.Instance;
+        _subject = subject ?? new StaticAuditSubject("unknown");
+        _time = time ?? TimeProvider.System;
     }
 
     /// <summary>Validates inputs, loads the scenario, appends the scene, and saves.</summary>
@@ -80,6 +92,16 @@ public sealed class AddSceneCommandHandler
             var err = ((Result<Unit, ScenarioStoreError>.Error)saveResult).Err;
             return Result.Failure<MockScenario, AddSceneError>(new AddSceneStoreFailure(err));
         }
+
+        await _audit.AppendAsync(
+            new ConfigMutated(
+                _time.GetUtcNow(),
+                "scene.add",
+                $"{name.Value}/{command.Match}",
+                _subject.Get()
+            ),
+            ct
+        );
 
         return Result.Success<MockScenario, AddSceneError>(updated);
     }

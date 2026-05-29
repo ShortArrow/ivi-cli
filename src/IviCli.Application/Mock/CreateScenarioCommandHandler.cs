@@ -1,3 +1,4 @@
+using IviCli.Application.Audit;
 using IviCli.Domain;
 using IviCli.Domain.Mock;
 
@@ -7,11 +8,22 @@ namespace IviCli.Application.Mock;
 public sealed class CreateScenarioCommandHandler
 {
     private readonly IScenarioStore _store;
+    private readonly IAuditLog _audit;
+    private readonly IAuditSubject _subject;
+    private readonly TimeProvider _time;
 
     /// <summary>Creates a new handler.</summary>
-    public CreateScenarioCommandHandler(IScenarioStore store)
+    public CreateScenarioCommandHandler(
+        IScenarioStore store,
+        IAuditLog? audit = null,
+        IAuditSubject? subject = null,
+        TimeProvider? time = null
+    )
     {
         _store = store;
+        _audit = audit ?? NullAuditLog.Instance;
+        _subject = subject ?? new StaticAuditSubject("unknown");
+        _time = time ?? TimeProvider.System;
     }
 
     /// <summary>Validates and persists the new scenario.</summary>
@@ -32,12 +44,16 @@ public sealed class CreateScenarioCommandHandler
 
         var scenario = MockScenario.Empty(name) with { IdnDefault = command.IdnDefault };
         var saveResult = await _store.SaveAsync(scenario, overwriteIfExists: false, ct);
+        if (saveResult is Result<Unit, ScenarioStoreError>.Ok)
+        {
+            await _audit.AppendAsync(
+                new ConfigMutated(_time.GetUtcNow(), "scenario.create", name.Value, _subject.Get()),
+                ct
+            );
+            return Result.Success<ScenarioName, CreateScenarioError>(name);
+        }
         return saveResult switch
         {
-            Result<Unit, ScenarioStoreError>.Ok => Result.Success<
-                ScenarioName,
-                CreateScenarioError
-            >(name),
             Result<Unit, ScenarioStoreError>.Error { Err: ScenarioAlreadyExists } => Result.Failure<
                 ScenarioName,
                 CreateScenarioError
