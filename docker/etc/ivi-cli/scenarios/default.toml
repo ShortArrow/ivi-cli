@@ -1,0 +1,21 @@
+# Default mock scenario for the ivi-cli container (ADR 0018).
+# Mount your own scenario directory at /etc/ivi-cli/scenarios or set
+# IVICLI_SCENARIO=<name> to choose a different one.
+
+idn = "IVICLI-MOCK,gateway,1,0.1.0"
+
+[[scenes]]
+match = "*IDN?"
+respond = "IVICLI-MOCK,gateway,1,0.1.0"
+
+[[scenes]]
+match = "*RST"
+ack = true
+
+[[scenes]]
+match = "*OPC?"
+respond = "1"
+
+[[scenes]]
+match = "SYST:ERR?"
+respond = "0,\"No error\""

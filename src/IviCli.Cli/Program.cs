@@ -216,13 +216,35 @@ internal static class Program
                         );
                     }
                 }
+                // IVICLI_MOCK_ONLY=1 collapses every transport-specific
+                // backend to the fallback (FakeBackend), so every gateway
+                // device resolves to the in-process mock — required for
+                // the scenario-driven mock-VISA container (ADR 0018).
+                // Combined with IVICLI_SCENARIO=<name> the gateway speaks
+                // SCPI from the activated scenario without any outbound
+                // connection attempt.
+                var mockOnly =
+                    Environment.GetEnvironmentVariable("IVICLI_MOCK_ONLY") == "1"
+                    || string.Equals(
+                        Environment.GetEnvironmentVariable("IVICLI_MOCK_ONLY"),
+                        "true",
+                        StringComparison.OrdinalIgnoreCase
+                    );
                 IviCli.Application.Backends.IBackendFactory factory =
                     new IviCli.Infrastructure.Backends.DefaultBackendFactory(
                         fallbackBackend: fallback,
-                        localBackend: sp.GetRequiredService<IviCli.Backends.Local.LocalBackend>(),
-                        hislipBackend: sp.GetRequiredService<IviCli.Backends.HiSlip.HiSlipBackend>(),
-                        socketBackend: sp.GetRequiredService<IviCli.Backends.Socket.SocketBackend>(),
-                        vxi11Backend: sp.GetRequiredService<IviCli.Backends.Vxi11.Vxi11Backend>()
+                        localBackend: mockOnly
+                            ? null
+                            : sp.GetRequiredService<IviCli.Backends.Local.LocalBackend>(),
+                        hislipBackend: mockOnly
+                            ? null
+                            : sp.GetRequiredService<IviCli.Backends.HiSlip.HiSlipBackend>(),
+                        socketBackend: mockOnly
+                            ? null
+                            : sp.GetRequiredService<IviCli.Backends.Socket.SocketBackend>(),
+                        vxi11Backend: mockOnly
+                            ? null
+                            : sp.GetRequiredService<IviCli.Backends.Vxi11.Vxi11Backend>()
                     );
 
                 // Instrumenting layer always wraps Default — Activity /

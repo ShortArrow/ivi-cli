@@ -1,0 +1,33 @@
+# Pre-baked default configuration for the ivi-cli mock-VISA container
+# (ADR 0018). Operators override by mounting their own config.toml at
+# /etc/ivi-cli/config.toml or by pointing IVICLI_CONFIG elsewhere.
+
+[audit]
+enabled = false
+
+[[devices]]
+name = "mock1"
+resource = "TCPIP0::127.0.0.1::INSTR"
+timeout_ms = 3000
+
+[[servers]]
+name = "hislip-mock"
+type = "hislip"
+bind = "0.0.0.0"
+port = 4880
+
+[[servers]]
+name = "socket-mock"
+type = "socket"
+bind = "0.0.0.0"
+port = 5025
+
+[[routes]]
+server = "hislip-mock"
+endpoint = "hislip0"
+device = "mock1"
+
+[[routes]]
+server = "socket-mock"
+endpoint = "5025"
+device = "mock1"

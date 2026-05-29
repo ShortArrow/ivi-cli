@@ -1,0 +1,21 @@
+# Keep the docker build context minimal — only the docker/ assets and
+# the per-RID self-contained publish output under ./artifacts/ should
+# be required (ADR 0018).
+**/bin/
+**/obj/
+.git/
+.github/
+.vs/
+.idea/
+.vscode/
+tests/
+docs/
+plans/
+*.md
+*.user
+*.suo
+*.DotSettings
+TestResults/
+coverage/
+.dotnet/
+.husky/
