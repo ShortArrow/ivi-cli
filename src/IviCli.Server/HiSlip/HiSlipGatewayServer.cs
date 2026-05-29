@@ -161,6 +161,15 @@ public sealed class HiSlipGatewayServer : IGatewayServer
         {
             // Graceful shutdown.
         }
+        catch (EndOfStreamException ex)
+            when (ex.Message.Contains("at 0/", StringComparison.Ordinal))
+        {
+            // The peer closed the TCP connection before sending any
+            // HiSLIP handshake bytes. Most common cause: a Docker
+            // HEALTHCHECK probe (`nc -z`) or a port scanner. Surface
+            // it at Debug so production logs stay clean.
+            _logger.LogDebug("HiSLIP probe disconnected without handshake");
+        }
         catch (Exception ex)
         {
             _logger.LogError(ex, "HiSLIP connection terminated with unexpected error");

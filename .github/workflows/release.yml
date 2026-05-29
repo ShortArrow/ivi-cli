@@ -60,6 +60,13 @@ jobs:
         run: |
           dotnet test --no-build --configuration Release --filter "Category!=Integration"
 
+      - name: Compute version from tag
+        id: version
+        shell: bash
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          echo "value=${VERSION}" >> "$GITHUB_OUTPUT"
+
       - name: Publish self-contained binary
         run: |
           dotnet publish src/IviCli.Cli/IviCli.Cli.csproj \
@@ -67,6 +74,7 @@ jobs:
             --self-contained true \
             -p:PublishSingleFile=true \
             -p:IncludeNativeLibrariesForSelfExtract=true \
+            -p:Version=${{ steps.version.outputs.value }} \
             -o ./artifacts/${{ matrix.rid }}-selfcontained
 
       - name: Publish framework-dependent binary
@@ -74,6 +82,7 @@ jobs:
           dotnet publish src/IviCli.Cli/IviCli.Cli.csproj \
             -c Release -r ${{ matrix.rid }} \
             --self-contained false \
+            -p:Version=${{ steps.version.outputs.value }} \
             -o ./artifacts/${{ matrix.rid }}-fxdep
 
       - name: Upload binaries
@@ -105,10 +114,14 @@ jobs:
 
       - name: Pack
         run: |
+          # Strip the leading `v` so v0.1.0 -> 0.1.0 for the NuGet
+          # package version + assembly metadata.
+          VERSION="${GITHUB_REF_NAME#v}"
           dotnet pack src/IviCli.Cli/IviCli.Cli.csproj \
             -c Release \
             -p:PackAsTool=true \
             -p:ToolCommandName=ivicli \
+            -p:Version="${VERSION}" \
             -o ./artifacts/nupkg
 
       - name: Push to NuGet

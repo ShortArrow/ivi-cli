@@ -126,6 +126,7 @@ public static class VisaScanCommand
         resource switch
         {
             VisaResource.Tcpip t => Sanitize(t.Host),
+            VisaResource.TcpipSocket s => $"{Sanitize(s.Host)}-{s.Port}",
             VisaResource.Usb u => $"usb-{Sanitize(u.SerialNumber)}",
             VisaResource.Gpib g => $"gpib-{g.PrimaryAddress}",
             _ => "device",
@@ -141,6 +142,7 @@ public static class VisaScanCommand
         resource switch
         {
             VisaResource.Tcpip t => $"TCPIP{t.Board}::{t.Host}::{t.LanDevice}::INSTR",
+            VisaResource.TcpipSocket s => $"TCPIP{s.Board}::{s.Host}::{s.Port}::SOCKET",
             VisaResource.Usb u => u.InterfaceNumber is { } iface
                 ? $"USB{u.Board}::{u.VendorId}::{u.ProductId}::{u.SerialNumber}::{iface}::INSTR"
                 : $"USB{u.Board}::{u.VendorId}::{u.ProductId}::{u.SerialNumber}::INSTR",

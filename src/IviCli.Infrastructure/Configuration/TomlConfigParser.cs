@@ -529,6 +529,7 @@ public static class TomlConfigParser
         resource switch
         {
             VisaResource.Tcpip t => $"TCPIP{t.Board}::{t.Host}::{t.LanDevice}::INSTR",
+            VisaResource.TcpipSocket s => $"TCPIP{s.Board}::{s.Host}::{s.Port}::SOCKET",
             VisaResource.Usb u => u.InterfaceNumber is { } iface
                 ? $"USB{u.Board}::{u.VendorId}::{u.ProductId}::{u.SerialNumber}::{iface}::INSTR"
                 : $"USB{u.Board}::{u.VendorId}::{u.ProductId}::{u.SerialNumber}::INSTR",

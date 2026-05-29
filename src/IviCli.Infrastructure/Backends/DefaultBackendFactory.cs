@@ -49,6 +49,7 @@ public sealed class DefaultBackendFactory : IBackendFactory
         {
             VisaResource.Tcpip t when LooksLikeHislip(t) => _hislipBackend ?? _fallbackBackend,
             VisaResource.Tcpip t when LooksLikeVxi11(t) => _vxi11Backend ?? _fallbackBackend,
+            VisaResource.TcpipSocket => _socketBackend ?? _fallbackBackend,
             VisaResource.Tcpip => _localBackend ?? _hislipBackend ?? _fallbackBackend,
             VisaResource.Usb => _localBackend ?? _fallbackBackend,
             VisaResource.Gpib => _localBackend ?? _fallbackBackend,

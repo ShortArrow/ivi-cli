@@ -4,7 +4,7 @@
 
 `ivi-cli` は、VISA/IVI 経由で計測器を管理・診断・操作する統合 CLI です。
 
-> ステータス: **alpha** — Phase 1–3 まで landed、現在 batch C 進行中。サブコマンド木 (HiSLIP / SOCKET gateway 含む) はビルド・配備可能。v0.1.0 までは破壊的変更が発生する可能性があります。
+> ステータス: **v0.1.0 — 初回パブリックリリース。** Phase 1〜3 が landed: CLI core、HiSLIP / VXI-11 / SOCKET gateway、シナリオ駆動 mock-VISA コンテナ (ghcr.io/shortarrow/ivi-cli-mock)、Management HTTP / WebSocket API (PAT + TLS + audit)、OpenTelemetry、LXI mDNS / VXI-11 broadcast discovery。1.0.0 までは [ADR 0022](docs/adr/0022-branching-strategy.md) に従って破壊的変更の可能性が残ります。[CHANGELOG.md](CHANGELOG.md) も参照。
 
 ## ハイライト
 

@@ -27,34 +27,22 @@ public sealed class SocketBackend : IIviBackend
     public async Task<Result<Unit, BackendError>> OpenAsync(Device device, CancellationToken ct)
     {
         ct.ThrowIfCancellationRequested();
-        if (device.Resource is not VisaResource.Tcpip tcpip)
+
+        // Primary: TcpipSocket variant (TCPIP::host::port::SOCKET).
+        // Backwards compat: legacy code path also accepted a Tcpip
+        // with a numeric LanDevice (the v0 hack before SOCKET became
+        // its own variant in Batch X).
+        if (!TryExtractEndpoint(device.Resource, out var host, out var port))
         {
             return Result.Failure<Unit, BackendError>(
                 new TransportDisconnected("SocketBackend only handles TCPIP::host::port::SOCKET")
             );
         }
 
-        var portText = tcpip.LanDevice;
-        if (
-            !int.TryParse(
-                portText,
-                System.Globalization.NumberStyles.Integer,
-                System.Globalization.CultureInfo.InvariantCulture,
-                out var port
-            )
-        )
-        {
-            return Result.Failure<Unit, BackendError>(
-                new TransportDisconnected(
-                    $"SocketBackend expects a numeric LanDevice (got '{portText}')"
-                )
-            );
-        }
-
         var client = new TcpClient();
         try
         {
-            await client.ConnectAsync(tcpip.Host, port, ct);
+            await client.ConnectAsync(host, port, ct);
         }
         catch (Exception ex) when (ex is SocketException or IOException)
         {
@@ -73,6 +61,31 @@ public sealed class SocketBackend : IIviBackend
             _sessions[device.Name] = new SocketSession(client);
         }
         return Result.Success<Unit, BackendError>(Unit.Value);
+    }
+
+    private static bool TryExtractEndpoint(VisaResource resource, out string host, out int port)
+    {
+        switch (resource)
+        {
+            case VisaResource.TcpipSocket s:
+                host = s.Host;
+                port = s.Port;
+                return true;
+            case VisaResource.Tcpip t
+                when int.TryParse(
+                    t.LanDevice,
+                    System.Globalization.NumberStyles.Integer,
+                    System.Globalization.CultureInfo.InvariantCulture,
+                    out var legacyPort
+                ):
+                host = t.Host;
+                port = legacyPort;
+                return true;
+            default:
+                host = string.Empty;
+                port = 0;
+                return false;
+        }
     }
 
     /// <inheritdoc/>

@@ -9,9 +9,12 @@ namespace IviCli.Domain.Visa;
 /// <c>USB0::0x0699::0x0408::C012345::INSTR</c>.
 /// </summary>
 /// <remarks>
-/// Variants are added as new transports are supported. Cycles 1, 2 and 3
-/// introduce <see cref="Tcpip"/>, <see cref="Usb"/> and <see cref="Gpib"/>;
-/// SOCKET and other transports follow in later cycles.
+/// Variants cover the four VISA transport shapes ivi-cli actually
+/// dispatches today: <see cref="Tcpip"/> (LXI / HiSLIP / VXI-11
+/// instrument), <see cref="TcpipSocket"/> (raw-socket SCPI on a
+/// TCP port — see ADR 0018 §3), <see cref="Usb"/>, and
+/// <see cref="Gpib"/>. Additional transports are added as new
+/// backend dispatch cases land.
 /// </remarks>
 public abstract partial record VisaResource
 {
@@ -43,6 +46,28 @@ public abstract partial record VisaResource
             string.Create(
                 System.Globalization.CultureInfo.InvariantCulture,
                 $"TCPIP{Board}::***::{LanDevice}::INSTR"
+            );
+    }
+
+    /// <summary>
+    /// A TCPIP raw-socket SCPI resource of the form
+    /// <c>TCPIP[board]::host::port::SOCKET</c>. Used by instruments
+    /// that accept newline-framed SCPI directly over a TCP port (and
+    /// by ivi-cli's own SOCKET gateway in the mock-VISA container,
+    /// ADR 0018 §3). Distinct from <see cref="Tcpip"/> because the
+    /// suffix is <c>SOCKET</c>, not <c>INSTR</c>, and the third
+    /// segment is a numeric port rather than a LAN device name.
+    /// </summary>
+    /// <param name="Board">The TCPIP interface number (defaults to <c>0</c>).</param>
+    /// <param name="Host">The IPv4/IPv6 literal or hostname of the instrument.</param>
+    /// <param name="Port">The TCP port the instrument's SOCKET listener accepts SCPI on (1–65535).</param>
+    public sealed record TcpipSocket(int Board, string Host, int Port) : VisaResource
+    {
+        /// <inheritdoc/>
+        public override string ToLogString() =>
+            string.Create(
+                System.Globalization.CultureInfo.InvariantCulture,
+                $"TCPIP{Board}::***::{Port}::SOCKET"
             );
     }
 
@@ -117,6 +142,10 @@ public abstract partial record VisaResource
 
     private const string SegmentSeparator = "::";
     private const string InstrSuffix = "INSTR";
+    private const string SocketSuffix = "SOCKET";
+
+    /// <summary>Inclusive upper bound for a valid TCP port number.</summary>
+    public const int MaxTcpPort = 65535;
 
     /// <summary>
     /// Parses a VISA resource string into its structured representation.
@@ -179,25 +208,51 @@ public abstract partial record VisaResource
             return Fail(raw);
         }
 
-        string lanDevice;
+        string thirdSegment;
         string suffix;
         if (segments.Length == 4)
         {
-            lanDevice = segments[2];
+            thirdSegment = segments[2];
             suffix = segments[3];
         }
         else
         {
-            lanDevice = "inst0";
+            // Three-segment form: `TCPIP[N]::host::INSTR` (lanDevice
+            // defaults to inst0). SOCKET requires the explicit four-
+            // segment shape so the port is unambiguous.
+            thirdSegment = "inst0";
             suffix = segments[2];
         }
 
-        if (string.IsNullOrEmpty(lanDevice) || suffix != InstrSuffix)
+        if (string.IsNullOrEmpty(thirdSegment))
         {
             return Fail(raw);
         }
 
-        return Result.Success<VisaResource, VisaResourceError>(new Tcpip(board, host, lanDevice));
+        return suffix switch
+        {
+            InstrSuffix => Result.Success<VisaResource, VisaResourceError>(
+                new Tcpip(board, host, thirdSegment)
+            ),
+            SocketSuffix when segments.Length == 4 && TryParseTcpPort(thirdSegment, out var port) =>
+                Result.Success<VisaResource, VisaResourceError>(new TcpipSocket(board, host, port)),
+            _ => Fail(raw),
+        };
+    }
+
+    private static bool TryParseTcpPort(string raw, out int port)
+    {
+        if (
+            int.TryParse(raw, NumberStyles.None, CultureInfo.InvariantCulture, out var parsed)
+            && parsed >= 1
+            && parsed <= MaxTcpPort
+        )
+        {
+            port = parsed;
+            return true;
+        }
+        port = 0;
+        return false;
     }
 
     private static Result<VisaResource, VisaResourceError> ParseUsb(string raw, string[] segments)
