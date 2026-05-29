@@ -220,6 +220,16 @@ public static async Task<int> Main(string[] args)
 
 `FormatUserMessage` renders the error in a form suitable for stdout/stderr (no `Cause`, no internal placeholders); the logger receives the full structured payload.
 
+### 11.1 Audit emission on success only
+
+Per [ADR 0043 §Wiring](0043-audit-log.md) (Batch U follow-up),
+config-mutating command handlers emit a `ConfigMutated` audit
+event **only on `SaveAsync` success**. Failed saves surface as
+typed `IviError` values to the caller per §3–§9 above and reach
+the operator-visible log line via §11 — they are not duplicated
+into the audit log. The audit log is a security-incident timeline
+of *what actually changed*, not a record of attempts.
+
 ### 12. Correlation ID / tracing
 
 Phase 1 does not introduce correlation IDs or `Activity`-based tracing. CLI invocations are short-lived and single-purpose; the cost of plumbing outweighs the benefit. Phase 2 (gateway server) revisits this through ADR 0011 / 0019.

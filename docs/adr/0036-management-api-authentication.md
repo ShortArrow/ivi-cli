@@ -127,7 +127,12 @@ Codes:
   [ADR 0043](0043-audit-log.md). The middleware emits
   `AuthSucceeded` / `AuthFailed` events with stable reason codes
   (`missing_token`, `invalid_token`, `no_tokens_configured`,
-  `token_store_unavailable`) per request.
+  `token_store_unavailable`, plus `expired_token` /
+  `insufficient_scope` from ADR 0044) per request. If a future
+  Management-API path mutates config (none today), the
+  `IAuditSubject` extension surface lets `ConfigMutated.Subject`
+  be sourced from `HttpContext.User` as `api/{token.Label}` —
+  mirrors the `cli/{user}` convention.
 - **Rate limiting / brute-force protection** — v1 stance is
   loopback-default + opt-in non-loopback; v2 can layer in IP
   throttling once concrete deployments emerge.

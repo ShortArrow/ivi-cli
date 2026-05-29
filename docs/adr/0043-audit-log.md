@@ -49,9 +49,9 @@ toolchain (`logrotate`, Windows Task Scheduler) against the file.
 | --- | --- | --- |
 | `AuthSucceeded` | `auth.succeeded` | Mechanism, Subject, Transport |
 | `AuthFailed` | `auth.failed` | Mechanism, Reason, Transport |
-| `ConfigMutated` | `config.mutated` | Operation, Target |
+| `ConfigMutated` | `config.mutated` | Operation, Target, Subject? |
 | `ApiRequest` | `api.request` | Method, Path, Status, Subject?, LatencyMs |
-| `ServerLifecycle` | `server.lifecycle` | Server, Action |
+| `ServerLifecycle` | `server.lifecycle` | Server, Action, Subject? |
 
 Mechanism is e.g. `"pat"` / `"mtls"` / `"anonymous"`. Reason for
 `AuthFailed` is a stable identifier (`"missing_token"`,
@@ -63,6 +63,22 @@ want different alerting on each.
 `ApiRequest`'s `Subject` is nullable for unauthenticated paths
 (`/healthz`, `/openapi/v1.json`) where the request middleware
 runs but the auth middleware never ran.
+
+`ConfigMutated.Subject` and `ServerLifecycle.Subject` are nullable
+positional record parameters (Batch U) — added at the tail with a
+`null` default so existing 3-arg construction stays source-
+compatible. Production CLI invocations resolve the subject via
+`IAuditSubject`, whose CLI impl returns
+`$"cli/{Environment.UserName}"`. Tests substitute a fixed value.
+A future Management-API-driven mutation path would add an
+`HttpContextAuditSubject` impl returning `$"api/{token.Label}"`,
+matching the same convention.
+
+`ConfigMutated.Operation` follows a `{entity}.{verb}` shape
+(`device.add`, `scene.remove`, `scenario.import`) so dashboards
+can prefix-filter (`operation startsWith "scene."`). `Target` is
+the entity primary key, slash-joined for nested children
+(`scenario1/sceneA` for scenes, `server1/hislip0` for routes).
 
 ### 3. Sink: NDJSON
 
@@ -114,9 +130,45 @@ request. Audit failures inside the middleware are caught and
 swallowed so an unwritable audit log never breaks the user
 request.
 
-**Gateway lifecycle / config mutations**: out of scope for this
-initial wiring batch. The port + events are defined; concrete
-gateway / handler-side emissions accrete in follow-up commits.
+**Config mutations** (Batch U): every command handler that
+persists operator-managed state emits one `ConfigMutated` on
+successful save. Wired sites:
+
+| Handler | Operation | Target |
+| --- | --- | --- |
+| `AddDeviceCommandHandler` | `device.add` | `{DeviceName}` |
+| `RemoveDeviceCommandHandler` | `device.remove` | `{DeviceName}` |
+| `AddServerCommandHandler` | `server.add` | `{ServerName}` |
+| `RemoveServerCommandHandler` | `server.remove` | `{ServerName}` |
+| `AddRouteCommandHandler` | `route.add` | `{ServerName}/{Endpoint}` |
+| `RemoveRouteCommandHandler` | `route.remove` | `{ServerName}/{Endpoint}` |
+| `AddSceneCommandHandler` | `scene.add` | `{ScenarioName}/{Match}` |
+| `RemoveSceneCommandHandler` | `scene.remove` | `{ScenarioName}/{Index}` |
+| `CreateScenarioCommandHandler` | `scenario.create` | `{ScenarioName}` |
+| `RemoveScenarioCommandHandler` | `scenario.remove` | `{ScenarioName}` |
+| `ImportScenarioFromTrafficCommandHandler` | `scenario.import` | `{ScenarioName}` |
+
+Emission fires only on `SaveAsync` success — failed saves are
+operational errors, not security events. The architecture test
+`AuditWiringTests` scans `IviCli.Application` for command handlers
+prefixed `Add` / `Remove` / `Create` / `Import` whose ctor depends
+on `IConfigStore` or `IScenarioStore` and verifies each also
+depends on `IAuditLog`. Drift guard for future handlers added
+without audit injection.
+
+**Gateway lifecycle** (Batch U): `StartServerCommandHandler` emits
+`ServerLifecycle(server, "start", subject)` after the PID-registry
+write and before `gateway.RunAsync`, then emits a terminal event
+in the `finally` block:
+
+- `gateway.RunAsync` returned `Result.Error` → `"crashed"`
+- otherwise (success or cooperative cancellation) → `"stop"`
+
+The terminal append uses `CancellationToken.None` so a cancelled
+outer token does not skip the audit emission itself.
+`StopServerCommand` (the SIGTERM-equivalent signal sender) does
+not emit — the start-side handler's terminal event already
+captures the actual transition timestamp.
 
 ### 6. Privacy
 
@@ -139,11 +191,21 @@ gateway / handler-side emissions accrete in follow-up commits.
 - **Remote sink.** OTel logs / Loki / Sentry shipping is a
   separate batch — operators who want centralised storage attach
   it via `logrotate`-piped scripts in the meantime.
-- **Config-mutation emissions.** `ConfigMutated` is defined but
-  the per-handler call sites aren't yet emitting. Follow-up.
-- **Gateway-server emissions.** `ServerLifecycle` is defined; the
-  HiSlip/VXI-11/Socket gateway `RunAsync` enter/exit emissions
-  ship next.
+- **Token CRUD audit.** `CreateApiToken` / `RevokeApiToken`
+  (ADR 0036) persist to a separate store (`api-tokens.toml`);
+  `ConfigMutated` deliberately does not cover them. A future
+  `AuthAdmin(Action, TokenId, Subject)` variant covers that path
+  if operator demand surfaces.
+- **`SetCurrentDevice` audit.** Session-pointer changes are
+  excluded as noise — operators care about config mutations, not
+  CLI cursor moves.
+- **`ConfigMutationFailed` variant.** Failed saves are operational
+  errors logged elsewhere; security review needs the "what
+  actually changed" timeline, not failed attempts.
+- **Per-gateway-connection audit** (HiSlip / VXI-11 client
+  connect/disconnect inside `gateway.RunAsync`). Out of v1 — the
+  ADR 0017 §6 baseline is satisfied by the `ServerLifecycle`
+  enter/exit pair plus existing OTel spans for per-request work.
 - **Filesystem rotation / retention.** The CLI does not rotate
   the file — operators use the OS toolchain.
 
@@ -167,11 +229,27 @@ gateway / handler-side emissions accrete in follow-up commits.
   - Codec round-trip for `[audit]` TOML.
   - `NdjsonAuditLog` MockFileSystem tests (one-line-per-event,
     field flattening, parent-directory creation, concurrent
-    append integrity).
+    append integrity, Subject round-trip for both new variants).
   - End-to-end via `ApiTestHost`: `/healthz` emits one
     `ApiRequest`; invalid bearer emits `AuthFailed` +
     `ApiRequest(401)`; valid bearer emits `AuthSucceeded` +
     `ApiRequest(200)` with the matching PAT label.
+  - `ConfigMutatedWiringTests` Theory body — 11 rows, one per
+    mutating handler, asserts exactly one `ConfigMutated`
+    emission with the expected `{entity}.{verb}` Operation /
+    slash-joined Target / forwarded Subject.
+  - `AuditWiringTests` Architecture guard — every
+    `{Add,Remove,Create,Import}*CommandHandler` whose ctor
+    depends on `IConfigStore` or `IScenarioStore` must also
+    depend on `IAuditLog`. Future handlers added without audit
+    wiring fail this test instead of silently swallowing.
+  - `StartServerLifecycleAuditTests` — normal / failed /
+    cancelled gateway termination paths assert the action
+    sequence (`[start, stop]` / `[start, crashed]`) and the
+    forwarded subject.
 - Manual: `ivicli api start --tls-self-signed`, perform a few
   requests, inspect `audit.ndjson` with `jq '. | select(.kind ==
-  "auth.succeeded")'`.
+  "auth.succeeded")'`. For Batch U follow-up:
+  `ivicli device add psu1 TCPIP::1.2.3.4::INSTR` then
+  `jq 'select(.kind == "config.mutated")' audit.ndjson` shows
+  `{operation:"device.add", target:"psu1", subject:"cli/<user>"}`.
