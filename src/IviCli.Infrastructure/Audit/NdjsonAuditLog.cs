@@ -103,6 +103,7 @@ public sealed class NdjsonAuditLog : IAuditLog, IDisposable
                     timestamp = c.Timestamp,
                     operation = c.Operation,
                     target = c.Target,
+                    subject = c.Subject,
                 },
                 JsonOptions
             ),
@@ -126,6 +127,7 @@ public sealed class NdjsonAuditLog : IAuditLog, IDisposable
                     timestamp = s.Timestamp,
                     server = s.Server,
                     action = s.Action,
+                    subject = s.Subject,
                 },
                 JsonOptions
             ),

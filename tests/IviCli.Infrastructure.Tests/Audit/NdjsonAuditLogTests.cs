@@ -87,6 +87,52 @@ public sealed class NdjsonAuditLogTests
     }
 
     [Fact]
+    public async Task AppendAsync_round_trips_ConfigMutated_subject()
+    {
+        var fs = new MockFileSystem();
+        using var sut = new NdjsonAuditLog(fs, Path);
+
+        await sut.AppendAsync(
+            new ConfigMutated(
+                new DateTimeOffset(2026, 5, 29, 10, 0, 0, TimeSpan.Zero),
+                Operation: "device.add",
+                Target: "psu1",
+                Subject: "cli/alice"
+            ),
+            default
+        );
+
+        using var doc = JsonDocument.Parse(fs.File.ReadAllText(Path).TrimEnd());
+        doc.RootElement.GetProperty("kind").GetString().ShouldBe("config.mutated");
+        doc.RootElement.GetProperty("operation").GetString().ShouldBe("device.add");
+        doc.RootElement.GetProperty("target").GetString().ShouldBe("psu1");
+        doc.RootElement.GetProperty("subject").GetString().ShouldBe("cli/alice");
+    }
+
+    [Fact]
+    public async Task AppendAsync_round_trips_ServerLifecycle_subject()
+    {
+        var fs = new MockFileSystem();
+        using var sut = new NdjsonAuditLog(fs, Path);
+
+        await sut.AppendAsync(
+            new ServerLifecycle(
+                new DateTimeOffset(2026, 5, 29, 10, 0, 0, TimeSpan.Zero),
+                Server: "gw1",
+                Action: "crashed",
+                Subject: "cli/bob"
+            ),
+            default
+        );
+
+        using var doc = JsonDocument.Parse(fs.File.ReadAllText(Path).TrimEnd());
+        doc.RootElement.GetProperty("kind").GetString().ShouldBe("server.lifecycle");
+        doc.RootElement.GetProperty("server").GetString().ShouldBe("gw1");
+        doc.RootElement.GetProperty("action").GetString().ShouldBe("crashed");
+        doc.RootElement.GetProperty("subject").GetString().ShouldBe("cli/bob");
+    }
+
+    [Fact]
     public async Task Concurrent_appends_do_not_interleave_lines()
     {
         var fs = new MockFileSystem();

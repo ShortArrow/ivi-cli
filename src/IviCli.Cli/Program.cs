@@ -100,6 +100,14 @@ internal static class Program
                 );
             }
 
+            // Audit subject (ADR 0043 Batch U). CliAuditSubject returns
+            // 'cli/{Environment.UserName}' so ConfigMutated and
+            // ServerLifecycle events attribute the actor.
+            services.AddSingleton<
+                IviCli.Application.Audit.IAuditSubject,
+                IviCli.Cli.Audit.CliAuditSubject
+            >();
+
             // Plugin discovery (ADR 0013) — opt-in. When enabled, each
             // loaded plugin's Register call adds its IIviBackend types as
             // DI singletons; the PluginBackendFactory decorator (below)

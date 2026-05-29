@@ -1,3 +1,4 @@
+using IviCli.Application.Audit;
 using IviCli.Application.Configuration;
 using IviCli.Domain;
 using IviCli.Domain.Configuration;
@@ -69,19 +70,25 @@ public sealed class StartServerCommandHandler
     private readonly IGatewayServerFactory _factory;
     private readonly IServerProcessRegistry _registry;
     private readonly TimeProvider _time;
+    private readonly IAuditLog _audit;
+    private readonly IAuditSubject _subject;
 
     /// <summary>Creates a new handler.</summary>
     public StartServerCommandHandler(
         IConfigStore configStore,
         IGatewayServerFactory factory,
         IServerProcessRegistry registry,
-        TimeProvider? time = null
+        TimeProvider? time = null,
+        IAuditLog? audit = null,
+        IAuditSubject? subject = null
     )
     {
         _configStore = configStore;
         _factory = factory;
         _registry = registry;
         _time = time ?? TimeProvider.System;
+        _audit = audit ?? NullAuditLog.Instance;
+        _subject = subject ?? new StaticAuditSubject("unknown");
     }
 
     /// <summary>Runs the requested server.</summary>
@@ -134,9 +141,16 @@ public sealed class StartServerCommandHandler
             );
         }
 
+        var subject = _subject.Get();
+        await _audit.AppendAsync(
+            new ServerLifecycle(_time.GetUtcNow(), name.Value, "start", subject),
+            ct
+        );
+
+        Result<Unit, GatewayServerError>? runResult = null;
         try
         {
-            var runResult = await gateway.RunAsync(server, config, ct);
+            runResult = await gateway.RunAsync(server, config, ct);
             return runResult switch
             {
                 Result<Unit, GatewayServerError>.Ok ok => Result.Success<Unit, StartServerError>(
@@ -151,9 +165,17 @@ public sealed class StartServerCommandHandler
         }
         finally
         {
+            // Audit the terminal transition before tearing down the PID
+            // file so consumers see [start → stop/crashed] in order.
+            var action = runResult is Result<Unit, GatewayServerError>.Error ? "crashed" : "stop";
+            await _audit.AppendAsync(
+                new ServerLifecycle(_time.GetUtcNow(), name.Value, action, subject),
+                CancellationToken.None
+            );
+
             // Best-effort cleanup; if the file system rejects the delete the
             // next start overwrites the PID file anyway.
-            _ = await _registry.DeleteAsync(name, ct);
+            _ = await _registry.DeleteAsync(name, CancellationToken.None);
         }
     }
 }
