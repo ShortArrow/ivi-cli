@@ -277,10 +277,17 @@ jobs:
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
-      - name: Download all artifacts
+      # Download only the artifacts we want attached to the GitHub
+      # Release. The docker job uploads a buildx provenance
+      # attestation as a side-effect artifact (named like
+      # "<owner>~<repo>~XXX.dockerbuild", ~60 MB) which has no value
+      # in the release page and historically times out the v4
+      # download client; we filter it out with a pattern.
+      - name: Download release artifacts
         uses: actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16 # v4.1.8
         with:
           path: ./artifacts
+          pattern: ivicli-*
 
       - name: Create GitHub Release
         env:
