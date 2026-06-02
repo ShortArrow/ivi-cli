@@ -289,6 +289,33 @@ jobs:
           path: ./artifacts
           pattern: ivicli-*
 
+      # Bundle each per-RID self-contained directory into a single
+      # archive so the Release page has one user-facing download per
+      # platform instead of dozens of loose .dll / .pdb files. The
+      # framework-dependent layout follows the same pattern but is
+      # zipped separately so users who already have .NET installed
+      # can grab the smaller artifact.
+      - name: Bundle per-RID archives
+        run: |
+          set -euo pipefail
+          VERSION="${GITHUB_REF_NAME#v}"
+          mkdir -p ./release-assets
+          for rid in linux-x64 linux-arm64 osx-x64 osx-arm64 win-x64 win-arm64; do
+            sc="./artifacts/ivicli-${rid}/${rid}-selfcontained"
+            fx="./artifacts/ivicli-${rid}/${rid}-fxdep"
+            if [ -d "$sc" ]; then
+              (cd "$sc" && zip -qr "../../../release-assets/ivicli-${VERSION}-${rid}-selfcontained.zip" .)
+            fi
+            if [ -d "$fx" ]; then
+              (cd "$fx" && zip -qr "../../../release-assets/ivicli-${VERSION}-${rid}-fxdep.zip" .)
+            fi
+          done
+          # NuGet package: attach as-is (already a single file).
+          if compgen -G "./artifacts/ivicli-nupkg/*.nupkg" > /dev/null; then
+            cp ./artifacts/ivicli-nupkg/*.nupkg ./release-assets/
+          fi
+          ls -la ./release-assets/
+
       - name: Create GitHub Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -296,4 +323,4 @@ jobs:
           gh release create "${{ github.ref_name }}" \
             --title "${{ github.ref_name }}" \
             --generate-notes \
-            ./artifacts/**/*
+            ./release-assets/*
