@@ -11,9 +11,12 @@ required if you use the mock container.
 | File | Purpose |
 |---|---|
 | `psu-bench.toml` | The scenario itself — drop into a scenarios directory. |
-| `setup.sh` | One-shot bash script that walks every CLI step. |
+| `setup.sh` | bash idempotent walker for Linux / macOS / WSL / Git Bash. |
+| `setup.ps1` | PowerShell-native equivalent for Windows. |
 
 ## Quick start — bare CLI
+
+### Linux / macOS / WSL / Git Bash
 
 ```sh
 ./setup.sh
@@ -25,6 +28,21 @@ ivicli visa query tester "*IDN?"
 `setup.sh` accepts `PROTO=socket PORT=5025` (and `PORT=...` /
 `SUBADDR=...`) to route through the raw-SOCKET gateway or a
 different TCP port.
+
+### Windows / PowerShell 7+
+
+```powershell
+.\setup.ps1
+ivicli visa add tester 'TCPIP::localhost::hislip0::INSTR'
+ivicli visa query tester '*IDN?'
+# → IVICLI-MOCK,PSU,SN0001,1.0.0
+```
+
+Accepts the same overrides as parameters:
+`.\setup.ps1 -Proto socket -Port 5025`. Tail of the script
+also prints the **NI MAX manual-registration steps** for apps
+that go through NI-VISA / Keysight VISA (e.g. ImageDataGetter)
+and need a static resource entry to pick the mock up.
 
 ## Quick start — mock-VISA container
 
