@@ -443,14 +443,14 @@
       "ivicli.api": {
         "type": "Project",
         "dependencies": {
-          "IviCli.Application": "[1.0.0, )",
+          "IviCli.Application": "[0.1.0, )",
           "Microsoft.AspNetCore.OpenApi": "[10.0.0, )"
         }
       },
       "ivicli.application": {
         "type": "Project",
         "dependencies": {
-          "IviCli.Domain": "[1.0.0, )",
+          "IviCli.Domain": "[0.1.0, )",
           "Microsoft.Extensions.DependencyInjection.Abstractions": "[10.0.0, )",
           "Microsoft.Extensions.Logging.Abstractions": "[10.0.0, )",
           "TestableIO.System.IO.Abstractions": "[22.1.0, )"
@@ -459,28 +459,28 @@
       "ivicli.backends.fake": {
         "type": "Project",
         "dependencies": {
-          "IviCli.Application": "[1.0.0, )",
+          "IviCli.Application": "[0.1.0, )",
           "Microsoft.Extensions.DependencyInjection.Abstractions": "[10.0.0, )"
         }
       },
       "ivicli.backends.hislip": {
         "type": "Project",
         "dependencies": {
-          "IviCli.Application": "[1.0.0, )",
+          "IviCli.Application": "[0.1.0, )",
           "Microsoft.Extensions.DependencyInjection.Abstractions": "[10.0.0, )"
         }
       },
       "ivicli.backends.local": {
         "type": "Project",
         "dependencies": {
-          "IviCli.Application": "[1.0.0, )",
+          "IviCli.Application": "[0.1.0, )",
           "Microsoft.Extensions.DependencyInjection.Abstractions": "[10.0.0, )"
         }
       },
       "ivicli.backends.lxi": {
         "type": "Project",
         "dependencies": {
-          "IviCli.Application": "[1.0.0, )",
+          "IviCli.Application": "[0.1.0, )",
           "Makaretu.Dns": "[2.0.1, )",
           "Makaretu.Dns.Multicast": "[0.27.0, )",
           "Microsoft.Extensions.DependencyInjection.Abstractions": "[10.0.0, )",
@@ -490,21 +490,21 @@
       "ivicli.backends.replay": {
         "type": "Project",
         "dependencies": {
-          "IviCli.Application": "[1.0.0, )",
+          "IviCli.Application": "[0.1.0, )",
           "Microsoft.Extensions.DependencyInjection.Abstractions": "[10.0.0, )"
         }
       },
       "ivicli.backends.socket": {
         "type": "Project",
         "dependencies": {
-          "IviCli.Application": "[1.0.0, )",
+          "IviCli.Application": "[0.1.0, )",
           "Microsoft.Extensions.DependencyInjection.Abstractions": "[10.0.0, )"
         }
       },
       "ivicli.backends.vxi11": {
         "type": "Project",
         "dependencies": {
-          "IviCli.Application": "[1.0.0, )",
+          "IviCli.Application": "[0.1.0, )",
           "Microsoft.Extensions.DependencyInjection.Abstractions": "[10.0.0, )",
           "Microsoft.Extensions.Logging.Abstractions": "[10.0.0, )"
         }
@@ -515,8 +515,8 @@
       "ivicli.infrastructure": {
         "type": "Project",
         "dependencies": {
-          "IviCli.Application": "[1.0.0, )",
-          "IviCli.Plugin": "[1.0.0, )",
+          "IviCli.Application": "[0.1.0, )",
+          "IviCli.Plugin": "[0.1.0, )",
           "Microsoft.Extensions.DependencyInjection.Abstractions": "[10.0.0, )",
           "Microsoft.Extensions.Logging.Abstractions": "[10.0.0, )",
           "TestableIO.System.IO.Abstractions": "[22.1.0, )",
@@ -527,13 +527,13 @@
       "ivicli.plugin": {
         "type": "Project",
         "dependencies": {
-          "IviCli.Application": "[1.0.0, )"
+          "IviCli.Application": "[0.1.0, )"
         }
       },
       "ivicli.server": {
         "type": "Project",
         "dependencies": {
-          "IviCli.Application": "[1.0.0, )",
+          "IviCli.Application": "[0.1.0, )",
           "Microsoft.Extensions.DependencyInjection.Abstractions": "[10.0.0, )",
           "Microsoft.Extensions.Logging.Abstractions": "[10.0.0, )"
         }
