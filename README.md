@@ -143,6 +143,7 @@ Dependency direction is one-way (Domain ← Application ← {Infrastructure, Bac
 - [PRD](docs/PRD.md) — full product requirements ([日本語](docs/PRD.jp.md))
 - [Architecture Decision Records](docs/adr/) — every Accepted decision behind the implementation. Start with [ADR 0003](docs/adr/0003-architecture-style.md) (architecture style), [ADR 0021](docs/adr/0021-repository-layout.md) (layer assemblies), [ADR 0007](docs/adr/0007-network-transport.md) (HiSLIP / SOCKET).
 - [Domain glossary](docs/domain-glossary.md) — the ubiquitous-language catalog
+- [Samples](docs/samples/) — drop-in scenarios + setup scripts (e.g. [PSU mock VISA device](docs/samples/psu/))
 - [Contributing](CONTRIBUTING.md) — local dev loop, branching, hooks ([日本語](CONTRIBUTING.jp.md))
 
 ## Building from source

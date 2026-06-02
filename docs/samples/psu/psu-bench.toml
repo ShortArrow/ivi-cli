@@ -1,0 +1,73 @@
+# PSU (DC power supply) mock scenario — drop into your scenarios
+# directory to make a single ivi-cli gateway emulate a programmable
+# bench power supply over HiSLIP / SOCKET.
+#
+# Typical install:
+#   cp docs/samples/psu/psu-bench.toml \
+#      ~/.config/ivi-cli/scenarios/psu-bench.toml
+#   ivicli mock scenario activate psu-bench
+#
+# Or, for the mock container:
+#   docker run -v $PWD/docs/samples/psu:/etc/ivi-cli/scenarios \
+#              -e IVICLI_SCENARIO=psu-bench \
+#              -p 4880:4880 -p 5025:5025 \
+#              ghcr.io/shortarrow/ivi-cli-mock:latest
+
+# Identification + reset
+[[scenes]]
+match = "*IDN?"
+respond = "IVICLI-MOCK,PSU,SN0001,1.0.0"
+
+[[scenes]]
+match = "*RST"
+ack = true
+
+[[scenes]]
+match = "*OPC?"
+respond = "1"
+
+# Output enable
+[[scenes]]
+match = "OUTP ON"
+ack = true
+
+[[scenes]]
+match = "OUTP OFF"
+ack = true
+
+[[scenes]]
+match = "OUTP?"
+respond = "1"
+
+# Voltage setpoint
+[[scenes]]
+match = "VOLT 5.0"
+ack = true
+
+[[scenes]]
+match = "VOLT?"
+respond = "5.000"
+
+# Current limit
+[[scenes]]
+match = "CURR 1.0"
+ack = true
+
+[[scenes]]
+match = "CURR?"
+respond = "1.000"
+
+# Live measurements (static snapshot — replace with `mock scenario record`
+# capture if you want a more realistic walk)
+[[scenes]]
+match = "MEAS:VOLT?"
+respond = "4.998"
+
+[[scenes]]
+match = "MEAS:CURR?"
+respond = "0.823"
+
+# Error queue
+[[scenes]]
+match = "SYST:ERR?"
+respond = "0,\"No error\""

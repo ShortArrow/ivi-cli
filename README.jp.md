@@ -143,6 +143,7 @@ flowchart LR
 - [PRD](docs/PRD.jp.md) — プロダクト要件 ([English](docs/PRD.md))
 - [Architecture Decision Records](docs/adr/) — Accepted な意思決定。読み始めの推奨: [ADR 0003](docs/adr/0003-architecture-style.md) (アーキテクチャスタイル)、[ADR 0021](docs/adr/0021-repository-layout.md) (層アセンブリ)、[ADR 0007](docs/adr/0007-network-transport.md) (HiSLIP / SOCKET)
 - [Domain glossary](docs/domain-glossary.md) — ユビキタス言語カタログ
+- [Samples](docs/samples/) — そのまま投入できる scenario + セットアップスクリプト (例: [PSU mock VISA device](docs/samples/psu/))
 - [Contributing](CONTRIBUTING.jp.md) — ローカル開発・ブランチ運用・hooks ([English](CONTRIBUTING.md))
 
 ## ソースからビルド
