@@ -160,8 +160,6 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     needs: publish
-    env:
-      IMAGE_NAME: ghcr.io/${{ github.repository_owner }}/ivi-cli-mock
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
@@ -177,14 +175,22 @@ jobs:
           name: ivicli-linux-arm64
           path: ./artifacts
 
+      # OCI registries (ghcr.io included) require fully lowercase
+      # repository names. GitHub's repository_owner preserves casing
+      # (e.g. "ShortArrow"), so we lowercase it once here and expose
+      # the full image reference as steps.tags.outputs.image for the
+      # multi-arch push step below.
       - name: Compute image tags
         id: tags
         run: |
+          owner="${GITHUB_REPOSITORY_OWNER,,}"
+          image="ghcr.io/${owner}/ivi-cli-mock"
           version="${{ github.ref_name }}"
           version_no_v="${version#v}"
           minor="$(echo "$version_no_v" | awk -F. '{print "v"$1"."$2}')"
           sha7="$(git rev-parse --short=7 HEAD)"
           {
+            echo "image=$image"
             echo "version=$version"
             echo "minor=$minor"
             echo "sha7=sha-$sha7"
@@ -259,10 +265,10 @@ jobs:
           # Both per-RID artifacts are staged earlier so each platform
           # build picks its own.
           tags: |
-            ${{ env.IMAGE_NAME }}:${{ steps.tags.outputs.version }}
-            ${{ env.IMAGE_NAME }}:${{ steps.tags.outputs.minor }}
-            ${{ env.IMAGE_NAME }}:${{ steps.tags.outputs.sha7 }}
-            ${{ env.IMAGE_NAME }}:latest
+            ${{ steps.tags.outputs.image }}:${{ steps.tags.outputs.version }}
+            ${{ steps.tags.outputs.image }}:${{ steps.tags.outputs.minor }}
+            ${{ steps.tags.outputs.image }}:${{ steps.tags.outputs.sha7 }}
+            ${{ steps.tags.outputs.image }}:latest
 
   release:
     name: github release
