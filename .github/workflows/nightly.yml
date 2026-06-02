@@ -12,6 +12,10 @@ concurrency:
   group: nightly
   cancel-in-progress: false
 
+defaults:
+  run:
+    shell: bash
+
 jobs:
   integration:
     name: integration / ${{ matrix.os }}
