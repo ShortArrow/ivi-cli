@@ -18,14 +18,14 @@
       },
       "Testably.Abstractions.FileSystem.Interface": {
         "type": "Transitive",
-        "resolved": "10.0.0",
-        "contentHash": "tZOXFLGjkh8TxgMgKeEcM2HAlz9DwndGl6TFLo6ISHcszFX3FkuPMrtVbmqVjhooWNXrgJ/a9cH9ym5MZL1LAg=="
+        "resolved": "10.1.0",
+        "contentHash": "0R+m7DvS2QuDcFOfDGtyGErRrgXOl4/z2tbNLX2RfvlYJjlVcKG+wMIBfZO8vxGtTNwNxffTG4ibFRwd0jkM7w=="
       },
       "ivicli.application": {
         "type": "Project",
         "dependencies": {
           "IviCli.Domain": "[0.1.0, )",
-          "TestableIO.System.IO.Abstractions": "[22.1.0, )"
+          "TestableIO.System.IO.Abstractions": "[22.1.1, )"
         }
       },
       "ivicli.domain": {
@@ -33,11 +33,11 @@
       },
       "TestableIO.System.IO.Abstractions": {
         "type": "CentralTransitive",
-        "requested": "[22.1.0, )",
-        "resolved": "22.1.0",
-        "contentHash": "YQ/IuNE8gP/+yNwQjdqd6DKhB9ADGjosxuY2IMXcQ3729iXa9QRsPlmIBpk73L0s9E2b+MTYhAR/2Spk8REjvA==",
+        "requested": "[22.1.1, )",
+        "resolved": "22.1.1",
+        "contentHash": "EJmXIKfwvJHvSHWP+NjA213avUdofV4SmBx2aWxc3SzPkrHHVKxUMC3fSa/epzk/SVITwuU2EAntgQTvobAqwQ==",
         "dependencies": {
-          "Testably.Abstractions.FileSystem.Interface": "10.0.0"
+          "Testably.Abstractions.FileSystem.Interface": "10.1.0"
         }
       }
     }
