@@ -5,6 +5,32 @@
     <AssemblyName>ivicli</AssemblyName>
   </PropertyGroup>
 
+  <!--
+    NuGet packaging metadata for the `dotnet tool install -g ivi-cli`
+    distribution channel. The parent src/Directory.Build.props sets
+    IsPackable=false for every assembly so library projects don't
+    publish to nuget.org; this csproj opts back in explicitly because
+    it is the user-facing tool entry point.
+  -->
+  <PropertyGroup>
+    <IsPackable>true</IsPackable>
+    <PackAsTool>true</PackAsTool>
+    <PackageId>ivi-cli</PackageId>
+    <ToolCommandName>ivicli</ToolCommandName>
+    <Title>ivi-cli</Title>
+    <Description>VISA/IVI instrument CLI with HiSLIP / VXI-11 / SOCKET gateways, scenario-driven mock backend, and Management HTTP/WebSocket API.</Description>
+    <Authors>ShortArrow</Authors>
+    <PackageProjectUrl>https://github.com/ShortArrow/ivi-cli</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/ShortArrow/ivi-cli</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageTags>visa;ivi;scpi;hislip;vxi-11;cli;instrument;test-automation</PackageTags>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="..\..\README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
   <ItemGroup>
     <ProjectReference Include="..\IviCli.Application\IviCli.Application.csproj" />
     <ProjectReference Include="..\IviCli.Infrastructure\IviCli.Infrastructure.csproj" />

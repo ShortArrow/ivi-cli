@@ -122,12 +122,11 @@ jobs:
       - name: Pack
         run: |
           # Strip the leading `v` so v0.1.0 -> 0.1.0 for the NuGet
-          # package version + assembly metadata.
+          # package version + assembly metadata. PackAsTool / PackageId
+          # / ToolCommandName are declared in IviCli.Cli.csproj.
           VERSION="${GITHUB_REF_NAME#v}"
           dotnet pack src/IviCli.Cli/IviCli.Cli.csproj \
             -c Release \
-            -p:PackAsTool=true \
-            -p:ToolCommandName=ivicli \
             -p:Version="${VERSION}" \
             -o ./artifacts/nupkg
 
