@@ -5,10 +5,10 @@ using Xunit;
 namespace IviCli.Domain.Tests.Protocols;
 
 /// <summary>
-/// Characteristic tests for the pure HiSLIP framer. Verifies the 16-byte
-/// header layout per IVI-6.1 §10: 'S' prologue, type, control code, 4-byte
-/// big-endian message parameter, 8-byte big-endian payload length, 1 byte
-/// reserved.
+/// Characteristic tests for the pure HiSLIP framer. Verifies the
+/// IVI-6.1 §10.1.1 header layout: 2-byte ASCII "HS" prologue,
+/// MessageType, ControlCode, 4-byte big-endian MessageParameter,
+/// 8-byte big-endian PayloadLength.
 /// </summary>
 public sealed class HiSlipMessageTests
 {
@@ -32,8 +32,11 @@ public sealed class HiSlipMessageTests
     }
 
     [Fact]
-    public void WriteHeader_places_prologue_at_offset_zero()
+    public void WriteHeader_places_ASCII_HS_prologue_at_offsets_zero_and_one()
     {
+        // IVI-6.1 §10.1.1: the first two octets are the literal
+        // ASCII string "HS" (0x48 0x53). Any drift here makes real
+        // VISA clients reject the connection at the wire level.
         var buffer = new byte[HiSlipMessage.HeaderSize];
         HiSlipMessage.WriteHeader(
             buffer,
@@ -42,14 +45,62 @@ public sealed class HiSlipMessageTests
             messageParameter: 0,
             payloadLength: 0
         );
-        buffer[0].ShouldBe(HiSlipMessage.Prologue);
+        buffer[0].ShouldBe<byte>(0x48); // 'H'
+        buffer[1].ShouldBe<byte>(0x53); // 'S'
     }
 
     [Fact]
-    public void ReadHeader_rejects_wrong_prologue()
+    public void WriteHeader_emits_exact_wire_bytes_for_known_input()
+    {
+        // Spec-anchored byte-sequence assertion. If any field shifts
+        // by one offset (which is exactly the bug that originally
+        // shipped in 0.1.0 — a single-byte 'S' prologue dropped
+        // every field one octet earlier), this test fails loudly.
+        var buffer = new byte[HiSlipMessage.HeaderSize];
+        HiSlipMessage.WriteHeader(
+            buffer,
+            HiSlipMessageType.Initialize,
+            controlCode: 0,
+            messageParameter: 0x00010000u, // protocol version 1, sub-address-id 0
+            payloadLength: 0u
+        );
+        var expected = new byte[]
+        {
+            0x48,
+            0x53, // "HS"
+            0x00, // MessageType.Initialize
+            0x00, // ControlCode
+            0x00,
+            0x01,
+            0x00,
+            0x00, // MessageParameter BE = 0x00010000
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00, // PayloadLength BE = 0
+        };
+        buffer.ShouldBe(expected);
+    }
+
+    [Fact]
+    public void ReadHeader_rejects_wrong_prologue_at_offset_zero()
     {
         var buffer = new byte[HiSlipMessage.HeaderSize];
         buffer[0] = 0x42;
+        buffer[1] = 0x53;
+        Should.Throw<InvalidDataException>(() => HiSlipMessage.ReadHeader(buffer));
+    }
+
+    [Fact]
+    public void ReadHeader_rejects_wrong_prologue_at_offset_one()
+    {
+        var buffer = new byte[HiSlipMessage.HeaderSize];
+        buffer[0] = 0x48;
+        buffer[1] = 0x42;
         Should.Throw<InvalidDataException>(() => HiSlipMessage.ReadHeader(buffer));
     }
 

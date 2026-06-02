@@ -4,6 +4,72 @@ All notable changes to ivi-cli are documented here. Format roughly follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning follows
 [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.1] — 2026-06-03
+
+### Fixed
+
+- **HiSLIP wire-format bug** (critical interop) — the message
+  header treated the IVI-6.1 §10.1.1 prologue as a single byte
+  (`'S'` 0x53) instead of the spec's 2-byte ASCII `"HS"`
+  (0x48 0x53). This shifted every subsequent field by one
+  octet, so the gateway was effectively speaking a non-HiSLIP
+  protocol on the wire. ivi-cli ↔ ivi-cli sessions happened to
+  work because both ends shared the same offset error, but any
+  spec-compliant client (NI-VISA / Keysight / R&S / PyVISA-py)
+  immediately closed the connection with a prologue mismatch
+  (surfaced to NI-VISA users as `0xBFFF00A6`). A
+  byte-sequence test against an IVI-6.1 example now guards the
+  layout.
+
+### Docs
+
+- New `docs/samples/psu/` walks the minimum CLI to stand up a
+  PSU mock VISA device over HiSLIP / SOCKET. Ships
+  `psu-bench.toml` (drop-in scenario), `setup.sh` (bash
+  idempotent walker for Linux / macOS / WSL / Git Bash), and
+  `setup.ps1` (PowerShell-native equivalent that also prints
+  NI MAX manual-registration steps for apps that go through
+  NI-VISA / Keysight VISA, e.g. ImageDataGetter).
+- ADR 0020 §12 marks NuGet auth keyless via Trusted Publishing
+  (OIDC); the `NUGET_API_KEY` secret row was removed.
+
+### Build / CI
+
+- `release.yml` and `nightly.yml` declare workflow-level
+  `defaults.run.shell: bash` so Windows runners stop parsing
+  bash `\` line continuations as PowerShell unary operators.
+- `release.yml` `pack` job switches to NuGet Trusted Publishing
+  (OIDC) via `NuGet/login@v1` — no long-lived `NUGET_API_KEY`
+  secret required.
+- `release.yml` `docker` job lowercases the ghcr.io owner before
+  composing image tags (OCI registries reject uppercase).
+- `release.yml` `github release` job bundles per-RID
+  self-contained and framework-dependent publishes into
+  `ivicli-X.Y.Z-<rid>-{selfcontained,fxdep}.zip` archives
+  before attaching, so the Release page shows one download
+  per platform/flavor instead of a flat dump of loose .dll /
+  .pdb files.
+- `IviCli.Cli.csproj` declares `IsPackable`, `PackAsTool`,
+  `PackageId=ivi-cli`, `ToolCommandName=ivicli`, plus
+  description / tags / repository metadata so `dotnet pack`
+  actually produces a nupkg (the parent
+  `src/Directory.Build.props` sets `IsPackable=false` for
+  library projects).
+
+### Known issues filed
+
+- #14 VXI-11 in mock-VISA container
+- #15 NativeAOT mock-VISA image
+- #16 Management API TLS certificate hot-reload
+- #17 OTel Activity emission from gateway servers
+- #18 Local backend SRQ / AssertTrigger parity
+- #19 Tighten Windows ACL on session.json
+- #20 VXI-11 client backend: real portmapper round-trip
+- #21 HiSlip gateway: sub-address multiplexing for multi-device
+- #22 CLI tree: surface `mock scene` as a peer of `mock scenario`
+- #23 DeviceName: actionable error message for hyphen / uppercase / dot
+- #24 PowerShell-native sample scripts (partially resolved here)
+
 ## [0.1.0] — 2026-05-29
 
 Initial public release. Covers Phase 1 (CLI core), Phase 2 (gateway servers
@@ -124,4 +190,5 @@ Initial public release. Covers Phase 1 (CLI core), Phase 2 (gateway servers
   VXI-11 backends are at parity; Local needs IVI.NET reflection
   follow-up.
 
+[0.1.1]: https://github.com/ShortArrow/ivi-cli/releases/tag/v0.1.1
 [0.1.0]: https://github.com/ShortArrow/ivi-cli/releases/tag/v0.1.0

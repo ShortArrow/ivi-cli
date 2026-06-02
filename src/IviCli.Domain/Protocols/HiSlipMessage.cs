@@ -3,17 +3,31 @@ using System.Buffers.Binary;
 namespace IviCli.Domain.Protocols;
 
 /// <summary>
-/// Pure HiSLIP message framing per IVI-6.1 §10. Headers are 16 bytes:
-/// 'S' prologue, type, control code, 4-byte message parameter (BE), 8-byte
-/// payload length (BE), then payload (variable, length given by header).
+/// Pure HiSLIP message framing per IVI-6.1 §10.1.1. Headers are
+/// 16 bytes:
+///
+///   [0..2]   Prologue, ASCII "HS" (0x48 0x53)
+///   [2]      MessageType (one octet, see <see cref="HiSlipMessageType"/>)
+///   [3]      ControlCode (one octet)
+///   [4..8]   MessageParameter (uint32, big-endian)
+///   [8..16]  PayloadLength   (uint64, big-endian)
+///
+/// Real VISA clients (NI-VISA, Keysight, R&amp;S, PyVISA-py) all
+/// send this layout — any drift here makes the gateway look like
+/// a non-HiSLIP server at the wire level and the client either
+/// times out or surfaces a connection error (e.g. NI-VISA
+/// 0xBFFF00A6).
 /// </summary>
 public static class HiSlipMessage
 {
-    /// <summary>HiSLIP header size in bytes (including the prologue).</summary>
+    /// <summary>HiSLIP header size in bytes (including the 2-byte prologue).</summary>
     public const int HeaderSize = 16;
 
-    /// <summary>The HiSLIP prologue byte ('S').</summary>
-    public const byte Prologue = 0x53;
+    /// <summary>First prologue byte ('H' = 0x48) per IVI-6.1 §10.1.1.</summary>
+    public const byte PrologueByte0 = 0x48;
+
+    /// <summary>Second prologue byte ('S' = 0x53) per IVI-6.1 §10.1.1.</summary>
+    public const byte PrologueByte1 = 0x53;
 
     /// <summary>Encodes a HiSLIP header into <paramref name="destination"/>.</summary>
     public static void WriteHeader(
@@ -31,12 +45,12 @@ public static class HiSlipMessage
                 nameof(destination)
             );
         }
-        destination[0] = Prologue;
-        destination[1] = (byte)type;
-        destination[2] = controlCode;
-        BinaryPrimitives.WriteUInt32BigEndian(destination[3..7], messageParameter);
-        BinaryPrimitives.WriteUInt64BigEndian(destination[7..15], payloadLength);
-        destination[15] = 0;
+        destination[0] = PrologueByte0;
+        destination[1] = PrologueByte1;
+        destination[2] = (byte)type;
+        destination[3] = controlCode;
+        BinaryPrimitives.WriteUInt32BigEndian(destination[4..8], messageParameter);
+        BinaryPrimitives.WriteUInt64BigEndian(destination[8..16], payloadLength);
     }
 
     /// <summary>Decodes a HiSLIP header from <paramref name="source"/>.</summary>
@@ -49,16 +63,17 @@ public static class HiSlipMessage
                 nameof(source)
             );
         }
-        if (source[0] != Prologue)
+        if (source[0] != PrologueByte0 || source[1] != PrologueByte1)
         {
             throw new InvalidDataException(
-                $"HiSLIP prologue mismatch: expected 0x{Prologue:X2}, got 0x{source[0]:X2}"
+                "HiSLIP prologue mismatch: expected 0x48 0x53 (\"HS\"), got "
+                    + $"0x{source[0]:X2} 0x{source[1]:X2}"
             );
         }
-        var type = (HiSlipMessageType)source[1];
-        var controlCode = source[2];
-        var messageParameter = BinaryPrimitives.ReadUInt32BigEndian(source[3..7]);
-        var payloadLength = BinaryPrimitives.ReadUInt64BigEndian(source[7..15]);
+        var type = (HiSlipMessageType)source[2];
+        var controlCode = source[3];
+        var messageParameter = BinaryPrimitives.ReadUInt32BigEndian(source[4..8]);
+        var payloadLength = BinaryPrimitives.ReadUInt64BigEndian(source[8..16]);
         return new HiSlipHeader(type, controlCode, messageParameter, payloadLength);
     }
 }
