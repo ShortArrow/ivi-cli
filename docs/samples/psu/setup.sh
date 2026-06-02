@@ -20,25 +20,25 @@ PROTO="${PROTO:-hislip}"
 PORT="${PORT:-4880}"
 SUBADDR="${SUBADDR:-hislip0}"     # only meaningful for hislip
 SERVER="${SERVER:-${PROTO}-psu}"
-DEVICE="${DEVICE:-psu-mock}"
+DEVICE="${DEVICE:-psu_mock}"
 
 echo "==> using scenario=$SCENARIO  proto=$PROTO  port=$PORT  device=$DEVICE  server=$SERVER"
 
 # 1) Scenario + scenes — define the PSU's SCPI conversation.
 ivicli mock scenario create "$SCENARIO" || true
-ivicli mock scene add "$SCENARIO" --match '*IDN?'      --respond 'IVICLI-MOCK,PSU,SN0001,1.0.0' || true
-ivicli mock scene add "$SCENARIO" --match '*RST'       --ack                                   || true
-ivicli mock scene add "$SCENARIO" --match '*OPC?'      --respond '1'                           || true
-ivicli mock scene add "$SCENARIO" --match 'OUTP ON'    --ack                                   || true
-ivicli mock scene add "$SCENARIO" --match 'OUTP OFF'   --ack                                   || true
-ivicli mock scene add "$SCENARIO" --match 'OUTP?'      --respond '1'                           || true
-ivicli mock scene add "$SCENARIO" --match 'VOLT 5.0'   --ack                                   || true
-ivicli mock scene add "$SCENARIO" --match 'VOLT?'      --respond '5.000'                       || true
-ivicli mock scene add "$SCENARIO" --match 'CURR 1.0'   --ack                                   || true
-ivicli mock scene add "$SCENARIO" --match 'CURR?'      --respond '1.000'                       || true
-ivicli mock scene add "$SCENARIO" --match 'MEAS:VOLT?' --respond '4.998'                       || true
-ivicli mock scene add "$SCENARIO" --match 'MEAS:CURR?' --respond '0.823'                       || true
-ivicli mock scene add "$SCENARIO" --match 'SYST:ERR?'  --respond '0,"No error"'                || true
+ivicli mock scenario scene add "$SCENARIO" --match '*IDN?'      --respond 'IVICLI-MOCK,PSU,SN0001,1.0.0' || true
+ivicli mock scenario scene add "$SCENARIO" --match '*RST'       --ack                                   || true
+ivicli mock scenario scene add "$SCENARIO" --match '*OPC?'      --respond '1'                           || true
+ivicli mock scenario scene add "$SCENARIO" --match 'OUTP ON'    --ack                                   || true
+ivicli mock scenario scene add "$SCENARIO" --match 'OUTP OFF'   --ack                                   || true
+ivicli mock scenario scene add "$SCENARIO" --match 'OUTP?'      --respond '1'                           || true
+ivicli mock scenario scene add "$SCENARIO" --match 'VOLT 5.0'   --ack                                   || true
+ivicli mock scenario scene add "$SCENARIO" --match 'VOLT?'      --respond '5.000'                       || true
+ivicli mock scenario scene add "$SCENARIO" --match 'CURR 1.0'   --ack                                   || true
+ivicli mock scenario scene add "$SCENARIO" --match 'CURR?'      --respond '1.000'                       || true
+ivicli mock scenario scene add "$SCENARIO" --match 'MEAS:VOLT?' --respond '4.998'                       || true
+ivicli mock scenario scene add "$SCENARIO" --match 'MEAS:CURR?' --respond '0.823'                       || true
+ivicli mock scenario scene add "$SCENARIO" --match 'SYST:ERR?'  --respond '0,"No error"'                || true
 
 # 2) Activate so backend FakeBackend serves these responses.
 ivicli mock scenario activate "$SCENARIO"
