@@ -126,10 +126,21 @@ All third-party actions are pinned by commit SHA (e.g. `actions/checkout@8a4c...
 | Secret | Purpose | Phase |
 | --- | --- | --- |
 | `CODECOV_TOKEN` | Coverage upload (optional for public repos) | 1 |
-| `NUGET_API_KEY` | `dotnet tool` publish to nuget.org | 1 (when first release ships) |
 | Code signing certificate | Binary signing | 2 |
 
 All secrets stored as repository / environment secrets; never written to logs.
+
+**nuget.org auth is keyless.** `dotnet tool` publish uses [NuGet Trusted
+Publishing](https://learn.microsoft.com/en-us/nuget/nuget-org/trusted-publishing)
+(OIDC) via `NuGet/login@v1` rather than a long-lived `NUGET_API_KEY`
+secret. The `pack` job in `release.yml` declares
+`permissions: { id-token: write }` and a matching policy is registered
+under the `ShortArrow` nuget.org account
+(`Repository Owner = ShortArrow`, `Repository = ivi-cli`,
+`Workflow = release.yml`).
+
+**ghcr.io auth is also keyless.** The `docker` job uses the
+built-in `GITHUB_TOKEN` with `packages: write` — no PAT required.
 
 ### 13. Analyzer enforcement
 

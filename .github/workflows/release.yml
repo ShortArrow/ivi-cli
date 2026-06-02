@@ -100,6 +100,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     needs: publish
+    permissions:
+      id-token: write
+      contents: read
     env:
       DOTNET_NOLOGO: true
       DOTNET_CLI_TELEMETRY_OPTOUT: true
@@ -128,13 +131,21 @@ jobs:
             -p:Version="${VERSION}" \
             -o ./artifacts/nupkg
 
+      # Exchange the GitHub OIDC token for a short-lived (1h) nuget.org
+      # API key via the trusted publisher policy registered under the
+      # ShortArrow nuget.org account. Requires `permissions.id-token: write`
+      # on this job and a matching policy at
+      # https://www.nuget.org/account/trusted-publishing.
+      - name: NuGet login (OIDC)
+        id: nuget-login
+        uses: NuGet/login@v1
+        with:
+          user: ShortArrow
+
       - name: Push to NuGet
-        if: ${{ env.NUGET_API_KEY != '' }}
-        env:
-          NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
         run: |
           dotnet nuget push './artifacts/nupkg/*.nupkg' \
-            --api-key "$NUGET_API_KEY" \
+            --api-key "${{ steps.nuget-login.outputs.NUGET_API_KEY }}" \
             --source https://api.nuget.org/v3/index.json \
             --skip-duplicate
 
