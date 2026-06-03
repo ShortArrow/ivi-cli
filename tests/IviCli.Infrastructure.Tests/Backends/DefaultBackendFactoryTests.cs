@@ -37,36 +37,45 @@ public sealed class DefaultBackendFactoryTests
     }
 
     [Fact]
-    public void Active_scenario_on_fallback_outranks_resource_shape_dispatch()
+    public void Active_scenario_short_circuits_vxi11_and_socket_but_not_hislip()
     {
-        // Issue #25: when the fallback backend reports an active mock
-        // scenario, every dispatch must collapse to the fallback so
-        // the gateway can answer from scenes instead of trying — and
-        // timing out on — a real transport connection. The
-        // TCPIP0::host::inst0 resource normally routes to the VXI-11
-        // backend; here it must NOT.
+        // Issue #25 + v0.2.1 refinement. When the fallback backend
+        // reports an active scenario, dispatches that would otherwise
+        // try a real transport with nothing listening
+        // (VXI-11 / SOCKET / Local / placeholder INSTR) collapse to
+        // the fallback so the gateway answers from scenes. HiSlip
+        // resources are deliberately EXCLUDED because they are the
+        // user's explicit "reach this network endpoint" signal —
+        // typically the ivi-cli gateway itself. Re-routing HiSlip to
+        // FakeBackend on the client side would prevent every
+        // ivicli invocation from crossing the wire and would reset
+        // FSM transitions every call.
         var fallback = new ScenarioAwareMarkerBackend("fallback", hasActiveScenario: true);
         var vxi11 = new MarkerBackend("vxi11");
         var hislip = new MarkerBackend("hislip");
+        var socket = new MarkerBackend("socket");
         var factory = new DefaultBackendFactory(
             fallback,
             hislipBackend: hislip,
-            vxi11Backend: vxi11
+            vxi11Backend: vxi11,
+            socketBackend: socket
         );
 
         var vxi11Device = BuildDevice("TCPIP0::127.0.0.1::inst0::INSTR");
         var hislipDevice = BuildDevice("TCPIP0::127.0.0.1::hislip0::INSTR");
         var socketDevice = BuildDevice("TCPIP0::127.0.0.1::5025::SOCKET");
 
+        // VXI-11 + SOCKET re-route to fallback (gateway mock case).
         ((ScenarioAwareMarkerBackend)factory.CreateFor(vxi11Device).ShouldBeOk()).Tag.ShouldBe(
-            "fallback"
-        );
-        ((ScenarioAwareMarkerBackend)factory.CreateFor(hislipDevice).ShouldBeOk()).Tag.ShouldBe(
             "fallback"
         );
         ((ScenarioAwareMarkerBackend)factory.CreateFor(socketDevice).ShouldBeOk()).Tag.ShouldBe(
             "fallback"
         );
+
+        // HiSlip stays on HiSlipBackend so client ivicli still hits
+        // the gateway across the wire — even with scenario active.
+        ((MarkerBackend)factory.CreateFor(hislipDevice).ShouldBeOk()).Tag.ShouldBe("hislip");
     }
 
     [Fact]

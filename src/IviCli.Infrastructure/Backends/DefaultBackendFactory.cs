@@ -45,25 +45,38 @@ public sealed class DefaultBackendFactory : IBackendFactory
     /// <inheritdoc/>
     public Result<IIviBackend, BackendError> CreateFor(Device device)
     {
-        // Scenario-aware short-circuit (issue #25). If the fallback
-        // backend reports an active mock scenario, the user has
-        // explicitly asked the mock to answer for every routed device;
-        // we must NOT hand the dispatch to a real transport backend
-        // that would try to TCP-connect to whatever the device's
-        // VisaResource shape implies and time out when nothing is
-        // listening.
-        if (_fallbackBackend is IScenarioAwareBackend probe && probe.HasActiveScenario)
-        {
-            return Result.Success<IIviBackend, BackendError>(_fallbackBackend);
-        }
+        // Scenario-aware short-circuit (issue #25, refined for HiSlip in
+        // v0.2.1). When the user has activated a mock scenario, dispatches
+        // that would otherwise hit a real transport backend with NOTHING
+        // listening (placeholder VXI-11 / SOCKET / Local resources) are
+        // re-routed to the FakeBackend instead, so the gateway answers
+        // from scenes rather than timing out trying to TCP-connect to
+        // 127.0.0.1:1024 or similar.
+        //
+        // HiSlip resources are deliberately EXCLUDED from the
+        // short-circuit: a HiSlip resource string (`...::hislip0::INSTR`)
+        // is the user explicitly asking to reach a network HiSLIP
+        // endpoint, which is typically the ivi-cli gateway itself. If we
+        // re-route HiSlip → FakeBackend on the client side, the
+        // client process would answer the scenario locally instead of
+        // crossing the wire to the gateway — every new ivicli
+        // invocation would reset the FSM and FSM transitions would never
+        // stick across CLI calls.
+        var hasActiveScenario =
+            _fallbackBackend is IScenarioAwareBackend probe && probe.HasActiveScenario;
 
         var backend = device.Resource switch
         {
             VisaResource.Tcpip t when LooksLikeHislip(t) => _hislipBackend ?? _fallbackBackend,
+            VisaResource.Tcpip t when LooksLikeVxi11(t) && hasActiveScenario => _fallbackBackend,
             VisaResource.Tcpip t when LooksLikeVxi11(t) => _vxi11Backend ?? _fallbackBackend,
+            VisaResource.TcpipSocket when hasActiveScenario => _fallbackBackend,
             VisaResource.TcpipSocket => _socketBackend ?? _fallbackBackend,
+            VisaResource.Tcpip when hasActiveScenario => _fallbackBackend,
             VisaResource.Tcpip => _localBackend ?? _hislipBackend ?? _fallbackBackend,
+            VisaResource.Usb when hasActiveScenario => _fallbackBackend,
             VisaResource.Usb => _localBackend ?? _fallbackBackend,
+            VisaResource.Gpib when hasActiveScenario => _fallbackBackend,
             VisaResource.Gpib => _localBackend ?? _fallbackBackend,
             _ => _fallbackBackend,
         };

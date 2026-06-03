@@ -4,6 +4,32 @@ All notable changes to ivi-cli are documented here. Format roughly follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning follows
 [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.1] — 2026-06-03
+
+### Fixed
+
+- **HiSlip clients now reach the gateway even when a scenario is
+  active.** v0.1.3 introduced a scenario-aware short-circuit in
+  `DefaultBackendFactory` that collapsed **every** dispatch to the
+  FakeBackend when a mock scenario was active. The intent was to
+  let the gateway answer from the mock for placeholder INSTR
+  resources without timing out trying to TCP-connect to a real
+  VXI-11 / SOCKET endpoint. Side-effect: client invocations
+  (`ivicli visa query/write`) targeting a HiSlip endpoint
+  (`...::hislip0::INSTR`) were ALSO re-routed to the client process's
+  local FakeBackend, so they never crossed the wire to the gateway.
+  Every new ivicli CLI call re-activated the scenario and reset the
+  FSM to the initial scene, so `OUTP ON` followed by `OUTP?` always
+  saw the `off` state's response.
+
+  The fix narrows the short-circuit: HiSlip resources are now
+  always dispatched to `HiSlipBackend`, regardless of scenario
+  activation. The user typed `...::hislip0::INSTR` to explicitly
+  reach a network HiSlip endpoint (typically the ivi-cli gateway
+  itself); honouring that intent preserves FSM behaviour across
+  CLI calls. VXI-11 / SOCKET / placeholder TCPIP-INSTR / USB /
+  GPIB short-circuits still apply.
+
 ## [0.2.0] — 2026-06-03
 
 This release reshapes the mock-scenario domain so that **scenes are
@@ -355,6 +381,7 @@ Initial public release. Covers Phase 1 (CLI core), Phase 2 (gateway servers
   VXI-11 backends are at parity; Local needs IVI.NET reflection
   follow-up.
 
+[0.2.1]: https://github.com/ShortArrow/ivi-cli/releases/tag/v0.2.1
 [0.2.0]: https://github.com/ShortArrow/ivi-cli/releases/tag/v0.2.0
 [0.1.4]: https://github.com/ShortArrow/ivi-cli/releases/tag/v0.1.4
 [0.1.3]: https://github.com/ShortArrow/ivi-cli/releases/tag/v0.1.3
