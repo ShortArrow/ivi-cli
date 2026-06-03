@@ -6,6 +6,12 @@ mock that responds to a typical SCPI conversation
 over HiSLIP or raw SOCKET — no real hardware, no .NET install
 required if you use the mock container.
 
+**v0.2.0**: this sample is a **two-state FSM**. `OUTP ON` while the
+device is off transitions it to "on"; `OUTP OFF` returns it to
+"off". `OUTP?` answers `0` or `1` according to the current state,
+and `MEAS:VOLT?` / `MEAS:CURR?` flip between the noise-floor
+values (off) and the configured setpoint (on).
+
 ## Files
 
 | File | Purpose |
@@ -67,31 +73,33 @@ the same scenario serves both.
 
 ## What the scenario covers
 
-| SCPI | Direction | Mock response |
-|---|---|---|
-| `*IDN?` | query | `IVICLI-MOCK,PSU,SN0001,1.0.0` |
-| `*RST` | write | (ack) |
-| `*OPC?` | query | `1` |
-| `OUTP ON` / `OUTP OFF` | write | (ack) |
-| `OUTP?` | query | `1` |
-| `VOLT 5.0` | write | (ack) |
-| `VOLT?` | query | `5.000` |
-| `CURR 1.0` | write | (ack) |
-| `CURR?` | query | `1.000` |
-| `MEAS:VOLT?` | query | `4.998` |
-| `MEAS:CURR?` | query | `0.823` |
-| `SYST:ERR?` | query | `0,"No error"` |
+| SCPI | Direction | State `off` | State `on` |
+|---|---|---|---|
+| `*IDN?` | query | `IVICLI-MOCK,PSU,SN0001,1.0.0` | (same) |
+| `*RST` | write | ack + transition to `off` | (same) |
+| `*OPC?` | query | `1` | (same) |
+| `OUTP ON` | write | ack + transition to `on` | ack (no-op) |
+| `OUTP OFF` | write | ack (no-op) | ack + transition to `off` |
+| `OUTP?` | query | `0` | `1` |
+| `VOLT 5.0` | write | (ack) | (ack) |
+| `VOLT?` | query | `5.000` | `5.000` |
+| `CURR 1.0` | write | (ack) | (ack) |
+| `CURR?` | query | `1.000` | `1.000` |
+| `MEAS:VOLT?` | query | `0.001` (noise floor) | `4.998` |
+| `MEAS:CURR?` | query | `0.000` | `0.823` |
+| `SYST:ERR?` | query | `0,"No error"` | (same) |
 
 ## Limitations
 
-- **No state machine** — `OUTP ON` followed by `OUTP?` still
-  returns the canned `1`, regardless of what was previously set.
-  For a stateful mock, capture a real instrument session with
-  `ivicli mock scenario record --from-script` and import it as
-  a new scenario.
-- **Static measurements** — `MEAS:VOLT?` returns the same value
-  every time. Replace with a `record` capture for realistic
-  drift.
+- **No key-value variable state** — `VOLT 7.5` followed by `VOLT?`
+  still returns the canned `5.000`. Modelling continuous setpoints
+  is a future feature (see issue
+  [#26](https://github.com/ShortArrow/ivi-cli/issues/26)
+  "Out of scope").
+- **Rules don't share across scenes** — static metadata
+  (`*IDN?`, etc.) must be duplicated in every scene because v0.2.0
+  rule matching is per-scene. The duplication is visible in
+  `psu-bench.toml` and `setup.{sh,ps1}`.
 - **Single device per HiSlip server** — to expose multiple
   instruments today, use separate `server add` entries on
   separate ports. Tracked in

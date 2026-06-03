@@ -1,6 +1,11 @@
-# PSU (DC power supply) mock scenario — drop into your scenarios
-# directory to make a single ivi-cli gateway emulate a programmable
-# bench power supply over HiSLIP / SOCKET.
+# PSU (DC power supply) mock scenario — v0.2.0 FSM shape.
+#
+# Two states: `off` and `on`. `OUTP ON` from `off` transitions to
+# `on`; `OUTP OFF` from `on` transitions back. `OUTP?` answers 0 or
+# 1 according to the current state. Static metadata (`*IDN?`, `*RST`,
+# voltages, currents, errors) is duplicated in both scenes because
+# v0.2.0 scenes do not share rule sets (key-value variable state is
+# a separate, future feature — see issue #26 §"Out of scope").
 #
 # Typical install:
 #   cp docs/samples/psu/psu-bench.toml \
@@ -13,61 +18,123 @@
 #              -p 4880:4880 -p 5025:5025 \
 #              ghcr.io/shortarrow/ivi-cli-mock:latest
 
-# Identification + reset
+idn = "IVICLI-MOCK,PSU,SN0001,1.0.0"
+initial_scene = "off"
+
+# ===================== off =====================
 [[scenes]]
+name = "off"
+
+[[scenes.rules]]
 match = "*IDN?"
 respond = "IVICLI-MOCK,PSU,SN0001,1.0.0"
 
-[[scenes]]
+[[scenes.rules]]
 match = "*RST"
 ack = true
+transition_to = "off"
 
-[[scenes]]
+[[scenes.rules]]
 match = "*OPC?"
 respond = "1"
 
-# Output enable
-[[scenes]]
+[[scenes.rules]]
+match = "OUTP?"
+respond = "0"
+
+[[scenes.rules]]
 match = "OUTP ON"
 ack = true
+transition_to = "on"
 
-[[scenes]]
+[[scenes.rules]]
 match = "OUTP OFF"
 ack = true
 
-[[scenes]]
-match = "OUTP?"
-respond = "1"
-
-# Voltage setpoint
-[[scenes]]
+[[scenes.rules]]
 match = "VOLT 5.0"
 ack = true
 
-[[scenes]]
+[[scenes.rules]]
 match = "VOLT?"
 respond = "5.000"
 
-# Current limit
-[[scenes]]
+[[scenes.rules]]
 match = "CURR 1.0"
 ack = true
 
-[[scenes]]
+[[scenes.rules]]
 match = "CURR?"
 respond = "1.000"
 
-# Live measurements (static snapshot — replace with `mock scenario record`
-# capture if you want a more realistic walk)
+# When the output is off, measured values are essentially zero
+# (instrument's noise floor); model that here.
+[[scenes.rules]]
+match = "MEAS:VOLT?"
+respond = "0.001"
+
+[[scenes.rules]]
+match = "MEAS:CURR?"
+respond = "0.000"
+
+[[scenes.rules]]
+match = "SYST:ERR?"
+respond = "0,\"No error\""
+
+# ===================== on =====================
 [[scenes]]
+name = "on"
+
+[[scenes.rules]]
+match = "*IDN?"
+respond = "IVICLI-MOCK,PSU,SN0001,1.0.0"
+
+[[scenes.rules]]
+match = "*RST"
+ack = true
+transition_to = "off"
+
+[[scenes.rules]]
+match = "*OPC?"
+respond = "1"
+
+[[scenes.rules]]
+match = "OUTP?"
+respond = "1"
+
+[[scenes.rules]]
+match = "OUTP ON"
+ack = true
+
+[[scenes.rules]]
+match = "OUTP OFF"
+ack = true
+transition_to = "off"
+
+[[scenes.rules]]
+match = "VOLT 5.0"
+ack = true
+
+[[scenes.rules]]
+match = "VOLT?"
+respond = "5.000"
+
+[[scenes.rules]]
+match = "CURR 1.0"
+ack = true
+
+[[scenes.rules]]
+match = "CURR?"
+respond = "1.000"
+
+[[scenes.rules]]
 match = "MEAS:VOLT?"
 respond = "4.998"
 
-[[scenes]]
+[[scenes.rules]]
 match = "MEAS:CURR?"
 respond = "0.823"
 
-# Error queue
-[[scenes]]
+[[scenes.rules]]
 match = "SYST:ERR?"
 respond = "0,\"No error\""

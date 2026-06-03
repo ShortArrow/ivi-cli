@@ -4,6 +4,103 @@ All notable changes to ivi-cli are documented here. Format roughly follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning follows
 [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.0] — 2026-06-03
+
+This release reshapes the mock-scenario domain so that **scenes are
+state nodes and scenarios are state machines**, removing a semantic
+mismatch that v0.1.x lived with (see issue
+[#26](https://github.com/ShortArrow/ivi-cli/issues/26) and ADR 0026
+§15 for the design rationale).
+
+The shape is a deliberate breaking change at the .NET library API
+and at the CLI verb surface. Existing **scenario TOML files** are
+backwards-compatible — they continue to load as a single
+synthetic `default` scene.
+
+### Added
+
+- **State-machine scenarios** — every `RuleAction` carries an
+  optional `Transition: SceneName?`. When set, the FakeBackend
+  swaps the active scenario's current scene immediately after the
+  rule's effect is applied, so the same SCPI query can produce
+  different responses across the session
+  (e.g. `OUTP?` returns `0` until `OUTP ON` walks the FSM to a
+  scene where `OUTP?` returns `1`).
+- **New CLI verbs** under `mock scenario`:
+  - `scene add <scenario> <scene>` — create an empty state node.
+  - `scene remove <scenario> <scene>` — remove a state node by
+    alias (refuses to remove the initial scene).
+  - `rule add <scenario> --in <scene> --match X --respond Y
+     [--transition-to <scene>]` — append a rule to a named
+    scene with an optional transition.
+  - `rule remove <scenario> <index> [--in <scene>]` — remove a
+    rule by 1-based index inside the target scene.
+  - `mock scenario show` now prints the multi-scene tree with the
+    initial scene marked `*` and per-rule transitions inline.
+- **v0.2.0 TOML schema** — `initial_scene` + `[[scenes]]` tables
+  with `name` + nested `[[scenes.rules]]`. Existing v0.1.x flat
+  scenarios (no `name`, flat `[[scenes]]` with `match`) keep
+  loading as a single synthetic `default` scene. Serialisation
+  emits the flat shape for single-default-scene scenarios with no
+  transitions so pre-v0.2 files round-trip unchanged.
+- **PSU sample upgraded to a 2-state FSM** — `docs/samples/psu/`
+  now demonstrates `off → on → off` walking via `OUTP ON` /
+  `OUTP OFF`, with `OUTP?` and `MEAS:VOLT?` flipping per state.
+  `psu-bench.toml`, `setup.sh`, and `setup.ps1` all switched to
+  the new shape.
+
+### Changed (breaking)
+
+- `IviCli.Domain.Mock.MockScene` is **renamed**: the v0.1.x type
+  (a single `match` → `action` pair) is now
+  `IviCli.Domain.Mock.MockRule`; the name `MockScene` is
+  re-purposed as the state-node type (`Name SceneName`, `Rules
+  ImmutableArray<MockRule>`).
+- `IviCli.Domain.Mock.SceneAction` → `IviCli.Domain.Mock.RuleAction`
+  with the same variants (`Respond` / `Ack` / `Fail`).
+- `IviCli.Domain.Mock.MockScenario`'s shape: now
+  `(Name, InitialScene SceneName, IdnDefault, Scenes
+  ImmutableArray<MockScene>)`. The v0.1.x convenience factory
+  `MockScenario.SingleScene(name, idnDefault, rules)` covers the
+  legacy flat-rule path used by traffic-record imports.
+- `IScenarioStore.AppendSceneAsync(MockScene)` → `AppendRuleAsync(MockRule)`,
+  with the documented contract of appending to the scenario's
+  initial scene.
+- CLI verbs `mock scenario scene add --match …` and
+  `scene remove <index>` are gone — use the new `scene` /
+  `rule` verbs above. Scripts that drove the v0.1.x verbs need a
+  one-time rewrite.
+- Audit log `Operation` codes: `scene.add` / `scene.remove` now
+  describe state-node operations (target =
+  `<scenario>/<scene>`); rule-level mutations use the new
+  `rule.add` / `rule.remove` codes (target =
+  `<scenario>/<scene>/<match-or-index>`). Tools that grep the
+  NDJSON audit log need to widen their recognised set.
+
+### Internals
+
+- New optional capability interface
+  `IviCli.Application.Backends.IScenarioAwareBackend`
+  (introduced in v0.1.3); the FakeBackend now also tracks its
+  current scene per active scenario and applies transitions
+  under a single internal lock.
+
+### Migration
+
+- **Authoring**: drop in the new v0.2.0 TOML manually, or copy the
+  PSU sample (`docs/samples/psu/psu-bench.toml`) as a starting
+  point.
+- **Existing v0.1.x scenarios**: no action required — load as a
+  single `default` scene; subsequent `rule add` / `rule remove`
+  without `--in` continues to operate on that scene.
+- **CLI**: replace `mock scenario scene add … --match …` with
+  `mock scenario rule add … --match …` (optionally
+  `--in <scene>` and `--transition-to <scene>`).
+- **Library consumers**: rename `MockScene` → `MockRule`,
+  `SceneAction` → `RuleAction`. Use
+  `MockScenario.SingleScene(...)` for v0.1.x-equivalent
+  construction.
+
 ## [0.1.4] — 2026-06-03
 
 ### Fixed
@@ -258,6 +355,7 @@ Initial public release. Covers Phase 1 (CLI core), Phase 2 (gateway servers
   VXI-11 backends are at parity; Local needs IVI.NET reflection
   follow-up.
 
+[0.2.0]: https://github.com/ShortArrow/ivi-cli/releases/tag/v0.2.0
 [0.1.4]: https://github.com/ShortArrow/ivi-cli/releases/tag/v0.1.4
 [0.1.3]: https://github.com/ShortArrow/ivi-cli/releases/tag/v0.1.3
 [0.1.2]: https://github.com/ShortArrow/ivi-cli/releases/tag/v0.1.2
