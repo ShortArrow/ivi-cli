@@ -57,11 +57,12 @@ else
   ivicli server route add "$SERVER" "$PORT" "$DEVICE" || true
 fi
 
-# 6) Start. IVICLI_MOCK_ONLY=1 collapses every transport backend
-# to the FakeBackend fallback so the gateway answers from the active
-# scenario instead of trying to open a real VXI-11/HiSlip session
-# against the device's placeholder resource string. See #25.
-IVICLI_MOCK_ONLY=1 ivicli server start "$SERVER"
+# 6) Start. Since v0.1.3, the gateway honors the active scenario
+# at backend-dispatch time (#25), so we don't need IVICLI_MOCK_ONLY=1
+# on the host CLI path — the gateway will route to the FakeBackend
+# automatically when a scenario is active. The container path keeps
+# using IVICLI_MOCK_ONLY=1 to skip all real-transport DI registrations.
+ivicli server start "$SERVER"
 
 echo
 echo "==> mock PSU is live."

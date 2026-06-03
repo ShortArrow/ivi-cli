@@ -45,6 +45,18 @@ public sealed class DefaultBackendFactory : IBackendFactory
     /// <inheritdoc/>
     public Result<IIviBackend, BackendError> CreateFor(Device device)
     {
+        // Scenario-aware short-circuit (issue #25). If the fallback
+        // backend reports an active mock scenario, the user has
+        // explicitly asked the mock to answer for every routed device;
+        // we must NOT hand the dispatch to a real transport backend
+        // that would try to TCP-connect to whatever the device's
+        // VisaResource shape implies and time out when nothing is
+        // listening.
+        if (_fallbackBackend is IScenarioAwareBackend probe && probe.HasActiveScenario)
+        {
+            return Result.Success<IIviBackend, BackendError>(_fallbackBackend);
+        }
+
         var backend = device.Resource switch
         {
             VisaResource.Tcpip t when LooksLikeHislip(t) => _hislipBackend ?? _fallbackBackend,

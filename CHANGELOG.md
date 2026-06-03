@@ -4,6 +4,27 @@ All notable changes to ivi-cli are documented here. Format roughly follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning follows
 [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.3] — 2026-06-03
+
+### Fixed
+
+- **Active mock scenario now outranks resource-shape dispatch**
+  (issue #25). When `ivicli mock scenario activate <name>` has
+  been called, `DefaultBackendFactory.CreateFor` short-circuits
+  to the FakeBackend regardless of the device's `VisaResource`
+  shape. Previously a placeholder TCPIP-INSTR resource still
+  routed traffic to the VXI-11 / HiSLIP / SOCKET / Local
+  backends, so the gateway tried (and timed out at ~2.5 s) to
+  open a real transport connection against a port nothing was
+  listening on. Net effect for sample users: the `IVICLI_MOCK_ONLY=1`
+  workaround is no longer required for the gateway side —
+  `setup.sh` and `setup.ps1` drop it. The env var still works
+  as a manual override (the container path keeps using it).
+- Introduces a new optional capability mixin
+  `IScenarioAwareBackend` (in `IviCli.Application/Backends/`)
+  that the FakeBackend implements; the factory consults this
+  on its fallback backend at dispatch time.
+
 ## [0.1.2] — 2026-06-03
 
 ### Fixed
@@ -223,6 +244,7 @@ Initial public release. Covers Phase 1 (CLI core), Phase 2 (gateway servers
   VXI-11 backends are at parity; Local needs IVI.NET reflection
   follow-up.
 
+[0.1.3]: https://github.com/ShortArrow/ivi-cli/releases/tag/v0.1.3
 [0.1.2]: https://github.com/ShortArrow/ivi-cli/releases/tag/v0.1.2
 [0.1.1]: https://github.com/ShortArrow/ivi-cli/releases/tag/v0.1.1
 [0.1.0]: https://github.com/ShortArrow/ivi-cli/releases/tag/v0.1.0

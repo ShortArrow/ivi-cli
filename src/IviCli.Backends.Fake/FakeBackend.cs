@@ -15,10 +15,13 @@ namespace IviCli.Backends.Fake;
 /// configuration. Implements the fault-injection surface declared in
 /// ADR 0009 §6 and the scenario-playback hook declared in ADR 0026 §4.
 /// </summary>
-public sealed class FakeBackend : IIviBackend
+public sealed class FakeBackend : IIviBackend, IScenarioAwareBackend
 {
     private readonly ConcurrentDictionary<DeviceName, FakeDeviceState> _devices = new();
     private MockScenario? _activeScenario;
+
+    /// <inheritdoc/>
+    public bool HasActiveScenario => _activeScenario is not null;
 
     /// <summary>Configures the default IDN response for <paramref name="name"/>.</summary>
     public FakeBackend ConfigureDevice(DeviceName name, string idn)

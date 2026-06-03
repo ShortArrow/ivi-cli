@@ -82,27 +82,6 @@ the same scenario serves both.
 | `MEAS:CURR?` | query | `0.823` |
 | `SYST:ERR?` | query | `0,"No error"` |
 
-## Until #25 lands: set `IVICLI_MOCK_ONLY=1` before `server start`
-
-When traffic comes through the gateway (not the local CLI), the
-backend factory dispatches on the device's resource shape
-**before** consulting the active scenario, so
-`TCPIP0::127.0.0.1::INSTR` falls into the VXI-11 path and the
-gateway tries (and fails) to open a real VXI-11 socket to
-127.0.0.1:1024. Until [#25](https://github.com/ShortArrow/ivi-cli/issues/25)
-makes the factory scenario-aware, force the all-fallback mode:
-
-```sh
-IVICLI_MOCK_ONLY=1 ivicli server start hislip-psu
-```
-
-```powershell
-$env:IVICLI_MOCK_ONLY = '1'
-ivicli server start hislip-psu
-```
-
-Both `setup.sh` and `setup.ps1` set this env var on your behalf.
-
 ## Limitations
 
 - **No state machine** — `OUTP ON` followed by `OUTP?` still
