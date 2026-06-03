@@ -19,6 +19,8 @@ public sealed class FakeBackend : IIviBackend, IScenarioAwareBackend
 {
     private readonly ConcurrentDictionary<DeviceName, FakeDeviceState> _devices = new();
     private MockScenario? _activeScenario;
+    private SceneName? _currentScene;
+    private readonly object _sceneGate = new();
 
     /// <inheritdoc/>
     public bool HasActiveScenario => _activeScenario is not null;
@@ -32,25 +34,86 @@ public sealed class FakeBackend : IIviBackend, IScenarioAwareBackend
     }
 
     /// <summary>
-    /// Activates a mock scenario. The scenario's scenes take precedence over
-    /// the programmatic DSL (<see cref="RespondToQuery"/>, etc.) when a match
-    /// is found; otherwise the existing fallthrough applies (ADR 0026 §4).
+    /// Activates a mock scenario. Resets the current scene to the
+    /// scenario's <see cref="MockScenario.InitialScene"/>; matching
+    /// rules whose action carries a <c>Transition</c> field move the
+    /// FakeBackend to a different scene at runtime
+    /// (issue #26 §"Implementation plan" — B0.2-3). The scenario's
+    /// rules take precedence over the programmatic DSL
+    /// (<see cref="RespondToQuery"/>, etc.) when a match is found;
+    /// otherwise the existing fallthrough applies (ADR 0026 §4).
     /// </summary>
     public FakeBackend ActivateScenario(MockScenario scenario)
     {
-        _activeScenario = scenario;
+        lock (_sceneGate)
+        {
+            _activeScenario = scenario;
+            _currentScene = scenario.InitialScene;
+        }
         return this;
     }
 
     /// <summary>Removes any active scenario.</summary>
     public FakeBackend DeactivateScenario()
     {
-        _activeScenario = null;
+        lock (_sceneGate)
+        {
+            _activeScenario = null;
+            _currentScene = null;
+        }
         return this;
     }
 
     /// <summary>The currently activated scenario, if any.</summary>
     public MockScenario? ActiveScenario => _activeScenario;
+
+    /// <summary>
+    /// The currently active scene inside the active scenario.
+    /// <see langword="null"/> when no scenario is active. Updated
+    /// whenever a matched rule's action carries a
+    /// <c>Transition</c>.
+    /// </summary>
+    public SceneName? CurrentScene => _currentScene;
+
+    /// <summary>
+    /// Looks up a rule in the active scenario's current scene, or
+    /// <see langword="null"/> when no scenario is active or no rule
+    /// matches.
+    /// </summary>
+    private MockRule? FindRuleInCurrentScene(string scpi)
+    {
+        var scenario = _activeScenario;
+        var currentScene = _currentScene;
+        if (scenario is null || currentScene is null)
+        {
+            return null;
+        }
+        return scenario.FindScene(currentScene)?.FindByMatch(scpi);
+    }
+
+    /// <summary>
+    /// Applies a rule action's optional transition: if the action
+    /// names a target scene and the active scenario contains it, the
+    /// FakeBackend's current scene is swapped under the scene-gate
+    /// lock. If the named scene does not exist, the transition is
+    /// silently ignored (the rule's payload still takes effect); a
+    /// future B0.2 patch may surface this as
+    /// <see cref="MockScenarioContractMismatch"/>.
+    /// </summary>
+    private void ApplyTransition(SceneName? target)
+    {
+        if (target is null)
+        {
+            return;
+        }
+        lock (_sceneGate)
+        {
+            if (_activeScenario?.FindScene(target) is not null)
+            {
+                _currentScene = target;
+            }
+        }
+    }
 
     /// <summary>
     /// Arranges that the next <see cref="OpenAsync"/> for <paramref name="name"/>
@@ -147,25 +210,33 @@ public sealed class FakeBackend : IIviBackend, IScenarioAwareBackend
         ct.ThrowIfCancellationRequested();
         var state = _devices.GetOrAdd(device.Name, _ => new FakeDeviceState());
 
-        // Scenario takes precedence over the programmatic DSL.
-        if (_activeScenario?.FindByMatch(command.Value) is { } scene)
+        // Scenario takes precedence over the programmatic DSL. Look up
+        // the rule in the active scenario's *current* scene (B0.2-3),
+        // not the flat rule list — once Transition actions land, the
+        // current scene moves at runtime so the same SCPI string may
+        // match different rules at different points in the session.
+        var rule = FindRuleInCurrentScene(command.Value);
+        if (rule is not null)
         {
-            return scene.Action switch
+            // Effect first, then transition: a Fail rule reports its
+            // canned failure before moving the scene; an Ack
+            // succeeds first, then moves on.
+            var effect = rule.Action switch
             {
-                RuleAction.Ack => Task.FromResult(Result.Success<Unit, BackendError>(Unit.Value)),
-                RuleAction.Fail f => Task.FromResult(
-                    Result.Failure<Unit, BackendError>(BuildFailure(command.Value, f))
+                RuleAction.Ack => Result.Success<Unit, BackendError>(Unit.Value),
+                RuleAction.Fail f => Result.Failure<Unit, BackendError>(
+                    BuildFailure(command.Value, f)
                 ),
-                RuleAction.Respond => Task.FromResult(
-                    Result.Failure<Unit, BackendError>(
-                        new MockScenarioContractMismatch(
-                            command.Value,
-                            "scenario scene has `respond` but WriteAsync expects `ack`"
-                        )
+                RuleAction.Respond => Result.Failure<Unit, BackendError>(
+                    new MockScenarioContractMismatch(
+                        command.Value,
+                        "scenario rule has `respond` but WriteAsync expects `ack`"
                     )
                 ),
-                _ => Task.FromResult(Result.Success<Unit, BackendError>(Unit.Value)),
+                _ => Result.Success<Unit, BackendError>(Unit.Value),
             };
+            ApplyTransition(rule.Action.Transition);
+            return Task.FromResult(effect);
         }
 
         state.LastWritten = command.Value;
@@ -182,27 +253,28 @@ public sealed class FakeBackend : IIviBackend, IScenarioAwareBackend
         ct.ThrowIfCancellationRequested();
         var state = _devices.GetOrAdd(device.Name, _ => new FakeDeviceState());
 
-        // Scenario takes precedence.
-        if (_activeScenario?.FindByMatch(query.Value) is { } scene)
+        // Scenario takes precedence. Look up the rule in the active
+        // scenario's *current* scene (B0.2-3); same rationale as the
+        // WriteAsync path above.
+        var rule = FindRuleInCurrentScene(query.Value);
+        if (rule is not null)
         {
-            return scene.Action switch
+            var effect = rule.Action switch
             {
-                RuleAction.Respond r => Task.FromResult(
-                    Result.Success<string, BackendError>(r.Text)
+                RuleAction.Respond r => Result.Success<string, BackendError>(r.Text),
+                RuleAction.Fail f => Result.Failure<string, BackendError>(
+                    BuildFailure(query.Value, f)
                 ),
-                RuleAction.Fail f => Task.FromResult(
-                    Result.Failure<string, BackendError>(BuildFailure(query.Value, f))
-                ),
-                RuleAction.Ack => Task.FromResult(
-                    Result.Failure<string, BackendError>(
-                        new MockScenarioContractMismatch(
-                            query.Value,
-                            "scenario scene has `ack` but QueryAsync expects `respond`"
-                        )
+                RuleAction.Ack => Result.Failure<string, BackendError>(
+                    new MockScenarioContractMismatch(
+                        query.Value,
+                        "scenario rule has `ack` but QueryAsync expects `respond`"
                     )
                 ),
-                _ => Task.FromResult(Result.Success<string, BackendError>(query.Value)),
+                _ => Result.Success<string, BackendError>(query.Value),
             };
+            ApplyTransition(rule.Action.Transition);
+            return Task.FromResult(effect);
         }
 
         if (state.QueryFailures.TryGetValue(query.Value, out var failure))
