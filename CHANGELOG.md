@@ -4,6 +4,20 @@ All notable changes to ivi-cli are documented here. Format roughly follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning follows
 [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.4] — 2026-06-03
+
+### Fixed
+
+- **Mock scenario scene match now normalises the SCPI leading-colon
+  prefix** (real-environment interop). At message start, SCPI 1999
+  §6.1.1 / IEEE 488.2 §7.5 treat `:OUTP` and `OUTP` as equivalent —
+  the colon is the "absolute path from root" prefix and there is no
+  current path to be relative to. Real VISA clients (NI-VISA,
+  Keysight, PyVISA, ImageDataGetter via NI-VISA) freely emit the
+  colon-prefixed form, so a scene registered as `MEAS:VOLT?` now
+  also matches `:MEAS:VOLT?` (and vice versa). Eliminates the need
+  to register redundant `:`/non-`:` scene pairs.
+
 ## [0.1.3] — 2026-06-03
 
 ### Fixed
@@ -244,6 +258,7 @@ Initial public release. Covers Phase 1 (CLI core), Phase 2 (gateway servers
   VXI-11 backends are at parity; Local needs IVI.NET reflection
   follow-up.
 
+[0.1.4]: https://github.com/ShortArrow/ivi-cli/releases/tag/v0.1.4
 [0.1.3]: https://github.com/ShortArrow/ivi-cli/releases/tag/v0.1.3
 [0.1.2]: https://github.com/ShortArrow/ivi-cli/releases/tag/v0.1.2
 [0.1.1]: https://github.com/ShortArrow/ivi-cli/releases/tag/v0.1.1

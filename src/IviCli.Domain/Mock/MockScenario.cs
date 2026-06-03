@@ -41,18 +41,33 @@ public sealed record MockScenario(
         return this with { Scenes = Scenes.RemoveAt(oneBasedIndex - 1) };
     }
 
-    /// <summary>Looks up a scene by its exact SCPI text.</summary>
+    /// <summary>
+    /// Looks up a scene by SCPI text. Matching is exact except for the
+    /// SCPI grammar's optional root-relative colon prefix
+    /// (IEEE 488.2 §7.5 / SCPI 1999 §6.1.1): a scene registered as
+    /// <c>OUTP ON</c> matches both <c>OUTP ON</c> and <c>:OUTP ON</c>
+    /// at lookup time, because — at the start of a message — both
+    /// forms address the same root command. Real VISA clients
+    /// (NI-VISA, Keysight, PyVISA) and apps like ImageDataGetter
+    /// freely emit the colon-prefixed form; honouring it here means
+    /// scenarios do not need redundant <c>:OUTP ON</c> / <c>OUTP ON</c>
+    /// duplicates.
+    /// </summary>
     public MockScene? FindByMatch(string scpi)
     {
+        var normalized = NormalizeForMatch(scpi);
         foreach (var s in Scenes)
         {
-            if (s.Match == scpi)
+            if (NormalizeForMatch(s.Match) == normalized)
             {
                 return s;
             }
         }
         return null;
     }
+
+    private static string NormalizeForMatch(string scpi) =>
+        scpi.Length > 0 && scpi[0] == ':' ? scpi[1..] : scpi;
 
     /// <summary>Custom structural equality including the array contents.</summary>
     public bool Equals(MockScenario? other) =>

@@ -46,6 +46,33 @@ public class FakeBackendScenarioTests
         result.ShouldBeOk().ShouldBe("3.30");
     }
 
+    [Theory]
+    [InlineData(":MEAS:VOLT?", "MEAS:VOLT?")] // client adds colon, scene without
+    [InlineData("MEAS:VOLT?", ":MEAS:VOLT?")] // scene adds colon, client without
+    [InlineData(":MEAS:VOLT?", ":MEAS:VOLT?")] // both prefixed
+    [InlineData("MEAS:VOLT?", "MEAS:VOLT?")] // legacy exact match still works
+    public async Task ActiveScenario_LeadingColon_Normalized(string clientScpi, string sceneMatch)
+    {
+        // Per SCPI 1999 §6.1.1 and IEEE 488.2 §7.5, the leading
+        // colon is the "absolute path from root" prefix; at message
+        // start there is no current path, so `:OUTP` ≡ `OUTP` at the
+        // wire level. Real VISA clients (NI-VISA, Keysight, PyVISA,
+        // ImageDataGetter via NI-VISA) emit the colon-prefixed form.
+        // Scene lookup must honour both.
+        var backend = new FakeBackend();
+        backend.ActivateScenario(
+            MakeScenario(new MockScene(sceneMatch, new SceneAction.Respond("3.30")))
+        );
+
+        var result = await backend.QueryAsync(
+            Dev(),
+            ScpiQuery.From(clientScpi).ShouldBeOk(),
+            CancellationToken.None
+        );
+
+        result.ShouldBeOk().ShouldBe("3.30");
+    }
+
     [Fact]
     public async Task ActiveScenario_IdnDefault_UsedWhenNoExplicitScene()
     {
