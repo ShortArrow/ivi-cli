@@ -268,7 +268,17 @@ public sealed class HiSlipGatewayServer : IGatewayServer
                     {
                         var scpi = assembled.ToString();
                         assembled.Clear();
-                        await DispatchScpiAsync(stream, backend, device, scpi, ct);
+                        // Echo the client's MessageId on the response per
+                        // IVI-6.1 §10.6.2 (server-to-client Data carries the
+                        // same MessageId as the client's initiating request).
+                        await DispatchScpiAsync(
+                            stream,
+                            backend,
+                            device,
+                            scpi,
+                            header.MessageParameter,
+                            ct
+                        );
                     }
                 }
                 else if (header.Type == HiSlipMessageType.Trigger)
@@ -576,12 +586,17 @@ public sealed class HiSlipGatewayServer : IGatewayServer
         IIviBackend backend,
         Domain.Devices.Device device,
         string scpi,
+        uint clientMessageId,
         CancellationToken ct
     )
     {
-        if (scpi.TrimEnd('\r', '\n').EndsWith('?'))
+        // Real VISA clients (NI-VISA, Keysight, R&S, PyVISA-py) terminate
+        // SCPI lines with `\r\n` or `\n` per IEEE 488.2 §7.5. Backends and
+        // scenario matchers see canonical, terminator-free strings.
+        var normalized = scpi.TrimEnd('\r', '\n');
+        if (normalized.EndsWith('?'))
         {
-            var queryResult = ScpiQuery.From(scpi);
+            var queryResult = ScpiQuery.From(normalized);
             if (queryResult is not Result<ScpiQuery, ScpiError>.Ok { Value: var q })
             {
                 await SendFatalAsync(stream, "invalid SCPI query", ct);
@@ -590,7 +605,7 @@ public sealed class HiSlipGatewayServer : IGatewayServer
             var resp = await backend.QueryAsync(device, q, ct);
             if (resp is Result<string, BackendError>.Ok { Value: var responseText })
             {
-                await SendDataEndAsync(stream, responseText, ct);
+                await SendDataEndAsync(stream, responseText, clientMessageId, ct);
             }
             else
             {
@@ -599,7 +614,7 @@ public sealed class HiSlipGatewayServer : IGatewayServer
         }
         else
         {
-            var cmdResult = ScpiCommand.From(scpi);
+            var cmdResult = ScpiCommand.From(normalized);
             if (cmdResult is not Result<ScpiCommand, ScpiError>.Ok { Value: var c })
             {
                 await SendFatalAsync(stream, "invalid SCPI command", ct);
@@ -613,6 +628,7 @@ public sealed class HiSlipGatewayServer : IGatewayServer
     private static async Task SendDataEndAsync(
         NetworkStream stream,
         string responseText,
+        uint clientMessageId,
         CancellationToken ct
     )
     {
@@ -622,7 +638,7 @@ public sealed class HiSlipGatewayServer : IGatewayServer
             header,
             HiSlipMessageType.DataEnd,
             controlCode: 0,
-            messageParameter: 0,
+            messageParameter: clientMessageId,
             payloadLength: (ulong)bytes.Length
         );
         await stream.WriteAsync(header, ct);

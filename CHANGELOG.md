@@ -4,6 +4,39 @@ All notable changes to ivi-cli are documented here. Format roughly follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning follows
 [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.2] — 2026-06-03
+
+### Fixed
+
+- **HiSLIP gateway SCPI termination + MessageId echo** (critical
+  interop). Two spec violations surfaced when a real NI-VISA
+  client (NI MAX) wrote `*IDN?\n` to the mock gateway and the
+  read returned `VI_ERROR_CONN_LOST` (0xBFFF00A6):
+  - `HiSlipGatewayServer.DispatchScpiAsync` passed the raw,
+    terminator-included SCPI string to `ScpiQuery.From` and to
+    the backend. Scenario scenes registered with
+    `--match '*IDN?'` (no terminator) did not match
+    `*IDN?\n`, so `FakeBackend` echoed the query instead of
+    answering with the scene response. Fix: trim
+    trailing `\r\n` at the gateway boundary before invoking
+    the backend, per IEEE 488.2 §7.5.
+  - `HiSlipGatewayServer.SendDataEndAsync` hardcoded
+    `messageParameter: 0` on every server-to-client response,
+    violating IVI-6.1 §10.6.2 which requires the server to
+    echo the MessageId of the client's initiating Data /
+    DataEnd. Real clients close the TCP connection when the
+    parameter doesn't match. Fix: thread the client's
+    MessageId through `DispatchScpiAsync` into
+    `SendDataEndAsync`.
+
+### Known
+
+- `IVICLI_MOCK_ONLY=1` is still required on the gateway
+  process to opt into FakeBackend dispatch when the device
+  resource is a placeholder TCPIP INSTR — tracked as #25.
+  `docs/samples/psu/{setup.sh,setup.ps1}` set this env var
+  automatically as of 0.1.1.
+
 ## [0.1.1] — 2026-06-03
 
 ### Fixed
@@ -190,5 +223,6 @@ Initial public release. Covers Phase 1 (CLI core), Phase 2 (gateway servers
   VXI-11 backends are at parity; Local needs IVI.NET reflection
   follow-up.
 
+[0.1.2]: https://github.com/ShortArrow/ivi-cli/releases/tag/v0.1.2
 [0.1.1]: https://github.com/ShortArrow/ivi-cli/releases/tag/v0.1.1
 [0.1.0]: https://github.com/ShortArrow/ivi-cli/releases/tag/v0.1.0
