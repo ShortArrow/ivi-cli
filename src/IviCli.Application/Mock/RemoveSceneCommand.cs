@@ -3,8 +3,13 @@ using IviCli.Domain.Mock;
 
 namespace IviCli.Application.Mock;
 
-/// <summary>Command DTO for removing a scene by 1-based index.</summary>
-public sealed record RemoveSceneCommand(string ScenarioName, int Index);
+/// <summary>
+/// Command DTO for removing a <see cref="MockScene"/> (state node) from
+/// a scenario by its alias.
+/// </summary>
+/// <param name="ScenarioName">The owning scenario.</param>
+/// <param name="SceneName">The scene alias to remove.</param>
+public sealed record RemoveSceneCommand(string ScenarioName, string SceneName);
 
 /// <summary>Outcomes the remove-scene command can fail with.</summary>
 public abstract record RemoveSceneError : IviError
@@ -35,6 +40,19 @@ public sealed record RemoveSceneInvalidScenarioName(string Raw) : RemoveSceneErr
     public override IReadOnlyList<object?> LogArgs => new object?[] { Raw };
 }
 
+/// <summary>The scene name failed validation.</summary>
+public sealed record RemoveSceneInvalidSceneName(string Raw) : RemoveSceneError
+{
+    /// <inheritdoc/>
+    public override LogSeverity Severity => LogSeverity.Warning;
+
+    /// <inheritdoc/>
+    public override string Message => "invalid scene name: {Raw}";
+
+    /// <inheritdoc/>
+    public override IReadOnlyList<object?> LogArgs => new object?[] { Raw };
+}
+
 /// <summary>The scenario does not exist.</summary>
 public sealed record RemoveSceneScenarioNotFound(ScenarioName Name) : RemoveSceneError
 {
@@ -48,17 +66,31 @@ public sealed record RemoveSceneScenarioNotFound(ScenarioName Name) : RemoveScen
     public override IReadOnlyList<object?> LogArgs => new object?[] { Name };
 }
 
-/// <summary>The supplied 1-based index does not refer to an existing scene.</summary>
-public sealed record RemoveSceneIndexOutOfRange(int Index, int Available) : RemoveSceneError
+/// <summary>The target scene does not exist within the scenario.</summary>
+public sealed record RemoveSceneNotFound(ScenarioName Scenario, SceneName Scene) : RemoveSceneError
 {
     /// <inheritdoc/>
     public override LogSeverity Severity => LogSeverity.Warning;
 
     /// <inheritdoc/>
-    public override string Message => "scene index {Index} out of range (1..{Available})";
+    public override string Message => "scene not found in scenario: {Scenario}/{Scene}";
 
     /// <inheritdoc/>
-    public override IReadOnlyList<object?> LogArgs => new object?[] { Index, Available };
+    public override IReadOnlyList<object?> LogArgs => new object?[] { Scenario, Scene };
+}
+
+/// <summary>The named scene is the scenario's initial scene and cannot be removed.</summary>
+public sealed record RemoveSceneIsInitial(ScenarioName Scenario, SceneName Scene) : RemoveSceneError
+{
+    /// <inheritdoc/>
+    public override LogSeverity Severity => LogSeverity.Warning;
+
+    /// <inheritdoc/>
+    public override string Message =>
+        "scene {Scene} is the initial scene of {Scenario}; remove the scenario or change the initial scene first";
+
+    /// <inheritdoc/>
+    public override IReadOnlyList<object?> LogArgs => new object?[] { Scene, Scenario };
 }
 
 /// <summary>The scenario store could not be read or written.</summary>

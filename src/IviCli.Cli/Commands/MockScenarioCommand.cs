@@ -23,6 +23,7 @@ public static class MockScenarioCommand
         command.Subcommands.Add(BuildActivate(services));
         command.Subcommands.Add(BuildDeactivate(services));
         command.Subcommands.Add(MockSceneCommand.Build(services));
+        command.Subcommands.Add(MockRuleCommand.Build(services));
         command.Subcommands.Add(BuildRecord(services));
         command.Subcommands.Add(BuildImport(services));
         return command;
@@ -519,35 +520,42 @@ public static class MockScenarioCommand
 
     private static int RenderShow(MockScenario scenario)
     {
-        Console.WriteLine($"name: {scenario.Name.Value}");
+        Console.WriteLine($"name:    {scenario.Name.Value}");
+        Console.WriteLine($"initial: {scenario.InitialScene.Value}");
         if (scenario.IdnDefault is { } idn)
         {
-            Console.WriteLine($"idn:  {idn}");
-        }
-        // v0.1.x compat output: flatten every scene's rules into a
-        // single ordered list. v0.2.0's multi-scene `show` rendering
-        // lands in a follow-up batch (issue #26 §"Implementation plan"
-        // — B0.2-4).
-        var rules = scenario.Scenes.SelectMany(s => s.Rules).ToList();
-        if (rules.Count == 0)
-        {
-            Console.WriteLine("scenes: (none)");
-            return ExitCodeMapper.Success;
+            Console.WriteLine($"idn:     {idn}");
         }
         Console.WriteLine("scenes:");
-        for (var i = 0; i < rules.Count; i++)
+        if (scenario.Scenes.Length == 0)
         {
-            var r = rules[i];
-            var action = r.Action switch
+            Console.WriteLine("  (none)");
+            return ExitCodeMapper.Success;
+        }
+        foreach (var scene in scenario.Scenes)
+        {
+            var marker = scene.Name == scenario.InitialScene ? " *" : "";
+            Console.WriteLine($"  [{scene.Name.Value}{marker}]");
+            if (scene.Rules.Length == 0)
             {
-                RuleAction.Respond resp => $"respond \"{resp.Text}\"",
-                RuleAction.Ack => "ack",
-                RuleAction.Fail f => f.Detail is null
-                    ? $"fail {f.Variant}"
-                    : $"fail {f.Variant} ({f.Detail})",
-                _ => "?",
-            };
-            Console.WriteLine($"  [{i + 1}] {r.Match} -> {action}");
+                Console.WriteLine("    (no rules)");
+                continue;
+            }
+            for (var i = 0; i < scene.Rules.Length; i++)
+            {
+                var r = scene.Rules[i];
+                var action = r.Action switch
+                {
+                    RuleAction.Respond resp => $"respond \"{resp.Text}\"",
+                    RuleAction.Ack => "ack",
+                    RuleAction.Fail f => f.Detail is null
+                        ? $"fail {f.Variant}"
+                        : $"fail {f.Variant} ({f.Detail})",
+                    _ => "?",
+                };
+                var transition = r.Action.Transition is { } t ? $" -> [{t.Value}]" : string.Empty;
+                Console.WriteLine($"    {i + 1}. {r.Match} -> {action}{transition}");
+            }
         }
         return ExitCodeMapper.Success;
     }

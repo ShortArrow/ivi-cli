@@ -4,16 +4,20 @@ using IviCli.Domain.Mock;
 namespace IviCli.Application.Mock;
 
 /// <summary>
-/// Command DTO for adding a new <see cref="MockScene"/> (state node)
-/// to a scenario. The new scene is empty (no rules); callers wire
-/// rules in afterwards via <see cref="AddRuleCommand"/>.
+/// Command DTO for removing a <see cref="MockRule"/> from a scene
+/// inside a scenario, addressed by 1-based <paramref name="Index"/>
+/// (as reported by <c>scenario show</c>).
 /// </summary>
 /// <param name="ScenarioName">The owning scenario.</param>
-/// <param name="SceneName">The new scene's alias.</param>
-public sealed record AddSceneCommand(string ScenarioName, string SceneName);
+/// <param name="Scene">
+/// Target scene name. <see langword="null"/> means "the scenario's
+/// initial scene".
+/// </param>
+/// <param name="Index">1-based rule index inside the target scene.</param>
+public sealed record RemoveRuleCommand(string ScenarioName, string? Scene, int Index);
 
-/// <summary>Outcomes the add-scene command can fail with.</summary>
-public abstract record AddSceneError : IviError
+/// <summary>Outcomes the remove-rule command can fail with.</summary>
+public abstract record RemoveRuleError : IviError
 {
     /// <inheritdoc/>
     public abstract LogSeverity Severity { get; }
@@ -29,7 +33,7 @@ public abstract record AddSceneError : IviError
 }
 
 /// <summary>The scenario name failed validation.</summary>
-public sealed record AddSceneInvalidScenarioName(string Raw) : AddSceneError
+public sealed record RemoveRuleInvalidScenarioName(string Raw) : RemoveRuleError
 {
     /// <inheritdoc/>
     public override LogSeverity Severity => LogSeverity.Warning;
@@ -41,8 +45,8 @@ public sealed record AddSceneInvalidScenarioName(string Raw) : AddSceneError
     public override IReadOnlyList<object?> LogArgs => new object?[] { Raw };
 }
 
-/// <summary>The scene name failed validation.</summary>
-public sealed record AddSceneInvalidSceneName(string Raw) : AddSceneError
+/// <summary>The supplied scene name failed validation.</summary>
+public sealed record RemoveRuleInvalidSceneName(string Raw) : RemoveRuleError
 {
     /// <inheritdoc/>
     public override LogSeverity Severity => LogSeverity.Warning;
@@ -55,7 +59,7 @@ public sealed record AddSceneInvalidSceneName(string Raw) : AddSceneError
 }
 
 /// <summary>The scenario does not exist.</summary>
-public sealed record AddSceneScenarioNotFound(ScenarioName Name) : AddSceneError
+public sealed record RemoveRuleScenarioNotFound(ScenarioName Name) : RemoveRuleError
 {
     /// <inheritdoc/>
     public override LogSeverity Severity => LogSeverity.Warning;
@@ -67,21 +71,35 @@ public sealed record AddSceneScenarioNotFound(ScenarioName Name) : AddSceneError
     public override IReadOnlyList<object?> LogArgs => new object?[] { Name };
 }
 
-/// <summary>A scene of that name already exists in the scenario.</summary>
-public sealed record AddSceneAlreadyExists(ScenarioName Scenario, SceneName Scene) : AddSceneError
+/// <summary>The target scene does not exist within the scenario.</summary>
+public sealed record RemoveRuleSceneNotFound(ScenarioName Scenario, SceneName Scene)
+    : RemoveRuleError
 {
     /// <inheritdoc/>
     public override LogSeverity Severity => LogSeverity.Warning;
 
     /// <inheritdoc/>
-    public override string Message => "scene already exists: {Scenario}/{Scene}";
+    public override string Message => "scene not found in scenario: {Scenario}/{Scene}";
 
     /// <inheritdoc/>
     public override IReadOnlyList<object?> LogArgs => new object?[] { Scenario, Scene };
 }
 
+/// <summary>The supplied 1-based index is outside the rule list of the target scene.</summary>
+public sealed record RemoveRuleIndexOutOfRange(int Index, int Available) : RemoveRuleError
+{
+    /// <inheritdoc/>
+    public override LogSeverity Severity => LogSeverity.Warning;
+
+    /// <inheritdoc/>
+    public override string Message => "rule index out of range: {Index} (have {Available})";
+
+    /// <inheritdoc/>
+    public override IReadOnlyList<object?> LogArgs => new object?[] { Index, Available };
+}
+
 /// <summary>The scenario store could not be read or written.</summary>
-public sealed record AddSceneStoreFailure(ScenarioStoreError Inner) : AddSceneError
+public sealed record RemoveRuleStoreFailure(ScenarioStoreError Inner) : RemoveRuleError
 {
     /// <inheritdoc/>
     public override LogSeverity Severity => Inner.Severity;

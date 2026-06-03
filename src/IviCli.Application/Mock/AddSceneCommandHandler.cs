@@ -4,7 +4,7 @@ using IviCli.Domain.Mock;
 
 namespace IviCli.Application.Mock;
 
-/// <summary>Appends a scene to an existing scenario.</summary>
+/// <summary>Appends a new empty <see cref="MockScene"/> (state node) to a scenario.</summary>
 public sealed class AddSceneCommandHandler
 {
     private readonly IScenarioStore _store;
@@ -26,7 +26,7 @@ public sealed class AddSceneCommandHandler
         _time = time ?? TimeProvider.System;
     }
 
-    /// <summary>Validates inputs, loads the scenario, appends the scene, and saves.</summary>
+    /// <summary>Validates inputs, loads the scenario, appends the empty scene, and saves.</summary>
     public async Task<Result<MockScenario, AddSceneError>> HandleAsync(
         AddSceneCommand command,
         CancellationToken ct
@@ -41,35 +41,15 @@ public sealed class AddSceneCommandHandler
                 new AddSceneInvalidScenarioName(command.ScenarioName)
             );
         }
-        if (string.IsNullOrEmpty(command.Match))
+
+        if (
+            SceneName.From(command.SceneName)
+            is not Result<SceneName, SceneNameError>.Ok { Value: var sceneName }
+        )
         {
             return Result.Failure<MockScenario, AddSceneError>(
-                new AddSceneInvalidMatch(command.Match)
+                new AddSceneInvalidSceneName(command.SceneName)
             );
-        }
-
-        // Resolve the action. Exactly one of (Respond, Ack, Fail) must be set.
-        var actionCount =
-            (command.Respond is not null ? 1 : 0)
-            + (command.Ack ? 1 : 0)
-            + (command.Fail is not null ? 1 : 0);
-        if (actionCount != 1)
-        {
-            return Result.Failure<MockScenario, AddSceneError>(new AddSceneActionAmbiguous());
-        }
-
-        RuleAction action;
-        if (command.Respond is not null)
-        {
-            action = new RuleAction.Respond(command.Respond);
-        }
-        else if (command.Ack)
-        {
-            action = new RuleAction.Ack();
-        }
-        else
-        {
-            action = new RuleAction.Fail(command.Fail!, command.FailDetail);
         }
 
         var loadResult = await _store.LoadAsync(name, ct);
@@ -85,22 +65,14 @@ public sealed class AddSceneCommandHandler
             return Result.Failure<MockScenario, AddSceneError>(new AddSceneStoreFailure(err));
         }
 
-        // v0.1.x compat: append the rule to the scenario's initial
-        // scene (which is `default` for scenarios that were created
-        // via `mock scenario create` and never adopted the v0.2.0
-        // multi-scene shape).
-        var initialScene = scenario.FindScene(scenario.InitialScene);
-        if (initialScene is null)
+        if (scenario.FindScene(sceneName) is not null)
         {
             return Result.Failure<MockScenario, AddSceneError>(
-                new AddSceneStoreFailure(
-                    new ScenarioStoreParseFailure($"missing initial scene {scenario.InitialScene}")
-                )
+                new AddSceneAlreadyExists(name, sceneName)
             );
         }
-        var updated = scenario.ReplaceScene(
-            initialScene.AddRule(new MockRule(command.Match, action))
-        )!;
+
+        var updated = scenario.AddScene(MockScene.Empty(sceneName));
         var saveResult = await _store.SaveAsync(updated, overwriteIfExists: true, ct);
         if (saveResult is not Result<Unit, ScenarioStoreError>.Ok)
         {
@@ -112,7 +84,7 @@ public sealed class AddSceneCommandHandler
             new ConfigMutated(
                 _time.GetUtcNow(),
                 "scene.add",
-                $"{name.Value}/{command.Match}",
+                $"{name.Value}/{sceneName.Value}",
                 _subject.Get()
             ),
             ct

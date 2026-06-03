@@ -31,8 +31,10 @@ public sealed class ConfigMutatedWiringTests
     [InlineData("server.remove", "server.remove", "gw1")]
     [InlineData("route.add", "route.add", "gw1/hislip0")]
     [InlineData("route.remove", "route.remove", "gw1/hislip0")]
-    [InlineData("scene.add", "scene.add", "demo/*IDN?")]
-    [InlineData("scene.remove", "scene.remove", "demo/1")]
+    [InlineData("scene.add", "scene.add", "demo/extra")]
+    [InlineData("scene.remove", "scene.remove", "demo/extra")]
+    [InlineData("rule.add", "rule.add", "demo/default/*IDN?")]
+    [InlineData("rule.remove", "rule.remove", "demo/default/1")]
     [InlineData("scenario.create", "scenario.create", "demo")]
     [InlineData("scenario.remove", "scenario.remove", "demo")]
     [InlineData("scenario.import", "scenario.import", "demo")]
@@ -85,6 +87,12 @@ public sealed class ConfigMutatedWiringTests
                 break;
             case "scene.remove":
                 await RunRemoveScene(audit, subject);
+                break;
+            case "rule.add":
+                await RunAddRule(audit, subject);
+                break;
+            case "rule.remove":
+                await RunRemoveRule(audit, subject);
                 break;
             case "scenario.create":
                 await RunCreateScenario(audit, subject);
@@ -214,21 +222,43 @@ public sealed class ConfigMutatedWiringTests
         var name = ScenarioName.From("demo").ShouldBeOk();
         var store = new FakeScenarioStore(new[] { MockScenario.Empty(name) });
         var handler = new AddSceneCommandHandler(store, audit, subject);
+        var result = await handler.HandleAsync(new AddSceneCommand("demo", "extra"), default);
+        result.ShouldBeOk();
+    }
+
+    private static async Task RunRemoveScene(FakeAuditLog audit, FakeAuditSubject subject)
+    {
+        var name = ScenarioName.From("demo").ShouldBeOk();
+        var extra = SceneName.From("extra").ShouldBeOk();
+        var seeded = MockScenario.Empty(name).AddScene(MockScene.Empty(extra));
+        var store = new FakeScenarioStore(new[] { seeded });
+        var handler = new RemoveSceneCommandHandler(store, audit, subject);
+        var result = await handler.HandleAsync(new RemoveSceneCommand("demo", "extra"), default);
+        result.ShouldBeOk();
+    }
+
+    private static async Task RunAddRule(FakeAuditLog audit, FakeAuditSubject subject)
+    {
+        var name = ScenarioName.From("demo").ShouldBeOk();
+        var store = new FakeScenarioStore(new[] { MockScenario.Empty(name) });
+        var handler = new AddRuleCommandHandler(store, audit, subject);
         var result = await handler.HandleAsync(
-            new AddSceneCommand(
+            new AddRuleCommand(
                 "demo",
-                "*IDN?",
+                Scene: null,
+                Match: "*IDN?",
                 Respond: "ACME,X,1,1.0",
                 Ack: false,
                 Fail: null,
-                FailDetail: null
+                FailDetail: null,
+                TransitionTo: null
             ),
             default
         );
         result.ShouldBeOk();
     }
 
-    private static async Task RunRemoveScene(FakeAuditLog audit, FakeAuditSubject subject)
+    private static async Task RunRemoveRule(FakeAuditLog audit, FakeAuditSubject subject)
     {
         var name = ScenarioName.From("demo").ShouldBeOk();
         var seeded = MockScenario.SingleScene(
@@ -239,8 +269,11 @@ public sealed class ConfigMutatedWiringTests
             )
         );
         var store = new FakeScenarioStore(new[] { seeded });
-        var handler = new RemoveSceneCommandHandler(store, audit, subject);
-        var result = await handler.HandleAsync(new RemoveSceneCommand("demo", 1), default);
+        var handler = new RemoveRuleCommandHandler(store, audit, subject);
+        var result = await handler.HandleAsync(
+            new RemoveRuleCommand("demo", Scene: null, Index: 1),
+            default
+        );
         result.ShouldBeOk();
     }
 

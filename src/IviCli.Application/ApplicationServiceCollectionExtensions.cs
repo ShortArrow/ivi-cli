@@ -66,6 +66,8 @@ public static class ApplicationServiceCollectionExtensions
         services.AddSingleton<DeactivateScenarioCommandHandler>();
         services.AddSingleton<AddSceneCommandHandler>();
         services.AddSingleton<RemoveSceneCommandHandler>();
+        services.AddSingleton<AddRuleCommandHandler>();
+        services.AddSingleton<RemoveRuleCommandHandler>();
         services.AddSingleton<RecordScenarioCommandHandler>();
         services.AddSingleton<ITrafficScenarioConverter, DefaultTrafficScenarioConverter>();
         services.AddSingleton<ImportScenarioFromTrafficCommandHandler>();

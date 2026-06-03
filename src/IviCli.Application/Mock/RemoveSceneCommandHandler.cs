@@ -1,10 +1,16 @@
+using System.Collections.Immutable;
 using IviCli.Application.Audit;
 using IviCli.Domain;
 using IviCli.Domain.Mock;
 
 namespace IviCli.Application.Mock;
 
-/// <summary>Removes a scene by 1-based index from an existing scenario.</summary>
+/// <summary>
+/// Removes a <see cref="MockScene"/> (state node) from a scenario.
+/// Refuses to remove the scenario's initial scene — the caller must
+/// pick a new initial scene first (a follow-up feature) or remove the
+/// whole scenario.
+/// </summary>
 public sealed class RemoveSceneCommandHandler
 {
     private readonly IScenarioStore _store;
@@ -26,7 +32,7 @@ public sealed class RemoveSceneCommandHandler
         _time = time ?? TimeProvider.System;
     }
 
-    /// <summary>Removes the requested scene.</summary>
+    /// <summary>Validates inputs, loads the scenario, removes the scene, and saves.</summary>
     public async Task<Result<MockScenario, RemoveSceneError>> HandleAsync(
         RemoveSceneCommand command,
         CancellationToken ct
@@ -39,6 +45,16 @@ public sealed class RemoveSceneCommandHandler
         {
             return Result.Failure<MockScenario, RemoveSceneError>(
                 new RemoveSceneInvalidScenarioName(command.ScenarioName)
+            );
+        }
+
+        if (
+            SceneName.From(command.SceneName)
+            is not Result<SceneName, SceneNameError>.Ok { Value: var sceneName }
+        )
+        {
+            return Result.Failure<MockScenario, RemoveSceneError>(
+                new RemoveSceneInvalidSceneName(command.SceneName)
             );
         }
 
@@ -55,25 +71,22 @@ public sealed class RemoveSceneCommandHandler
             return Result.Failure<MockScenario, RemoveSceneError>(new RemoveSceneStoreFailure(err));
         }
 
-        // v0.1.x compat: index addresses a rule inside the
-        // scenario's initial scene (the only scene that exists for
-        // scenarios that have not adopted the v0.2.0 multi-scene
-        // shape).
-        var initialScene = scenario.FindScene(scenario.InitialScene);
-        if (initialScene is null)
+        if (scenario.FindScene(sceneName) is null)
         {
             return Result.Failure<MockScenario, RemoveSceneError>(
-                new RemoveSceneIndexOutOfRange(command.Index, 0)
+                new RemoveSceneNotFound(name, sceneName)
             );
         }
-        var trimmedScene = initialScene.RemoveRuleAt(command.Index);
-        if (trimmedScene is null)
+
+        if (scenario.InitialScene == sceneName)
         {
             return Result.Failure<MockScenario, RemoveSceneError>(
-                new RemoveSceneIndexOutOfRange(command.Index, initialScene.Rules.Length)
+                new RemoveSceneIsInitial(name, sceneName)
             );
         }
-        var updated = scenario.ReplaceScene(trimmedScene)!;
+
+        var trimmedScenes = scenario.Scenes.Where(s => s.Name != sceneName).ToImmutableArray();
+        var updated = scenario with { Scenes = trimmedScenes };
 
         var saveResult = await _store.SaveAsync(updated, overwriteIfExists: true, ct);
         if (saveResult is not Result<Unit, ScenarioStoreError>.Ok)
@@ -86,7 +99,7 @@ public sealed class RemoveSceneCommandHandler
             new ConfigMutated(
                 _time.GetUtcNow(),
                 "scene.remove",
-                $"{name.Value}/{command.Index}",
+                $"{name.Value}/{sceneName.Value}",
                 _subject.Get()
             ),
             ct
