@@ -154,12 +154,26 @@ this avoids introducing a third persistence file.
 
 ### 8. Domain types
 
-`IviCli.Domain.Mock` houses:
+`IviCli.Domain.Mock` houses (v0.2.0 shape, see §15 for the v0.1.x →
+v0.2.0 evolution and the rename rationale):
 
-- `MockScenario` (Name, IdnDefault, Scenes ImmutableArray)
-- `MockScene` (Match, Action) where `Action` is a sealed sum type:
-  `Respond(string Text)`, `Ack`, `Fail(string Variant, string? Detail)`
-- `ScenarioName` Value Object (validation similar to `DeviceName`)
+- `MockScenario` (`Name`, `InitialScene`, `IdnDefault`,
+  `Scenes ImmutableArray<MockScene>`) — a named behaviour package
+  that may be a single-state config or a multi-state graph.
+- `MockScene` (`Name SceneName`, `Rules ImmutableArray<MockRule>`)
+  — a state node inside a scenario. The currently-active scene
+  determines which rules are consulted; state-machine transitions
+  (rule action `Transition(SceneName)`) move the active scene
+  at runtime (issue #26 §"Implementation plan" — B0.2-3).
+- `MockRule` (`Match`, `Action`) where `Action` is a sealed sum
+  type: `Respond(string Text)`, `Ack`, `Fail(string Variant,
+  string? Detail)`. This is what v0.1.x called `MockScene` —
+  renamed in v0.2.0 to reclaim "scene" for the state-node role.
+- `ScenarioName`, `SceneName` Value Objects (validation similar
+  to `DeviceName`).
+
+v0.1.x scenarios (flat rule list under `[[scenes]]`) load
+transparently as a single synthetic `default` scene; see §15.
 
 ### 9. Error taxonomy
 
@@ -192,19 +206,28 @@ The Backend-side `MockScenarioContractMismatch` is added to
   `IviCli.Application.Mock` live in existing assemblies (no new
   csproj). The Infrastructure adapter lives in `IviCli.Infrastructure`.
 
-### 11. Not in this ADR
+### 11. Not in this ADR (as of v0.2.0)
 
 The following are deliberately deferred:
 
 - Pattern / regex matching on `match`.
-- Ordered or state-machine scenes (e.g. "first call returns A, second
-  returns B").
+- Time-based / sequence rules (e.g. "the 3rd time you see X, fail").
 - Scenario import/export beyond manual file copy.
 - Multi-device scenarios where different aliases get different
   behaviour.
+- **State-machine semantics** — `MockRule.Action` gains a
+  `Transition(SceneName)` variant, and the FakeBackend tracks the
+  current scene per active scenario, in B0.2-3 of issue #26
+  ("Implementation plan"). The v0.2.0 shape (§8, §15) holds the
+  type-system half of this contract; runtime behaviour ships
+  alongside the CLI surface in B0.2-4.
+- **Key-value variable state** (write `:VOLT 5.0` → later
+  `:VOLT?` returns 5.0). Separate future issue; needed for
+  continuous-variable mocks like voltage setpoint readback.
 - Recording from a real backend is handled by ADR 0027
-  (`mock scenario record --from-script`); deterministic playback as a
-  dedicated `IIviBackend` is split out into ADR 0028 (Replay Backend).
+  (`mock scenario record --from-script`); deterministic playback
+  as a dedicated `IIviBackend` is split out into ADR 0028
+  (Replay Backend).
 
 Each of these is a candidate for a follow-up ADR once v1 has real users.
 
@@ -265,3 +288,53 @@ outbound connection. The env is documented in ADR 0018 §10.
   already understand the shape.
 - `MockScenarioContractMismatch` surfaces authoring mistakes loudly at
   the Backend boundary instead of silently corrupting data.
+
+### 15. v0.2.0 evolution — Scenario / Scene / Rule hierarchy
+
+v0.1.x conflated two roles into a single type called `MockScene`:
+
+- 場面 (scene) = a state the mock is in,
+- ルール (rule) = a single match → action pair.
+
+The everyday meanings of "scenario" (脚本 / sequence over time) and
+"scene" (場面 / one point in a sequence) made the v0.1.x model
+mis-named once state-machine semantics were on the table — the
+natural read of "the scenario switches scenes" should describe a
+state transition inside one behaviour package, not a swap of the
+top-level behaviour package itself.
+
+v0.2.0 reclaims the language:
+
+| Concept | v0.1.x | v0.2.0 |
+| --- | --- | --- |
+| 全体 (behaviour package, possibly a state graph) | `MockScenario` | `MockScenario` |
+| 場面 (state node) | _(folded into rule)_ | `MockScene` |
+| 1 行のセリフ (match → action) | `MockScene` | `MockRule` |
+| Sum-type of actions | `SceneAction` | `RuleAction` |
+
+`MockScenario` gains an `InitialScene` field (which scene is
+active on `mock scenario activate`). State-machine transitions
+land in B0.2-3 as a new `RuleAction.Transition(SceneName)`
+variant. Until then, a scenario is effectively a single-scene
+graph and the behaviour observable to existing users is
+unchanged.
+
+Backwards compatibility:
+
+- v0.1.x TOML scenarios continue to load. The parser
+  (`TomlScenarioParser.Parse`) wraps every flat `[[scenes]]`
+  table as a rule in a synthetic scene named `default`, and
+  designates it as the `InitialScene`. `Serialize` round-trips
+  back to the v0.1.x flat shape until v0.2.0's multi-scene
+  schema (`[[scenes]] name = "..."` + nested
+  `[[scenes.rules]]`) ships in B0.2-2.
+- The `IScenarioStore.AppendSceneAsync(MockScene)` port from
+  v0.1.x is renamed to `AppendRuleAsync(MockRule)` and appends
+  to the scenario's initial scene.
+- `mock scenario show` still flattens to a single ordered list
+  for v0.1.x parity until B0.2-4 lands the multi-scene view.
+- The `mock scenario scene add ...` CLI verb continues to
+  function with the same arguments (it appends a rule to the
+  initial scene, same observable behaviour as v0.1.x).
+
+Tracked in [issue #26](https://github.com/ShortArrow/ivi-cli/issues/26).

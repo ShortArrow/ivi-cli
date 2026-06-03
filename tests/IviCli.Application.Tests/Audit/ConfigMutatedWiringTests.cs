@@ -231,10 +231,14 @@ public sealed class ConfigMutatedWiringTests
     private static async Task RunRemoveScene(FakeAuditLog audit, FakeAuditSubject subject)
     {
         var name = ScenarioName.From("demo").ShouldBeOk();
-        var scenario = MockScenario
-            .Empty(name)
-            .AddScene(new MockScene("*IDN?", new SceneAction.Respond("ACME")));
-        var store = new FakeScenarioStore(new[] { scenario });
+        var seeded = MockScenario.SingleScene(
+            name,
+            idnDefault: null,
+            rules: System.Collections.Immutable.ImmutableArray.Create(
+                new MockRule("*IDN?", new RuleAction.Respond("ACME"))
+            )
+        );
+        var store = new FakeScenarioStore(new[] { seeded });
         var handler = new RemoveSceneCommandHandler(store, audit, subject);
         var result = await handler.HandleAsync(new RemoveSceneCommand("demo", 1), default);
         result.ShouldBeOk();

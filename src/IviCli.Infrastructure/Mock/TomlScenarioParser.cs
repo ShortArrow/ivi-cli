@@ -50,7 +50,7 @@ public static class TomlScenarioParser
             idnDefault = idnString;
         }
 
-        var scenes = ImmutableArray.CreateBuilder<MockScene>();
+        var scenes = ImmutableArray.CreateBuilder<MockRule>();
         if (model.TryGetValue(ScenesArray, out var scenesValue))
         {
             if (scenesValue is not TomlTableArray sceneTables)
@@ -61,18 +61,21 @@ public static class TomlScenarioParser
             foreach (var table in sceneTables)
             {
                 var sceneResult = ParseScene(table);
-                if (sceneResult is not Result<MockScene, ScenarioStoreError>.Ok sceneOk)
+                if (sceneResult is not Result<MockRule, ScenarioStoreError>.Ok sceneOk)
                 {
                     return Result.Failure<MockScenario, ScenarioStoreError>(
-                        ((Result<MockScene, ScenarioStoreError>.Error)sceneResult).Err
+                        ((Result<MockRule, ScenarioStoreError>.Error)sceneResult).Err
                     );
                 }
                 scenes.Add(sceneOk.Value);
             }
         }
 
+        // v0.1.x compat: every parsed rule lives inside a synthetic
+        // `default` scene. v0.2.0's multi-scene TOML schema lands in
+        // a follow-up batch (issue #26 §"Implementation plan" — B0.2-2).
         return Result.Success<MockScenario, ScenarioStoreError>(
-            new MockScenario(name, idnDefault, scenes.ToImmutable())
+            MockScenario.SingleScene(name, idnDefault, scenes.ToImmutable())
         );
     }
 
@@ -88,19 +91,22 @@ public static class TomlScenarioParser
             builder.AppendLine();
         }
 
-        foreach (var scene in scenario.Scenes)
+        // v0.1.x compat: flatten every scene's rules back into a flat
+        // `[[scenes]]` list. v0.2.0's multi-scene TOML schema lands in
+        // a follow-up batch.
+        foreach (var rule in scenario.Scenes.SelectMany(s => s.Rules))
         {
             builder.AppendLine("[[scenes]]");
-            builder.AppendLine(inv, $"match = \"{Escape(scene.Match)}\"");
-            switch (scene.Action)
+            builder.AppendLine(inv, $"match = \"{Escape(rule.Match)}\"");
+            switch (rule.Action)
             {
-                case SceneAction.Respond r:
+                case RuleAction.Respond r:
                     builder.AppendLine(inv, $"respond = \"{Escape(r.Text)}\"");
                     break;
-                case SceneAction.Ack:
+                case RuleAction.Ack:
                     builder.AppendLine("ack = true");
                     break;
-                case SceneAction.Fail f:
+                case RuleAction.Fail f:
                     builder.AppendLine(inv, $"fail = \"{Escape(f.Variant)}\"");
                     if (f.Detail is { } detail)
                     {
@@ -109,7 +115,7 @@ public static class TomlScenarioParser
                     break;
                 default:
                     throw new InvalidOperationException(
-                        $"unknown SceneAction variant: {scene.Action.GetType().Name}"
+                        $"unknown RuleAction variant: {rule.Action.GetType().Name}"
                     );
             }
             builder.AppendLine();
@@ -118,7 +124,7 @@ public static class TomlScenarioParser
         return builder.ToString();
     }
 
-    private static Result<MockScene, ScenarioStoreError> ParseScene(TomlTable table)
+    private static Result<MockRule, ScenarioStoreError> ParseScene(TomlTable table)
     {
         if (
             !table.TryGetValue(MatchField, out var matchValue)
@@ -141,14 +147,14 @@ public static class TomlScenarioParser
             );
         }
 
-        SceneAction action;
+        RuleAction action;
         if (hasRespond)
         {
             if (respondValue is not string respondText)
             {
                 return FailScene($"scene for `{match}`: `respond` must be a string");
             }
-            action = new SceneAction.Respond(respondText);
+            action = new RuleAction.Respond(respondText);
         }
         else if (hasAck)
         {
@@ -156,7 +162,7 @@ public static class TomlScenarioParser
             {
                 return FailScene($"scene for `{match}`: `ack` must be the boolean true");
             }
-            action = new SceneAction.Ack();
+            action = new RuleAction.Ack();
         }
         else
         {
@@ -172,17 +178,17 @@ public static class TomlScenarioParser
             {
                 detail = detailString;
             }
-            action = new SceneAction.Fail(failVariant, detail);
+            action = new RuleAction.Fail(failVariant, detail);
         }
 
-        return Result.Success<MockScene, ScenarioStoreError>(new MockScene(match, action));
+        return Result.Success<MockRule, ScenarioStoreError>(new MockRule(match, action));
     }
 
     private static Result<MockScenario, ScenarioStoreError> Fail(string reason) =>
         Result.Failure<MockScenario, ScenarioStoreError>(new ScenarioStoreParseFailure(reason));
 
-    private static Result<MockScene, ScenarioStoreError> FailScene(string reason) =>
-        Result.Failure<MockScene, ScenarioStoreError>(new ScenarioStoreParseFailure(reason));
+    private static Result<MockRule, ScenarioStoreError> FailScene(string reason) =>
+        Result.Failure<MockRule, ScenarioStoreError>(new ScenarioStoreParseFailure(reason));
 
     private static string Escape(string raw) =>
         raw.Replace("\\", "\\\\", StringComparison.Ordinal)

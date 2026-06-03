@@ -524,25 +524,30 @@ public static class MockScenarioCommand
         {
             Console.WriteLine($"idn:  {idn}");
         }
-        if (scenario.Scenes.IsEmpty)
+        // v0.1.x compat output: flatten every scene's rules into a
+        // single ordered list. v0.2.0's multi-scene `show` rendering
+        // lands in a follow-up batch (issue #26 §"Implementation plan"
+        // — B0.2-4).
+        var rules = scenario.Scenes.SelectMany(s => s.Rules).ToList();
+        if (rules.Count == 0)
         {
             Console.WriteLine("scenes: (none)");
             return ExitCodeMapper.Success;
         }
         Console.WriteLine("scenes:");
-        for (var i = 0; i < scenario.Scenes.Length; i++)
+        for (var i = 0; i < rules.Count; i++)
         {
-            var s = scenario.Scenes[i];
-            var action = s.Action switch
+            var r = rules[i];
+            var action = r.Action switch
             {
-                SceneAction.Respond r => $"respond \"{r.Text}\"",
-                SceneAction.Ack => "ack",
-                SceneAction.Fail f => f.Detail is null
+                RuleAction.Respond resp => $"respond \"{resp.Text}\"",
+                RuleAction.Ack => "ack",
+                RuleAction.Fail f => f.Detail is null
                     ? $"fail {f.Variant}"
                     : $"fail {f.Variant} ({f.Detail})",
                 _ => "?",
             };
-            Console.WriteLine($"  [{i + 1}] {s.Match} -> {action}");
+            Console.WriteLine($"  [{i + 1}] {r.Match} -> {action}");
         }
         return ExitCodeMapper.Success;
     }

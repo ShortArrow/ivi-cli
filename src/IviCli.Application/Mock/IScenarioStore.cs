@@ -38,15 +38,16 @@ public interface IScenarioStore
     Task<Result<bool, ScenarioStoreError>> ExistsAsync(ScenarioName name, CancellationToken ct);
 
     /// <summary>
-    /// Appends a single <see cref="MockScene"/> to the named scenario,
-    /// creating an empty scenario when it does not yet exist (per ADR 0027
+    /// Appends a single <see cref="MockRule"/> to the named scenario's
+    /// initial scene, creating an empty scenario (with a synthetic
+    /// <c>default</c> scene) when one does not yet exist (per ADR 0027
     /// §4). Implementations should perform load + add + save atomically
-    /// enough for serial recording use cases; concurrent recorders against
-    /// the same scenario are not supported in v1.
+    /// enough for serial recording use cases; concurrent recorders
+    /// against the same scenario are not supported in v1.
     /// </summary>
-    Task<Result<MockScenario, ScenarioStoreError>> AppendSceneAsync(
+    Task<Result<MockScenario, ScenarioStoreError>> AppendRuleAsync(
         ScenarioName name,
-        MockScene scene,
+        MockRule rule,
         CancellationToken ct
     );
 }

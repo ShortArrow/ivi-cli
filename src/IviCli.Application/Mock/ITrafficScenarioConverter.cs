@@ -76,8 +76,8 @@ public sealed record ConvertTrafficNoScenes(string? DeviceFilter) : ConvertTraff
 }
 
 /// <summary>
-/// Default converter. Maps Write events to <see cref="SceneAction.Ack"/>
-/// and Query events to <see cref="SceneAction.Respond"/>. Skips Open /
+/// Default converter. Maps Write events to <see cref="RuleAction.Ack"/>
+/// and Query events to <see cref="RuleAction.Respond"/>. Skips Open /
 /// Close / Read / failed events (ADR 0033 §1 mapping table).
 /// </summary>
 public sealed class DefaultTrafficScenarioConverter : ITrafficScenarioConverter
@@ -91,7 +91,7 @@ public sealed class DefaultTrafficScenarioConverter : ITrafficScenarioConverter
     {
         ArgumentNullException.ThrowIfNull(events);
         var seenDevices = new HashSet<string>(StringComparer.Ordinal);
-        var scenes = ImmutableArray.CreateBuilder<MockScene>();
+        var rules = ImmutableArray.CreateBuilder<MockRule>();
         string? idnDefault = null;
 
         foreach (var ev in events)
@@ -117,11 +117,11 @@ public sealed class DefaultTrafficScenarioConverter : ITrafficScenarioConverter
             {
                 continue;
             }
-            var scene =
+            var rule =
                 ev.Op == TrafficOp.Write
-                    ? new MockScene(ev.Data, new SceneAction.Ack())
-                    : new MockScene(ev.Data, new SceneAction.Respond(ev.Response ?? string.Empty));
-            scenes.Add(scene);
+                    ? new MockRule(ev.Data, new RuleAction.Ack())
+                    : new MockRule(ev.Data, new RuleAction.Respond(ev.Response ?? string.Empty));
+            rules.Add(rule);
 
             if (
                 ev.Op == TrafficOp.Query
@@ -142,7 +142,7 @@ public sealed class DefaultTrafficScenarioConverter : ITrafficScenarioConverter
                 )
             );
         }
-        if (scenes.Count == 0)
+        if (rules.Count == 0)
         {
             return Result.Failure<MockScenario, ConvertTrafficError>(
                 new ConvertTrafficNoScenes(deviceFilter?.Value)
@@ -150,7 +150,7 @@ public sealed class DefaultTrafficScenarioConverter : ITrafficScenarioConverter
         }
 
         return Result.Success<MockScenario, ConvertTrafficError>(
-            new MockScenario(name, idnDefault, scenes.ToImmutable())
+            MockScenario.SingleScene(name, idnDefault, rules.ToImmutable())
         );
     }
 }

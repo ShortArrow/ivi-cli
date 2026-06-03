@@ -108,9 +108,9 @@ public sealed class FakeScenarioStore : IScenarioStore
     }
 
     /// <inheritdoc/>
-    public Task<Result<MockScenario, ScenarioStoreError>> AppendSceneAsync(
+    public Task<Result<MockScenario, ScenarioStoreError>> AppendRuleAsync(
         ScenarioName name,
-        MockScene scene,
+        MockRule rule,
         CancellationToken ct
     )
     {
@@ -118,7 +118,16 @@ public sealed class FakeScenarioStore : IScenarioStore
         var scenario = _scenarios.TryGetValue(name.Value, out var existing)
             ? existing
             : MockScenario.Empty(name);
-        var updated = scenario.AddScene(scene);
+        var initial = scenario.FindScene(scenario.InitialScene);
+        if (initial is null)
+        {
+            return Task.FromResult(
+                Result.Failure<MockScenario, ScenarioStoreError>(
+                    new ScenarioStoreParseFailure($"missing initial scene {scenario.InitialScene}")
+                )
+            );
+        }
+        var updated = scenario.ReplaceScene(initial.AddRule(rule))!;
         _scenarios[name.Value] = updated;
         return Task.FromResult(Result.Success<MockScenario, ScenarioStoreError>(updated));
     }

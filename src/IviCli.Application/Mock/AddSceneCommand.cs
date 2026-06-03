@@ -10,9 +10,9 @@ namespace IviCli.Application.Mock;
 /// </summary>
 /// <param name="ScenarioName">The owning scenario.</param>
 /// <param name="Match">The exact SCPI text the new scene reacts to.</param>
-/// <param name="Respond">Set when the action is <see cref="SceneAction.Respond"/>.</param>
-/// <param name="Ack">Set to true when the action is <see cref="SceneAction.Ack"/>.</param>
-/// <param name="Fail">Set when the action is <see cref="SceneAction.Fail"/> — the variant tag.</param>
+/// <param name="Respond">Set when the action is <see cref="RuleAction.Respond"/>.</param>
+/// <param name="Ack">Set to true when the action is <see cref="RuleAction.Ack"/>.</param>
+/// <param name="Fail">Set when the action is <see cref="RuleAction.Fail"/> — the variant tag.</param>
 /// <param name="FailDetail">Optional detail payload for fail variants that need one.</param>
 public sealed record AddSceneCommand(
     string ScenarioName,

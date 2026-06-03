@@ -10,7 +10,7 @@ namespace IviCli.Backends.Replay;
 /// Deterministic playback <see cref="IIviBackend"/> per ADR 0028.
 /// Differs from <c>FakeBackend</c> in that it consults exactly one
 /// <see cref="MockScenario"/> and rejects any SCPI that does not match
-/// a recorded <see cref="MockScene"/>. No DSL fallback, no synthetic
+/// a recorded <see cref="MockRule"/>. No DSL fallback, no synthetic
 /// <c>*IDN?</c>, no programmatic state. Designed for "play a recording
 /// from `mock scenario record` exactly as captured" use cases.
 /// </summary>
@@ -88,14 +88,14 @@ public sealed class ReplayBackend : IIviBackend
         return Task.FromResult(FailString("(bare read)"));
     }
 
-    private static Result<Unit, BackendError> ApplyForWrite(MockScene scene, string scpi) =>
+    private static Result<Unit, BackendError> ApplyForWrite(MockRule scene, string scpi) =>
         scene.Action switch
         {
-            SceneAction.Ack => Result.Success<Unit, BackendError>(Unit.Value),
-            SceneAction.Respond => Result.Failure<Unit, BackendError>(
+            RuleAction.Ack => Result.Success<Unit, BackendError>(Unit.Value),
+            RuleAction.Respond => Result.Failure<Unit, BackendError>(
                 new ReplayActionMismatch(scpi, "scene returns a Respond for a Write")
             ),
-            SceneAction.Fail f => Result.Failure<Unit, BackendError>(
+            RuleAction.Fail f => Result.Failure<Unit, BackendError>(
                 new ReplayCannedFailure(f.Variant, f.Detail)
             ),
             _ => Result.Failure<Unit, BackendError>(
@@ -103,14 +103,14 @@ public sealed class ReplayBackend : IIviBackend
             ),
         };
 
-    private static Result<string, BackendError> ApplyForQuery(MockScene scene, string scpi) =>
+    private static Result<string, BackendError> ApplyForQuery(MockRule scene, string scpi) =>
         scene.Action switch
         {
-            SceneAction.Respond r => Result.Success<string, BackendError>(r.Text),
-            SceneAction.Ack => Result.Failure<string, BackendError>(
+            RuleAction.Respond r => Result.Success<string, BackendError>(r.Text),
+            RuleAction.Ack => Result.Failure<string, BackendError>(
                 new ReplayActionMismatch(scpi, "scene returns an Ack for a Query")
             ),
-            SceneAction.Fail f => Result.Failure<string, BackendError>(
+            RuleAction.Fail f => Result.Failure<string, BackendError>(
                 new ReplayCannedFailure(f.Variant, f.Detail)
             ),
             _ => Result.Failure<string, BackendError>(

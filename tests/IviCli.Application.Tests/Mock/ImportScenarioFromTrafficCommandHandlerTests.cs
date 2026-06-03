@@ -49,7 +49,7 @@ public sealed class ImportScenarioFromTrafficCommandHandlerTests
         summary.Device.ShouldBe("psu1");
         summary.Scenes.ShouldBe(2);
         var loaded = (await store.LoadAsync(summary.Name, default)).ShouldBeOk();
-        loaded.Scenes.Length.ShouldBe(2);
+        loaded.Scenes.Single().Rules.Length.ShouldBe(2);
         loaded.IdnDefault.ShouldBe("ACME,PSU,1,1.0");
     }
 

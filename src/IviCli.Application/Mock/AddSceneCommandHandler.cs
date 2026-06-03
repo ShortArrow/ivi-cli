@@ -58,18 +58,18 @@ public sealed class AddSceneCommandHandler
             return Result.Failure<MockScenario, AddSceneError>(new AddSceneActionAmbiguous());
         }
 
-        SceneAction action;
+        RuleAction action;
         if (command.Respond is not null)
         {
-            action = new SceneAction.Respond(command.Respond);
+            action = new RuleAction.Respond(command.Respond);
         }
         else if (command.Ack)
         {
-            action = new SceneAction.Ack();
+            action = new RuleAction.Ack();
         }
         else
         {
-            action = new SceneAction.Fail(command.Fail!, command.FailDetail);
+            action = new RuleAction.Fail(command.Fail!, command.FailDetail);
         }
 
         var loadResult = await _store.LoadAsync(name, ct);
@@ -85,7 +85,22 @@ public sealed class AddSceneCommandHandler
             return Result.Failure<MockScenario, AddSceneError>(new AddSceneStoreFailure(err));
         }
 
-        var updated = scenario.AddScene(new MockScene(command.Match, action));
+        // v0.1.x compat: append the rule to the scenario's initial
+        // scene (which is `default` for scenarios that were created
+        // via `mock scenario create` and never adopted the v0.2.0
+        // multi-scene shape).
+        var initialScene = scenario.FindScene(scenario.InitialScene);
+        if (initialScene is null)
+        {
+            return Result.Failure<MockScenario, AddSceneError>(
+                new AddSceneStoreFailure(
+                    new ScenarioStoreParseFailure($"missing initial scene {scenario.InitialScene}")
+                )
+            );
+        }
+        var updated = scenario.ReplaceScene(
+            initialScene.AddRule(new MockRule(command.Match, action))
+        )!;
         var saveResult = await _store.SaveAsync(updated, overwriteIfExists: true, ct);
         if (saveResult is not Result<Unit, ScenarioStoreError>.Ok)
         {

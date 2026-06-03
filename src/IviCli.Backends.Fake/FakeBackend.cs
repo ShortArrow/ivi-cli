@@ -152,11 +152,11 @@ public sealed class FakeBackend : IIviBackend, IScenarioAwareBackend
         {
             return scene.Action switch
             {
-                SceneAction.Ack => Task.FromResult(Result.Success<Unit, BackendError>(Unit.Value)),
-                SceneAction.Fail f => Task.FromResult(
+                RuleAction.Ack => Task.FromResult(Result.Success<Unit, BackendError>(Unit.Value)),
+                RuleAction.Fail f => Task.FromResult(
                     Result.Failure<Unit, BackendError>(BuildFailure(command.Value, f))
                 ),
-                SceneAction.Respond => Task.FromResult(
+                RuleAction.Respond => Task.FromResult(
                     Result.Failure<Unit, BackendError>(
                         new MockScenarioContractMismatch(
                             command.Value,
@@ -187,13 +187,13 @@ public sealed class FakeBackend : IIviBackend, IScenarioAwareBackend
         {
             return scene.Action switch
             {
-                SceneAction.Respond r => Task.FromResult(
+                RuleAction.Respond r => Task.FromResult(
                     Result.Success<string, BackendError>(r.Text)
                 ),
-                SceneAction.Fail f => Task.FromResult(
+                RuleAction.Fail f => Task.FromResult(
                     Result.Failure<string, BackendError>(BuildFailure(query.Value, f))
                 ),
-                SceneAction.Ack => Task.FromResult(
+                RuleAction.Ack => Task.FromResult(
                     Result.Failure<string, BackendError>(
                         new MockScenarioContractMismatch(
                             query.Value,
@@ -263,7 +263,7 @@ public sealed class FakeBackend : IIviBackend, IScenarioAwareBackend
         }
     }
 
-    private static BackendError BuildFailure(string match, SceneAction.Fail fail) =>
+    private static BackendError BuildFailure(string match, RuleAction.Fail fail) =>
         fail.Variant.ToLowerInvariant() switch
         {
             "transport_timeout" => new TransportTimeout(ParseTimeSpan(fail.Detail)),

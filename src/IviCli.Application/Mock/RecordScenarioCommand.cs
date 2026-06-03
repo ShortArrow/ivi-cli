@@ -286,9 +286,9 @@ public sealed class RecordScenarioCommandHandler
                                     new RecordScenarioTransportFailure(werr.Err)
                                 );
                             }
-                            var append = await _scenarioStore.AppendSceneAsync(
+                            var append = await _scenarioStore.AppendRuleAsync(
                                 scenarioName,
-                                new MockScene(w.Text, new SceneAction.Ack()),
+                                new MockRule(w.Text, new RuleAction.Ack()),
                                 ct
                             );
                             if (append is Result<MockScenario, ScenarioStoreError>.Error aerr)
@@ -322,9 +322,9 @@ public sealed class RecordScenarioCommandHandler
                                     )
                                 );
                             }
-                            var append = await _scenarioStore.AppendSceneAsync(
+                            var append = await _scenarioStore.AppendRuleAsync(
                                 scenarioName,
-                                new MockScene(q.Text, new SceneAction.Respond(responseText)),
+                                new MockRule(q.Text, new RuleAction.Respond(responseText)),
                                 ct
                             );
                             if (append is Result<MockScenario, ScenarioStoreError>.Error aerr)

@@ -19,11 +19,11 @@ public class FakeBackendScenarioTests
             Timeout.FromMilliseconds(3000).ShouldBeOk()
         );
 
-    private static MockScenario MakeScenario(params MockScene[] scenes) =>
-        new(
+    private static MockScenario MakeScenario(params MockRule[] rules) =>
+        MockScenario.SingleScene(
             ScenarioName.From("test-scn").ShouldBeOk(),
-            IdnDefault: "ACME,FAKE-PSU,001,1.0",
-            Scenes: scenes.ToImmutableArray()
+            idnDefault: "ACME,FAKE-PSU,001,1.0",
+            rules: rules.ToImmutableArray()
         );
 
     [Fact]
@@ -32,7 +32,7 @@ public class FakeBackendScenarioTests
         // Given
         var backend = new FakeBackend();
         backend.ActivateScenario(
-            MakeScenario(new MockScene("MEAS:VOLT?", new SceneAction.Respond("3.30")))
+            MakeScenario(new MockRule("MEAS:VOLT?", new RuleAction.Respond("3.30")))
         );
 
         // When
@@ -61,7 +61,7 @@ public class FakeBackendScenarioTests
         // Scene lookup must honour both.
         var backend = new FakeBackend();
         backend.ActivateScenario(
-            MakeScenario(new MockScene(sceneMatch, new SceneAction.Respond("3.30")))
+            MakeScenario(new MockRule(sceneMatch, new RuleAction.Respond("3.30")))
         );
 
         var result = await backend.QueryAsync(
@@ -96,7 +96,7 @@ public class FakeBackendScenarioTests
     {
         // Given
         var backend = new FakeBackend();
-        backend.ActivateScenario(MakeScenario(new MockScene("OUTP ON", new SceneAction.Ack())));
+        backend.ActivateScenario(MakeScenario(new MockRule("OUTP ON", new RuleAction.Ack())));
 
         // When
         var writeResult = await backend.WriteAsync(
@@ -115,7 +115,7 @@ public class FakeBackendScenarioTests
         // Given
         var backend = new FakeBackend();
         backend.ActivateScenario(
-            MakeScenario(new MockScene("OUTP ON", new SceneAction.Respond("ok")))
+            MakeScenario(new MockRule("OUTP ON", new RuleAction.Respond("ok")))
         );
 
         // When
@@ -134,7 +134,7 @@ public class FakeBackendScenarioTests
     {
         // Given
         var backend = new FakeBackend();
-        backend.ActivateScenario(MakeScenario(new MockScene("MEAS:VOLT?", new SceneAction.Ack())));
+        backend.ActivateScenario(MakeScenario(new MockRule("MEAS:VOLT?", new RuleAction.Ack())));
 
         // When
         var result = await backend.QueryAsync(
@@ -153,9 +153,7 @@ public class FakeBackendScenarioTests
         // Given
         var backend = new FakeBackend();
         backend.ActivateScenario(
-            MakeScenario(
-                new MockScene("MEAS:VOLT?", new SceneAction.Fail("transport_timeout", "50"))
-            )
+            MakeScenario(new MockRule("MEAS:VOLT?", new RuleAction.Fail("transport_timeout", "50")))
         );
 
         // When
@@ -176,7 +174,7 @@ public class FakeBackendScenarioTests
         // Given
         var backend = new FakeBackend();
         backend.ActivateScenario(
-            MakeScenario(new MockScene("*IDN?", new SceneAction.Respond("FROM,SCENARIO")))
+            MakeScenario(new MockRule("*IDN?", new RuleAction.Respond("FROM,SCENARIO")))
         );
         var pre = await backend.QueryAsync(
             Dev(),

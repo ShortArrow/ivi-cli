@@ -36,11 +36,11 @@ public sealed class TrafficScenarioConverterTests
 
         var scenario = conv.Convert(events, Name("psu1-smoke"), deviceFilter: null).ShouldBeOk();
 
-        scenario.Scenes.Length.ShouldBe(2);
-        scenario.Scenes[0].Match.ShouldBe("OUTP ON");
-        scenario.Scenes[0].Action.ShouldBeOfType<SceneAction.Ack>();
-        scenario.Scenes[1].Match.ShouldBe("*IDN?");
-        var respond = scenario.Scenes[1].Action.ShouldBeOfType<SceneAction.Respond>();
+        scenario.Scenes.Single().Rules.Length.ShouldBe(2);
+        scenario.Scenes.Single().Rules[0].Match.ShouldBe("OUTP ON");
+        scenario.Scenes.Single().Rules[0].Action.ShouldBeOfType<RuleAction.Ack>();
+        scenario.Scenes.Single().Rules[1].Match.ShouldBe("*IDN?");
+        var respond = scenario.Scenes.Single().Rules[1].Action.ShouldBeOfType<RuleAction.Respond>();
         respond.Text.ShouldBe("ACME,PSU,1,1.0");
         scenario.IdnDefault.ShouldBe("ACME,PSU,1,1.0");
     }
@@ -76,9 +76,9 @@ public sealed class TrafficScenarioConverterTests
         var scenario = conv.Convert(events, Name("psu1-only"), deviceFilter: Dev("psu1"))
             .ShouldBeOk();
 
-        scenario.Scenes.Length.ShouldBe(2);
-        scenario.Scenes.ShouldContain(s => s.Match == "*IDN?");
-        scenario.Scenes.ShouldContain(s => s.Match == "OUTP ON");
+        scenario.Scenes.Single().Rules.Length.ShouldBe(2);
+        scenario.Scenes.Single().Rules.ShouldContain(s => s.Match == "*IDN?");
+        scenario.Scenes.Single().Rules.ShouldContain(s => s.Match == "OUTP ON");
         scenario.IdnDefault.ShouldBe("A");
     }
 
@@ -94,8 +94,8 @@ public sealed class TrafficScenarioConverterTests
 
         var scenario = conv.Convert(events, Name("x"), deviceFilter: null).ShouldBeOk();
 
-        scenario.Scenes.Length.ShouldBe(1);
-        scenario.Scenes[0].Match.ShouldBe("*IDN?");
+        scenario.Scenes.Single().Rules.Length.ShouldBe(1);
+        scenario.Scenes.Single().Rules[0].Match.ShouldBe("*IDN?");
     }
 
     [Fact]
@@ -112,7 +112,7 @@ public sealed class TrafficScenarioConverterTests
 
         var scenario = conv.Convert(events, Name("x"), deviceFilter: null).ShouldBeOk();
 
-        scenario.Scenes.Length.ShouldBe(1);
+        scenario.Scenes.Single().Rules.Length.ShouldBe(1);
     }
 
     [Fact]
@@ -142,6 +142,6 @@ public sealed class TrafficScenarioConverterTests
         var scenario = conv.Convert(events, Name("x"), deviceFilter: null).ShouldBeOk();
 
         scenario.IdnDefault.ShouldBe("FIRST");
-        scenario.Scenes.Length.ShouldBe(3);
+        scenario.Scenes.Single().Rules.Length.ShouldBe(3);
     }
 }

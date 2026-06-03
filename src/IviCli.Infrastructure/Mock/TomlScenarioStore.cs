@@ -200,9 +200,9 @@ public sealed class TomlScenarioStore : IScenarioStore
     }
 
     /// <inheritdoc/>
-    public async Task<Result<MockScenario, ScenarioStoreError>> AppendSceneAsync(
+    public async Task<Result<MockScenario, ScenarioStoreError>> AppendRuleAsync(
         ScenarioName name,
-        MockScene scene,
+        MockRule rule,
         CancellationToken ct
     )
     {
@@ -225,7 +225,17 @@ public sealed class TomlScenarioStore : IScenarioStore
             return loadResult;
         }
 
-        var updated = scenario.AddScene(scene);
+        // v0.1.x compat: append the rule to the scenario's initial
+        // scene. v0.2.0 callers that want to address a different scene
+        // explicitly will use a richer API in a follow-up batch.
+        var initialScene = scenario.FindScene(scenario.InitialScene);
+        if (initialScene is null)
+        {
+            return Result.Failure<MockScenario, ScenarioStoreError>(
+                new ScenarioStoreParseFailure($"missing initial scene {scenario.InitialScene}")
+            );
+        }
+        var updated = scenario.ReplaceScene(initialScene.AddRule(rule))!;
         var saveResult = await SaveAsync(updated, overwriteIfExists: true, ct);
         if (saveResult is Result<Unit, ScenarioStoreError>.Error err)
         {

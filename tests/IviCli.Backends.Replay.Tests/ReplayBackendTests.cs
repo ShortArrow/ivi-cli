@@ -20,17 +20,17 @@ public class ReplayBackendTests
             Timeout.FromMilliseconds(3000).ShouldBeOk()
         );
 
-    private static MockScenario Scenario(params MockScene[] scenes) =>
-        new(
+    private static MockScenario Scenario(params MockRule[] rules) =>
+        MockScenario.SingleScene(
             ScenarioName.From("demo").ShouldBeOk(),
-            IdnDefault: null,
-            Scenes: scenes.ToImmutableArray()
+            idnDefault: null,
+            rules: rules.ToImmutableArray()
         );
 
     [Fact]
     public async Task QueryAsync_returns_response_from_matching_scene()
     {
-        var scenario = Scenario(new MockScene("*IDN?", new SceneAction.Respond("FAKE,REPLAY,0,1")));
+        var scenario = Scenario(new MockRule("*IDN?", new RuleAction.Respond("FAKE,REPLAY,0,1")));
         var backend = new ReplayBackend(scenario);
 
         (await backend.OpenAsync(Dev(), default)).ShouldBeOk();
@@ -54,7 +54,7 @@ public class ReplayBackendTests
     [Fact]
     public async Task WriteAsync_accepts_Ack_scene()
     {
-        var scenario = Scenario(new MockScene("*RST", new SceneAction.Ack()));
+        var scenario = Scenario(new MockRule("*RST", new RuleAction.Ack()));
         var backend = new ReplayBackend(scenario);
 
         var write = await backend.WriteAsync(Dev(), ScpiCommand.From("*RST").ShouldBeOk(), default);
@@ -64,7 +64,7 @@ public class ReplayBackendTests
     [Fact]
     public async Task WriteAsync_returns_ActionMismatch_for_Respond_scene()
     {
-        var scenario = Scenario(new MockScene("*RST", new SceneAction.Respond("oops")));
+        var scenario = Scenario(new MockRule("*RST", new RuleAction.Respond("oops")));
         var backend = new ReplayBackend(scenario);
         var write = await backend.WriteAsync(Dev(), ScpiCommand.From("*RST").ShouldBeOk(), default);
         write.ShouldBeOfType<Result<Unit, BackendError>.Error>();
@@ -75,7 +75,7 @@ public class ReplayBackendTests
     public async Task QueryAsync_returns_CannedFailure_for_Fail_scene()
     {
         var scenario = Scenario(
-            new MockScene("BROKEN?", new SceneAction.Fail("transport_timeout", "simulated"))
+            new MockRule("BROKEN?", new RuleAction.Fail("transport_timeout", "simulated"))
         );
         var backend = new ReplayBackend(scenario);
         var resp = await backend.QueryAsync(Dev(), ScpiQuery.From("BROKEN?").ShouldBeOk(), default);

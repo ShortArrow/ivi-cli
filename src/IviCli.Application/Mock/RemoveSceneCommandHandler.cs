@@ -55,13 +55,25 @@ public sealed class RemoveSceneCommandHandler
             return Result.Failure<MockScenario, RemoveSceneError>(new RemoveSceneStoreFailure(err));
         }
 
-        var updated = scenario.RemoveSceneAt(command.Index);
-        if (updated is null)
+        // v0.1.x compat: index addresses a rule inside the
+        // scenario's initial scene (the only scene that exists for
+        // scenarios that have not adopted the v0.2.0 multi-scene
+        // shape).
+        var initialScene = scenario.FindScene(scenario.InitialScene);
+        if (initialScene is null)
         {
             return Result.Failure<MockScenario, RemoveSceneError>(
-                new RemoveSceneIndexOutOfRange(command.Index, scenario.Scenes.Length)
+                new RemoveSceneIndexOutOfRange(command.Index, 0)
             );
         }
+        var trimmedScene = initialScene.RemoveRuleAt(command.Index);
+        if (trimmedScene is null)
+        {
+            return Result.Failure<MockScenario, RemoveSceneError>(
+                new RemoveSceneIndexOutOfRange(command.Index, initialScene.Rules.Length)
+            );
+        }
+        var updated = scenario.ReplaceScene(trimmedScene)!;
 
         var saveResult = await _store.SaveAsync(updated, overwriteIfExists: true, ct);
         if (saveResult is not Result<Unit, ScenarioStoreError>.Ok)
