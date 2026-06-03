@@ -74,6 +74,7 @@ appsettings.Local.json
 .claude/plans/
 .claude/cache/
 .claude/logs/
+.claude/scheduled_tasks.lock
 
 # Plan / scratch
 plans/

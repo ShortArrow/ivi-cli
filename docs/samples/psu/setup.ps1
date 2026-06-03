@@ -41,8 +41,9 @@ function Invoke-IvicliStep {
 Write-Host "==> scenario=$Scenario  proto=$Proto  port=$Port  device=$Device  server=$Server" -ForegroundColor Yellow
 
 # 1) Scenario + scenes — FSM (off/on).
-Invoke-IvicliStep 'create scenario'  @('mock', 'scenario', 'create', $Scenario)
-Invoke-IvicliStep 'add scene off'    @('mock', 'scenario', 'scene', 'add', $Scenario, 'off')
+# --initial off makes the FSM start in the `off` scene, so the
+# synthetic `default` scene v0.2.0 used to auto-create is skipped.
+Invoke-IvicliStep 'create scenario'  @('mock', 'scenario', 'create', $Scenario, '--initial', 'off')
 Invoke-IvicliStep 'add scene on'     @('mock', 'scenario', 'scene', 'add', $Scenario, 'on')
 
 # Static metadata, duplicated across both scenes (v0.2.0 limitation —

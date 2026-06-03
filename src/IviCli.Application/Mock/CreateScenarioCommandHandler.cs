@@ -42,7 +42,31 @@ public sealed class CreateScenarioCommandHandler
             );
         }
 
-        var scenario = MockScenario.Empty(name) with { IdnDefault = command.IdnDefault };
+        MockScenario scenario;
+        if (command.InitialScene is { Length: > 0 } initialRaw)
+        {
+            if (
+                SceneName.From(initialRaw)
+                is not Result<SceneName, SceneNameError>.Ok { Value: var initialScene }
+            )
+            {
+                return Result.Failure<ScenarioName, CreateScenarioError>(
+                    new CreateScenarioInvalidInitialScene(initialRaw)
+                );
+            }
+            scenario = new MockScenario(
+                name,
+                InitialScene: initialScene,
+                IdnDefault: command.IdnDefault,
+                Scenes: System.Collections.Immutable.ImmutableArray.Create(
+                    MockScene.Empty(initialScene)
+                )
+            );
+        }
+        else
+        {
+            scenario = MockScenario.Empty(name) with { IdnDefault = command.IdnDefault };
+        }
         var saveResult = await _store.SaveAsync(scenario, overwriteIfExists: false, ct);
         if (saveResult is Result<Unit, ScenarioStoreError>.Ok)
         {

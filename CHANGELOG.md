@@ -4,6 +4,31 @@ All notable changes to ivi-cli are documented here. Format roughly follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning follows
 [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.2] — 2026-06-03
+
+### Added
+
+- **`mock scenario create --initial <scene>`** — choose the
+  starting scene at create time. The scenario opens with that
+  single (empty) scene as both its only scene and its
+  `InitialScene`. Without the flag, the v0.1.x-compatible
+  synthetic `default` scene shape is preserved. Eliminates the
+  v0.2.0 footgun where a freshly-created scenario was stuck in
+  an empty `default` scene unless the user hand-edited TOML or
+  used `scene add` workarounds.
+
+  Example end-to-end FSM setup that previously required scp'ing
+  a TOML now stays entirely in the CLI:
+
+  ```sh
+  ivicli mock scenario create psu-bench --initial off
+  ivicli mock scenario scene add psu-bench on
+  ivicli mock scenario rule add psu-bench --in off \
+      --match 'OUTP ON' --ack --transition-to on
+  ivicli mock scenario rule add psu-bench --in on \
+      --match 'OUTP OFF' --ack --transition-to off
+  ```
+
 ## [0.2.1] — 2026-06-03
 
 ### Fixed
@@ -381,6 +406,7 @@ Initial public release. Covers Phase 1 (CLI core), Phase 2 (gateway servers
   VXI-11 backends are at parity; Local needs IVI.NET reflection
   follow-up.
 
+[0.2.2]: https://github.com/ShortArrow/ivi-cli/releases/tag/v0.2.2
 [0.2.1]: https://github.com/ShortArrow/ivi-cli/releases/tag/v0.2.1
 [0.2.0]: https://github.com/ShortArrow/ivi-cli/releases/tag/v0.2.0
 [0.1.4]: https://github.com/ShortArrow/ivi-cli/releases/tag/v0.1.4

@@ -29,11 +29,10 @@ DEVICE="${DEVICE:-psu_mock}"
 echo "==> using scenario=$SCENARIO  proto=$PROTO  port=$PORT  device=$DEVICE  server=$SERVER"
 
 # 1) Scenario + scenes — define the PSU's FSM (off/on).
-ivicli mock scenario create "$SCENARIO" || true
-# `default` is the auto-created initial scene; we rename our two
-# states explicitly so the FSM reads off → on → off intuitively.
-ivicli mock scenario scene add "$SCENARIO" off || true
-ivicli mock scenario scene add "$SCENARIO" on  || true
+# `--initial off` makes the FSM start in the `off` scene, so the
+# synthetic `default` scene v0.2.0 used to auto-create is skipped.
+ivicli mock scenario create "$SCENARIO" --initial off || true
+ivicli mock scenario scene add "$SCENARIO" on        || true
 
 # Static metadata duplicated across both scenes (v0.2.0 limitation —
 # scenes do not share rules; key-value variable state is a follow-up).

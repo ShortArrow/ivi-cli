@@ -269,24 +269,36 @@ public static class MockScenarioCommand
         {
             Description = "Optional default *IDN? response for the scenario.",
         };
+        var initialOpt = new Option<string?>("--initial")
+        {
+            Description =
+                "Initial scene name. When set, the scenario starts with that scene (empty, no rules) as its only scene; otherwise the synthetic `default` scene is used.",
+        };
 
         var cmd = new Command("create", "Create an empty scenario.");
         cmd.Arguments.Add(nameArg);
         cmd.Options.Add(idnOpt);
+        cmd.Options.Add(initialOpt);
 
         cmd.SetAction(
             async (parseResult, ct) =>
             {
                 var name = parseResult.GetRequiredValue(nameArg);
                 var idn = parseResult.GetValue(idnOpt);
+                var initial = parseResult.GetValue(initialOpt);
                 var handler = services.GetRequiredService<CreateScenarioCommandHandler>();
                 var logger = services.GetRequiredService<ILogger<CreateScenarioCommandHandler>>();
 
-                var result = await handler.HandleAsync(new CreateScenarioCommand(name, idn), ct);
+                var result = await handler.HandleAsync(
+                    new CreateScenarioCommand(name, idn, initial),
+                    ct
+                );
                 return result switch
                 {
                     Result<ScenarioName, CreateScenarioError>.Ok ok => SuccessLine(
-                        $"created scenario {ok.Value.Value}"
+                        initial is { Length: > 0 }
+                            ? $"created scenario {ok.Value.Value} (initial scene: {initial})"
+                            : $"created scenario {ok.Value.Value}"
                     ),
                     Result<ScenarioName, CreateScenarioError>.Error err => err.Err switch
                     {
@@ -294,6 +306,12 @@ public static class MockScenarioCommand
                             err.Err,
                             logger,
                             $"error: invalid scenario name '{n.Raw}'.",
+                            ExitCodeMapper.UsageError
+                        ),
+                        CreateScenarioInvalidInitialScene n => LogAndUserError(
+                            err.Err,
+                            logger,
+                            $"error: invalid initial scene name '{n.Raw}'.",
                             ExitCodeMapper.UsageError
                         ),
                         CreateScenarioAlreadyExists a => LogAndUserError(

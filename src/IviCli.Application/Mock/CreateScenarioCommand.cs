@@ -3,8 +3,18 @@ using IviCli.Domain.Mock;
 
 namespace IviCli.Application.Mock;
 
-/// <summary>Command DTO for creating an empty scenario.</summary>
-public sealed record CreateScenarioCommand(string Name, string? IdnDefault = null);
+/// <summary>
+/// Command DTO for creating a new scenario. When
+/// <paramref name="InitialScene"/> is supplied, the scenario starts
+/// with that scene (empty, no rules) as both its only scene and its
+/// initial scene. Otherwise the scenario starts with the synthetic
+/// <c>default</c> scene (v0.1.x-compatible shape).
+/// </summary>
+public sealed record CreateScenarioCommand(
+    string Name,
+    string? IdnDefault = null,
+    string? InitialScene = null
+);
 
 /// <summary>Outcomes the create command can fail with.</summary>
 public abstract record CreateScenarioError : IviError
@@ -20,6 +30,19 @@ public abstract record CreateScenarioError : IviError
 
     /// <inheritdoc/>
     public virtual Exception? Cause => null;
+}
+
+/// <summary>The supplied <c>--initial</c> scene name failed validation.</summary>
+public sealed record CreateScenarioInvalidInitialScene(string Raw) : CreateScenarioError
+{
+    /// <inheritdoc/>
+    public override LogSeverity Severity => LogSeverity.Warning;
+
+    /// <inheritdoc/>
+    public override string Message => "invalid initial scene name: {Raw}";
+
+    /// <inheritdoc/>
+    public override IReadOnlyList<object?> LogArgs => new object?[] { Raw };
 }
 
 /// <summary>The scenario name failed validation.</summary>
