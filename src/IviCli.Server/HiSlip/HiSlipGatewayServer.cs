@@ -184,11 +184,48 @@ public sealed class HiSlipGatewayServer : IGatewayServer
         CancellationToken ct
     )
     {
-        // Drain the Initialize payload (sub-protocol name and client identifier).
+        // Drain the Initialize payload — IVI-6.1 §10.2.1: the payload is
+        // an ASCII string identifying the sub-protocol (typically the
+        // LAN device name from the client's VISA resource, e.g.
+        // "hislip0", "hislip1"). We use that to multiplex multiple
+        // routed devices onto a single TCP port (issue #21).
         var initPayload = new byte[init.PayloadLength];
         if (initPayload.Length > 0)
         {
             await ReadExactlyAsync(stream, initPayload, ct);
+        }
+        var subAddress =
+            initPayload.Length > 0
+                ? System.Text.Encoding.ASCII.GetString(initPayload).Trim('\0')
+                : string.Empty;
+
+        // Resolve the bound device BEFORE replying so a sub-address
+        // miss surfaces as a Fatal at handshake time (rather than
+        // dragging the client through a successful InitializeResponse
+        // followed by an unexplained close on first Data).
+        Route? route = null;
+        foreach (var r in config.Routes)
+        {
+            if (r.ServerName == server.Name && r.Endpoint.Value == subAddress)
+            {
+                route = r;
+                break;
+            }
+        }
+        var device = route is not null ? config.FindDevice(route.DeviceName) : null;
+        if (device is null)
+        {
+            _logger.LogInformation(
+                "HiSLIP Initialize miss: server {Server} has no route for sub-address {SubAddress}",
+                server.Name.Value,
+                subAddress
+            );
+            await SendFatalAsync(
+                stream,
+                $"no route for sub-address '{subAddress}' on server {server.Name.Value}",
+                ct
+            );
+            return;
         }
 
         // Reply with InitializeResponse: protocol version + session id.
@@ -207,24 +244,6 @@ public sealed class HiSlipGatewayServer : IGatewayServer
             payloadLength: 0
         );
         await stream.WriteAsync(respHeader, ct);
-
-        // Resolve the bound device. HiSLIP servers in v1 expose one logical
-        // instrument; we pick the first route on this server.
-        Route? route = null;
-        foreach (var r in config.Routes)
-        {
-            if (r.ServerName == server.Name)
-            {
-                route = r;
-                break;
-            }
-        }
-        var device = route is not null ? config.FindDevice(route.DeviceName) : null;
-        if (device is null)
-        {
-            await SendFatalAsync(stream, "no route configured", ct);
-            return;
-        }
 
         var backendResult = _backendFactory.CreateFor(device);
         if (backendResult is not Result<IIviBackend, BackendError>.Ok { Value: var backend })

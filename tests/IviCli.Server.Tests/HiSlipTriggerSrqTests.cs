@@ -117,7 +117,7 @@ public sealed class HiSlipTriggerSrqTests
             Timeout.FromMilliseconds(3000).ShouldBeOk()
         );
         var serverName = ServerName.From("hislip-srv").ShouldBeOk();
-        var endpoint = PublicEndpoint.From("dut").ShouldBeOk();
+        var endpoint = PublicEndpoint.From("hislip0").ShouldBeOk();
         var bind = IpAddress.From("127.0.0.1").ShouldBeOk();
         var portValue = Port.From(port).ShouldBeOk();
         var srv = new IviCli.Domain.Servers.Server(serverName, ServerType.HiSlip, bind, portValue);

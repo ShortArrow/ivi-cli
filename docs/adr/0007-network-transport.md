@@ -197,6 +197,24 @@ local NI-VISA install — anything that resolves to an `IIviBackend`
 works, including chained `HiSlipBackend` instances (a proxy
 configuration future-proofed by this design).
 
+**Sub-address multiplexing (v0.2.3, issue #21).** For HiSLIP, step 1
+reads the **Initialize payload** sent by the client per IVI-6.1
+§10.2.1 — an ASCII string carrying the resource's LAN-device segment
+(`hislip0`, `hislip1`, …). Step 2 matches that string against the
+route's `Endpoint.Value`, which is why operators set
+`server route add <server> hislip0 <device>` for the device they want
+clients addressing `TCPIP::host::hislip0::INSTR` to reach. Multiple
+routes on the same gateway server with distinct endpoint names share
+the TCP port — clients pick which device they talk to via the
+sub-address segment of their VISA resource string. If no route
+matches the supplied sub-address the gateway returns a HiSLIP Fatal
+message at handshake time (rather than silently picking another
+route, which v0.1.x — v0.2.2 did).
+
+For SOCKET the equivalent identifier is the listening TCP port,
+which `[[routes]] endpoint = "<port>"` already encodes; one port,
+one device.
+
 ### 8. Backwards compatibility with existing VISA clients
 
 Both protocols must be byte-identical to the relevant standard for

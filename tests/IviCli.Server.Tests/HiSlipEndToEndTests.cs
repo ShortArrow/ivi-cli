@@ -36,7 +36,9 @@ public sealed class HiSlipEndToEndTests
             Timeout.FromMilliseconds(3000).ShouldBeOk()
         );
         var serverName = ServerName.From("hislip-srv").ShouldBeOk();
-        var endpoint = PublicEndpoint.From("dut").ShouldBeOk();
+        // Match the client's LanDevice ("hislip0") so the gateway's
+        // sub-address router (issue #21) resolves this single route.
+        var endpoint = PublicEndpoint.From("hislip0").ShouldBeOk();
         var bind = IpAddress.From("127.0.0.1").ShouldBeOk();
         var portValue = Port.From(port).ShouldBeOk();
         var server = new IviCli.Domain.Servers.Server(

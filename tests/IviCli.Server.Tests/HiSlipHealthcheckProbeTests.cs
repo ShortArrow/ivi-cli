@@ -33,7 +33,7 @@ public sealed class HiSlipHealthcheckProbeTests
             Timeout.FromMilliseconds(3000).ShouldBeOk()
         );
         var serverName = ServerName.From("hislip-srv").ShouldBeOk();
-        var endpoint = PublicEndpoint.From("dut").ShouldBeOk();
+        var endpoint = PublicEndpoint.From("hislip0").ShouldBeOk();
         var server = new IviCli.Domain.Servers.Server(
             serverName,
             ServerType.HiSlip,

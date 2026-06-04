@@ -131,7 +131,7 @@ public sealed class HiSlipV3Tests
                 Timeout.FromMilliseconds(3000).ShouldBeOk()
             );
             var serverName = ServerName.From("hislip-srv").ShouldBeOk();
-            var endpoint = PublicEndpoint.From("dut").ShouldBeOk();
+            var endpoint = PublicEndpoint.From("hislip0").ShouldBeOk();
             var bind = IpAddress.From("127.0.0.1").ShouldBeOk();
             var portValue = Port.From(port).ShouldBeOk();
             var server = new IviCli.Domain.Servers.Server(
@@ -204,15 +204,19 @@ public sealed class HiSlipV3Tests
             var sync = new TcpClient();
             await sync.ConnectAsync(IPAddress.Loopback, _port, _cts.Token);
             var stream = sync.GetStream();
+            // Initialize payload carries the sub-address per IVI-6.1
+            // §10.2.1 — must match the route's endpoint (issue #21).
+            var payload = System.Text.Encoding.ASCII.GetBytes("hislip0");
             var header = new byte[HiSlipMessage.HeaderSize];
             HiSlipMessage.WriteHeader(
                 header,
                 HiSlipMessageType.Initialize,
                 controlCode: 0,
                 messageParameter: 0,
-                payloadLength: 0
+                payloadLength: (ulong)payload.Length
             );
             await stream.WriteAsync(header, _cts.Token);
+            await stream.WriteAsync(payload, _cts.Token);
             var resp = await ReadHeaderAsync(stream, _cts.Token);
             resp.Type.ShouldBe(HiSlipMessageType.InitializeResponse);
             return stream;

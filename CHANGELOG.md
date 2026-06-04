@@ -4,6 +4,38 @@ All notable changes to ivi-cli are documented here. Format roughly follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning follows
 [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.3] — 2026-06-04
+
+### Fixed
+
+- **HiSLIP gateway: sub-address multiplexing** (issue #21). A
+  single gateway server can now route incoming HiSLIP sessions to
+  distinct backend devices based on the client-supplied sub-address
+  in the Initialize payload (IVI-6.1 §10.2.1). Two routes with
+  endpoints `hislip0` and `hislip1` on the same `[[servers]]` entry
+  serve the corresponding devices on the same TCP port — one
+  container or one gateway process can now expose a virtual lab of
+  several mock instruments without needing one TCP port per
+  device. v0.1.x — v0.2.2 silently ignored the sub-address and
+  picked the scenario's first route on the server, which
+  prevented this and made the user-facing behaviour incoherent
+  with the wire-level protocol.
+
+  When no route matches the supplied sub-address, the gateway now
+  returns a HiSLIP Fatal at handshake time (logged at INF) instead
+  of silently serving the wrong device. Operators with broken
+  route configs (endpoint name mismatching the wire sub-address)
+  will see the failure surface immediately.
+
+### Migration
+
+- `server route add <server> <endpoint> <device>` must use an
+  endpoint string that matches the LAN-device segment of the VISA
+  resource clients dial in with — `hislip0` / `hislip1` / etc. for
+  HiSLIP, the TCP port number for SOCKET. The PSU sample
+  (`docs/samples/psu/`) and the prior release-day idg setup
+  already use `hislip0`, so no change for existing deployments.
+
 ## [0.2.2] — 2026-06-03
 
 ### Added
@@ -406,6 +438,7 @@ Initial public release. Covers Phase 1 (CLI core), Phase 2 (gateway servers
   VXI-11 backends are at parity; Local needs IVI.NET reflection
   follow-up.
 
+[0.2.3]: https://github.com/ShortArrow/ivi-cli/releases/tag/v0.2.3
 [0.2.2]: https://github.com/ShortArrow/ivi-cli/releases/tag/v0.2.2
 [0.2.1]: https://github.com/ShortArrow/ivi-cli/releases/tag/v0.2.1
 [0.2.0]: https://github.com/ShortArrow/ivi-cli/releases/tag/v0.2.0

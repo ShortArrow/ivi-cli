@@ -38,7 +38,7 @@ public sealed class HiSlipPyVisaInteropTests
             Timeout.FromMilliseconds(5000).ShouldBeOk()
         );
         var serverName = ServerName.From("hislip-srv").ShouldBeOk();
-        var endpoint = PublicEndpoint.From("dut").ShouldBeOk();
+        var endpoint = PublicEndpoint.From("hislip0").ShouldBeOk();
         var bind = IpAddress.From("127.0.0.1").ShouldBeOk();
         var portValue = Port.From(port).ShouldBeOk();
         var server = new IviCli.Domain.Servers.Server(
