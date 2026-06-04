@@ -24,7 +24,7 @@
       "ivicli.application": {
         "type": "Project",
         "dependencies": {
-          "IviCli.Domain": "[0.2.2, )",
+          "IviCli.Domain": "[0.2.3, )",
           "TestableIO.System.IO.Abstractions": "[22.1.1, )"
         }
       },
