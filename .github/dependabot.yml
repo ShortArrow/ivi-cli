@@ -9,6 +9,13 @@ updates:
       time: '06:00'
       timezone: Etc/UTC
     open-pull-requests-limit: 5
+    # Match the Conventional Commits prefix the pr.yml semantic-PR
+    # check enforces (see ADR 0022). Without this, NuGet PR titles
+    # default to "Bump X" with no type prefix and the title-check
+    # job fails before the build can run.
+    commit-message:
+      prefix: chore
+      include: scope
     groups:
       test-stack:
         patterns:
