@@ -88,10 +88,16 @@ RUN chmod +x /usr/local/bin/entrypoint.sh
 # - IVICLI_CONFIG     → config.toml location
 # - IVICLI_MOCK_ONLY  → null out transport backends so every gateway
 #                       device resolves to FakeBackend (ADR 0018 §2)
-# - IVICLI_SCENARIO   → activate the named scenario on FakeBackend
+# - IVICLI_SCENARIO     → activate the named scenario on FakeBackend
+# - IVICLI_SCENARIO_FOR → bind IVICLI_SCENARIO to this device alias
+#                         (v0.2.4+ replaced the single-global-scenario
+#                         model with per-device bindings; the container
+#                         pins the baked `default` scenario to the
+#                         baked `mock1` device — ADR 0026 §16).
 ENV IVICLI_CONFIG=/etc/ivi-cli/config.toml \
     IVICLI_MOCK_ONLY=1 \
     IVICLI_SCENARIO=default \
+    IVICLI_SCENARIO_FOR=mock1 \
     PATH=/opt/ivi-cli:${PATH}
 
 # HiSlip gateway (per ADR 0018 §3) on 4880, SOCKET gateway on 5025.

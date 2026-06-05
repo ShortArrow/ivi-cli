@@ -4,6 +4,38 @@ All notable changes to ivi-cli are documented here. Format roughly follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning follows
 [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.5] — 2026-06-05
+
+### Fixed
+
+- **Mock-VISA container: scenario auto-load** (regression in
+  v0.2.4). The v0.2.4 per-device scenario rewrite started ignoring
+  `IVICLI_SCENARIO` when no current device was selected, which
+  broke the pre-baked container — its `session.json` is empty by
+  design and `IVICLI_SCENARIO=default` was previously enough to
+  arm the gateway. The Dockerfile now ships
+  `IVICLI_SCENARIO_FOR=mock1` so the env-driven activation has an
+  explicit target. The release-time smoke test exercises this
+  path; v0.2.4's container build failed it (no GitHub Release
+  was cut for v0.2.4).
+
+### Added
+
+- **`IVICLI_SCENARIO_FOR=<device>` env var** — pairs with
+  `IVICLI_SCENARIO` to bind the named scenario to a specific
+  device at startup, without needing `state.json` written first.
+  Resolution order is now `IVICLI_SCENARIO_FOR` → session's
+  current device → warning + skip. Invalid device names log a
+  warning and fall through to the session default.
+
+### Compatibility
+
+- Consumers that relied on v0.2.4's nupkg (NuGet `ivicli 0.2.4`)
+  can continue using it locally — the regression only affected
+  the container image. Container users should pull
+  `ghcr.io/shortarrow/ivi-cli-mock:0.2.5` once the release
+  workflow finishes.
+
 ## [0.2.4] — 2026-06-05
 
 ### Added

@@ -512,11 +512,16 @@ internal static class Program
         var store = services.GetRequiredService<IScenarioStore>();
         var fake = services.GetRequiredService<FakeBackend>();
 
-        // Highest precedence: IVICLI_SCENARIO env var. When set, it binds
-        // to the current device from session.json (matching the CLI
-        // `--for` default fallback). Without a current device, the env
-        // var is ignored with a warning — there's nothing to bind to.
+        // Highest precedence: IVICLI_SCENARIO env var. The target device
+        // is resolved in this order: IVICLI_SCENARIO_FOR (explicit env)
+        // → session.CurrentDevice (the `visa use` default). When neither
+        // is set, the env var is ignored with a warning — there's nothing
+        // to bind to. The explicit env exists so containers and CI runs
+        // can pre-load a scenario without writing session.json first
+        // (Dockerfile `IVICLI_SCENARIO_FOR=mock1` covers the canonical
+        // mock-container case).
         string? envScenario = Environment.GetEnvironmentVariable("IVICLI_SCENARIO");
+        string? envScenarioFor = Environment.GetEnvironmentVariable("IVICLI_SCENARIO_FOR");
 
         var sessionStore = services.GetRequiredService<ISessionStore>();
         var sessionResult = await sessionStore.LoadAsync(ct);
@@ -527,10 +532,32 @@ internal static class Program
 
         if (!string.IsNullOrEmpty(envScenario))
         {
-            if (session.CurrentDevice is not { } currentDevice)
+            DeviceName? envTarget = null;
+            if (!string.IsNullOrEmpty(envScenarioFor))
+            {
+                if (
+                    DeviceName.From(envScenarioFor) is Result<DeviceName, DeviceError>.Ok
+                    {
+                        Value: var parsed
+                    }
+                )
+                {
+                    envTarget = parsed;
+                }
+                else
+                {
+                    Log.Logger.Warning(
+                        "ignoring invalid IVICLI_SCENARIO_FOR value {Raw}",
+                        envScenarioFor
+                    );
+                }
+            }
+            envTarget ??= session.CurrentDevice;
+
+            if (envTarget is null)
             {
                 Log.Logger.Warning(
-                    "IVICLI_SCENARIO={Name} ignored: no current device selected (run `ivicli visa use <device>` first)",
+                    "IVICLI_SCENARIO={Name} ignored: no target device (set IVICLI_SCENARIO_FOR=<device> or run `ivicli visa use <device>` first)",
                     envScenario
                 );
             }
@@ -543,7 +570,7 @@ internal static class Program
             }
             else
             {
-                await ActivateOne(store, fake, currentDevice, envName, ct);
+                await ActivateOne(store, fake, envTarget, envName, ct);
             }
         }
 
