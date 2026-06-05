@@ -1,7 +1,9 @@
 using System.CommandLine;
 using IviCli.Application.Mock;
+using IviCli.Application.Session;
 using IviCli.Domain;
 using IviCli.Domain.Mock;
+using IviCli.Domain.Session;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -22,6 +24,7 @@ public static class MockScenarioCommand
         command.Subcommands.Add(BuildShow(services));
         command.Subcommands.Add(BuildActivate(services));
         command.Subcommands.Add(BuildDeactivate(services));
+        command.Subcommands.Add(BuildListActive(services));
         command.Subcommands.Add(MockSceneCommand.Build(services));
         command.Subcommands.Add(MockRuleCommand.Build(services));
         command.Subcommands.Add(BuildRecord(services));
@@ -431,18 +434,28 @@ public static class MockScenarioCommand
     private static Command BuildActivate(IServiceProvider services)
     {
         var nameArg = new Argument<string>("name") { Description = "Scenario name." };
+        var forOpt = new Option<string?>("--for")
+        {
+            Description =
+                "Device alias to bind the scenario to. Defaults to the current device (see `visa use`).",
+        };
 
-        var cmd = new Command("activate", "Make a scenario the active mock.");
+        var cmd = new Command("activate", "Bind a scenario to a device.");
         cmd.Arguments.Add(nameArg);
+        cmd.Options.Add(forOpt);
 
         cmd.SetAction(
             async (parseResult, ct) =>
             {
                 var name = parseResult.GetRequiredValue(nameArg);
+                var device = parseResult.GetValue(forOpt);
                 var handler = services.GetRequiredService<ActivateScenarioCommandHandler>();
                 var logger = services.GetRequiredService<ILogger<ActivateScenarioCommandHandler>>();
 
-                var result = await handler.HandleAsync(new ActivateScenarioCommand(name), ct);
+                var result = await handler.HandleAsync(
+                    new ActivateScenarioCommand(name, device),
+                    ct
+                );
                 return result switch
                 {
                     Result<ScenarioName, ActivateScenarioError>.Ok ok => SuccessLine(
@@ -454,6 +467,18 @@ public static class MockScenarioCommand
                             err.Err,
                             logger,
                             $"error: invalid scenario name '{n.Raw}'.",
+                            ExitCodeMapper.UsageError
+                        ),
+                        ActivateScenarioInvalidDevice d => LogAndUserError(
+                            err.Err,
+                            logger,
+                            $"error: invalid device name '{d.Raw}'.",
+                            ExitCodeMapper.UsageError
+                        ),
+                        ActivateScenarioNoDeviceSelected => LogAndUserError(
+                            err.Err,
+                            logger,
+                            "error: no device selected. pass --for <device> or run `ivicli visa use <device>` first.",
                             ExitCodeMapper.UsageError
                         ),
                         ActivateScenarioNotFound nf => LogAndUserError(
@@ -478,27 +503,114 @@ public static class MockScenarioCommand
 
     private static Command BuildDeactivate(IServiceProvider services)
     {
-        var cmd = new Command("deactivate", "Clear any active mock scenario.");
+        var forOpt = new Option<string?>("--for")
+        {
+            Description =
+                "Device alias whose scenario binding to clear. Defaults to the current device.",
+        };
+
+        var cmd = new Command("deactivate", "Clear a device's scenario binding.");
+        cmd.Options.Add(forOpt);
         cmd.SetAction(
             async (parseResult, ct) =>
             {
+                var device = parseResult.GetValue(forOpt);
                 var handler = services.GetRequiredService<DeactivateScenarioCommandHandler>();
                 var logger = services.GetRequiredService<
                     ILogger<DeactivateScenarioCommandHandler>
                 >();
 
-                var result = await handler.HandleAsync(new DeactivateScenarioCommand(), ct);
+                var result = await handler.HandleAsync(new DeactivateScenarioCommand(device), ct);
                 return result switch
                 {
                     Result<Unit, ActivateScenarioError>.Ok => SuccessLine("scenario deactivated"),
-                    Result<Unit, ActivateScenarioError>.Error err => LogAndUserError(
-                        err.Err,
+                    Result<Unit, ActivateScenarioError>.Error err => err.Err switch
+                    {
+                        ActivateScenarioInvalidDevice d => LogAndUserError(
+                            err.Err,
+                            logger,
+                            $"error: invalid device name '{d.Raw}'.",
+                            ExitCodeMapper.UsageError
+                        ),
+                        ActivateScenarioNoDeviceSelected => LogAndUserError(
+                            err.Err,
+                            logger,
+                            "error: no device selected. pass --for <device> or run `ivicli visa use <device>` first.",
+                            ExitCodeMapper.UsageError
+                        ),
+                        _ => LogAndUserError(
+                            err.Err,
+                            logger,
+                            "error: session storage failed.",
+                            ExitCodeMapper.ConfigurationError
+                        ),
+                    },
+                    _ => ExitCodeMapper.GenericFailure,
+                };
+            }
+        );
+        return cmd;
+    }
+
+    private static Command BuildListActive(IServiceProvider services)
+    {
+        var jsonOpt = new Option<bool>("--json") { Description = "Emit machine-readable JSON." };
+        var cmd = new Command("list-active", "List every device with an active scenario binding.");
+        cmd.Options.Add(jsonOpt);
+        cmd.SetAction(
+            async (parseResult, ct) =>
+            {
+                var emitJson = parseResult.GetValue(jsonOpt);
+                var sessionStore = services.GetRequiredService<ISessionStore>();
+                var logger = services.GetRequiredService<
+                    ILogger<DeactivateScenarioCommandHandler>
+                >();
+
+                var loadResult = await sessionStore.LoadAsync(ct);
+                if (
+                    loadResult
+                    is not Result<SessionState, SessionStoreError>.Ok { Value: var session }
+                )
+                {
+                    var err = ((Result<SessionState, SessionStoreError>.Error)loadResult).Err;
+                    return LogAndUserError(
+                        err,
                         logger,
                         "error: session storage failed.",
                         ExitCodeMapper.ConfigurationError
-                    ),
-                    _ => ExitCodeMapper.GenericFailure,
-                };
+                    );
+                }
+
+                if (emitJson)
+                {
+                    Console.Write("{\"bindings\":[");
+                    var first = true;
+                    foreach (var (dev, scn) in session.DeviceScenarios)
+                    {
+                        if (!first)
+                        {
+                            Console.Write(",");
+                        }
+                        first = false;
+                        Console.Write(
+                            $"{{\"device\":\"{dev.Value}\",\"scenario\":\"{scn.Value}\"}}"
+                        );
+                    }
+                    Console.WriteLine("]}");
+                }
+                else if (session.DeviceScenarios.IsEmpty)
+                {
+                    Console.WriteLine("(no active scenarios)");
+                }
+                else
+                {
+                    foreach (var (dev, scn) in session.DeviceScenarios)
+                    {
+                        var marker = session.CurrentDevice == dev ? " *" : "";
+                        Console.WriteLine($"{dev.Value} -> {scn.Value}{marker}");
+                    }
+                }
+                return 0;
             }
         );
         return cmd;

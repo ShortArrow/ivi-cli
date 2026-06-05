@@ -12,6 +12,7 @@ using IviCli.Cli.Commands;
 using IviCli.Cli.Logging;
 using IviCli.Cli.Paths;
 using IviCli.Domain;
+using IviCli.Domain.Devices;
 using IviCli.Domain.Mock;
 using IviCli.Domain.Session;
 using IviCli.Infrastructure;
@@ -508,41 +509,69 @@ internal static class Program
         CancellationToken ct
     )
     {
-        // Highest precedence: IVICLI_SCENARIO env var. Falls back to session.json.
-        string? requested = Environment.GetEnvironmentVariable("IVICLI_SCENARIO");
-        if (string.IsNullOrEmpty(requested))
+        var store = services.GetRequiredService<IScenarioStore>();
+        var fake = services.GetRequiredService<FakeBackend>();
+
+        // Highest precedence: IVICLI_SCENARIO env var. When set, it binds
+        // to the current device from session.json (matching the CLI
+        // `--for` default fallback). Without a current device, the env
+        // var is ignored with a warning — there's nothing to bind to.
+        string? envScenario = Environment.GetEnvironmentVariable("IVICLI_SCENARIO");
+
+        var sessionStore = services.GetRequiredService<ISessionStore>();
+        var sessionResult = await sessionStore.LoadAsync(ct);
+        if (sessionResult is not Result<SessionState, SessionStoreError>.Ok { Value: var session })
         {
-            var sessionStore = services.GetRequiredService<ISessionStore>();
-            var sessionResult = await sessionStore.LoadAsync(ct);
-            if (
-                sessionResult is Result<SessionState, SessionStoreError>.Ok { Value: var session }
-                && session.ActiveScenario is { } scenarioName
+            return;
+        }
+
+        if (!string.IsNullOrEmpty(envScenario))
+        {
+            if (session.CurrentDevice is not { } currentDevice)
+            {
+                Log.Logger.Warning(
+                    "IVICLI_SCENARIO={Name} ignored: no current device selected (run `ivicli visa use <device>` first)",
+                    envScenario
+                );
+            }
+            else if (
+                ScenarioName.From(envScenario)
+                is not Result<ScenarioName, ScenarioNameError>.Ok { Value: var envName }
             )
             {
-                requested = scenarioName.Value;
+                Log.Logger.Warning("ignoring invalid IVICLI_SCENARIO value {Raw}", envScenario);
+            }
+            else
+            {
+                await ActivateOne(store, fake, currentDevice, envName, ct);
             }
         }
-        if (string.IsNullOrEmpty(requested))
+
+        foreach (var (device, scenarioName) in session.DeviceScenarios)
         {
-            return;
+            await ActivateOne(store, fake, device, scenarioName, ct);
         }
-        if (
-            ScenarioName.From(requested)
-            is not Result<ScenarioName, ScenarioNameError>.Ok { Value: var name }
-        )
-        {
-            Log.Logger.Warning("ignoring invalid IVICLI_SCENARIO value {Raw}", requested);
-            return;
-        }
-        var store = services.GetRequiredService<IScenarioStore>();
+    }
+
+    private static async Task ActivateOne(
+        IScenarioStore store,
+        FakeBackend fake,
+        DeviceName device,
+        ScenarioName name,
+        CancellationToken ct
+    )
+    {
         var loadResult = await store.LoadAsync(name, ct);
         if (loadResult is not Result<MockScenario, ScenarioStoreError>.Ok { Value: var scenario })
         {
-            Log.Logger.Warning("could not load active scenario {Name}: ignored", requested);
+            Log.Logger.Warning(
+                "could not load active scenario {Name} for device {Device}: ignored",
+                name.Value,
+                device.Value
+            );
             return;
         }
-        var fake = services.GetRequiredService<FakeBackend>();
-        fake.ActivateScenario(scenario);
+        fake.ActivateScenario(scenario, device);
     }
 
     private static LogEventLevel ResolveVerbosity(string[] args, out bool quiet)

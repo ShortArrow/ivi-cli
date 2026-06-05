@@ -1,6 +1,8 @@
+using System.Collections.Immutable;
 using System.IO.Abstractions.TestingHelpers;
 using IviCli.Application.Session;
 using IviCli.Domain.Devices;
+using IviCli.Domain.Mock;
 using IviCli.Domain.Session;
 using IviCli.Infrastructure.Session;
 using IviCli.TestKit;
@@ -31,7 +33,10 @@ public class JsonSessionStoreTests
         // Given
         var fs = new MockFileSystem();
         var store = new JsonSessionStore(fs, Path);
-        var state = new SessionState(DeviceName.From("psu1").ShouldBeOk());
+        var state = new SessionState(
+            DeviceName.From("psu1").ShouldBeOk(),
+            ImmutableDictionary<DeviceName, ScenarioName>.Empty
+        );
 
         // When
         (await store.SaveAsync(state, CancellationToken.None)).ShouldBeOk();

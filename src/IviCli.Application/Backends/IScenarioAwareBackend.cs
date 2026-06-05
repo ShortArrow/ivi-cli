@@ -1,3 +1,5 @@
+using IviCli.Domain.Devices;
+
 namespace IviCli.Application.Backends;
 
 /// <summary>
@@ -18,9 +20,19 @@ namespace IviCli.Application.Backends;
 public interface IScenarioAwareBackend : IIviBackend
 {
     /// <summary>
-    /// True iff a scenario is currently active on this backend. The
-    /// flag is allowed to flip at runtime (scenario activate/deactivate
-    /// commands); implementations should read it lazily, not cache it.
+    /// True iff at least one device has an active scenario binding on
+    /// this backend. The flag is allowed to flip at runtime (scenario
+    /// activate/deactivate commands); implementations should read it
+    /// lazily, not cache it.
     /// </summary>
     bool HasActiveScenario { get; }
+
+    /// <summary>
+    /// True iff <paramref name="device"/> specifically has an active
+    /// scenario binding. v0.2.4+ replaced the single-global-scenario
+    /// model with per-device bindings (issue #36) — factories must short-
+    /// circuit to this backend only for devices that *actually* have a
+    /// scenario, not unconditionally whenever any scenario is active.
+    /// </summary>
+    bool HasActiveScenarioFor(Device device);
 }

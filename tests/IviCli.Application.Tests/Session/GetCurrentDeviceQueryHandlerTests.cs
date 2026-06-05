@@ -21,7 +21,16 @@ public class GetCurrentDeviceQueryHandlerTests
     public async Task Handle_WhenSessionHasCurrentDevice_ReturnsIt()
     {
         // Given
-        var session = new FakeSessionStore(new SessionState(DeviceName.From("psu1").ShouldBeOk()));
+        var session = new FakeSessionStore(
+            new SessionState(
+                DeviceName.From("psu1").ShouldBeOk(),
+                System
+                    .Collections
+                    .Immutable
+                    .ImmutableDictionary<DeviceName, IviCli.Domain.Mock.ScenarioName>
+                    .Empty
+            )
+        );
         var config = new FakeConfigStore();
         var handler = new GetCurrentDeviceQueryHandler(config, session);
 

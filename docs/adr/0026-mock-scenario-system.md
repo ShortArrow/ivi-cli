@@ -338,3 +338,65 @@ Backwards compatibility:
   initial scene, same observable behaviour as v0.1.x).
 
 Tracked in [issue #26](https://github.com/ShortArrow/ivi-cli/issues/26).
+
+### 16. v0.2.4 evolution — per-device scenario bindings
+
+v0.1.x — v0.2.3 stored a single global active scenario in
+`SessionState.ActiveScenario`. With v0.2.3's HiSLIP sub-address
+multiplexing one gateway can route to several backend devices,
+but every device that landed on the FakeBackend got the *same*
+scenario forced onto it — multi-device mocks were only useful
+when every device wanted the same state machine simultaneously.
+
+v0.2.4 replaces the single field with an explicit per-device
+map:
+
+```csharp
+public sealed record SessionState(
+    DeviceName? CurrentDevice,
+    ImmutableDictionary<DeviceName, ScenarioName> DeviceScenarios
+);
+```
+
+The FakeBackend gains a per-device binding table
+(`ConcurrentDictionary<DeviceName, ActiveBinding>` where
+`ActiveBinding` holds the scenario plus that device's current
+scene), and `IScenarioAwareBackend` gains a per-device probe
+`HasActiveScenarioFor(Device)`. `DefaultBackendFactory` consults
+the per-device probe instead of the global flag, so a device
+without a binding still dispatches to its real transport
+backend on the same gateway. State-machine transitions remain
+per-device — `OUTP ON` on `psu1` does not move `psu2`'s scene.
+
+**CLI shape.** `ivicli mock scenario activate <name>` keeps the
+single-arg form, but the binding target is the *current device*
+(set by `ivicli visa use <device>`). Explicit binding is
+`--for <device>`:
+
+```
+ivicli visa use psu1
+ivicli mock scenario activate psu-fsm                   # binds to psu1
+ivicli mock scenario activate dmm-noise --for dmm0      # bind ad-hoc
+ivicli mock scenario list-active                        # show bindings
+ivicli mock scenario deactivate --for dmm0              # clear one
+```
+
+Calls fail with `ActivateScenarioNoDeviceSelected` when
+`--for` is omitted and no current device is set, so the user
+gets a precise CLI message rather than silently binding to
+nothing.
+
+**Persistence migration.** `state.json` adds a new
+`device_scenarios` map; the legacy `active_scenario` field is
+read-only and promotes to the binding for the then-current
+device on first load. Old files written by v0.1.x — v0.2.3
+upgrade transparently. When the legacy state had no current
+device the binding has nowhere to go and is dropped silently —
+the user re-activates explicitly under the new shape.
+
+**Environment variable.** `IVICLI_SCENARIO` binds the named
+scenario to the current device on startup, mirroring the CLI
+default. Without a current device the variable logs a warning
+and is ignored.
+
+Tracked in [issue #36](https://github.com/ShortArrow/ivi-cli/issues/36).

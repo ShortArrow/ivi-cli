@@ -1,11 +1,16 @@
 using IviCli.Application.Session;
 using IviCli.Domain;
+using IviCli.Domain.Devices;
 using IviCli.Domain.Mock;
 using IviCli.Domain.Session;
 
 namespace IviCli.Application.Mock;
 
-/// <summary>Activates a scenario by writing its name into <see cref="SessionState"/>.</summary>
+/// <summary>
+/// Activates a scenario by binding it to a specific device in
+/// <see cref="SessionState"/>. When no device is supplied, the
+/// session's current device is used; calls fail when neither is set.
+/// </summary>
 public sealed class ActivateScenarioCommandHandler
 {
     private readonly IScenarioStore _scenarioStore;
@@ -18,7 +23,7 @@ public sealed class ActivateScenarioCommandHandler
         _sessionStore = sessionStore;
     }
 
-    /// <summary>Activates the scenario.</summary>
+    /// <summary>Activates the scenario for the resolved target device.</summary>
     public async Task<Result<ScenarioName, ActivateScenarioError>> HandleAsync(
         ActivateScenarioCommand command,
         CancellationToken ct
@@ -58,7 +63,18 @@ public sealed class ActivateScenarioCommandHandler
             );
         }
 
-        var next = session with { ActiveScenario = name };
+        var deviceResolution = ResolveDevice(command.Device, session);
+        if (
+            deviceResolution
+            is not Result<DeviceName, ActivateScenarioError>.Ok { Value: var device }
+        )
+        {
+            return Result.Failure<ScenarioName, ActivateScenarioError>(
+                ((Result<DeviceName, ActivateScenarioError>.Error)deviceResolution).Err
+            );
+        }
+
+        var next = session.BindScenario(device, name);
         var saveResult = await _sessionStore.SaveAsync(next, ct);
         if (saveResult is not Result<Unit, SessionStoreError>.Ok)
         {
@@ -70,9 +86,34 @@ public sealed class ActivateScenarioCommandHandler
 
         return Result.Success<ScenarioName, ActivateScenarioError>(name);
     }
+
+    internal static Result<DeviceName, ActivateScenarioError> ResolveDevice(
+        string? raw,
+        SessionState session
+    )
+    {
+        if (raw is { Length: > 0 } explicitName)
+        {
+            return
+                DeviceName.From(explicitName)
+                    is Result<DeviceName, DeviceError>.Ok { Value: var parsed }
+                ? Result.Success<DeviceName, ActivateScenarioError>(parsed)
+                : Result.Failure<DeviceName, ActivateScenarioError>(
+                    new ActivateScenarioInvalidDevice(explicitName)
+                );
+        }
+        return session.CurrentDevice is { } current
+            ? Result.Success<DeviceName, ActivateScenarioError>(current)
+            : Result.Failure<DeviceName, ActivateScenarioError>(
+                new ActivateScenarioNoDeviceSelected()
+            );
+    }
 }
 
-/// <summary>Clears any active scenario from the session.</summary>
+/// <summary>
+/// Clears the scenario binding for the resolved target device. When no
+/// binding existed, the call is a successful no-op.
+/// </summary>
 public sealed class DeactivateScenarioCommandHandler
 {
     private readonly ISessionStore _sessionStore;
@@ -83,7 +124,7 @@ public sealed class DeactivateScenarioCommandHandler
         _sessionStore = sessionStore;
     }
 
-    /// <summary>Clears the active scenario.</summary>
+    /// <summary>Clears the active scenario binding for the resolved device.</summary>
     public async Task<Result<Unit, ActivateScenarioError>> HandleAsync(
         DeactivateScenarioCommand command,
         CancellationToken ct
@@ -98,7 +139,21 @@ public sealed class DeactivateScenarioCommandHandler
             );
         }
 
-        var next = session with { ActiveScenario = null };
+        var deviceResolution = ActivateScenarioCommandHandler.ResolveDevice(
+            command.Device,
+            session
+        );
+        if (
+            deviceResolution
+            is not Result<DeviceName, ActivateScenarioError>.Ok { Value: var device }
+        )
+        {
+            return Result.Failure<Unit, ActivateScenarioError>(
+                ((Result<DeviceName, ActivateScenarioError>.Error)deviceResolution).Err
+            );
+        }
+
+        var next = session.UnbindScenario(device);
         var saveResult = await _sessionStore.SaveAsync(next, ct);
         if (saveResult is not Result<Unit, SessionStoreError>.Ok)
         {

@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.IO.Abstractions;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -90,7 +91,12 @@ public sealed class JsonSessionStore : ISessionStore
             currentDevice = nameOk.Value;
         }
 
-        ScenarioName? activeScenario = null;
+        var bindings = ImmutableDictionary.CreateBuilder<DeviceName, ScenarioName>();
+
+        // v0.2.x → 0.2.4 migration: an old `active_scenario` field
+        // promotes to the binding for the then-current device. When no
+        // current device was set, the binding has nowhere to attach
+        // and is dropped (the user can re-activate explicitly).
         if (!string.IsNullOrEmpty(dto.ActiveScenario))
         {
             var scenarioResult = ScenarioName.From(dto.ActiveScenario);
@@ -100,11 +106,44 @@ public sealed class JsonSessionStore : ISessionStore
                     new SessionStoreParseFailure($"invalid active_scenario: {dto.ActiveScenario}")
                 );
             }
-            activeScenario = scenarioOk.Value;
+            if (currentDevice is not null)
+            {
+                bindings[currentDevice] = scenarioOk.Value;
+            }
+        }
+
+        if (dto.DeviceScenarios is { } map)
+        {
+            foreach (var (deviceRaw, scenarioRaw) in map)
+            {
+                if (
+                    DeviceName.From(deviceRaw)
+                    is not Result<DeviceName, DeviceError>.Ok { Value: var deviceName }
+                )
+                {
+                    return Result.Failure<SessionState, SessionStoreError>(
+                        new SessionStoreParseFailure(
+                            $"invalid device in device_scenarios: {deviceRaw}"
+                        )
+                    );
+                }
+                if (
+                    ScenarioName.From(scenarioRaw)
+                    is not Result<ScenarioName, ScenarioNameError>.Ok { Value: var scenarioName }
+                )
+                {
+                    return Result.Failure<SessionState, SessionStoreError>(
+                        new SessionStoreParseFailure(
+                            $"invalid scenario in device_scenarios: {scenarioRaw}"
+                        )
+                    );
+                }
+                bindings[deviceName] = scenarioName;
+            }
         }
 
         return Result.Success<SessionState, SessionStoreError>(
-            new SessionState(currentDevice, activeScenario)
+            new SessionState(currentDevice, bindings.ToImmutable())
         );
     }
 
@@ -119,7 +158,10 @@ public sealed class JsonSessionStore : ISessionStore
         var dto = new SessionStateDto
         {
             CurrentDevice = state.CurrentDevice?.Value,
-            ActiveScenario = state.ActiveScenario?.Value,
+            ActiveScenario = null, // dropped in v0.2.4; kept readable for legacy JSON only
+            DeviceScenarios = state.DeviceScenarios.IsEmpty
+                ? null
+                : state.DeviceScenarios.ToDictionary(kv => kv.Key.Value, kv => kv.Value.Value),
         };
         var serialized = JsonSerializer.Serialize(dto, JsonOptions);
 
@@ -196,7 +238,13 @@ public sealed class JsonSessionStore : ISessionStore
         [JsonPropertyName("current_device")]
         public string? CurrentDevice { get; set; }
 
+        /// <summary>Legacy v0.1.x — v0.2.3 single-global-scenario field;
+        /// read for migration only, never written by v0.2.4+.</summary>
         [JsonPropertyName("active_scenario")]
         public string? ActiveScenario { get; set; }
+
+        /// <summary>Per-device scenario bindings (v0.2.4+).</summary>
+        [JsonPropertyName("device_scenarios")]
+        public Dictionary<string, string>? DeviceScenarios { get; set; }
     }
 }

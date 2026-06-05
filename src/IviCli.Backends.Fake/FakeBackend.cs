@@ -18,12 +18,14 @@ namespace IviCli.Backends.Fake;
 public sealed class FakeBackend : IIviBackend, IScenarioAwareBackend
 {
     private readonly ConcurrentDictionary<DeviceName, FakeDeviceState> _devices = new();
-    private MockScenario? _activeScenario;
-    private SceneName? _currentScene;
+    private readonly ConcurrentDictionary<DeviceName, ActiveBinding> _bindings = new();
     private readonly object _sceneGate = new();
 
     /// <inheritdoc/>
-    public bool HasActiveScenario => _activeScenario is not null;
+    public bool HasActiveScenario => !_bindings.IsEmpty;
+
+    /// <inheritdoc/>
+    public bool HasActiveScenarioFor(Device device) => _bindings.ContainsKey(device.Name);
 
     /// <summary>Configures the default IDN response for <paramref name="name"/>.</summary>
     public FakeBackend ConfigureDevice(DeviceName name, string idn)
@@ -34,73 +36,74 @@ public sealed class FakeBackend : IIviBackend, IScenarioAwareBackend
     }
 
     /// <summary>
-    /// Activates a mock scenario. Resets the current scene to the
-    /// scenario's <see cref="MockScenario.InitialScene"/>; matching
-    /// rules whose action carries a <c>Transition</c> field move the
-    /// FakeBackend to a different scene at runtime
-    /// (issue #26 §"Implementation plan" — B0.2-3). The scenario's
+    /// Activates a mock scenario for <paramref name="device"/> only.
+    /// Resets that device's current scene to the scenario's
+    /// <see cref="MockScenario.InitialScene"/>; matching rules whose
+    /// action carries a <c>Transition</c> move the FakeBackend to a
+    /// different scene at runtime (issue #26 §"Implementation plan" —
+    /// B0.2-3). Different devices may have different scenarios
+    /// active simultaneously (issue #36 / v0.2.4). The scenario's
     /// rules take precedence over the programmatic DSL
     /// (<see cref="RespondToQuery"/>, etc.) when a match is found;
     /// otherwise the existing fallthrough applies (ADR 0026 §4).
     /// </summary>
-    public FakeBackend ActivateScenario(MockScenario scenario)
+    public FakeBackend ActivateScenario(MockScenario scenario, DeviceName device)
     {
         lock (_sceneGate)
         {
-            _activeScenario = scenario;
-            _currentScene = scenario.InitialScene;
+            _bindings[device] = new ActiveBinding(scenario, scenario.InitialScene);
         }
         return this;
     }
 
-    /// <summary>Removes any active scenario.</summary>
-    public FakeBackend DeactivateScenario()
+    /// <summary>Removes the active scenario binding for <paramref name="device"/>.</summary>
+    public FakeBackend DeactivateScenario(DeviceName device)
     {
         lock (_sceneGate)
         {
-            _activeScenario = null;
-            _currentScene = null;
+            _bindings.TryRemove(device, out _);
         }
         return this;
     }
 
-    /// <summary>The currently activated scenario, if any.</summary>
-    public MockScenario? ActiveScenario => _activeScenario;
-
-    /// <summary>
-    /// The currently active scene inside the active scenario.
-    /// <see langword="null"/> when no scenario is active. Updated
-    /// whenever a matched rule's action carries a
-    /// <c>Transition</c>.
-    /// </summary>
-    public SceneName? CurrentScene => _currentScene;
-
-    /// <summary>
-    /// Looks up a rule in the active scenario's current scene, or
-    /// <see langword="null"/> when no scenario is active or no rule
-    /// matches.
-    /// </summary>
-    private MockRule? FindRuleInCurrentScene(string scpi)
+    /// <summary>Removes every active scenario binding.</summary>
+    public FakeBackend DeactivateAllScenarios()
     {
-        var scenario = _activeScenario;
-        var currentScene = _currentScene;
-        if (scenario is null || currentScene is null)
+        lock (_sceneGate)
+        {
+            _bindings.Clear();
+        }
+        return this;
+    }
+
+    /// <summary>Returns the scenario currently bound to <paramref name="device"/>, or null.</summary>
+    public MockScenario? GetActiveScenario(DeviceName device) =>
+        _bindings.TryGetValue(device, out var b) ? b.Scenario : null;
+
+    /// <summary>Returns the current scene for <paramref name="device"/>, or null.</summary>
+    public SceneName? GetCurrentScene(DeviceName device) =>
+        _bindings.TryGetValue(device, out var b) ? b.CurrentScene : null;
+
+    /// <summary>
+    /// Looks up a rule in the active scenario's current scene for
+    /// <paramref name="device"/>, or <see langword="null"/> when no
+    /// binding exists or no rule matches.
+    /// </summary>
+    private MockRule? FindRuleInCurrentScene(DeviceName device, string scpi)
+    {
+        if (!_bindings.TryGetValue(device, out var binding))
         {
             return null;
         }
-        return scenario.FindScene(currentScene)?.FindByMatch(scpi);
+        return binding.Scenario.FindScene(binding.CurrentScene)?.FindByMatch(scpi);
     }
 
     /// <summary>
-    /// Applies a rule action's optional transition: if the action
-    /// names a target scene and the active scenario contains it, the
-    /// FakeBackend's current scene is swapped under the scene-gate
-    /// lock. If the named scene does not exist, the transition is
-    /// silently ignored (the rule's payload still takes effect); a
-    /// future B0.2 patch may surface this as
-    /// <see cref="MockScenarioContractMismatch"/>.
+    /// Applies a rule action's optional transition for
+    /// <paramref name="device"/>. Silently ignored when the target
+    /// scene does not exist in the bound scenario.
     /// </summary>
-    private void ApplyTransition(SceneName? target)
+    private void ApplyTransition(DeviceName device, SceneName? target)
     {
         if (target is null)
         {
@@ -108,12 +111,17 @@ public sealed class FakeBackend : IIviBackend, IScenarioAwareBackend
         }
         lock (_sceneGate)
         {
-            if (_activeScenario?.FindScene(target) is not null)
+            if (
+                _bindings.TryGetValue(device, out var binding)
+                && binding.Scenario.FindScene(target) is not null
+            )
             {
-                _currentScene = target;
+                _bindings[device] = binding with { CurrentScene = target };
             }
         }
     }
+
+    private sealed record ActiveBinding(MockScenario Scenario, SceneName CurrentScene);
 
     /// <summary>
     /// Arranges that the next <see cref="OpenAsync"/> for <paramref name="name"/>
@@ -215,7 +223,7 @@ public sealed class FakeBackend : IIviBackend, IScenarioAwareBackend
         // not the flat rule list — once Transition actions land, the
         // current scene moves at runtime so the same SCPI string may
         // match different rules at different points in the session.
-        var rule = FindRuleInCurrentScene(command.Value);
+        var rule = FindRuleInCurrentScene(device.Name, command.Value);
         if (rule is not null)
         {
             // Effect first, then transition: a Fail rule reports its
@@ -235,7 +243,7 @@ public sealed class FakeBackend : IIviBackend, IScenarioAwareBackend
                 ),
                 _ => Result.Success<Unit, BackendError>(Unit.Value),
             };
-            ApplyTransition(rule.Action.Transition);
+            ApplyTransition(device.Name, rule.Action.Transition);
             return Task.FromResult(effect);
         }
 
@@ -256,7 +264,7 @@ public sealed class FakeBackend : IIviBackend, IScenarioAwareBackend
         // Scenario takes precedence. Look up the rule in the active
         // scenario's *current* scene (B0.2-3); same rationale as the
         // WriteAsync path above.
-        var rule = FindRuleInCurrentScene(query.Value);
+        var rule = FindRuleInCurrentScene(device.Name, query.Value);
         if (rule is not null)
         {
             var effect = rule.Action switch
@@ -273,7 +281,7 @@ public sealed class FakeBackend : IIviBackend, IScenarioAwareBackend
                 ),
                 _ => Result.Success<string, BackendError>(query.Value),
             };
-            ApplyTransition(rule.Action.Transition);
+            ApplyTransition(device.Name, rule.Action.Transition);
             return Task.FromResult(effect);
         }
 
@@ -292,7 +300,10 @@ public sealed class FakeBackend : IIviBackend, IScenarioAwareBackend
         // then the device-configured IDN, then a generic FAKE response.
         if (query.Value.Equals("*IDN?", StringComparison.Ordinal))
         {
-            var idn = _activeScenario?.IdnDefault ?? state.IdnResponse ?? "FAKE,FAKE,0,1.0";
+            var idn =
+                GetActiveScenario(device.Name)?.IdnDefault
+                ?? state.IdnResponse
+                ?? "FAKE,FAKE,0,1.0";
             return Task.FromResult(Result.Success<string, BackendError>(idn));
         }
 

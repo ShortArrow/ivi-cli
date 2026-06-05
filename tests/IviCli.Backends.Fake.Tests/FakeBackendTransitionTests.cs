@@ -22,9 +22,11 @@ public sealed class FakeBackendTransitionTests
     private static readonly SceneName Off = SceneName.From("off").ShouldBeOk();
     private static readonly SceneName On = SceneName.From("on").ShouldBeOk();
 
+    private static DeviceName DevName() => DeviceName.From("psu1").ShouldBeOk();
+
     private static Device Dev() =>
         new(
-            DeviceName.From("psu1").ShouldBeOk(),
+            DevName(),
             VisaResource.Parse("TCPIP0::host::inst0::INSTR").ShouldBeOk(),
             Timeout.FromMilliseconds(3000).ShouldBeOk()
         );
@@ -60,7 +62,7 @@ public sealed class FakeBackendTransitionTests
     [Fact]
     public async Task State_machine_walks_off_on_off_via_OUTP_writes()
     {
-        var backend = new FakeBackend().ActivateScenario(PsuStateMachine());
+        var backend = new FakeBackend().ActivateScenario(PsuStateMachine(), DevName());
 
         // Initially in `off`: OUTP? -> 0
         (
@@ -73,7 +75,7 @@ public sealed class FakeBackendTransitionTests
             .ShouldBeOk()
             .ShouldBe("0");
 
-        backend.CurrentScene.ShouldBe(Off);
+        backend.GetCurrentScene(DevName()).ShouldBe(Off);
 
         // OUTP ON acks + transitions to `on`
         (
@@ -83,7 +85,7 @@ public sealed class FakeBackendTransitionTests
                 CancellationToken.None
             )
         ).ShouldBeOk();
-        backend.CurrentScene.ShouldBe(On);
+        backend.GetCurrentScene(DevName()).ShouldBe(On);
 
         // Now in `on`: OUTP? -> 1
         (
@@ -104,7 +106,7 @@ public sealed class FakeBackendTransitionTests
                 CancellationToken.None
             )
         ).ShouldBeOk();
-        backend.CurrentScene.ShouldBe(Off);
+        backend.GetCurrentScene(DevName()).ShouldBe(Off);
 
         // Back to 0
         (
@@ -124,7 +126,7 @@ public sealed class FakeBackendTransitionTests
         // In `off`, OUTP OFF has no rule (only in `on`). The backend
         // should fall through to its default Write success (the
         // rule isn't applied; no transition happens).
-        var backend = new FakeBackend().ActivateScenario(PsuStateMachine());
+        var backend = new FakeBackend().ActivateScenario(PsuStateMachine(), DevName());
 
         (
             await backend.WriteAsync(
@@ -134,7 +136,9 @@ public sealed class FakeBackendTransitionTests
             )
         ).ShouldBeOk();
 
-        backend.CurrentScene.ShouldBe(Off, "no matching rule should not move the scene");
+        backend
+            .GetCurrentScene(DevName())
+            .ShouldBe(Off, "no matching rule should not move the scene");
     }
 
     [Fact]
@@ -161,7 +165,7 @@ public sealed class FakeBackendTransitionTests
             Scenes: ImmutableArray.Create(idleScene, armedScene)
         );
 
-        var backend = new FakeBackend().ActivateScenario(scenario);
+        var backend = new FakeBackend().ActivateScenario(scenario, DevName());
 
         (
             await backend.QueryAsync(
@@ -172,7 +176,7 @@ public sealed class FakeBackendTransitionTests
         )
             .ShouldBeOk()
             .ShouldBe("ARMED");
-        backend.CurrentScene.ShouldBe(armed);
+        backend.GetCurrentScene(DevName()).ShouldBe(armed);
 
         // STAT? is only in the armed scene; reachable now.
         (
@@ -206,7 +210,7 @@ public sealed class FakeBackendTransitionTests
             Scenes: ImmutableArray.Create(scene)
         );
 
-        var backend = new FakeBackend().ActivateScenario(scenario);
+        var backend = new FakeBackend().ActivateScenario(scenario, DevName());
         (
             await backend.WriteAsync(
                 Dev(),
@@ -215,21 +219,23 @@ public sealed class FakeBackendTransitionTests
             )
         ).ShouldBeOk();
 
-        backend.CurrentScene.ShouldBe(Off, "transition target must exist to be honoured");
+        backend
+            .GetCurrentScene(DevName())
+            .ShouldBe(Off, "transition target must exist to be honoured");
     }
 
     [Fact]
     public void Reactivating_scenario_resets_current_scene_to_initial()
     {
         var backend = new FakeBackend();
-        backend.ActivateScenario(PsuStateMachine());
-        backend.CurrentScene.ShouldBe(Off);
+        backend.ActivateScenario(PsuStateMachine(), DevName());
+        backend.GetCurrentScene(DevName()).ShouldBe(Off);
 
         // Re-activating a (different or same) scenario must reset.
-        backend.DeactivateScenario();
-        backend.CurrentScene.ShouldBeNull();
+        backend.DeactivateScenario(DevName());
+        backend.GetCurrentScene(DevName()).ShouldBeNull();
 
-        backend.ActivateScenario(PsuStateMachine());
-        backend.CurrentScene.ShouldBe(Off);
+        backend.ActivateScenario(PsuStateMachine(), DevName());
+        backend.GetCurrentScene(DevName()).ShouldBe(Off);
     }
 }

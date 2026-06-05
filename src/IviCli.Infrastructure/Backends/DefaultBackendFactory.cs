@@ -62,8 +62,11 @@ public sealed class DefaultBackendFactory : IBackendFactory
         // crossing the wire to the gateway — every new ivicli
         // invocation would reset the FSM and FSM transitions would never
         // stick across CLI calls.
+        // v0.2.4 per-device shape (issue #36): only short-circuit when
+        // *this specific device* has a scenario bound. Other devices on
+        // the same gateway may still hit their real transport backend.
         var hasActiveScenario =
-            _fallbackBackend is IScenarioAwareBackend probe && probe.HasActiveScenario;
+            _fallbackBackend is IScenarioAwareBackend probe && probe.HasActiveScenarioFor(device);
 
         var backend = device.Resource switch
         {

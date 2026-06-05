@@ -61,7 +61,14 @@ public class QueryDeviceCommandHandlerTests
         // Given
         var handler = MakeHandler(out var _, out var session, out var backend, Dev("psu1"));
         await session.SaveAsync(
-            new SessionState(DeviceName.From("psu1").ShouldBeOk()),
+            new SessionState(
+                DeviceName.From("psu1").ShouldBeOk(),
+                System
+                    .Collections
+                    .Immutable
+                    .ImmutableDictionary<DeviceName, IviCli.Domain.Mock.ScenarioName>
+                    .Empty
+            ),
             CancellationToken.None
         );
 

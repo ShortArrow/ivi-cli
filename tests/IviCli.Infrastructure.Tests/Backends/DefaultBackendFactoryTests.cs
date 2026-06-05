@@ -175,6 +175,8 @@ public sealed class DefaultBackendFactoryTests
         public string Tag { get; }
         public bool HasActiveScenario { get; }
 
+        public bool HasActiveScenarioFor(Device device) => HasActiveScenario;
+
         public Task<Result<Unit, BackendError>> OpenAsync(Device device, CancellationToken ct) =>
             Task.FromResult(Result.Success<Unit, BackendError>(Unit.Value));
 

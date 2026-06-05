@@ -4,6 +4,57 @@ All notable changes to ivi-cli are documented here. Format roughly follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning follows
 [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.4] — 2026-06-05
+
+### Added
+
+- **Per-device scenario bindings** (issue #36). The single global
+  active-scenario field is replaced by an explicit per-device
+  binding: `ivicli mock scenario activate <name> --for <device>`
+  binds the scenario to one device on a gateway, while other
+  devices on the same `FakeBackend` may carry distinct scenarios
+  active simultaneously. The `--for` flag defaults to the current
+  device set by `ivicli visa use <device>`, so the common case
+  stays one command. Explicit `--for` still works for ad-hoc
+  binding without changing the session pointer.
+- **`ivicli mock scenario list-active`** — lists every device that
+  currently has a scenario bound, optionally as `--json`. The
+  current device is marked with a trailing `*`.
+- **`ivicli mock scenario deactivate --for <device>`** —
+  symmetric counterpart that clears a single binding (the same
+  current-device default applies).
+
+### Changed
+
+- **`SessionState` shape** — `active_scenario` (single global
+  field) → `device_scenarios` (map of device → scenario).
+  Existing `state.json` files written by v0.1.x — v0.2.3 are
+  migrated on first read: an old `active_scenario` is promoted
+  to the binding for the then-`current_device` and the legacy
+  field is dropped on save. When the legacy state had no current
+  device, the binding has nowhere to attach and is dropped — the
+  user re-activates explicitly. No further user action required.
+- **`IScenarioAwareBackend`** gained `HasActiveScenarioFor(Device)`.
+  `DefaultBackendFactory` now short-circuits to the FakeBackend
+  only for devices that *actually* have a scenario bound; devices
+  without a binding continue to dispatch to their real transport
+  backend.
+- **`IVICLI_SCENARIO` env var** binds the named scenario to the
+  current device on startup, matching the `--for` default
+  fallback. Without a current device the variable is ignored
+  with a logged warning (there's no device to bind to).
+
+### Why
+
+v0.2.3 unlocked HiSLIP sub-address multiplexing (one gateway,
+multiple backend devices), but a single global scenario meant
+that activating a state machine for one device unconditionally
+gave the same state machine to every other device on the
+gateway. Multi-device mocks were only useful as long as every
+device wanted the same scenario at once — which is rarely the
+case. v0.2.4 lifts that limitation while keeping the single-
+device workflow unchanged.
+
 ## [0.2.3] — 2026-06-04
 
 ### Fixed
