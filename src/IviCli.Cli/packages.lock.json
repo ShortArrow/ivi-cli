@@ -459,8 +459,8 @@
         "type": "Project",
         "dependencies": {
           "IviCli.Domain": "[0.2.5, )",
-          "Microsoft.Extensions.DependencyInjection.Abstractions": "[10.0.8, )",
-          "Microsoft.Extensions.Logging.Abstractions": "[10.0.8, )",
+          "Microsoft.Extensions.DependencyInjection.Abstractions": "[10.0.9, )",
+          "Microsoft.Extensions.Logging.Abstractions": "[10.0.9, )",
           "TestableIO.System.IO.Abstractions": "[22.1.1, )"
         }
       },
@@ -468,21 +468,21 @@
         "type": "Project",
         "dependencies": {
           "IviCli.Application": "[0.2.5, )",
-          "Microsoft.Extensions.DependencyInjection.Abstractions": "[10.0.8, )"
+          "Microsoft.Extensions.DependencyInjection.Abstractions": "[10.0.9, )"
         }
       },
       "ivicli.backends.hislip": {
         "type": "Project",
         "dependencies": {
           "IviCli.Application": "[0.2.5, )",
-          "Microsoft.Extensions.DependencyInjection.Abstractions": "[10.0.8, )"
+          "Microsoft.Extensions.DependencyInjection.Abstractions": "[10.0.9, )"
         }
       },
       "ivicli.backends.local": {
         "type": "Project",
         "dependencies": {
           "IviCli.Application": "[0.2.5, )",
-          "Microsoft.Extensions.DependencyInjection.Abstractions": "[10.0.8, )"
+          "Microsoft.Extensions.DependencyInjection.Abstractions": "[10.0.9, )"
         }
       },
       "ivicli.backends.lxi": {
@@ -491,30 +491,30 @@
           "IviCli.Application": "[0.2.5, )",
           "Makaretu.Dns": "[2.0.1, )",
           "Makaretu.Dns.Multicast": "[0.27.0, )",
-          "Microsoft.Extensions.DependencyInjection.Abstractions": "[10.0.8, )",
-          "Microsoft.Extensions.Logging.Abstractions": "[10.0.8, )"
+          "Microsoft.Extensions.DependencyInjection.Abstractions": "[10.0.9, )",
+          "Microsoft.Extensions.Logging.Abstractions": "[10.0.9, )"
         }
       },
       "ivicli.backends.replay": {
         "type": "Project",
         "dependencies": {
           "IviCli.Application": "[0.2.5, )",
-          "Microsoft.Extensions.DependencyInjection.Abstractions": "[10.0.8, )"
+          "Microsoft.Extensions.DependencyInjection.Abstractions": "[10.0.9, )"
         }
       },
       "ivicli.backends.socket": {
         "type": "Project",
         "dependencies": {
           "IviCli.Application": "[0.2.5, )",
-          "Microsoft.Extensions.DependencyInjection.Abstractions": "[10.0.8, )"
+          "Microsoft.Extensions.DependencyInjection.Abstractions": "[10.0.9, )"
         }
       },
       "ivicli.backends.vxi11": {
         "type": "Project",
         "dependencies": {
           "IviCli.Application": "[0.2.5, )",
-          "Microsoft.Extensions.DependencyInjection.Abstractions": "[10.0.8, )",
-          "Microsoft.Extensions.Logging.Abstractions": "[10.0.8, )"
+          "Microsoft.Extensions.DependencyInjection.Abstractions": "[10.0.9, )",
+          "Microsoft.Extensions.Logging.Abstractions": "[10.0.9, )"
         }
       },
       "ivicli.domain": {
@@ -525,8 +525,8 @@
         "dependencies": {
           "IviCli.Application": "[0.2.5, )",
           "IviCli.Plugin": "[0.2.5, )",
-          "Microsoft.Extensions.DependencyInjection.Abstractions": "[10.0.8, )",
-          "Microsoft.Extensions.Logging.Abstractions": "[10.0.8, )",
+          "Microsoft.Extensions.DependencyInjection.Abstractions": "[10.0.9, )",
+          "Microsoft.Extensions.Logging.Abstractions": "[10.0.9, )",
           "TestableIO.System.IO.Abstractions": "[22.1.1, )",
           "TestableIO.System.IO.Abstractions.Wrappers": "[22.1.1, )",
           "Tomlyn": "[0.19.0, )"
@@ -542,8 +542,8 @@
         "type": "Project",
         "dependencies": {
           "IviCli.Application": "[0.2.5, )",
-          "Microsoft.Extensions.DependencyInjection.Abstractions": "[10.0.8, )",
-          "Microsoft.Extensions.Logging.Abstractions": "[10.0.8, )"
+          "Microsoft.Extensions.DependencyInjection.Abstractions": "[10.0.9, )",
+          "Microsoft.Extensions.Logging.Abstractions": "[10.0.9, )"
         }
       },
       "Makaretu.Dns": {
@@ -587,17 +587,17 @@
       },
       "Microsoft.Extensions.DependencyInjection.Abstractions": {
         "type": "CentralTransitive",
-        "requested": "[10.0.8, )",
-        "resolved": "10.0.8",
-        "contentHash": "21nbDV60SRPWGIivsyl6lqBeEJNG1sginhhfWgRrr3Ais7aQ12To25OAHQxgoiJkjqy1aQ6RxpZBGYuTi7Ge6A=="
+        "requested": "[10.0.9, )",
+        "resolved": "10.0.9",
+        "contentHash": "g41l/30G3K4B/d/L8kjux0+30e27c8D0FVQ/PFCpbekgfDpj9mnDhieP67EqXWvl1EWNeZh2rpR4F5B/jcDOHA=="
       },
       "Microsoft.Extensions.Logging.Abstractions": {
         "type": "CentralTransitive",
-        "requested": "[10.0.8, )",
-        "resolved": "10.0.8",
-        "contentHash": "fdVadZmsC8jRP0KvKy8mO8f6GV/HyBvElfcSxEhd+5FM5boAw/01iSaCto5G3G37ApJira4A3pNaVvBv8cUiLQ==",
+        "requested": "[10.0.9, )",
+        "resolved": "10.0.9",
+        "contentHash": "9S/DFt4cohlMPpzIxjG6kk0L8MuN2vDm9pbMCulxtJzzk82oJHVLBd8vuQxaPskaYQwKqmFmbannf5eoChgjYg==",
         "dependencies": {
-          "Microsoft.Extensions.DependencyInjection.Abstractions": "10.0.8"
+          "Microsoft.Extensions.DependencyInjection.Abstractions": "10.0.9"
         }
       },
       "TestableIO.System.IO.Abstractions": {
