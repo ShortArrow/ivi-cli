@@ -452,7 +452,7 @@
         "type": "Project",
         "dependencies": {
           "IviCli.Application": "[0.2.5, )",
-          "Microsoft.AspNetCore.OpenApi": "[10.0.0, )"
+          "Microsoft.AspNetCore.OpenApi": "[10.0.9, )"
         }
       },
       "ivicli.application": {
@@ -569,9 +569,9 @@
       },
       "Microsoft.AspNetCore.OpenApi": {
         "type": "CentralTransitive",
-        "requested": "[10.0.0, )",
-        "resolved": "10.0.0",
-        "contentHash": "0aqIF1t+sA2T62LIeMtXGSiaV7keGQaJnvwwmu+htQdjCaKYARfXAeqp4nHH9y2etpilyZ/tnQzZg4Ilmo/c4Q==",
+        "requested": "[10.0.9, )",
+        "resolved": "10.0.9",
+        "contentHash": "1ihb8FO9cGgEK1/m3CTtT/SfnynwmiZib0W2pcDVj3KSWk/Sca4VOXEtaptKQc582zpFrzTFiwkGRCglt6H+WQ==",
         "dependencies": {
           "Microsoft.OpenApi": "2.0.0"
         }
