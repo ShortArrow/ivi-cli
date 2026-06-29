@@ -60,23 +60,39 @@ single round-trip.
 
 ### 3. VXI-11 portmapper broadcast
 
-A minimal ONC RPC encoder (no dependency on `Vxi11Backend`) sends
-`PMAPPROC_GETPORT` for the VXI-11 Device Core program
-(`0x0607AF`, version 1) over UDP broadcast `255.255.255.255:111`.
-Any host that registers the program in its portmapper replies with
-the TCP port; the scanner records the sender IP and builds
-`TCPIP0::<sender>::inst0::INSTR`.
+The scanner sends `PMAPPROC_GETPORT` for the VXI-11 Device Core
+program (`0x0607AF` / 395183, version 1) over UDP/111. Any host that
+registers the program in its portmapper replies with the TCP port;
+the scanner records the sender IP and builds
+`TCPIP0::<sender>::inst0::INSTR`. The GETPORT request/reply codec is
+shared with the client backend's unicast portmapper resolution via
+`Vxi11Portmapper` (ADR 0029).
 
-Wire format follows RFC 1833 exactly:
+**Per-interface directed broadcast.** The scanner enumerates every
+operational, non-loopback IPv4 interface and sends one probe per NIC,
+bound to that NIC's local address, addressed to the interface's
+**subnet-directed** broadcast (e.g. `192.168.3.255:111`). A limited
+broadcast (`255.255.255.255`) egresses only a single interface on a
+multi-homed host — typically whichever owns the default route — so
+on a machine with the instruments on a secondary lab NIC it never
+reaches them. Probing each subnet directly fixes that. Replies are
+de-duplicated by sender IP across all interfaces.
 
-- AUTH_NONE credentials + verifier (flavor = 0, length = 0)
-- Big-endian XDR throughout
-- 72-byte request, 28-byte minimum successful reply
+Wire format follows RFC 1833: AUTH_NONE credentials + verifier
+(flavor = 0, length = 0), big-endian XDR, 28-byte minimum successful
+reply.
 
 The scanner does not chase the per-host TCP port (e.g. by issuing
 `create_link`) — the portmapper response is sufficient evidence
 that the standard `Vxi11Backend.OpenAsync` path can reach the
 instrument.
+
+**Inherent limits.** Broadcast/multicast discovery is link-local: it
+cannot cross a router into another subnet (limited broadcast is never
+forwarded; directed broadcast is dropped by routers by default per
+RFC 2644; mDNS is TTL-scoped), and it only finds instruments that
+answer a broadcast GETPORT or advertise mDNS. Instruments on another
+subnet are reached by `visa add` with the known address, not by scan.
 
 ### 4. `visa scan` UX
 
@@ -98,6 +114,12 @@ resource shape so repeated invocations are idempotent:
 
 Existing alias collisions are surfaced as "skipped (alias taken)"
 rather than errors.
+
+`visa scan` prints the **unmasked** resource string (real host) in
+both human and `--json` output — it is user-requested discovery
+output, not a log line, so the `ToLogString()` masking rule (ADR 0017,
+scoped to logging) does not apply. This matches the value `--add`
+writes to config.
 
 ### 5. Cancellation + timeout semantics
 
