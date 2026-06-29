@@ -54,6 +54,12 @@ public static class Vxi11Constants
     /// <summary>Portmapper GETPORT procedure.</summary>
     public const uint PortmapGetPort = 3;
 
+    /// <summary>Well-known TCP/UDP port the ONC portmapper listens on (RFC 1833).</summary>
+    public const int PortmapperPort = 111;
+
+    /// <summary>ONC RPC transport protocol identifier for TCP (IPPROTO_TCP), used in the portmapper mapping struct.</summary>
+    public const uint IpProtoTcp = 6;
+
     /// <summary>Core: create_link.</summary>
     public const uint ProcCreateLink = 10;
 

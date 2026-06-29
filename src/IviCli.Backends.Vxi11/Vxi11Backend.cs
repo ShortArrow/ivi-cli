@@ -16,41 +16,62 @@ namespace IviCli.Backends.Vxi11;
 
 /// <summary>
 /// Client-side <see cref="IIviBackend"/> for VXI-11 endpoints
-/// (PRD §7.1 priority 2, ADR 0029). v1 implements create_link /
+/// (PRD §7.1 priority 2, ADR 0029). Implements create_link /
 /// device_write / device_read / destroy_link over a single TCP
-/// connection per device. The portmapper round-trip is deliberately
-/// skipped — ivi-cli's gateway co-locates portmapper + Core on the
-/// same bind port, so a real GETPORT call would only echo back the
-/// port we already connected to. Real-portmapper-at-111 support is
-/// deferred to v2.
+/// connection per device.
+///
+/// On open the client first asks the instrument's portmapper at TCP/111
+/// for the dynamically-assigned VXI-11 Core port (a real GETPORT
+/// round-trip — issue #20). When no portmapper answers (e.g. ivi-cli's
+/// own gateway, which co-locates portmapper + Core on a single bind
+/// port and does not listen on 111) it falls back to the fixed port,
+/// preserving the gateway pairing.
 /// </summary>
 public sealed class Vxi11Backend : IIviBackend
 {
     /// <summary>
-    /// Fallback TCP port when the constructor override is not used.
-    /// VXI-11 has no IANA-assigned core port (clients traditionally
-    /// learn it from portmapper at 111); this value is a placeholder
-    /// suitable for ad-hoc deployments where the gateway operator
-    /// configures the server with a matching port.
+    /// Fallback TCP port used when no portmapper answers. VXI-11 has no
+    /// IANA-assigned core port; this value matches the port ivi-cli's
+    /// gateway binds by default for ad-hoc deployments.
     /// </summary>
     public const int DefaultVxi11Port = 1024;
 
+    /// <summary>How long to wait for the portmapper round-trip before falling back.</summary>
+    private static readonly TimeSpan PortmapperProbeTimeout = TimeSpan.FromSeconds(3);
+
     private readonly Dictionary<DeviceName, Vxi11Session> _sessions = new();
     private readonly object _gate = new();
-    private readonly int _port;
-
-    /// <summary>Creates a backend bound to <see cref="DefaultVxi11Port"/>.</summary>
-    public Vxi11Backend()
-        : this(DefaultVxi11Port) { }
+    private readonly int _fallbackPort;
+    private readonly int _portmapperPort;
+    private readonly bool _usePortmapper;
 
     /// <summary>
-    /// Creates a backend that connects to <paramref name="port"/> instead of
-    /// the default. Intended for tests against an in-process gateway listening
-    /// on a randomly allocated loopback port.
+    /// Production constructor: resolves the Core port via the portmapper at
+    /// <see cref="Vxi11Constants.PortmapperPort"/>, falling back to
+    /// <see cref="DefaultVxi11Port"/>.
+    /// </summary>
+    public Vxi11Backend()
+        : this(DefaultVxi11Port, PortmapperPort, usePortmapper: true) { }
+
+    /// <summary>
+    /// Creates a backend that connects to a fixed <paramref name="port"/>
+    /// without a portmapper round-trip. Intended for tests / co-located
+    /// gateways listening on a known loopback port.
     /// </summary>
     public Vxi11Backend(int port)
+        : this(port, PortmapperPort, usePortmapper: false) { }
+
+    /// <summary>
+    /// Full constructor. When <paramref name="usePortmapper"/> is set the
+    /// backend issues a GETPORT against <paramref name="portmapperPort"/> to
+    /// learn the Core port, falling back to <paramref name="fallbackPort"/>
+    /// if the portmapper is unreachable or has no registration.
+    /// </summary>
+    public Vxi11Backend(int fallbackPort, int portmapperPort, bool usePortmapper)
     {
-        _port = port;
+        _fallbackPort = fallbackPort;
+        _portmapperPort = portmapperPort;
+        _usePortmapper = usePortmapper;
     }
 
     /// <inheritdoc/>
@@ -72,10 +93,12 @@ public sealed class Vxi11Backend : IIviBackend
             );
         }
 
+        var corePort = await ResolveCorePortAsync(tcpip.Host, ct);
+
         var client = new TcpClient();
         try
         {
-            await client.ConnectAsync(tcpip.Host, _port, ct);
+            await client.ConnectAsync(tcpip.Host, corePort, ct);
         }
         catch (Exception ex) when (ex is SocketException or IOException)
         {
@@ -304,6 +327,39 @@ public sealed class Vxi11Backend : IIviBackend
         lock (_gate)
         {
             return _sessions.TryGetValue(device.Name, out var s) ? s : null;
+        }
+    }
+
+    /// <summary>
+    /// Resolves the VXI-11 Core TCP port for <paramref name="host"/>. Asks the
+    /// portmapper at <see cref="_portmapperPort"/> when enabled, falling back to
+    /// <see cref="_fallbackPort"/> if the portmapper is unreachable, times out,
+    /// or has no Core registration.
+    /// </summary>
+    private async Task<int> ResolveCorePortAsync(string host, CancellationToken ct)
+    {
+        if (!_usePortmapper)
+        {
+            return _fallbackPort;
+        }
+        try
+        {
+            var resolved = await Vxi11Portmapper.ResolveCorePortAsync(
+                host,
+                _portmapperPort,
+                PortmapperProbeTimeout,
+                ct
+            );
+            return resolved > 0 ? resolved : _fallbackPort;
+        }
+        catch (Exception ex)
+            when (ex is SocketException or IOException
+                || (ex is OperationCanceledException && !ct.IsCancellationRequested)
+            )
+        {
+            // No reachable portmapper (e.g. co-located gateway) — use the
+            // fixed port. Genuine caller cancellation is rethrown.
+            return _fallbackPort;
         }
     }
 

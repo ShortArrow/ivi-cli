@@ -56,9 +56,18 @@ RPC calls to the Core handler when the program number matches.
   [ADR 0041](0041-trigger-and-srq-ports.md).
 - Vendor extensions, TLS, UDP transport, broadcast portmapper queries
   on UDP 111.
-- Real **portmapper-at-111** client conversation — Batch D's client
+- ~~Real **portmapper-at-111** client conversation — Batch D's client
   backend connects directly to the configured Core port instead, since
-  the gateway co-locates portmapper + Core on one bind address. v2.
+  the gateway co-locates portmapper + Core on one bind address. v2.~~
+  Shipped (issue #20): the client backend now issues a real
+  `PMAPPROC_GETPORT` over **TCP/111** to resolve the dynamically-assigned
+  Core port of physical instruments (e.g. Kikusui PWR801L, whose Core is
+  not on a fixed port). When no portmapper answers within a short probe
+  window — as with ivi-cli's own gateway, which co-locates portmapper +
+  Core on one bind address and does not listen on 111 — the client falls
+  back to the configured fixed port, preserving the gateway pairing.
+  Shared GETPORT request/reply codec lives in `Vxi11Portmapper`, reused
+  by the broadcast scanner (ADR 0008).
 
 The companion client backend (`IviCli.Backends.Vxi11`) shipped in
 Batch D, sharing the XDR codec / RPC message records uplifted to
