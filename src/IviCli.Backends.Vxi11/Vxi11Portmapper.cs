@@ -7,20 +7,23 @@ namespace IviCli.Backends.Vxi11;
 /// <summary>
 /// ONC RPC portmapper (RFC 1833) GETPORT helpers shared by the VXI-11
 /// client backend and the broadcast scanner. The request/reply wire
-/// format is transport-agnostic: the scanner sends the raw bytes over
-/// UDP broadcast, while the client wraps them in TCP record-marking
-/// framing for a unicast round-trip against an instrument's portmapper
-/// at <see cref="Vxi11Constants.PortmapperPort"/>.
+/// format is transport-agnostic: the broadcast scanner sends the raw
+/// bytes to the subnet broadcast address, while the client sends a
+/// unicast datagram to an instrument's portmapper at
+/// <see cref="Vxi11Constants.PortmapperPort"/>. Both use UDP — embedded
+/// VXI-11 portmappers (e.g. Kikusui PWR-X) answer GETPORT over UDP only,
+/// even when they accept TCP connections on port 111.
 /// </summary>
 public static class Vxi11Portmapper
 {
     /// <summary>
-    /// Connects to <paramref name="host"/>:<paramref name="portmapperPort"/>
-    /// over TCP, issues <c>PMAPPROC_GETPORT</c> for the VXI-11 Device Core
-    /// program, and returns the TCP port the Core listens on (0 if the
-    /// program is not registered). Throws <see cref="SocketException"/> /
-    /// <see cref="IOException"/> when the portmapper is unreachable so the
-    /// caller can fall back to a fixed port.
+    /// Sends a unicast <c>PMAPPROC_GETPORT</c> datagram to
+    /// <paramref name="host"/>:<paramref name="portmapperPort"/> over UDP and
+    /// returns the TCP port the VXI-11 Device Core listens on (0 if the
+    /// program is not registered). Throws <see cref="SocketException"/> when
+    /// the host rejects the datagram, or
+    /// <see cref="OperationCanceledException"/> when no reply arrives within
+    /// <paramref name="timeout"/>, so the caller can fall back to a fixed port.
     /// </summary>
     public static async Task<int> ResolveCorePortAsync(
         string host,
@@ -31,14 +34,21 @@ public static class Vxi11Portmapper
     {
         using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
         cts.CancelAfter(timeout);
-        using var client = new TcpClient();
-        await client.ConnectAsync(host, portmapperPort, cts.Token);
-        var stream = client.GetStream();
+        using var udp = new UdpClient(AddressFamily.InterNetwork);
+        udp.Connect(host, portmapperPort);
 
         var xid = unchecked((uint)Random.Shared.Next(int.MinValue, int.MaxValue));
-        await Vxi11RecordFraming.WriteRecordAsync(stream, BuildGetportRequest(xid), cts.Token);
-        var reply = await Vxi11RecordFraming.ReadRecordAsync(stream, cts.Token);
-        return TryParseGetportReply(reply, xid, out var port) ? port : 0;
+        await udp.SendAsync(BuildGetportRequest(xid), cts.Token);
+
+        // Ignore stray datagrams that don't match our transaction id.
+        while (true)
+        {
+            var datagram = await udp.ReceiveAsync(cts.Token);
+            if (TryParseGetportReply(datagram.Buffer, xid, out var port))
+            {
+                return port;
+            }
+        }
     }
 
     /// <summary>

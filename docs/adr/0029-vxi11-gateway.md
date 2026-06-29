@@ -60,14 +60,16 @@ RPC calls to the Core handler when the program number matches.
   backend connects directly to the configured Core port instead, since
   the gateway co-locates portmapper + Core on one bind address. v2.~~
   Shipped (issue #20): the client backend now issues a real
-  `PMAPPROC_GETPORT` over **TCP/111** to resolve the dynamically-assigned
-  Core port of physical instruments (e.g. Kikusui PWR801L, whose Core is
-  not on a fixed port). When no portmapper answers within a short probe
-  window — as with ivi-cli's own gateway, which co-locates portmapper +
-  Core on one bind address and does not listen on 111 — the client falls
-  back to the configured fixed port, preserving the gateway pairing.
-  Shared GETPORT request/reply codec lives in `Vxi11Portmapper`, reused
-  by the broadcast scanner (ADR 0008).
+  `PMAPPROC_GETPORT` over **UDP/111** to resolve the dynamically-assigned
+  Core port of physical instruments (verified against a Kikusui PWR801L,
+  whose portmapper answers GETPORT only over UDP and reports a dynamic
+  Core port — TCP/111 accepts connections but never replies to GETPORT).
+  When no portmapper answers within a short probe window — as with
+  ivi-cli's own gateway, which co-locates portmapper + Core on one bind
+  address and does not answer GETPORT on 111 — the client falls back to
+  the configured fixed port, preserving the gateway pairing. The shared
+  GETPORT request/reply codec lives in `Vxi11Portmapper`, reused by the
+  broadcast scanner (ADR 0008).
 
 The companion client backend (`IviCli.Backends.Vxi11`) shipped in
 Batch D, sharing the XDR codec / RPC message records uplifted to

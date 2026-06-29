@@ -24,9 +24,7 @@ public sealed class Vxi11PortmapperResolveTests
     public async Task ResolveCorePortAsync_returns_core_port_from_getport_reply()
     {
         const int corePort = 54321;
-        await using var pmap = StubHost.Start(
-            (stream, ct) => ServePortmapperOnce(stream, corePort, ct)
-        );
+        await using var pmap = UdpPortmapperStub.Start(corePort);
 
         var resolved = await Vxi11Portmapper.ResolveCorePortAsync(
             "127.0.0.1",
@@ -61,9 +59,7 @@ public sealed class Vxi11PortmapperResolveTests
     public async Task OpenAsync_resolves_core_port_via_portmapper_then_connects()
     {
         await using var core = StubHost.Start(ServeCoreOpen);
-        await using var pmap = StubHost.Start(
-            (stream, ct) => ServePortmapperOnce(stream, core.Port, ct)
-        );
+        await using var pmap = UdpPortmapperStub.Start(core.Port);
 
         // Fixed fallback intentionally points at a dead port: success proves
         // the connection used the portmapper-resolved port, not the fallback.
@@ -104,18 +100,6 @@ public sealed class Vxi11PortmapperResolveTests
         var port = ((IPEndPoint)listener.LocalEndpoint).Port;
         listener.Stop();
         return port;
-    }
-
-    /// <summary>Reads one GETPORT call and replies with <paramref name="corePort"/>.</summary>
-    private static async Task ServePortmapperOnce(
-        NetworkStream stream,
-        int corePort,
-        CancellationToken ct
-    )
-    {
-        var (xid, proc) = await ReadCallAsync(stream, ct);
-        proc.ShouldBe(PortmapGetPort);
-        await WriteReplyAsync(stream, xid, w => w.WriteUInt32((uint)corePort), ct);
     }
 
     /// <summary>Serves create_link + interrupt-channel setup so OpenAsync succeeds.</summary>
@@ -177,6 +161,63 @@ public sealed class Vxi11PortmapperResolveTests
         writer.WriteUInt32(AcceptSuccess);
         body(writer);
         await Vxi11RecordFraming.WriteRecordAsync(stream, writer.ToArray(), ct);
+    }
+
+    /// <summary>
+    /// Builds a portmapper GETPORT reply datagram echoing <paramref name="xid"/>
+    /// and reporting <paramref name="corePort"/> as the Device Core port.
+    /// </summary>
+    private static byte[] BuildGetportReply(uint xid, int corePort)
+    {
+        var w = new Vxi11XdrCodec.XdrWriter();
+        w.WriteUInt32(xid);
+        w.WriteUInt32(1); // mtype = REPLY
+        w.WriteUInt32(MsgAccepted);
+        w.WriteUInt32(0); // verf flavor
+        w.WriteOpaque([]); // verf body (length 0)
+        w.WriteUInt32(AcceptSuccess);
+        w.WriteUInt32((uint)corePort);
+        return w.ToArray();
+    }
+
+    /// <summary>Single-shot loopback UDP portmapper that answers one GETPORT.</summary>
+    private sealed class UdpPortmapperStub : IAsyncDisposable
+    {
+        private readonly UdpClient _udp;
+        private readonly Task _served;
+
+        private UdpPortmapperStub(UdpClient udp, int corePort)
+        {
+            _udp = udp;
+            _served = Task.Run(async () =>
+            {
+                var datagram = await _udp.ReceiveAsync();
+                var buf = datagram.Buffer;
+                var xid = (uint)((buf[0] << 24) | (buf[1] << 16) | (buf[2] << 8) | buf[3]);
+                var reply = BuildGetportReply(xid, corePort);
+                await _udp.SendAsync(reply, reply.Length, datagram.RemoteEndPoint);
+            });
+        }
+
+        public int Port => ((IPEndPoint)_udp.Client.LocalEndPoint!).Port;
+
+        public static UdpPortmapperStub Start(int corePort)
+        {
+            var udp = new UdpClient(new IPEndPoint(IPAddress.Loopback, 0));
+            return new UdpPortmapperStub(udp, corePort);
+        }
+
+        public async ValueTask DisposeAsync()
+        {
+            _udp.Dispose();
+            try
+            {
+                await _served;
+            }
+            catch
+            { /* socket torn down */
+            }
+        }
     }
 
     /// <summary>Single-accept loopback TCP listener that runs a serve callback.</summary>
