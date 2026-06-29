@@ -4,6 +4,43 @@ All notable changes to ivi-cli are documented here. Format roughly follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning follows
 [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.6] — 2026-06-29
+
+### Fixed
+
+- **VXI-11 client: real portmapper round-trip** (closes #20). The
+  client connected straight to a fixed port (1024) and timed out
+  against physical instruments that assign the VXI-11 Core to a
+  dynamic port. `OpenAsync` now issues a `PMAPPROC_GETPORT` over
+  **UDP/111** to resolve the Core port, falling back to the fixed
+  port when no portmapper answers (e.g. ivi-cli's co-located gateway,
+  which does not answer GETPORT on 111). Verified against a Kikusui
+  PWR801L: its portmapper answers GETPORT only over UDP (TCP/111
+  accepts connections but never replies). Note: on that unit the
+  advertised Core port is not reachable, so VXI-11 `*IDN?` still
+  cannot complete there — a device-side limitation, independent of
+  the client; its SOCKET (5025) and HiSLIP (4880) paths are unaffected.
+- **`visa scan`: discover instruments on every interface.** On a
+  multi-homed host the scanner sent its portmapper probe only to the
+  limited broadcast `255.255.255.255`, which egresses a single NIC, so
+  instruments on a secondary lab subnet were never found. It now
+  enumerates every operational IPv4 interface and sends a
+  subnet-directed broadcast (e.g. `192.168.3.255`) bound to each NIC,
+  aggregating responders. Verified: discovery of a real instrument on
+  a secondary subnet went from 0 to found.
+- **`visa scan`: show the real host.** Discovered resources are now
+  printed unmasked (real host) in human and `--json` output instead of
+  the `***`-masked log form, matching what `--add` writes to config
+  (`ToLogString` masking is scoped to logging, ADR 0017).
+
+### Added
+
+- **`visa list` shows the resource string.** Human output is now
+  `name<TAB>resource<TAB>timeout`, and `--json` gains a `resource`
+  field, so the host/port/protocol behind each alias is visible without
+  reading `config.toml`. Backed by a new `VisaResource.ToCanonical()`
+  (the unmasked inverse of `Parse`), reused by `visa scan`.
+
 ## [0.2.5] — 2026-06-05
 
 ### Fixed
