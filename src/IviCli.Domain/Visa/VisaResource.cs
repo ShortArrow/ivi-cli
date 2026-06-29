@@ -30,6 +30,15 @@ public abstract partial record VisaResource
     public abstract string ToLogString();
 
     /// <summary>
+    /// Returns the full, unmasked canonical VISA resource string — the inverse
+    /// of <see cref="Parse"/>. Unlike <see cref="ToLogString"/> (ADR 0017, log
+    /// masking) this preserves hosts / serial numbers, so it is the form shown
+    /// in user-requested output such as <c>visa list</c> and <c>visa scan</c>,
+    /// and the value written back to config.
+    /// </summary>
+    public abstract string ToCanonical();
+
+    /// <summary>
     /// A TCPIP LAN-attached instrument resource of the form
     /// <c>TCPIP[board]::host::lan_device::INSTR</c>.
     /// </summary>
@@ -46,6 +55,13 @@ public abstract partial record VisaResource
             string.Create(
                 System.Globalization.CultureInfo.InvariantCulture,
                 $"TCPIP{Board}::***::{LanDevice}::INSTR"
+            );
+
+        /// <inheritdoc/>
+        public override string ToCanonical() =>
+            string.Create(
+                System.Globalization.CultureInfo.InvariantCulture,
+                $"TCPIP{Board}::{Host}::{LanDevice}::INSTR"
             );
     }
 
@@ -68,6 +84,13 @@ public abstract partial record VisaResource
             string.Create(
                 System.Globalization.CultureInfo.InvariantCulture,
                 $"TCPIP{Board}::***::{Port}::SOCKET"
+            );
+
+        /// <inheritdoc/>
+        public override string ToCanonical() =>
+            string.Create(
+                System.Globalization.CultureInfo.InvariantCulture,
+                $"TCPIP{Board}::{Host}::{Port}::SOCKET"
             );
     }
 
@@ -99,6 +122,18 @@ public abstract partial record VisaResource
                     System.Globalization.CultureInfo.InvariantCulture,
                     $"USB{Board}::{VendorId}::{ProductId}::***::INSTR"
                 );
+
+        /// <inheritdoc/>
+        public override string ToCanonical() =>
+            InterfaceNumber is { } iface
+                ? string.Create(
+                    System.Globalization.CultureInfo.InvariantCulture,
+                    $"USB{Board}::{VendorId}::{ProductId}::{SerialNumber}::{iface}::INSTR"
+                )
+                : string.Create(
+                    System.Globalization.CultureInfo.InvariantCulture,
+                    $"USB{Board}::{VendorId}::{ProductId}::{SerialNumber}::INSTR"
+                );
     }
 
     /// <summary>
@@ -114,6 +149,20 @@ public abstract partial record VisaResource
     {
         /// <inheritdoc/>
         public override string ToLogString() =>
+            SecondaryAddress is { } secondary
+                ? string.Create(
+                    System.Globalization.CultureInfo.InvariantCulture,
+                    $"GPIB{Board}::{PrimaryAddress}::{secondary}::INSTR"
+                )
+                : string.Create(
+                    System.Globalization.CultureInfo.InvariantCulture,
+                    $"GPIB{Board}::{PrimaryAddress}::INSTR"
+                );
+
+        // GPIB carries no sensitive segment, so the canonical and log forms
+        // are identical; both are spelled out for clarity.
+        /// <inheritdoc/>
+        public override string ToCanonical() =>
             SecondaryAddress is { } secondary
                 ? string.Create(
                     System.Globalization.CultureInfo.InvariantCulture,

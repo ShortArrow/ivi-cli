@@ -1,1 +1,1 @@
-﻿{"devices":[{"name":"psu1","timeout_ms":3000},{"name":"scope1","timeout_ms":5000}],"default":"psu1"}
+﻿{"devices":[{"name":"psu1","resource":"TCPIP0::192.168.0.10::inst0::INSTR","timeout_ms":3000},{"name":"scope1","resource":"USB0::0x0699::0x0408::C012345::INSTR","timeout_ms":5000}],"default":"psu1"}
