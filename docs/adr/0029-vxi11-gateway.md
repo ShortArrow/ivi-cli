@@ -69,7 +69,9 @@ RPC calls to the Core handler when the program number matches.
   address and does not answer GETPORT on 111 — the client falls back to
   the configured fixed port, preserving the gateway pairing. The shared
   GETPORT request/reply codec lives in `Vxi11Portmapper`, reused by the
-  broadcast scanner (ADR 0008).
+  broadcast scanner (ADR 0008). A resource may also pin the Core port
+  explicitly via the VISA `inst0,<port>` form (ADR 0007 §4); when present
+  the client connects there directly and skips the portmapper GETPORT.
 
 The companion client backend (`IviCli.Backends.Vxi11`) shipped in
 Batch D, sharing the XDR codec / RPC message records uplifted to

@@ -184,9 +184,18 @@ public sealed class LxiMdnsScanner : IBackendScanner
         // _lxi alone has no protocol shape; we surface the matching
         // protocol-specific announcements when the device also publishes
         // _hislip / _vxi-11 / _scpi-raw.
+        //
+        // For _hislip the SRV record carries the actual HiSLIP TCP port, so a
+        // non-standard port is preserved via the `hislip0,<port>` form. For
+        // _vxi-11 the SRV port is the portmapper (111), not the Core port, so
+        // we keep bare `inst0` and let connect-time portmapper resolution pick
+        // the dynamic Core port.
+        const int HiSlipWellKnownPort = 4880;
         var raw = hit.ServiceType switch
         {
-            "_hislip._tcp.local" => $"TCPIP0::{hit.Host}::hislip0::INSTR",
+            "_hislip._tcp.local" => hit.Port == HiSlipWellKnownPort
+                ? $"TCPIP0::{hit.Host}::hislip0::INSTR"
+                : $"TCPIP0::{hit.Host}::hislip0,{hit.Port}::INSTR",
             "_vxi-11._tcp.local" => $"TCPIP0::{hit.Host}::inst0::INSTR",
             "_scpi-raw._tcp.local" => $"TCPIP0::{hit.Host}::{hit.Port}::SOCKET",
             _ => null,

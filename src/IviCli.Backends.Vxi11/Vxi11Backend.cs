@@ -93,7 +93,9 @@ public sealed class Vxi11Backend : IIviBackend
             );
         }
 
-        var corePort = await ResolveCorePortAsync(tcpip.Host, ct);
+        // An explicit port in the resource (`inst0,<port>`) pins the Core port
+        // and skips the portmapper round-trip; otherwise resolve it normally.
+        var corePort = tcpip.Port ?? await ResolveCorePortAsync(tcpip.Host, ct);
 
         var client = new TcpClient();
         try
