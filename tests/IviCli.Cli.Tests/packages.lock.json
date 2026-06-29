@@ -534,22 +534,22 @@
       "ivi-cli": {
         "type": "Project",
         "dependencies": {
-          "IviCli.Api": "[0.2.5, )",
-          "IviCli.Application": "[0.2.5, )",
-          "IviCli.Backends.Fake": "[0.2.5, )",
-          "IviCli.Backends.HiSlip": "[0.2.5, )",
-          "IviCli.Backends.Local": "[0.2.5, )",
-          "IviCli.Backends.Lxi": "[0.2.5, )",
-          "IviCli.Backends.Replay": "[0.2.5, )",
-          "IviCli.Backends.Socket": "[0.2.5, )",
-          "IviCli.Backends.Vxi11": "[0.2.5, )",
-          "IviCli.Infrastructure": "[0.2.5, )",
-          "IviCli.Server": "[0.2.5, )",
+          "IviCli.Api": "[0.2.6, )",
+          "IviCli.Application": "[0.2.6, )",
+          "IviCli.Backends.Fake": "[0.2.6, )",
+          "IviCli.Backends.HiSlip": "[0.2.6, )",
+          "IviCli.Backends.Local": "[0.2.6, )",
+          "IviCli.Backends.Lxi": "[0.2.6, )",
+          "IviCli.Backends.Replay": "[0.2.6, )",
+          "IviCli.Backends.Socket": "[0.2.6, )",
+          "IviCli.Backends.Vxi11": "[0.2.6, )",
+          "IviCli.Infrastructure": "[0.2.6, )",
+          "IviCli.Server": "[0.2.6, )",
           "Microsoft.Extensions.Hosting": "[10.0.8, )",
           "Microsoft.Extensions.Logging": "[10.0.8, )",
           "OpenTelemetry.Exporter.OpenTelemetryProtocol": "[1.16.0, )",
           "OpenTelemetry.Extensions.Hosting": "[1.16.0, )",
-          "OpenTelemetry.Instrumentation.AspNetCore": "[1.15.2, )",
+          "OpenTelemetry.Instrumentation.AspNetCore": "[1.16.0, )",
           "Serilog": "[4.3.0, )",
           "Serilog.Extensions.Hosting": "[10.0.0, )",
           "Serilog.Formatting.Compact": "[3.0.0, )",
@@ -562,14 +562,14 @@
       "ivicli.api": {
         "type": "Project",
         "dependencies": {
-          "IviCli.Application": "[0.2.5, )",
+          "IviCli.Application": "[0.2.6, )",
           "Microsoft.AspNetCore.OpenApi": "[10.0.9, )"
         }
       },
       "ivicli.application": {
         "type": "Project",
         "dependencies": {
-          "IviCli.Domain": "[0.2.5, )",
+          "IviCli.Domain": "[0.2.6, )",
           "Microsoft.Extensions.DependencyInjection.Abstractions": "[10.0.9, )",
           "Microsoft.Extensions.Logging.Abstractions": "[10.0.9, )",
           "TestableIO.System.IO.Abstractions": "[22.1.1, )"
@@ -578,28 +578,28 @@
       "ivicli.backends.fake": {
         "type": "Project",
         "dependencies": {
-          "IviCli.Application": "[0.2.5, )",
+          "IviCli.Application": "[0.2.6, )",
           "Microsoft.Extensions.DependencyInjection.Abstractions": "[10.0.9, )"
         }
       },
       "ivicli.backends.hislip": {
         "type": "Project",
         "dependencies": {
-          "IviCli.Application": "[0.2.5, )",
+          "IviCli.Application": "[0.2.6, )",
           "Microsoft.Extensions.DependencyInjection.Abstractions": "[10.0.9, )"
         }
       },
       "ivicli.backends.local": {
         "type": "Project",
         "dependencies": {
-          "IviCli.Application": "[0.2.5, )",
+          "IviCli.Application": "[0.2.6, )",
           "Microsoft.Extensions.DependencyInjection.Abstractions": "[10.0.9, )"
         }
       },
       "ivicli.backends.lxi": {
         "type": "Project",
         "dependencies": {
-          "IviCli.Application": "[0.2.5, )",
+          "IviCli.Application": "[0.2.6, )",
           "Makaretu.Dns": "[2.0.1, )",
           "Makaretu.Dns.Multicast": "[0.27.0, )",
           "Microsoft.Extensions.DependencyInjection.Abstractions": "[10.0.9, )",
@@ -609,21 +609,21 @@
       "ivicli.backends.replay": {
         "type": "Project",
         "dependencies": {
-          "IviCli.Application": "[0.2.5, )",
+          "IviCli.Application": "[0.2.6, )",
           "Microsoft.Extensions.DependencyInjection.Abstractions": "[10.0.9, )"
         }
       },
       "ivicli.backends.socket": {
         "type": "Project",
         "dependencies": {
-          "IviCli.Application": "[0.2.5, )",
+          "IviCli.Application": "[0.2.6, )",
           "Microsoft.Extensions.DependencyInjection.Abstractions": "[10.0.9, )"
         }
       },
       "ivicli.backends.vxi11": {
         "type": "Project",
         "dependencies": {
-          "IviCli.Application": "[0.2.5, )",
+          "IviCli.Application": "[0.2.6, )",
           "Microsoft.Extensions.DependencyInjection.Abstractions": "[10.0.9, )",
           "Microsoft.Extensions.Logging.Abstractions": "[10.0.9, )"
         }
@@ -634,8 +634,8 @@
       "ivicli.infrastructure": {
         "type": "Project",
         "dependencies": {
-          "IviCli.Application": "[0.2.5, )",
-          "IviCli.Plugin": "[0.2.5, )",
+          "IviCli.Application": "[0.2.6, )",
+          "IviCli.Plugin": "[0.2.6, )",
           "Microsoft.Extensions.DependencyInjection.Abstractions": "[10.0.9, )",
           "Microsoft.Extensions.Logging.Abstractions": "[10.0.9, )",
           "TestableIO.System.IO.Abstractions": "[22.1.1, )",
@@ -646,13 +646,13 @@
       "ivicli.plugin": {
         "type": "Project",
         "dependencies": {
-          "IviCli.Application": "[0.2.5, )"
+          "IviCli.Application": "[0.2.6, )"
         }
       },
       "ivicli.server": {
         "type": "Project",
         "dependencies": {
-          "IviCli.Application": "[0.2.5, )",
+          "IviCli.Application": "[0.2.6, )",
           "Microsoft.Extensions.DependencyInjection.Abstractions": "[10.0.9, )",
           "Microsoft.Extensions.Logging.Abstractions": "[10.0.9, )"
         }
@@ -660,9 +660,9 @@
       "ivicli.testkit": {
         "type": "Project",
         "dependencies": {
-          "IviCli.Application": "[0.2.5, )",
-          "IviCli.Backends.Fake": "[0.2.5, )",
-          "IviCli.Domain": "[0.2.5, )",
+          "IviCli.Application": "[0.2.6, )",
+          "IviCli.Backends.Fake": "[0.2.6, )",
+          "IviCli.Domain": "[0.2.6, )",
           "Microsoft.Extensions.Logging.Abstractions": "[10.0.9, )",
           "NSubstitute": "[5.3.0, )",
           "Shouldly": "[4.3.0, )",
@@ -778,11 +778,11 @@
       },
       "OpenTelemetry.Instrumentation.AspNetCore": {
         "type": "CentralTransitive",
-        "requested": "[1.15.2, )",
-        "resolved": "1.15.2",
-        "contentHash": "2nPd7r0ug/gd6/CNFL6Rlu+RSQ9WYGSGHAYQ1ssbSqyzKJpqTunfx2I/1O0WB5k+L0cyXbG4XVZpoSoUc3M7wg==",
+        "requested": "[1.16.0, )",
+        "resolved": "1.16.0",
+        "contentHash": "vSC5EsmBVNcqXMh9BGkkq8zkoUjrg8ghBDb9zbKR8Bqjd05utjVgVft+fqsqQVsvlV5olGj1pBliHBngcIGSIg==",
         "dependencies": {
-          "OpenTelemetry.Api.ProviderBuilderExtensions": "[1.15.3, 2.0.0)"
+          "OpenTelemetry.Api.ProviderBuilderExtensions": "[1.16.0, 2.0.0)"
         }
       },
       "Serilog": {
