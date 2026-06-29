@@ -176,7 +176,7 @@ public static class VisaScanCommand
                     Console.Write(",");
                 }
                 var r = scan.Resources[i];
-                var resourceString = r.Resource.ToLogString();
+                var resourceString = FormatResource(r.Resource);
                 var idnJson = r.Idn is null ? "null" : $"\"{Escape(r.Idn)}\"";
                 Console.Write(
                     string.Create(
@@ -200,7 +200,7 @@ public static class VisaScanCommand
                     var r = scan.Resources[i];
                     Console.WriteLine(string.Create(inv, $"[{i + 1}]"));
                     Console.WriteLine(
-                        string.Create(inv, $"    Resource: {r.Resource.ToLogString()}")
+                        string.Create(inv, $"    Resource: {FormatResource(r.Resource)}")
                     );
                     if (r.Idn is not null)
                     {
