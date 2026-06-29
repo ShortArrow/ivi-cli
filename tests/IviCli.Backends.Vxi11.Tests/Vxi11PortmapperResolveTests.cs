@@ -86,6 +86,27 @@ public sealed class Vxi11PortmapperResolveTests
         (await backend.OpenAsync(BuildDevice(), default)).ShouldBeOk();
     }
 
+    [Fact]
+    public async Task OpenAsync_uses_explicit_resource_port_and_skips_portmapper()
+    {
+        await using var core = StubHost.Start(ServeCoreOpen);
+
+        // Portmapper points at a dead port; an explicit `inst0,<port>` in the
+        // resource must connect to the Core directly without a GETPORT.
+        var backend = new Vxi11Backend(
+            fallbackPort: FreePort(),
+            portmapperPort: FreePort(),
+            usePortmapper: true
+        );
+        var device = new Device(
+            DeviceName.From("dut").ShouldBeOk(),
+            VisaResource.Parse($"TCPIP0::127.0.0.1::inst0,{core.Port}::INSTR").ShouldBeOk(),
+            Timeout.FromMilliseconds(3000).ShouldBeOk()
+        );
+
+        (await backend.OpenAsync(device, default)).ShouldBeOk();
+    }
+
     private static Device BuildDevice() =>
         new(
             DeviceName.From("dut").ShouldBeOk(),

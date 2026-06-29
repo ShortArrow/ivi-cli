@@ -48,21 +48,38 @@ public abstract partial record VisaResource
     /// The LAN device name (typically <c>inst0</c> for VXI-11 / LXI or
     /// <c>hislipN</c> for HiSLIP). Defaults to <c>inst0</c> when omitted in input.
     /// </param>
-    public sealed record Tcpip(int Board, string Host, string LanDevice) : VisaResource
+    /// <param name="Port">
+    /// Optional explicit TCP port for the LAN device, from the VISA
+    /// <c>lan_device,port</c> convention (e.g. <c>hislip0,5000</c>). When
+    /// set it overrides the protocol's well-known port — HiSLIP connects
+    /// here directly and VXI-11 skips the portmapper. <see langword="null"/>
+    /// when omitted (well-known port / portmapper resolution).
+    /// </param>
+    public sealed record Tcpip(int Board, string Host, string LanDevice, int? Port = null)
+        : VisaResource
     {
         /// <inheritdoc/>
         public override string ToLogString() =>
             string.Create(
                 System.Globalization.CultureInfo.InvariantCulture,
-                $"TCPIP{Board}::***::{LanDevice}::INSTR"
+                $"TCPIP{Board}::***::{LanSegment}::INSTR"
             );
 
         /// <inheritdoc/>
         public override string ToCanonical() =>
             string.Create(
                 System.Globalization.CultureInfo.InvariantCulture,
-                $"TCPIP{Board}::{Host}::{LanDevice}::INSTR"
+                $"TCPIP{Board}::{Host}::{LanSegment}::INSTR"
             );
+
+        // The third resource segment: `lan_device` or `lan_device,port`.
+        private string LanSegment =>
+            Port is { } p
+                ? string.Create(
+                    System.Globalization.CultureInfo.InvariantCulture,
+                    $"{LanDevice},{p}"
+                )
+                : LanDevice;
     }
 
     /// <summary>
@@ -280,13 +297,41 @@ public abstract partial record VisaResource
 
         return suffix switch
         {
-            InstrSuffix => Result.Success<VisaResource, VisaResourceError>(
-                new Tcpip(board, host, thirdSegment)
-            ),
+            InstrSuffix => ParseInstrLanSegment(raw, board, host, thirdSegment),
             SocketSuffix when segments.Length == 4 && TryParseTcpPort(thirdSegment, out var port) =>
                 Result.Success<VisaResource, VisaResourceError>(new TcpipSocket(board, host, port)),
             _ => Fail(raw),
         };
+    }
+
+    /// <summary>
+    /// Parses the INSTR third segment, which is either a bare LAN device name
+    /// (<c>hislip0</c>, <c>inst0</c>) or the VISA <c>lan_device,port</c> form
+    /// carrying an explicit TCP port.
+    /// </summary>
+    private static Result<VisaResource, VisaResourceError> ParseInstrLanSegment(
+        string raw,
+        int board,
+        string host,
+        string segment
+    )
+    {
+        var comma = segment.IndexOf(',');
+        if (comma < 0)
+        {
+            return Result.Success<VisaResource, VisaResourceError>(new Tcpip(board, host, segment));
+        }
+
+        var lanDevice = segment[..comma];
+        var portText = segment[(comma + 1)..];
+        if (string.IsNullOrEmpty(lanDevice) || !TryParseTcpPort(portText, out var port))
+        {
+            return Fail(raw);
+        }
+
+        return Result.Success<VisaResource, VisaResourceError>(
+            new Tcpip(board, host, lanDevice, port)
+        );
     }
 
     private static bool TryParseTcpPort(string raw, out int port)

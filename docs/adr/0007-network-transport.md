@@ -153,6 +153,14 @@ to a future v4 ADR.
 - Default ports:
   - SOCKET: `5025` (industry-standard SCPI/raw socket port).
   - HiSLIP: `4880` (IVI Foundation registered port).
+- **Client-side port override.** A resource may pin a non-standard TCP
+  port via the VISA `lan_device,port` form — `TCPIP0::host::hislip0,5000::INSTR`
+  (HiSLIP) or `TCPIP0::host::inst0,20001::INSTR` (VXI-11). HiSLIP connects
+  there directly; VXI-11 skips the portmapper GETPORT and connects to the
+  pinned Core port. Omitting the port keeps the well-known port (HiSLIP) or
+  portmapper resolution (VXI-11, ADR 0029). SOCKET already carries its port
+  as the third segment. This matches the syntax pyvisa/NI-VISA emit, so the
+  same resource string works against ivi-cli and other VISA clients.
 
 ### 5. TLS / authentication
 

@@ -63,10 +63,14 @@ public sealed class HiSlipBackend : IIviBackend
             );
         }
 
+        // An explicit port in the resource (`hislip0,<port>`) overrides the
+        // well-known port; otherwise use the backend default.
+        var port = tcpip.Port ?? _port;
+
         var client = new TcpClient();
         try
         {
-            await client.ConnectAsync(tcpip.Host, _port, ct);
+            await client.ConnectAsync(tcpip.Host, port, ct);
         }
         catch (Exception ex) when (ex is SocketException or IOException)
         {
@@ -119,7 +123,7 @@ public sealed class HiSlipBackend : IIviBackend
             // Open the async channel so we can receive ServiceRequest
             // notifications and (in a future batch) send AsyncDeviceClear /
             // AsyncLock without blocking the sync channel.
-            var asyncChannel = await OpenAsyncChannelAsync(tcpip.Host, sessionId, ct);
+            var asyncChannel = await OpenAsyncChannelAsync(tcpip.Host, port, sessionId, ct);
             if (
                 asyncChannel
                 is not Result<(TcpClient client, NetworkStream stream), BackendError>.Ok asyncOk
@@ -153,16 +157,14 @@ public sealed class HiSlipBackend : IIviBackend
         }
     }
 
-    private async Task<Result<(TcpClient, NetworkStream), BackendError>> OpenAsyncChannelAsync(
-        string host,
-        ushort sessionId,
-        CancellationToken ct
-    )
+    private static async Task<
+        Result<(TcpClient, NetworkStream), BackendError>
+    > OpenAsyncChannelAsync(string host, int port, ushort sessionId, CancellationToken ct)
     {
         var client = new TcpClient();
         try
         {
-            await client.ConnectAsync(host, _port, ct);
+            await client.ConnectAsync(host, port, ct);
             var stream = client.GetStream();
             var header = new byte[HiSlipMessage.HeaderSize];
             HiSlipMessage.WriteHeader(
