@@ -1,2 +1,2 @@
-﻿* psu1	3000ms
-  scope1	5000ms
+﻿* psu1	TCPIP0::192.168.0.10::inst0::INSTR	3000ms
+  scope1	USB0::0x0699::0x0408::C012345::INSTR	5000ms

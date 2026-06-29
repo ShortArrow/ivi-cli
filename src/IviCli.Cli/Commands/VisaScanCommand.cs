@@ -134,25 +134,11 @@ public static class VisaScanCommand
 
     /// <summary>
     /// Renders an unmasked VISA resource string suitable for
-    /// <see cref="AddDeviceCommand"/>. Mirrors the (private)
-    /// <c>TomlConfigParser.FormatResource</c> shape so the value the
-    /// CLI emits round-trips through the parser unchanged.
+    /// <see cref="AddDeviceCommand"/>. Delegates to
+    /// <see cref="VisaResource.ToCanonical"/> so the value the CLI emits
+    /// round-trips through the parser unchanged.
     /// </summary>
-    public static string FormatResource(VisaResource resource) =>
-        resource switch
-        {
-            VisaResource.Tcpip t => $"TCPIP{t.Board}::{t.Host}::{t.LanDevice}::INSTR",
-            VisaResource.TcpipSocket s => $"TCPIP{s.Board}::{s.Host}::{s.Port}::SOCKET",
-            VisaResource.Usb u => u.InterfaceNumber is { } iface
-                ? $"USB{u.Board}::{u.VendorId}::{u.ProductId}::{u.SerialNumber}::{iface}::INSTR"
-                : $"USB{u.Board}::{u.VendorId}::{u.ProductId}::{u.SerialNumber}::INSTR",
-            VisaResource.Gpib g => g.SecondaryAddress is { } secondary
-                ? $"GPIB{g.Board}::{g.PrimaryAddress}::{secondary}::INSTR"
-                : $"GPIB{g.Board}::{g.PrimaryAddress}::INSTR",
-            _ => throw new InvalidOperationException(
-                $"unsupported VisaResource variant: {resource.GetType().Name}"
-            ),
-        };
+    public static string FormatResource(VisaResource resource) => resource.ToCanonical();
 
     private static string Sanitize(string raw)
     {

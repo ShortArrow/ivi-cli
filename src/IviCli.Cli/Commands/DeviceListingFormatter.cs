@@ -31,6 +31,8 @@ public static class DeviceListingFormatter
             builder.Append(' ');
             builder.Append(d.Name.Value);
             builder.Append('\t');
+            builder.Append(d.Resource.ToCanonical());
+            builder.Append('\t');
             builder.Append(d.Timeout.ToString());
             builder.Append('\n');
         }
@@ -56,7 +58,7 @@ public static class DeviceListingFormatter
             var d = listing.Devices[i];
             builder.Append(
                 inv,
-                $"{{\"name\":\"{d.Name.Value}\",\"timeout_ms\":{d.Timeout.Milliseconds}}}"
+                $"{{\"name\":\"{d.Name.Value}\",\"resource\":\"{d.Resource.ToCanonical()}\",\"timeout_ms\":{d.Timeout.Milliseconds}}}"
             );
         }
         builder.Append("],\"default\":");
