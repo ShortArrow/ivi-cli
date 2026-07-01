@@ -48,6 +48,7 @@ public sealed class LxiMdnsScanner : IBackendScanner
 
     /// <inheritdoc/>
     public async Task<Result<ImmutableArray<DiscoveredResource>, BackendError>> ScanAsync(
+        ScanOptions options,
         CancellationToken ct
     )
     {

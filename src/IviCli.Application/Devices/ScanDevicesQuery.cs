@@ -5,7 +5,13 @@ using IviCli.Domain;
 namespace IviCli.Application.Devices;
 
 /// <summary>Query DTO for the <c>visa scan</c> command (PRD §6.2).</summary>
-public sealed record ScanDevicesQuery;
+/// <param name="Options">Sweep ports, target overrides, and verbosity for this scan.</param>
+public sealed record ScanDevicesQuery(ScanOptions Options)
+{
+    /// <summary>A passive scan with default options.</summary>
+    public ScanDevicesQuery()
+        : this(ScanOptions.Default) { }
+}
 
 /// <summary>The aggregated discovery result.</summary>
 /// <param name="Resources">The discovered resources, indexed by their position in the array.</param>

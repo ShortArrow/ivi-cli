@@ -140,21 +140,35 @@ ivicli
 ### visa scan
 
 ```bash
-ivicli visa scan
+ivicli visa scan                                   # LXI mDNS + VXI-11 broadcast
+ivicli visa scan --port 5025 --port 1394           # also TCP-sweep the local subnet
+ivicli visa scan --port 1394 --host 192.168.0.110  # probe a single known host
+ivicli visa scan --port 5025 --subnet 10.0.0.0/24  # sweep an explicit subnet
+ivicli visa scan --verbose                         # send *IDN? + show resolved Core port
 ```
 
-Enumerates the VISA resources currently visible.
+Enumerates the VISA resources currently visible. Discovered resources are
+grouped by host, so a device's VXI-11 / HiSLIP / SCPI-RAW access paths list
+together — each host is probed on the well-known instrument ports (4880,
+5025, and any `--port`) to surface every protocol it accepts, not just the
+one that answered discovery.
+
+`--port <n>` (repeatable) additionally TCP-sweeps the local subnet(s) to
+find raw-SOCKET instruments that answer no broadcast or mDNS (e.g. a
+Keithley on its vendor port). The sweep is opt-in and bounded to `/24`-or-
+smaller subnets; `--subnet`/`--host` override the target set. `--verbose`
+sends `*IDN?` to each open SOCKET endpoint and reports the model.
 
 Example output:
 
 ```text
-[1] psu1
-    Resource: TCPIP0::192.168.0.10::inst0::INSTR
-    IDN: KIKUSUI,PWR801L,...
+[1] 192.168.0.10
+      TCPIP0::192.168.0.10::inst0::INSTR
+      TCPIP0::192.168.0.10::hislip0::INSTR
+      TCPIP0::192.168.0.10::5025::SOCKET
 
-[2] scope1
-    Resource: USB0::0x0699::...
-    IDN: TEKTRONIX,MDO34,...
+[2] 192.168.0.110
+      TCPIP0::192.168.0.110::1394::SOCKET
 ```
 
 ---

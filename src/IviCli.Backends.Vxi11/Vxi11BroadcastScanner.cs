@@ -47,6 +47,7 @@ public sealed class Vxi11BroadcastScanner : IBackendScanner
 
     /// <inheritdoc/>
     public async Task<Result<ImmutableArray<DiscoveredResource>, BackendError>> ScanAsync(
+        ScanOptions options,
         CancellationToken ct
     )
     {
@@ -73,7 +74,7 @@ public sealed class Vxi11BroadcastScanner : IBackendScanner
         ct.ThrowIfCancellationRequested();
 
         var resources = responders
-            .Keys.Select(BuildDiscovered)
+            .Select(kv => BuildDiscovered(kv.Key, kv.Value, options.Verbose))
             .Where(r => r is not null)
             .Select(r => r!)
             .ToImmutableArray();
@@ -210,7 +211,7 @@ public sealed class Vxi11BroadcastScanner : IBackendScanner
         return targets;
     }
 
-    private static DiscoveredResource? BuildDiscovered(IPAddress host)
+    private static DiscoveredResource? BuildDiscovered(IPAddress host, int corePort, bool verbose)
     {
         var raw = $"TCPIP0::{host}::inst0::INSTR";
         var parsed = VisaResource.Parse(raw);
@@ -218,7 +219,11 @@ public sealed class Vxi11BroadcastScanner : IBackendScanner
         {
             return null;
         }
-        return new DiscoveredResource(resource, Idn: null);
+        // The canonical resource stays port-less (the client re-resolves the
+        // dynamic Core port via the portmapper on connect); the resolved port
+        // is a verbose-only diagnostic since it changes across reboots.
+        var detail = verbose ? $"VXI-11 Core port: {corePort}" : null;
+        return new DiscoveredResource(resource, Idn: null, Detail: detail);
     }
 
     private readonly record struct BroadcastTarget(IPAddress Local, IPAddress Broadcast);

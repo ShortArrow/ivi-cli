@@ -165,6 +165,7 @@ internal static class Program
             // nothing when the container is alone on its network.
             services.AddIviCliLxiScanner();
             services.AddIviCliVxi11Scanner();
+            services.AddIviCliSocketScanner();
             // Dynamic-completion plumbing for the `__complete` verb.
             services.AddSingleton<IviCli.Cli.Completion.CompletionRegistry>();
             services.AddSingleton<

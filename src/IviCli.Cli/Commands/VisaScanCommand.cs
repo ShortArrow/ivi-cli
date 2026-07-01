@@ -1,5 +1,7 @@
+using System.Collections.Immutable;
 using System.CommandLine;
 using System.Globalization;
+using IviCli.Application.Backends;
 using IviCli.Application.Devices;
 using IviCli.Domain;
 using IviCli.Domain.Visa;
@@ -27,15 +29,43 @@ public static class VisaScanCommand
                 "Per-device default operation timeout for auto-registered entries (default 3000).",
             DefaultValueFactory = _ => 3000,
         };
+        var portOpt = new Option<int[]>("--port")
+        {
+            Description =
+                "TCP-sweep the local subnet for raw-SOCKET instruments on this port "
+                + "(repeatable, e.g. --port 5025 --port 1394). Also probed on every "
+                + "discovered host. Without this flag only broadcast/mDNS discovery runs.",
+            AllowMultipleArgumentsPerToken = true,
+            DefaultValueFactory = _ => Array.Empty<int>(),
+        };
+        var subnetOpt = new Option<string?>("--subnet")
+        {
+            Description =
+                "Sweep this CIDR (e.g. 192.168.3.0/24) instead of the auto-detected local subnets.",
+        };
+        var hostOpt = new Option<string?>("--host")
+        {
+            Description = "Probe only this single host (no subnet sweep).",
+        };
+        var verboseOpt = new Option<bool>("--verbose")
+        {
+            Description =
+                "Send *IDN? to each discovered SOCKET endpoint to report the model, "
+                + "and show diagnostics such as the resolved VXI-11 Core port.",
+        };
 
         var command = new Command(
             "scan",
             "Enumerate VISA resources visible to the registered backends "
-                + "(LXI mDNS + VXI-11 portmapper broadcast, ADR 0008)."
+                + "(LXI mDNS + VXI-11 portmapper broadcast, plus optional --port TCP sweep, ADR 0008)."
         );
         command.Options.Add(jsonOpt);
         command.Options.Add(addOpt);
         command.Options.Add(addTimeoutOpt);
+        command.Options.Add(portOpt);
+        command.Options.Add(subnetOpt);
+        command.Options.Add(hostOpt);
+        command.Options.Add(verboseOpt);
 
         command.SetAction(
             async (parseResult, ct) =>
@@ -43,11 +73,17 @@ public static class VisaScanCommand
                 var json = parseResult.GetValue(jsonOpt);
                 var add = parseResult.GetValue(addOpt);
                 var addTimeoutMs = parseResult.GetValue(addTimeoutOpt);
+                var options = new ScanOptions(
+                    (parseResult.GetValue(portOpt) ?? []).ToImmutableArray(),
+                    parseResult.GetValue(subnetOpt),
+                    parseResult.GetValue(hostOpt),
+                    parseResult.GetValue(verboseOpt)
+                );
 
                 var handler = services.GetRequiredService<ScanDevicesQueryHandler>();
                 var logger = services.GetRequiredService<ILogger<ScanDevicesQueryHandler>>();
 
-                var result = await handler.HandleAsync(new ScanDevicesQuery(), ct);
+                var result = await handler.HandleAsync(new ScanDevicesQuery(options), ct);
                 return result switch
                 {
                     Result<ScanResult, ScanDevicesError>.Ok ok => await SuccessAsync(
@@ -164,39 +200,62 @@ public static class VisaScanCommand
                 var r = scan.Resources[i];
                 var resourceString = FormatResource(r.Resource);
                 var idnJson = r.Idn is null ? "null" : $"\"{Escape(r.Idn)}\"";
+                var detailJson = r.Detail is null ? "null" : $"\"{Escape(r.Detail)}\"";
                 Console.Write(
                     string.Create(
                         inv,
-                        $"{{\"index\":{i + 1},\"resource\":\"{resourceString}\",\"idn\":{idnJson}}}"
+                        $"{{\"index\":{i + 1},\"resource\":\"{resourceString}\",\"idn\":{idnJson},\"detail\":{detailJson}}}"
                     )
                 );
             }
             Console.WriteLine("]}");
         }
+        else if (scan.Resources.IsEmpty)
+        {
+            Console.WriteLine("(no resources discovered)");
+        }
         else
         {
-            if (scan.Resources.IsEmpty)
+            var groups = scan
+                .Resources.GroupBy(GroupKey, StringComparer.OrdinalIgnoreCase)
+                .OrderBy(g => g.Key, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+            for (var i = 0; i < groups.Count; i++)
             {
-                Console.WriteLine("(no resources discovered)");
-            }
-            else
-            {
-                for (var i = 0; i < scan.Resources.Length; i++)
+                var group = groups[i];
+                Console.WriteLine(string.Create(inv, $"[{i + 1}] {group.Key}"));
+                foreach (
+                    var r in group.OrderBy(r => FormatResource(r.Resource), StringComparer.Ordinal)
+                )
                 {
-                    var r = scan.Resources[i];
-                    Console.WriteLine(string.Create(inv, $"[{i + 1}]"));
-                    Console.WriteLine(
-                        string.Create(inv, $"    Resource: {FormatResource(r.Resource)}")
-                    );
+                    var line = $"      {FormatResource(r.Resource)}";
                     if (r.Idn is not null)
                     {
-                        Console.WriteLine(string.Create(inv, $"    IDN: {r.Idn}"));
+                        line += $"   [{r.Idn}]";
                     }
+                    if (r.Detail is not null)
+                    {
+                        line += $"   ({r.Detail})";
+                    }
+                    Console.WriteLine(line);
                 }
             }
         }
         return ExitCodeMapper.Success;
     }
+
+    /// <summary>
+    /// Groups discovered resources by the endpoint they share: the host for
+    /// TCPIP-family resources (so a device's VXI-11 / HiSLIP / SCPI-RAW access
+    /// paths list together), otherwise the resource string itself.
+    /// </summary>
+    private static string GroupKey(DiscoveredResource r) =>
+        r.Resource switch
+        {
+            VisaResource.Tcpip t => t.Host,
+            VisaResource.TcpipSocket s => s.Host,
+            _ => FormatResource(r.Resource),
+        };
 
     private static int Fail(ScanDevicesError error, ILogger logger)
     {

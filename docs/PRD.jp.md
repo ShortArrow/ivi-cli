@@ -145,21 +145,34 @@ ivicli
 ### visa scan
 
 ```bash
-ivicli visa scan
+ivicli visa scan                                   # LXI mDNS + VXI-11 broadcast
+ivicli visa scan --port 5025 --port 1394           # ローカルサブネットも TCP sweep
+ivicli visa scan --port 1394 --host 192.168.0.110  # 既知の単一ホストのみ probe
+ivicli visa scan --port 5025 --subnet 10.0.0.0/24  # 明示サブネットを sweep
+ivicli visa scan --verbose                         # *IDN? 送信 + 解決した Core port 表示
 ```
 
-現在見えている VISA resource を列挙。
+現在見えている VISA resource を列挙。発見結果は host ごとにグループ化され、
+1台のデバイスの VXI-11 / HiSLIP / SCPI-RAW アクセス手段がまとまって並ぶ。各
+host は well-known な計測器ポート（4880・5025・および `--port` 指定分）を
+probe し、発見に応答したプロトコルだけでなく受け付ける全プロトコルを表示する。
+
+`--port <n>`（複数指定可）は、broadcast/mDNS に応答しない raw-SOCKET 計測器
+（例：ベンダー固有ポートの Keithley）を見つけるため、ローカルサブネットを
+追加で TCP sweep する。sweep はオプトインで `/24` 以下のサブネットに限定。
+`--subnet`/`--host` で対象を上書き。`--verbose` は各 SOCKET エンドポイントへ
+`*IDN?` を送り機種名を表示する。
 
 表示例：
 
 ```text
-[1] psu1
-    Resource: TCPIP0::192.168.0.10::inst0::INSTR
-    IDN: KIKUSUI,PWR801L,...
+[1] 192.168.0.10
+      TCPIP0::192.168.0.10::inst0::INSTR
+      TCPIP0::192.168.0.10::hislip0::INSTR
+      TCPIP0::192.168.0.10::5025::SOCKET
 
-[2] scope1
-    Resource: USB0::0x0699::...
-    IDN: TEKTRONIX,MDO34,...
+[2] 192.168.0.110
+      TCPIP0::192.168.0.110::1394::SOCKET
 ```
 
 ---
