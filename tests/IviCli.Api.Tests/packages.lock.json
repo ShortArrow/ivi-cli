@@ -109,11 +109,6 @@
         "resolved": "18.7.0",
         "contentHash": "+wFfx9s7D9wegM0RziXMj2kvYDT4qcqXXtyjiQwSZOGQ2wwcOAJQcD6eQXk02jt0MvRNawtp8TJxTrV+wD8X1g=="
       },
-      "Microsoft.OpenApi": {
-        "type": "Transitive",
-        "resolved": "2.0.0",
-        "contentHash": "GGYLfzV/G/ct80OZ45JxnWP7NvMX1BCugn/lX7TH5o0lcVaviavsLMTxmFV2AybXWjbi3h6FF1vgZiTK6PXndw=="
-      },
       "Microsoft.TestPlatform.ObjectModel": {
         "type": "Transitive",
         "resolved": "18.7.0",
@@ -194,21 +189,21 @@
       "ivicli.api": {
         "type": "Project",
         "dependencies": {
-          "IviCli.Application": "[0.2.5, )",
+          "IviCli.Application": "[0.2.6, )",
           "Microsoft.AspNetCore.OpenApi": "[10.0.9, )"
         }
       },
       "ivicli.application": {
         "type": "Project",
         "dependencies": {
-          "IviCli.Domain": "[0.2.5, )",
+          "IviCli.Domain": "[0.2.6, )",
           "TestableIO.System.IO.Abstractions": "[22.1.1, )"
         }
       },
       "ivicli.backends.fake": {
         "type": "Project",
         "dependencies": {
-          "IviCli.Application": "[0.2.5, )"
+          "IviCli.Application": "[0.2.6, )"
         }
       },
       "ivicli.domain": {
@@ -217,8 +212,8 @@
       "ivicli.infrastructure": {
         "type": "Project",
         "dependencies": {
-          "IviCli.Application": "[0.2.5, )",
-          "IviCli.Plugin": "[0.2.5, )",
+          "IviCli.Application": "[0.2.6, )",
+          "IviCli.Plugin": "[0.2.6, )",
           "TestableIO.System.IO.Abstractions": "[22.1.1, )",
           "TestableIO.System.IO.Abstractions.Wrappers": "[22.1.1, )",
           "Tomlyn": "[0.19.0, )"
@@ -227,15 +222,15 @@
       "ivicli.plugin": {
         "type": "Project",
         "dependencies": {
-          "IviCli.Application": "[0.2.5, )"
+          "IviCli.Application": "[0.2.6, )"
         }
       },
       "ivicli.testkit": {
         "type": "Project",
         "dependencies": {
-          "IviCli.Application": "[0.2.5, )",
-          "IviCli.Backends.Fake": "[0.2.5, )",
-          "IviCli.Domain": "[0.2.5, )",
+          "IviCli.Application": "[0.2.6, )",
+          "IviCli.Backends.Fake": "[0.2.6, )",
+          "IviCli.Domain": "[0.2.6, )",
           "NSubstitute": "[5.3.0, )",
           "Shouldly": "[4.3.0, )",
           "TestableIO.System.IO.Abstractions": "[22.1.1, )",
@@ -251,6 +246,12 @@
         "dependencies": {
           "Microsoft.OpenApi": "2.0.0"
         }
+      },
+      "Microsoft.OpenApi": {
+        "type": "CentralTransitive",
+        "requested": "[2.7.5, )",
+        "resolved": "2.7.5",
+        "contentHash": "0FA67RSnRM4tcBKqiqVu/HPdZ9+QOKbmeRjxRUGTCjPU4C0bmUhd97Dso7Yild5P7nOV6GxJ2xrK0Kv/O9xp0w=="
       },
       "TestableIO.System.IO.Abstractions.Wrappers": {
         "type": "CentralTransitive",
