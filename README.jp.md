@@ -35,22 +35,6 @@ dotnet tool install -g ivi-cli
 
 リリースは `win-x64` / `win-arm64` / `linux-x64` / `linux-arm64` / `osx-x64` / `osx-arm64` を提供します。
 
-## Docker でクイックスタート (mock-VISA e2e)
-
-開発中の VISA アプリの e2e テスト用に「スクリプト可能な VISA 計測器」を立てたい開発者向け — ハードウェア不要、.NET インストール不要、設定不要:
-
-```sh
-docker run --rm -p 4880:4880 -p 5025:5025 \
-    ghcr.io/shortarrow/ivi-cli-mock:latest
-
-# 別ターミナルから ivicli 自身 (or 任意の SCPI クライアント) で:
-ivicli visa add mock TCPIP::localhost::hislip0::INSTR
-ivicli visa query mock "*IDN?"
-# → IVICLI-MOCK,gateway,1,0.1.0
-```
-
-コンテナは HiSlip gateway を `4880`、raw SOCKET gateway を `5025` で公開します。両方とも scenario 駆動の mock backend (`*IDN?` / `*RST` / `*OPC?` / `SYST:ERR?` が初期対応済) でバックエンドされます。独自シナリオは `-v ./scenarios:/etc/ivi-cli/scenarios` でマウント、テスト中に動的に状態を arm するには `docker exec mock ivicli mock scene add …` を使います。詳細は [ADR 0018](docs/adr/0018-deployment-strategy.md) を参照してください。
-
 ## クイックスタート
 
 ```sh
@@ -83,6 +67,32 @@ ivicli server start hislip-srv
 | Windows | `%LOCALAPPDATA%\ivi-cli\config.toml` |
 
 環境変数 `IVICLI_CONFIG` で上書き可能です。
+
+## すぐ試す — ハードウェア不要
+
+既製の mock 計測器をワンコマンドで — .NET インストール不要、設定不要:
+
+```sh
+docker run --rm -p 4880:4880 -p 5025:5025 \
+    ghcr.io/shortarrow/ivi-cli-mock:latest
+
+# 別ターミナルから ivicli 自身 (or 任意の SCPI クライアント) で:
+ivicli visa add mock TCPIP::localhost::hislip0::INSTR
+ivicli visa query mock "*IDN?"
+# → IVICLI-MOCK,gateway,1,0.1.0
+```
+
+コンテナは同じシナリオを HiSLIP gateway (`4880`) と raw SOCKET gateway (`5025`) の両方で公開します（`*IDN?` / `*RST` / `*OPC?` / `SYST:ERR?` が初期対応済）。
+
+## VISA 計測器をモックする
+
+VISA 計測器を操作するアプリを開発していて、実機を用意せずにテストしたい場合、アプリの SCPI に応答する mock を立てられます:
+
+- **既製 mock を動かす** — 上のコンテナ、または bare CLI。
+- **自分の計測器用にシナリオを書く** — `*IDN?`・各クエリ・状態遷移をマッピング。
+- **アプリを接続する** — `ivicli` や任意の VISA クライアント。NI-VISA / Keysight-VISA アプリは mock を NI MAX に登録。
+
+→ 手順は **[Mock a VISA instrument](docs/guides/mock-a-visa-instrument.md)**（英語ガイド）、完全な実例は **[PSU サンプル](docs/samples/psu/)**（drop-in シナリオ + セットアップスクリプト）。
 
 ## サブコマンドマップ
 
@@ -143,6 +153,7 @@ flowchart LR
 - [PRD](docs/PRD.jp.md) — プロダクト要件 ([English](docs/PRD.md))
 - [Architecture Decision Records](docs/adr/) — Accepted な意思決定。読み始めの推奨: [ADR 0003](docs/adr/0003-architecture-style.md) (アーキテクチャスタイル)、[ADR 0021](docs/adr/0021-repository-layout.md) (層アセンブリ)、[ADR 0007](docs/adr/0007-network-transport.md) (HiSLIP / SOCKET)
 - [Domain glossary](docs/domain-glossary.md) — ユビキタス言語カタログ
+- [Guides](docs/guides/) — タスク指向の how-to。まずは [Mock a VISA instrument](docs/guides/mock-a-visa-instrument.md)
 - [Samples](docs/samples/) — そのまま投入できる scenario + セットアップスクリプト (例: [PSU mock VISA device](docs/samples/psu/))
 - [Contributing](CONTRIBUTING.jp.md) — ローカル開発・ブランチ運用・hooks ([English](CONTRIBUTING.md))
 

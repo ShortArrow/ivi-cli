@@ -35,22 +35,6 @@ dotnet tool install -g ivi-cli
 
 Releases ship for `win-x64`, `win-arm64`, `linux-x64`, `linux-arm64`, `osx-x64`, and `osx-arm64`.
 
-## Quick start with Docker (mock-VISA e2e)
-
-For 3rd-party app developers who need a scriptable VISA instrument to point their app under test at — no hardware, no .NET install, no manual config:
-
-```sh
-docker run --rm -p 4880:4880 -p 5025:5025 \
-    ghcr.io/shortarrow/ivi-cli-mock:latest
-
-# In another terminal — using ivicli itself, or any SCPI client:
-ivicli visa add mock TCPIP::localhost::hislip0::INSTR
-ivicli visa query mock "*IDN?"
-# → IVICLI-MOCK,gateway,1,0.1.0
-```
-
-The container exposes a HiSlip gateway on `4880` and a raw SOCKET gateway on `5025`. Both are backed by a scenario-driven mock (`*IDN?` / `*RST` / `*OPC?` / `SYST:ERR?` out of the box). Mount your own scenarios via `-v ./scenarios:/etc/ivi-cli/scenarios` or arm the mock at runtime with `docker exec mock ivicli mock scene add …`. See [ADR 0018](docs/adr/0018-deployment-strategy.md) for the full container reference.
-
 ## Quick start
 
 ```sh
@@ -83,6 +67,32 @@ Configuration lives at the platform-specific XDG-style path:
 | Windows | `%LOCALAPPDATA%\ivi-cli\config.toml` |
 
 Override with the `IVICLI_CONFIG` environment variable.
+
+## Try it now — no hardware
+
+A ready-made mock instrument in one command — no .NET install, no config:
+
+```sh
+docker run --rm -p 4880:4880 -p 5025:5025 \
+    ghcr.io/shortarrow/ivi-cli-mock:latest
+
+# In another terminal — using ivicli itself, or any SCPI client:
+ivicli visa add mock TCPIP::localhost::hislip0::INSTR
+ivicli visa query mock "*IDN?"
+# → IVICLI-MOCK,gateway,1,0.1.0
+```
+
+The container serves the same scenario over a HiSLIP gateway on `4880` and a raw SOCKET gateway on `5025` (`*IDN?` / `*RST` / `*OPC?` / `SYST:ERR?` out of the box).
+
+## Mock a VISA instrument
+
+Building an app that drives a VISA instrument and want to test it without the hardware on the bench? Stand up a mock that answers your app's SCPI:
+
+- **Run a ready-made mock** — the container above, or the bare CLI.
+- **Author a scenario for *your* instrument** — map its `*IDN?`, queries, and state transitions.
+- **Point your app at it** — `ivicli` or any VISA client; NI-VISA / Keysight-VISA apps register the mock in NI MAX.
+
+→ **[Mock a VISA instrument](docs/guides/mock-a-visa-instrument.md)** is the step-by-step guide; the **[PSU sample](docs/samples/psu/)** is a complete worked example (drop-in scenario + setup scripts).
 
 ## Subcommand map
 
@@ -143,6 +153,7 @@ Dependency direction is one-way (Domain ← Application ← {Infrastructure, Bac
 - [PRD](docs/PRD.md) — full product requirements ([日本語](docs/PRD.jp.md))
 - [Architecture Decision Records](docs/adr/) — every Accepted decision behind the implementation. Start with [ADR 0003](docs/adr/0003-architecture-style.md) (architecture style), [ADR 0021](docs/adr/0021-repository-layout.md) (layer assemblies), [ADR 0007](docs/adr/0007-network-transport.md) (HiSLIP / SOCKET).
 - [Domain glossary](docs/domain-glossary.md) — the ubiquitous-language catalog
+- [Guides](docs/guides/) — task-oriented how-tos, starting with [Mock a VISA instrument](docs/guides/mock-a-visa-instrument.md)
 - [Samples](docs/samples/) — drop-in scenarios + setup scripts (e.g. [PSU mock VISA device](docs/samples/psu/))
 - [Contributing](CONTRIBUTING.md) — local dev loop, branching, hooks ([日本語](CONTRIBUTING.jp.md))
 
