@@ -1,0 +1,13 @@
+# hadolint configuration for docker/Dockerfile (see .github/workflows/pr.yml).
+#
+# failure-threshold: fail CI on warnings and above; info/style stay advisory.
+failure-threshold: warning
+
+ignored:
+  # DL3008 — "pin versions in apt-get install". On Debian slim images the
+  # exact patch versions of bash / netcat-openbsd are not stable across
+  # security updates and pinning them makes the image fail to build the
+  # moment the archive rotates. We deliberately track the distro's current
+  # package and keep the layer minimal via --no-install-recommends + apt
+  # list cleanup instead.
+  - DL3008

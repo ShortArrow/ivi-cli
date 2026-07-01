@@ -73,12 +73,13 @@ jobs:
     timeout-minutes: 5
     outputs:
       code: ${{ steps.filter.outputs.code }}
+      docker: ${{ steps.filter.outputs.docker }}
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           fetch-depth: 0
       - id: filter
-        name: Any non-docs file changed?
+        name: Classify changed files
         shell: bash
         run: |
           set -euo pipefail
@@ -92,7 +93,28 @@ jobs:
           else
             echo "code=false" >> "$GITHUB_OUTPUT"
           fi
+          # Docker lint only when the Dockerfile, its build context, or the
+          # hadolint config changed.
+          if echo "$changed" | grep -qE '(^docker/|Dockerfile|\.hadolint\.ya?ml$)'; then
+            echo "docker=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "docker=false" >> "$GITHUB_OUTPUT"
+          fi
           echo "Changed files:"; echo "$changed"
+
+  hadolint:
+    name: hadolint (Dockerfile)
+    needs: changes
+    if: needs.changes.outputs.docker == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - name: Lint docker/Dockerfile
+        uses: hadolint/hadolint-action@2332a7b74a6de0dda2e2221d575162eba76ba5e5 # v3.3.0
+        with:
+          dockerfile: docker/Dockerfile
+          config: .hadolint.yaml
 
   build-and-test:
     name: build / format / analyzers / test
