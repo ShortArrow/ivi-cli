@@ -4,6 +4,40 @@ All notable changes to ivi-cli are documented here. Format roughly follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning follows
 [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.7] — 2026-07-01
+
+### Added
+
+- **`visa scan --port <n>`: TCP-sweep for raw-SOCKET instruments** (#65).
+  Broadcast/mDNS discovery cannot see a device that speaks SCPI only on a
+  raw socket (e.g. a Keithley 2701 on its vendor port 1394). `--port`
+  (repeatable) opens a bounded-timeout TCP connection to every host of the
+  local `/24`-or-smaller subnets and reports each responder as
+  `TCPIP0::<host>::<port>::SOCKET`. APIPA and oversized subnets are skipped;
+  `--subnet <cidr>` / `--host <ip>` override the target set.
+- **`visa scan`: per-host protocol enrichment** (#65). Every discovered host
+  is probed on the well-known instrument ports it did not already surface —
+  HiSLIP `4880`, SCPI-RAW `5025`, and any `--port` — so a device found via
+  VXI-11 now also lists its HiSLIP and SCPI-RAW access paths. Output is
+  grouped by host.
+- **`visa scan --verbose`** (#65). Sends `*IDN?` to each open SOCKET
+  endpoint to report the instrument model, and shows the VXI-11 Core port
+  the portmapper resolved. The Core port stays a diagnostic — the registered
+  resource remains the port-less `inst0::INSTR`, re-resolved on each connect,
+  because the dynamic port changes across reboots.
+- **Explicit port in a TCPIP resource via `lan_device,port`** (#64).
+  `TCPIP0::host::inst0,20001::INSTR` (VXI-11) and
+  `TCPIP0::host::hislip0,5000::INSTR` (HiSLIP) pin a non-standard Core /
+  HiSLIP port, matching the VISA convention NI-VISA and pyvisa emit. Without
+  the comma the client resolves the port normally (portmapper for VXI-11,
+  4880 for HiSLIP).
+
+### Security
+
+- **Pin Microsoft.OpenApi 2.7.5** to clear NU1903 (GHSA-v5pm-xwqc-g5wc).
+  `Microsoft.AspNetCore.OpenApi` 10.0.9 pulled the vulnerable transitive
+  2.0.0; 2.7.5 is the first patched 2.x release, transitive-pinned via CPM.
+
 ## [0.2.6] — 2026-06-29
 
 ### Fixed
