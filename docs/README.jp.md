@@ -1,10 +1,10 @@
-[English](README.md) | **日本語**
+[English](../README.md) | **日本語**
 
 # ivi-cli
 
 `ivi-cli` は、VISA/IVI 経由で計測器を管理・診断・操作する統合 CLI です。
 
-> ステータス: **v0.1.0 — 初回パブリックリリース。** Phase 1〜3 が landed: CLI core、HiSLIP / VXI-11 / SOCKET gateway、シナリオ駆動 mock-VISA コンテナ (ghcr.io/shortarrow/ivi-cli-mock)、Management HTTP / WebSocket API (PAT + TLS + audit)、OpenTelemetry、LXI mDNS / VXI-11 broadcast discovery。1.0.0 までは [ADR 0022](docs/adr/0022-branching-strategy.md) に従って破壊的変更の可能性が残ります。[CHANGELOG.md](CHANGELOG.md) も参照。
+> ステータス: **v0.1.0 — 初回パブリックリリース。** Phase 1〜3 が landed: CLI core、HiSLIP / VXI-11 / SOCKET gateway、シナリオ駆動 mock-VISA コンテナ (ghcr.io/shortarrow/ivi-cli-mock)、Management HTTP / WebSocket API (PAT + TLS + audit)、OpenTelemetry、LXI mDNS / VXI-11 broadcast discovery。1.0.0 までは [ADR 0022](adr/0022-branching-strategy.md) に従って破壊的変更の可能性が残ります。[CHANGELOG.md](CHANGELOG.md) も参照。
 
 ## ハイライト
 
@@ -14,7 +14,7 @@
   - **自動化指向.** stdout はデータ (`--json` 含む)、stderr はログ専用。終了コードは POSIX 慣習に従い、bash / zsh / PowerShell の補完をサポートします。
 - **発見と可視化**
   - **自動 discovery.** `ivicli visa scan` で LAN 上の機器を LXI mDNS / DNS-SD + VXI-11 portmapper broadcast で発見、`--add` を付ければそのまま `visa add` でまとめて登録します。
-  - **IVI Configuration Store の中身を覗く.** `ivicli driver list` / `ivicli logical list` で `IviConfigurationStore.xml` を読み、インストール済み IVI ドライバ / 論理名を列挙。「機器とは通信できるけどドライバが合ってない」系のデバッグを Configuration Server GUI を開かずに片付けられます ([ADR 0045](docs/adr/0045-ivi-configuration-store.md))。
+  - **IVI Configuration Store の中身を覗く.** `ivicli driver list` / `ivicli logical list` で `IviConfigurationStore.xml` を読み、インストール済み IVI ドライバ / 論理名を列挙。「機器とは通信できるけどドライバが合ってない」系のデバッグを Configuration Server GUI を開かずに片付けられます ([ADR 0045](adr/0045-ivi-configuration-store.md))。
 - **バックエンドとゲートウェイ**
   - **複数バックエンド.** Local NI-VISA / HiSLIP / VXI-11 / raw TCP SOCKET / Fake (プログラム可能 + scenario 再生) / Replay (厳密な決定論的再生) を単一の `IIviBackend` port 越しに提供します。
   - **ゲートウェイサーバ.** ローカル計測器を HiSLIP (`TCPIP::host::hislip0::INSTR`) または raw socket で公開し、リモートの PyVISA / NI-VISA クライアントから駆動できます。
@@ -97,7 +97,7 @@ VISA 計測器を操作するアプリを開発していて、実機を用意せ
 - **自分の計測器用にシナリオを書く** — `*IDN?`・各クエリ・状態遷移をマッピング。
 - **アプリを接続する** — `ivicli` や任意の VISA クライアント。NI-VISA / Keysight-VISA アプリは mock を NI MAX に登録。
 
-→ 手順は **[Mock a VISA instrument](docs/guides/mock-a-visa-instrument.md)**（英語ガイド）、完全な実例は **[PSU サンプル](docs/samples/psu/)**（drop-in シナリオ + セットアップスクリプト）。
+→ 手順は **[Mock a VISA instrument](guides/mock-a-visa-instrument.md)**（英語ガイド）、完全な実例は **[PSU サンプル](samples/psu/)**（drop-in シナリオ + セットアップスクリプト）。
 
 ## サブコマンドマップ
 
@@ -155,11 +155,11 @@ flowchart LR
 
 ## ドキュメント
 
-- [PRD](docs/PRD.jp.md) — プロダクト要件 ([English](docs/PRD.md))
-- [Architecture Decision Records](docs/adr/) — Accepted な意思決定。読み始めの推奨: [ADR 0003](docs/adr/0003-architecture-style.md) (アーキテクチャスタイル)、[ADR 0021](docs/adr/0021-repository-layout.md) (層アセンブリ)、[ADR 0007](docs/adr/0007-network-transport.md) (HiSLIP / SOCKET)
-- [Domain glossary](docs/domain-glossary.md) — ユビキタス言語カタログ
-- [Guides](docs/guides/) — タスク指向の how-to。まずは [Mock a VISA instrument](docs/guides/mock-a-visa-instrument.md)
-- [Samples](docs/samples/) — そのまま投入できる scenario + セットアップスクリプト (例: [PSU mock VISA device](docs/samples/psu/))
+- [PRD](PRD.jp.md) — プロダクト要件 ([English](PRD.md))
+- [Architecture Decision Records](adr/) — Accepted な意思決定。読み始めの推奨: [ADR 0003](adr/0003-architecture-style.md) (アーキテクチャスタイル)、[ADR 0021](adr/0021-repository-layout.md) (層アセンブリ)、[ADR 0007](adr/0007-network-transport.md) (HiSLIP / SOCKET)
+- [Domain glossary](domain-glossary.md) — ユビキタス言語カタログ
+- [Guides](guides/) — タスク指向の how-to。まずは [Mock a VISA instrument](guides/mock-a-visa-instrument.md)
+- [Samples](samples/) — そのまま投入できる scenario + セットアップスクリプト (例: [PSU mock VISA device](samples/psu/))
 - [Contributing](CONTRIBUTING.jp.md) — ローカル開発・ブランチ運用・hooks ([English](CONTRIBUTING.md))
 
 ## ソースからビルド

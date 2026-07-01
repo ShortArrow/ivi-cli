@@ -1,10 +1,10 @@
-**English** | [日本語](README.jp.md)
+**English** | [日本語](docs/README.jp.md)
 
 # ivi-cli
 
 `ivi-cli` is an integrated CLI for managing, diagnosing, and operating instruments addressed via VISA/IVI.
 
-> Status: **v0.1.0 — first public release.** Phase 1–3 are landed: CLI core, HiSLIP / VXI-11 / SOCKET gateways, scenario-driven mock-VISA container (ghcr.io/shortarrow/ivi-cli-mock), Management HTTP / WebSocket API with PAT + TLS + audit, OpenTelemetry, and LXI mDNS / VXI-11 broadcast discovery. Pre-1.0.0, breaking changes are still possible per [ADR 0022](docs/adr/0022-branching-strategy.md). See [CHANGELOG.md](CHANGELOG.md).
+> Status: **v0.1.0 — first public release.** Phase 1–3 are landed: CLI core, HiSLIP / VXI-11 / SOCKET gateways, scenario-driven mock-VISA container (ghcr.io/shortarrow/ivi-cli-mock), Management HTTP / WebSocket API with PAT + TLS + audit, OpenTelemetry, and LXI mDNS / VXI-11 broadcast discovery. Pre-1.0.0, breaking changes are still possible per [ADR 0022](docs/adr/0022-branching-strategy.md). See [CHANGELOG.md](docs/CHANGELOG.md).
 
 ## Highlights
 
@@ -160,7 +160,7 @@ Dependency direction is one-way (Domain ← Application ← {Infrastructure, Bac
 - [Domain glossary](docs/domain-glossary.md) — the ubiquitous-language catalog
 - [Guides](docs/guides/) — task-oriented how-tos, starting with [Mock a VISA instrument](docs/guides/mock-a-visa-instrument.md)
 - [Samples](docs/samples/) — drop-in scenarios + setup scripts (e.g. [PSU mock VISA device](docs/samples/psu/))
-- [Contributing](CONTRIBUTING.md) — local dev loop, branching, hooks ([日本語](CONTRIBUTING.jp.md))
+- [Contributing](docs/CONTRIBUTING.md) — local dev loop, branching, hooks ([日本語](docs/CONTRIBUTING.jp.md))
 
 ## Building from source
 

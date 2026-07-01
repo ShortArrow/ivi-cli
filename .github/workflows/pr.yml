@@ -64,8 +64,8 @@ jobs:
             fi
           }
           check_pair 'docs/PRD.md' 'docs/PRD.jp.md'
-          check_pair 'README.md' 'README.jp.md'
-          check_pair 'CONTRIBUTING.md' 'CONTRIBUTING.jp.md'
+          check_pair 'README.md' 'docs/README.jp.md'
+          check_pair 'docs/CONTRIBUTING.md' 'docs/CONTRIBUTING.jp.md'
 
   changes:
     name: detect code changes
