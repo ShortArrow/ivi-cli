@@ -32,14 +32,14 @@ discovery strategy backed by industry-standard mechanisms.
 | --- | --- | --- | --- |
 | **Primary** | **LXI mDNS / DNS-SD** | LXI 1.4+ standard; instruments self-announce; vendor + model + serial available in TXT records; subnet-local with zero config | Skips legacy instruments without mDNS; requires same broadcast domain |
 | **Secondary** | **VXI-11 portmapper broadcast (UDP 111)** | Catches pre-mDNS VXI-11 devices; aligned with RFC 1833 portmapper; ivi-cli already has XDR encoders | Slower per-host turnaround; some networks filter UDP/111 |
-| **Tertiary (deferred)** | **`nmap`-style subnet TCP sweep** | Last resort for instruments without mDNS or VXI-11 announcements | Security-team-hostile (IDS/IPS hits); slow; high false-positive rate |
+| **Tertiary (opt-in)** | **Subnet TCP sweep (`--port`)** | Last resort for raw-SOCKET instruments without mDNS or VXI-11 announcements (e.g. Keithley 2701 on vendor port 1394) | Active probing (IDS/IPS-visible); slower; opt-in only | 
 | **OS-native** | **NI-VISA `viFindRsrc`** (via Local backend on Windows) | Re-uses an installed VISA runtime that already does mDNS + portmapper + USB-TMC | Windows + vendor SDK required; not a 1st-class ivi-cli path |
 
-Batch W ships Primary + Secondary. Tertiary is deferred — operators
-who need it can build the same sweep on top of `nmap -sT -p 5025,4880`
-and pipe the result into `ivicli visa add`. OS-native is implicit
-through the existing `LocalBackend` Local-VISA path; the discovery
-flow lives there for users who already have NI-VISA installed.
+Primary + Secondary run unconditionally. Tertiary is **opt-in** via
+`visa scan --port <n>` (§4) — off by default so a bare `visa scan`
+never generates active TCP probes. OS-native is implicit through the
+existing `LocalBackend` Local-VISA path; the discovery flow lives there
+for users who already have NI-VISA installed.
 
 ### 2. LXI mDNS service types
 
@@ -94,14 +94,62 @@ RFC 2644; mDNS is TTL-scoped), and it only finds instruments that
 answer a broadcast GETPORT or advertise mDNS. Instruments on another
 subnet are reached by `visa add` with the known address, not by scan.
 
-### 4. `visa scan` UX
+### 4. Active socket sweep and host enrichment
+
+Broadcast/mDNS discovery has two blind spots that this section closes:
+
+1. **Raw-SOCKET-only instruments** (no VXI-11, no mDNS) — e.g. a
+   Keithley 2701, which speaks SCPI only on its vendor port 1394.
+2. **Discovered devices' other access paths** — a device found via
+   VXI-11 broadcast (`inst0::INSTR`) frequently also speaks HiSLIP and
+   SCPI-RAW, but broadcast only surfaces the one protocol that answered.
+
+**Socket sweep (`SocketSweepScanner`, opt-in via `--port`).** For each
+`--port <n>` (repeatable), the scanner opens a bounded-timeout TCP
+connection to every target address and reports
+`TCPIP0::<host>::<n>::SOCKET` for each host that accepts. Targets default
+to every operational IPv4 subnet no larger than a `/24`; APIPA
+(`169.254/16`) and oversized subnets are skipped so a stray `/16` never
+becomes a 65k-probe scan. `--subnet <cidr>` and `--host <ip>` override
+the target set. Concurrency is bounded (128 in flight). The CIDR/subnet
+math and interface-selection predicate are pure functions
+(`SocketSweepTargets`) covered by unit tests; only the socket round-trip
+is environment-dependent (behind `IEndpointProber`).
+
+**Host enrichment (`ScanDevicesQueryHandler`).** After discovery, every
+host that any scanner surfaced is probed on the well-known instrument
+ports it has not already reported — HiSLIP `4880` →
+`hislip0::INSTR`, SCPI-RAW `5025` → `5025::SOCKET`, plus any `--port`
+values — and a resource is appended per reachable protocol (deduped by
+canonical resource string). This is why a Kikusui PWR-series device found
+via VXI-11 now also lists its HiSLIP and SCPI-RAW access paths. An open
+`4880` is taken as evidence of HiSLIP and is never sent a raw `*IDN?`
+(that needs the HiSLIP handshake).
+
+**Identification (`--verbose`).** By default the sweep and enrichment
+only report which ports are open — fast, no payload. `--verbose` sends
+`*IDN?` to each open SOCKET endpoint and attaches the model, and surfaces
+diagnostics such as the VXI-11 Core port the portmapper resolved. The
+Core port stays a diagnostic, never the canonical resource: it is a
+dynamic port that changes across instrument reboots, so the registered
+resource stays the port-less `inst0::INSTR` and the client re-resolves it
+via the portmapper on every connect (ADR 0029).
+
+### 5. `visa scan` UX
 
 ```sh
-ivicli visa scan                                # human-readable list
+ivicli visa scan                                # human-readable list (broadcast + mDNS)
 ivicli visa scan --json                         # machine-readable
 ivicli visa scan --add                          # also register every result
 ivicli visa scan --add --add-timeout-ms 5000    # override default 3000 ms
+ivicli visa scan --port 5025 --port 1394        # also TCP-sweep the local subnet
+ivicli visa scan --port 1394 --host 192.168.3.110  # probe a single known host
+ivicli visa scan --port 5025 --subnet 10.0.0.0/24  # sweep an explicit subnet
+ivicli visa scan --verbose                      # send *IDN? + show resolved Core port
 ```
+
+Human output groups resources by host so a device's VXI-11 / HiSLIP /
+SCPI-RAW access paths list together.
 
 Auto-registration uses a deterministic alias derived from the
 resource shape so repeated invocations are idempotent:
@@ -121,7 +169,7 @@ output, not a log line, so the `ToLogString()` masking rule (ADR 0017,
 scoped to logging) does not apply. This matches the value `--add`
 writes to config.
 
-### 5. Cancellation + timeout semantics
+### 6. Cancellation + timeout semantics
 
 - The discovery window per scanner is fixed at 3 s by default; future
   work may surface this as a CLI flag once operators ask.
@@ -133,7 +181,7 @@ writes to config.
   through (`ScanDevicesQueryHandler` swallows per-scanner failures
   unless every scanner failed).
 
-### 6. Mock-container compatibility
+### 7. Mock-container compatibility
 
 The discovery scanners are registered unconditionally in the CLI
 composition root — even inside the mock-VISA container (ADR 0018).
@@ -141,11 +189,13 @@ When the container runs alone on its Docker network, both probes
 silently return zero responders. No special-case code path; the
 behaviour is exactly what the user would see on an isolated VLAN.
 
-### 7. Out of scope (v1)
+### 8. Out of scope
 
-- **`nmap`-style subnet sweep.** Adds security-noise and false
-  positives. A future batch may add `visa scan --subnet
-  <cidr>` with an explicit warning.
+- **Cross-subnet / routed discovery.** Broadcast and mDNS stay
+  link-local; the `--port` sweep only walks subnets the host is a
+  member of. Reaching an instrument on another subnet is a `visa add`
+  with the known address, or an explicit `--subnet <cidr>` sweep of a
+  reachable range.
 - **Configurable discovery window** (`--timeout-ms`). Defaults
   are fine for v1; flag added when an operator asks.
 - **Per-source toggles** (`--mdns` / `--vxi-11`). Single-source
@@ -203,8 +253,13 @@ behaviour is exactly what the user would see on an isolated VLAN.
 ## Verification
 
 - `dotnet test --filter "Category!=Integration"` covers the pure
-  helpers (alias derivation, resource roundtrip) — 9 tests in
-  `IviCli.Cli.Tests/Commands/VisaScanCommandTests.cs`.
+  helpers: alias derivation / resource roundtrip
+  (`IviCli.Cli.Tests/Commands/VisaScanCommandTests.cs`), the sweep
+  CIDR / subnet math and interface predicate
+  (`IviCli.Backends.Socket.Tests/SocketSweepTargetsTests.cs`), the
+  sweep scanner driven by a fake prober
+  (`SocketSweepScannerTests.cs`), and the enrichment pipeline
+  (`IviCli.Application.Tests/.../ScanDevicesQueryHandlerTests.cs`).
 - Manual: on a LAN with an LXI-conformant instrument, run
   `ivicli visa scan` and confirm the instrument appears within
   the 3-s window. With `--add`, confirm `visa list` shows the new

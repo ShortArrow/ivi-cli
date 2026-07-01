@@ -32,6 +32,7 @@ public sealed class FakeBackendScanner : IBackendScanner
 
     /// <inheritdoc/>
     public Task<Result<ImmutableArray<DiscoveredResource>, BackendError>> ScanAsync(
+        ScanOptions options,
         CancellationToken ct
     )
     {
