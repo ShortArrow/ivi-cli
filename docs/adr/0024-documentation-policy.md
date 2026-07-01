@@ -27,9 +27,9 @@ This ADR establishes those conventions. It is the first ADR written in English; 
 | PRD | `docs/PRD.md` (+ optional `docs/PRD.jp.md`) | Product requirements; reader-facing |
 | ADR | `docs/adr/NNNN-*.md` | Architectural decisions; living documents tracked in git |
 | Domain Glossary | `docs/domain-glossary.md` | Ubiquitous-language catalog of Entities / Value Objects / Domain Services |
-| README | `/README.md` (+ optional `/README.jp.md`) | Project intro, install, quick start; reader-facing |
-| CONTRIBUTING | `/CONTRIBUTING.md` | Developer onboarding |
-| CHANGELOG | `/CHANGELOG.md` | Release-by-release user-visible changes |
+| README | `/README.md` (+ optional `docs/README.jp.md`) | Project intro, install, quick start; reader-facing. The English `README.md` stays at the repo root so GitHub renders it on the project home page; translations live under `docs/` so added languages don't clutter the root. |
+| CONTRIBUTING | `docs/CONTRIBUTING.md` (+ optional `docs/CONTRIBUTING.jp.md`) | Developer onboarding. Under `docs/`; GitHub still surfaces it as the repository's contributing guideline. |
+| CHANGELOG | `docs/CHANGELOG.md` | Release-by-release user-visible changes |
 | User manual / tutorials | `docs/user/` (future) | Long-form user-facing docs |
 | API reference | Generated from XML doc comments (future) | Public API surface |
 | `--help` text | Embedded in code via System.CommandLine annotations | Authoritative source for CLI usage |
