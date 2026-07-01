@@ -67,8 +67,37 @@ jobs:
           check_pair 'README.md' 'README.jp.md'
           check_pair 'CONTRIBUTING.md' 'CONTRIBUTING.jp.md'
 
+  changes:
+    name: detect code changes
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      code: ${{ steps.filter.outputs.code }}
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          fetch-depth: 0
+      - id: filter
+        name: Any non-docs file changed?
+        shell: bash
+        run: |
+          set -euo pipefail
+          base="${{ github.event.pull_request.base.sha }}"
+          head="${{ github.event.pull_request.head.sha }}"
+          changed=$(git diff --name-only "$base" "$head")
+          # Docs-only = every changed path is a *.md file or lives under docs/.
+          # Anything else (code, csproj, Dockerfile, workflows, …) needs the build.
+          if echo "$changed" | grep -qvE '(\.md$|^docs/)'; then
+            echo "code=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "code=false" >> "$GITHUB_OUTPUT"
+          fi
+          echo "Changed files:"; echo "$changed"
+
   build-and-test:
     name: build / format / analyzers / test
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
