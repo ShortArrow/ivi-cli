@@ -175,4 +175,11 @@ dotnet test --filter "Category!=Integration"
 
 ## ライセンス
 
-ライセンス未定。`LICENSE` ファイルがコミットされるまでは "all rights reserved" として扱ってください。再利用前に明確化が必要な場合は issue を開いてください。
+以下のいずれかを
+
+- MIT ライセンス ([LICENSE-MIT](../LICENSE-MIT) または <http://opensource.org/licenses/MIT>)
+- Apache License, Version 2.0 ([LICENSE-APACHE](../LICENSE-APACHE) または <http://www.apache.org/licenses/LICENSE-2.0>)
+
+利用者の選択で適用できるデュアルライセンスです。判断の根拠は [ADR 0046](adr/0046-licensing.md) を参照。
+
+明示的に別段の定めをしない限り、本プロジェクトへ意図的に提出された貢献（Apache-2.0 ライセンスに定義される Contribution）は、追加の条項なしに上記のデュアルライセンスで提供されるものとします。

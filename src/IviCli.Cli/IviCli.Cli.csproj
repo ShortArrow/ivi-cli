@@ -29,6 +29,8 @@
 
   <ItemGroup>
     <None Include="..\..\README.md" Pack="true" PackagePath="\" />
+    <None Include="..\..\LICENSE-MIT" Pack="true" PackagePath="\" />
+    <None Include="..\..\LICENSE-APACHE" Pack="true" PackagePath="\" />
   </ItemGroup>
 
   <ItemGroup>
