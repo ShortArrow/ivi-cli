@@ -139,24 +139,32 @@ ivicli completion powershell | Out-String | Invoke-Expression
 
 `ivicli` は呼び出し側と計測器の間に立ちます。使い方は次の 4 通りです:
 
+**1 · 実機を操作**
+
 ```mermaid
-flowchart TB
-    subgraph drive["1 · 実機を操作"]
-        direction LR
-        u1["you / CI"] -->|"VISA — NI-VISA / HiSLIP / VXI-11 / SOCKET"| c1["ivicli"] --> i1["計測器<br/>(LAN, USB/GPIB)"]
-    end
-    subgraph test["2 · ハードウェアなしでテスト"]
-        direction LR
-        u2["you / CI"] --> c2["ivicli"] -->|"Fake / Replay / mock container"| n2["ハードウェアなし"]
-    end
-    subgraph expose["3 · ローカル計測器を公開"]
-        direction LR
-        r3["remote PyVISA /<br/>NI-VISA client"] -->|"HiSLIP / SOCKET gateway"| c3["ivicli"] --> i3["ローカル計測器"]
-    end
-    subgraph control["4 · コントロールプレーン"]
-        direction LR
-        a4["AI agent /<br/>dashboard / CI"] -->|"HTTP / WebSocket API"| c4["ivicli"] --> i4["計測器"]
-    end
+flowchart LR
+    u["you / CI"] -->|"VISA — NI-VISA / HiSLIP / VXI-11 / SOCKET"| c["ivicli"] --> i["計測器 (LAN, USB/GPIB)"]
+```
+
+**2 · ハードウェアなしでテスト**
+
+```mermaid
+flowchart LR
+    u["you / CI"] --> c["ivicli"] -->|"Fake / Replay / mock container"| n["ハードウェアなし"]
+```
+
+**3 · ローカル計測器を公開**
+
+```mermaid
+flowchart LR
+    r["remote PyVISA / NI-VISA client"] -->|"HiSLIP / SOCKET gateway"| c["ivicli"] --> i["ローカル計測器"]
+```
+
+**4 · コントロールプレーン**
+
+```mermaid
+flowchart LR
+    a["AI agent / dashboard / CI"] -->|"HTTP / WebSocket API"| c["ivicli"] --> i["計測器"]
 ```
 
 内部の層構成（Clean Architecture と一方向の依存方向、アーキテクチャテストで強制）は、コントリビュータ向けに [ADR 0003](adr/0003-architecture-style.md) と [ADR 0021](adr/0021-repository-layout.md) に記載しています。

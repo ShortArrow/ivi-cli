@@ -139,24 +139,32 @@ Once installed, `<Tab>` expands subcommands, options, and runtime identifiers (d
 
 `ivicli` sits between a caller and an instrument. The four ways you use it:
 
+**1 · Drive real hardware**
+
 ```mermaid
-flowchart TB
-    subgraph drive["1 · Drive real hardware"]
-        direction LR
-        u1["you / CI"] -->|"VISA — NI-VISA / HiSLIP / VXI-11 / SOCKET"| c1["ivicli"] --> i1["instrument<br/>(LAN, USB/GPIB)"]
-    end
-    subgraph test["2 · Test without hardware"]
-        direction LR
-        u2["you / CI"] --> c2["ivicli"] -->|"Fake / Replay / mock container"| n2["no hardware"]
-    end
-    subgraph expose["3 · Expose a local instrument"]
-        direction LR
-        r3["remote PyVISA /<br/>NI-VISA client"] -->|"HiSLIP / SOCKET gateway"| c3["ivicli"] --> i3["local instrument"]
-    end
-    subgraph control["4 · Control plane"]
-        direction LR
-        a4["AI agent /<br/>dashboard / CI"] -->|"HTTP / WebSocket API"| c4["ivicli"] --> i4["instrument"]
-    end
+flowchart LR
+    u["you / CI"] -->|"VISA — NI-VISA / HiSLIP / VXI-11 / SOCKET"| c["ivicli"] --> i["instrument (LAN, USB/GPIB)"]
+```
+
+**2 · Test without hardware**
+
+```mermaid
+flowchart LR
+    u["you / CI"] --> c["ivicli"] -->|"Fake / Replay / mock container"| n["no hardware"]
+```
+
+**3 · Expose a local instrument**
+
+```mermaid
+flowchart LR
+    r["remote PyVISA / NI-VISA client"] -->|"HiSLIP / SOCKET gateway"| c["ivicli"] --> i["local instrument"]
+```
+
+**4 · Control plane**
+
+```mermaid
+flowchart LR
+    a["AI agent / dashboard / CI"] -->|"HTTP / WebSocket API"| c["ivicli"] --> i["instrument"]
 ```
 
 The internal layering (Clean Architecture + one-way dependency direction, enforced by an architecture-test suite) is documented for contributors in [ADR 0003](docs/adr/0003-architecture-style.md) and [ADR 0021](docs/adr/0021-repository-layout.md).
