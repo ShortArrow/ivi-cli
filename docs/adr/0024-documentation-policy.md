@@ -75,6 +75,8 @@ and on the JP side:
 
 Both files share the same heading structure and section order so cross-reference is trivial.
 
+**Navigation links point to the English canonical only.** When one document links to another (e.g. the README's documentation index linking to the PRD or CONTRIBUTING), it links the English file and does *not* append inline per-language variants such as `([日本語](...))`. Readers switch language via the target document's own top-of-file switcher. This keeps index lines from growing one entry longer per added language; the whole-document switcher header is the single place a language choice is offered.
+
 ### 5. Domain glossary
 
 `docs/domain-glossary.md` is a living document:

@@ -9,7 +9,7 @@
 ## Highlights
 
 - **Stateful, VISA-native CLI**
-  - **Stateful UX.** Register an alias once with `ivicli visa add psu1 ...`; subsequent commands operate on `psu1` without retyping the VISA resource.
+  - **A current device, like a shell's working directory.** `ivicli visa add psu1 <resource>` registers an alias once; `ivicli visa use psu1` makes it *the current device*, so every later `visa query` / `write` / `script` needs no target at all — no VISA resource, not even the alias.
   - **VISA-compatible.** Parses standard `TCPIP::`, `USB::`, `GPIB::` resource strings without proprietary syntax.
   - **Automation-friendly.** Stdout carries data (including `--json`); stderr carries logs. Exit codes are POSIX-conventional. Shell completion ships for bash / zsh / PowerShell.
 - **Discover & inspect**
@@ -19,9 +19,9 @@
   - **Multiple backends.** Local NI-VISA, HiSLIP, VXI-11, raw TCP SOCKET, Fake (programmable + scenario playback), Replay (strict deterministic playback) — all behind a single `IIviBackend` port.
   - **Gateway servers.** Expose a local instrument over HiSLIP (`TCPIP::host::hislip0::INSTR`) or raw socket so remote PyVISA / NI-VISA clients can drive it without redeploying the test.
 - **Test without hardware**
-  - **Recordable scenarios.** `mock scenario record --from-script` captures the SCPI traffic of a script run; `IVICLI_REPLAY=<scenario>` re-runs the same scripts deterministically without hardware.
-  - **Record once, replay forever.** Capture a real session with `IVICLI_CAPTURE`, convert it via `mock scenario import`, then drive any verb with `IVICLI_REPLAY=<name>` — no more hardware time burned on regression checks.
-  - **Lint your scripts.** `visa lint foo.scpi` catches unknown SCPI roots (IEEE 488.2 + SCPI core) before you run them, without touching the instrument.
+  - **Run a mock instrument.** The `Fake` backend answers SCPI from a *scenario* — a scripted set of `query → response` rules — so `ivicli` (or your own VISA app) can talk to a stand-in with zero bench time.
+  - **Capture, then replay.** Record a live session (`IVICLI_CAPTURE=<path>`) or a SCPI script run (`mock scenario record --from-script foo.scpi`) into a scenario, then re-run it deterministically with `IVICLI_REPLAY=<scenario>` — no hardware burned on regression checks.
+  - **Run & lint SCPI scripts.** `visa script foo.scpi` runs a `.scpi` file — [SCPI](https://www.ivifoundation.org/downloads/SCPI/scpi-99.pdf) commands plus ivi-cli's inline assertions ([ADR 0027](docs/adr/0027-phase3-operator-automation.md)) — against the current device; `visa lint foo.scpi` flags unknown SCPI roots (IEEE 488.2 + SCPI core) before you run it.
   - **Audit-friendly.** Set `IVICLI_CAPTURE=<path>` and every backend operation streams to an NDJSON log for post-hoc inspection — `tail -f path | jq` or hand it to support.
 - **Control plane (HTTP / WebSocket API)**
   - **JSON HTTP API.** `ivicli api start` exposes a JSON HTTP API at `http://127.0.0.1:8080/v1` (with `/openapi/v1.json`) so AI agents, dashboards, and CI scripts can list devices / fire SCPI queries / read status without speaking VISA.
@@ -135,32 +135,48 @@ ivicli completion powershell | Out-String | Invoke-Expression
 
 Once installed, `<Tab>` expands subcommands, options, and runtime identifiers (device aliases, server names, scenario names).
 
-## Architecture
+## How it connects
+
+`ivicli` sits between a caller and an instrument. The four ways you use it:
+
+**1 · Drive real hardware**
 
 ```mermaid
 flowchart LR
-    Cli["IviCli.Cli<br/>(composition root)"] --> App["IviCli.Application<br/>(handlers, ports)"]
-    Cli --> Server["IviCli.Server<br/>(HiSLIP / SOCKET gateways)"]
-    Server --> App
-    Cli --> Infra["IviCli.Infrastructure<br/>(TomlConfigStore, FilePidRegistry)"]
-    Infra --> App
-    Cli --> Backends["IviCli.Backends.*<br/>(Fake / Local / HiSlip / Vxi11 / Socket / Replay)"]
-    Backends --> App
-    App --> Domain["IviCli.Domain<br/>(value objects, entities, errors)"]
-    Server --> Domain
-    Backends --> Domain
+    u["you / CI"] -->|"VISA — NI-VISA / HiSLIP / VXI-11 / SOCKET"| c["ivicli"] --> i["instrument (LAN, USB/GPIB)"]
 ```
 
-Dependency direction is one-way (Domain ← Application ← {Infrastructure, Backends, Server} ← Cli). The architecture-test suite (`tests/IviCli.Cli.Tests/Architecture/`) enforces it on every PR.
+**2 · Test without hardware**
+
+```mermaid
+flowchart LR
+    u["you / CI"] --> c["ivicli"] -->|"Fake / Replay / mock container"| n["no hardware"]
+```
+
+**3 · Expose a local instrument**
+
+```mermaid
+flowchart LR
+    r["remote PyVISA / NI-VISA client"] -->|"HiSLIP / SOCKET gateway"| c["ivicli"] --> i["local instrument"]
+```
+
+**4 · Control plane**
+
+```mermaid
+flowchart LR
+    a["AI agent / dashboard / CI"] -->|"HTTP / WebSocket API"| c["ivicli"] --> i["instrument"]
+```
+
+The internal layering (Clean Architecture + one-way dependency direction, enforced by an architecture-test suite) is documented for contributors in [ADR 0003](docs/adr/0003-architecture-style.md) and [ADR 0021](docs/adr/0021-repository-layout.md).
 
 ## Documentation
 
-- [PRD](docs/PRD.md) — full product requirements ([日本語](docs/PRD.jp.md))
+- [PRD](docs/PRD.md) — full product requirements
 - [Architecture Decision Records](docs/adr/) — every Accepted decision behind the implementation. Start with [ADR 0003](docs/adr/0003-architecture-style.md) (architecture style), [ADR 0021](docs/adr/0021-repository-layout.md) (layer assemblies), [ADR 0007](docs/adr/0007-network-transport.md) (HiSLIP / SOCKET).
 - [Domain glossary](docs/domain-glossary.md) — the ubiquitous-language catalog
 - [Guides](docs/guides/) — task-oriented how-tos, starting with [Mock a VISA instrument](docs/guides/mock-a-visa-instrument.md)
-- [Samples](docs/samples/) — drop-in scenarios + setup scripts (e.g. [PSU mock VISA device](docs/samples/psu/))
-- [Contributing](docs/CONTRIBUTING.md) — local dev loop, branching, hooks ([日本語](docs/CONTRIBUTING.jp.md))
+- [Samples](docs/samples/) — ready-made **mock instruments** for testing without hardware: drop-in scenarios + setup scripts (e.g. the [PSU mock](docs/samples/psu/))
+- [Contributing](docs/CONTRIBUTING.md) — local dev loop, branching, hooks
 
 ## Building from source
 
