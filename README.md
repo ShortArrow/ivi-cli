@@ -107,7 +107,7 @@ Building an app that drives a VISA instrument and want to test it without the ha
 | `mock scenario` | `list` `create` `remove` `show` `activate` `deactivate` `record` `import` + `scene add` / `scene remove` | Author and capture mock-device scenarios |
 | `server` | `add` `remove` `list` `route add` / `route remove` / `route list` `start` `stop` `status` `log` | Gateway-server lifecycle |
 | `api` | `start` `stop` `token create` `token list` `token revoke` | Management HTTP JSON API (ADR 0034) + WebSocket subprotocol (ADR 0035) + PAT auth (ADR 0036) |
-| top-level | `diagnose` `completion <shell>` | Environment health + shell autocomplete |
+| top-level | `doctor` `completion <shell>` | Environment health + shell autocomplete |
 
 ## Verbosity & format flags
 

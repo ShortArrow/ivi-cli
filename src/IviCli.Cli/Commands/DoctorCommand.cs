@@ -8,9 +8,9 @@ using Microsoft.Extensions.Logging;
 namespace IviCli.Cli.Commands;
 
 /// <summary>
-/// Wires the <c>ivicli diagnose</c> top-level subcommand.
+/// Wires the <c>ivicli doctor</c> top-level subcommand.
 /// </summary>
-public static class DiagnoseCommand
+public static class DoctorCommand
 {
     /// <summary>Builds the configured <see cref="Command"/>.</summary>
     public static Command Build(IServiceProvider services)
@@ -18,7 +18,7 @@ public static class DiagnoseCommand
         var jsonOpt = new Option<bool>("--json") { Description = "Emit machine-readable JSON." };
 
         var command = new Command(
-            "diagnose",
+            "doctor",
             "Report runtime, configuration, and backend-registration health."
         );
         command.Options.Add(jsonOpt);
@@ -27,14 +27,14 @@ public static class DiagnoseCommand
             async (parseResult, ct) =>
             {
                 var json = parseResult.GetValue(jsonOpt);
-                var handler = services.GetRequiredService<DiagnoseQueryHandler>();
-                var logger = services.GetRequiredService<ILogger<DiagnoseQueryHandler>>();
+                var handler = services.GetRequiredService<DoctorQueryHandler>();
+                var logger = services.GetRequiredService<ILogger<DoctorQueryHandler>>();
 
-                var result = await handler.HandleAsync(new DiagnoseQuery(), ct);
+                var result = await handler.HandleAsync(new DoctorQuery(), ct);
                 return result switch
                 {
-                    Result<DiagnosticsReport, DiagnoseError>.Ok ok => Render(ok.Value, json),
-                    Result<DiagnosticsReport, DiagnoseError>.Error err => Fail(err.Err, logger),
+                    Result<DiagnosticsReport, DoctorError>.Ok ok => Render(ok.Value, json),
+                    Result<DiagnosticsReport, DoctorError>.Error err => Fail(err.Err, logger),
                     _ => ExitCodeMapper.GenericFailure,
                 };
             }
@@ -80,7 +80,7 @@ public static class DiagnoseCommand
             : ExitCodeMapper.Success;
     }
 
-    private static int Fail(DiagnoseError error, ILogger logger)
+    private static int Fail(DoctorError error, ILogger logger)
     {
         logger.Log(
             Logging.SerilogConfiguration.ToLogLevel(error.Severity),
@@ -88,7 +88,7 @@ public static class DiagnoseCommand
             error.Message,
             error.LogArgs.ToArray()
         );
-        Console.Error.WriteLine("error: diagnose failed.");
+        Console.Error.WriteLine("error: doctor failed.");
         return ExitCodeMapper.GenericFailure;
     }
 

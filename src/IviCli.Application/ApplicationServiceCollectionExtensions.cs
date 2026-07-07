@@ -38,7 +38,7 @@ public static class ApplicationServiceCollectionExtensions
         services.AddSingleton<IDeviceStatusProbe, DefaultDeviceStatusProbe>();
         services.AddSingleton<StatusDeviceCommandHandler>();
         services.AddSingleton<ScanDevicesQueryHandler>();
-        services.AddSingleton<DiagnoseQueryHandler>();
+        services.AddSingleton<DoctorQueryHandler>();
         services.AddSingleton<ScriptDeviceCommandHandler>();
         services.AddSingleton<MonitorDeviceCommandHandler>();
         services.AddSingleton<IScriptLinter, DefaultScriptLinter>();

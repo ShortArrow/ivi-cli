@@ -129,7 +129,7 @@ ivicli
  ├─ server    # gateway / remote instrument publishing
  ├─ logical   # logical name management
  ├─ config    # configuration management
- ├─ diagnose  # environment diagnostics
+ ├─ doctor  # environment diagnostics
  └─ driver    # IVI driver management
 ```
 
@@ -356,10 +356,10 @@ Removes a route.
 
 ## 6.4 Diagnostics
 
-### diagnose
+### doctor
 
 ```bash
-ivicli diagnose
+ivicli doctor
 ```
 
 Diagnoses the following:
@@ -643,7 +643,7 @@ Intended for CI / AI Agents.
 ```text
                     Control Plane
 ┌─────────────────────────────────────────────────┐
-│ config / logical / diagnose / server route     │
+│ config / logical / doctor / server route     │
 └─────────────────────────────────────────────────┘
                         ↓
                 Management API
@@ -818,7 +818,7 @@ Phase 1:
 * visa use/current
 * visa query/write/read
 * visa status
-* diagnose
+* doctor
 * driver list — enumerate installed IVI drivers from the local IVI
   Configuration Store (ADR 0045). Essential for debugging when an
   instrument is online but the driver assembly is missing or mis-

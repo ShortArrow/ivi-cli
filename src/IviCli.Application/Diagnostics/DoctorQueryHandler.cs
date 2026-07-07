@@ -6,13 +6,13 @@ using IviCli.Domain;
 namespace IviCli.Application.Diagnostics;
 
 /// <summary>
-/// Application-layer handler for <c>ivicli diagnose</c> (PRD §6.4). Reports
+/// Application-layer handler for <c>ivicli doctor</c> (PRD §6.4). Reports
 /// runtime, config, and backend-registration health. Since each check is
 /// reported independently, the handler does not fail at the command level;
 /// even when every check is in Error state the caller still receives a
 /// populated <see cref="DiagnosticsReport"/>.
 /// </summary>
-public sealed class DiagnoseQueryHandler
+public sealed class DoctorQueryHandler
 {
     private readonly IFileSystem _fs;
     private readonly IEnumerable<IIviBackend> _backends;
@@ -21,7 +21,7 @@ public sealed class DiagnoseQueryHandler
     private readonly string _logDirectory;
 
     /// <summary>Creates a new handler.</summary>
-    public DiagnoseQueryHandler(
+    public DoctorQueryHandler(
         IFileSystem fs,
         IEnumerable<IIviBackend> backends,
         IEnumerable<IBackendScanner> scanners,
@@ -36,8 +36,8 @@ public sealed class DiagnoseQueryHandler
     }
 
     /// <summary>Runs every diagnostic check and aggregates them.</summary>
-    public Task<Result<DiagnosticsReport, DiagnoseError>> HandleAsync(
-        DiagnoseQuery query,
+    public Task<Result<DiagnosticsReport, DoctorError>> HandleAsync(
+        DoctorQuery query,
         CancellationToken ct
     )
     {
@@ -53,7 +53,7 @@ public sealed class DiagnoseQueryHandler
         checks.Add(CheckScanners());
 
         return Task.FromResult(
-            Result.Success<DiagnosticsReport, DiagnoseError>(
+            Result.Success<DiagnosticsReport, DoctorError>(
                 new DiagnosticsReport(checks.ToImmutable())
             )
         );
@@ -134,7 +134,7 @@ public sealed class DiagnoseQueryHandler
     }
 }
 
-/// <summary>Composition-time options for <see cref="DiagnoseQueryHandler"/>.</summary>
+/// <summary>Composition-time options for <see cref="DoctorQueryHandler"/>.</summary>
 /// <param name="ConfigPath">Absolute path to the config.toml file.</param>
 /// <param name="LogDirectory">Absolute path to the log output directory.</param>
 public sealed record DiagnoseHandlerOptions(string ConfigPath, string LogDirectory);

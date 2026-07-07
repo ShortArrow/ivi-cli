@@ -134,7 +134,7 @@ ivicli
  ├─ server    # gateway / remote instrument publishing
  ├─ logical   # logical name management
  ├─ config    # configuration management
- ├─ diagnose  # environment diagnostics
+ ├─ doctor  # environment diagnostics
  └─ driver    # IVI driver management
 ```
 
@@ -360,10 +360,10 @@ route を削除する。
 
 ## 6.4 Diagnostics
 
-### diagnose
+### doctor
 
 ```bash
-ivicli diagnose
+ivicli doctor
 ```
 
 以下を診断：
@@ -648,7 +648,7 @@ CI / AI Agent 向け。
 ```text
                     Control Plane
 ┌─────────────────────────────────────────────────┐
-│ config / logical / diagnose / server route     │
+│ config / logical / doctor / server route     │
 └─────────────────────────────────────────────────┘
                         ↓
                 Management API
@@ -823,7 +823,7 @@ Phase 1:
 * visa use/current
 * visa query/write/read
 * visa status
-* diagnose
+* doctor
 * driver list — ローカルの IVI Configuration Store からインストール
   済み IVI ドライバを列挙 (ADR 0045)。機器は通信できているのにドライ
   バ DLL が無い / バージョン不一致、といったデバッグで必須。

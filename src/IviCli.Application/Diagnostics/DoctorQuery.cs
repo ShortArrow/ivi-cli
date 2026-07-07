@@ -3,8 +3,8 @@ using IviCli.Domain;
 
 namespace IviCli.Application.Diagnostics;
 
-/// <summary>Query DTO for <c>ivicli diagnose</c> (PRD §6.4).</summary>
-public sealed record DiagnoseQuery;
+/// <summary>Query DTO for <c>ivicli doctor</c> (PRD §6.4).</summary>
+public sealed record DoctorQuery;
 
 /// <summary>The overall diagnostics report.</summary>
 /// <param name="Checks">The individual checks performed, in stable order.</param>
@@ -29,8 +29,8 @@ public enum DiagnosticStatus
     Error,
 }
 
-/// <summary>Errors that the diagnose query itself can fail with (rare — most issues are reported as DiagnosticCheck entries).</summary>
-public abstract record DiagnoseError : IviError
+/// <summary>Errors that the doctor query itself can fail with (rare — most issues are reported as DiagnosticCheck entries).</summary>
+public abstract record DoctorError : IviError
 {
     /// <inheritdoc/>
     public abstract LogSeverity Severity { get; }

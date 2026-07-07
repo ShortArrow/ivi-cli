@@ -6,9 +6,9 @@ using IviCli.TestKit;
 
 namespace IviCli.Application.Tests.Diagnostics;
 
-public class DiagnoseQueryHandlerTests
+public class DoctorQueryHandlerTests
 {
-    private static DiagnoseQueryHandler MakeHandler(
+    private static DoctorQueryHandler MakeHandler(
         bool configExists,
         bool logDirExists,
         IEnumerable<IIviBackend>? backends = null,
@@ -28,7 +28,7 @@ public class DiagnoseQueryHandlerTests
             fs.AddDirectory(logDir);
         }
 
-        return new DiagnoseQueryHandler(
+        return new DoctorQueryHandler(
             fs,
             backends ?? Array.Empty<IIviBackend>(),
             scanners ?? Array.Empty<IBackendScanner>(),
@@ -48,7 +48,7 @@ public class DiagnoseQueryHandlerTests
         );
 
         // When
-        var result = await handler.HandleAsync(new DiagnoseQuery(), CancellationToken.None);
+        var result = await handler.HandleAsync(new DoctorQuery(), CancellationToken.None);
 
         // Then
         var report = result.ShouldBeOk();
@@ -63,7 +63,7 @@ public class DiagnoseQueryHandlerTests
         var handler = MakeHandler(configExists: true, logDirExists: true);
 
         // When
-        var result = await handler.HandleAsync(new DiagnoseQuery(), CancellationToken.None);
+        var result = await handler.HandleAsync(new DoctorQuery(), CancellationToken.None);
 
         // Then
         var report = result.ShouldBeOk();
@@ -83,7 +83,7 @@ public class DiagnoseQueryHandlerTests
         );
 
         // When
-        var result = await handler.HandleAsync(new DiagnoseQuery(), CancellationToken.None);
+        var result = await handler.HandleAsync(new DoctorQuery(), CancellationToken.None);
 
         // Then
         var report = result.ShouldBeOk();
