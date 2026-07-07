@@ -129,7 +129,7 @@ ivicli
  ├─ server    # gateway / remote instrument publishing
  ├─ logical   # logical name management
  ├─ config    # configuration management
- ├─ doctor  # environment diagnostics
+ ├─ doctor    # environment diagnostics
  └─ driver    # IVI driver management
 ```
 
@@ -362,7 +362,7 @@ Removes a route.
 ivicli doctor
 ```
 
-`diagnose` is kept as a deprecated alias for backward compatibility; it will be removed at 1.0.0.
+`diagnose` is kept as a deprecated alias for backward compatibility; it will be removed at 0.3.0.
 
 Diagnoses the following:
 

@@ -134,7 +134,7 @@ ivicli
  ├─ server    # gateway / remote instrument publishing
  ├─ logical   # logical name management
  ├─ config    # configuration management
- ├─ doctor  # environment diagnostics
+ ├─ doctor    # environment diagnostics
  └─ driver    # IVI driver management
 ```
 
@@ -366,7 +366,7 @@ route を削除する。
 ivicli doctor
 ```
 
-後方互換のため `diagnose` を非推奨エイリアスとして残します（1.0.0 で削除予定）。
+後方互換のため `diagnose` を非推奨エイリアスとして残します（0.3.0 で削除予定）。
 
 以下を診断：
 
