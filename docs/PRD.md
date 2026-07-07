@@ -362,6 +362,8 @@ Removes a route.
 ivicli doctor
 ```
 
+`diagnose` is kept as a deprecated alias for backward compatibility; it will be removed at 1.0.0.
+
 Diagnoses the following:
 
 * IVI Shared Components

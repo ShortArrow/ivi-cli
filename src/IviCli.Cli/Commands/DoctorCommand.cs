@@ -21,6 +21,7 @@ public static class DoctorCommand
             "doctor",
             "Report runtime, configuration, and backend-registration health."
         );
+        command.Aliases.Add("diagnose"); // deprecated pre-rename spelling; drop at 1.0.0
         command.Options.Add(jsonOpt);
 
         command.SetAction(
