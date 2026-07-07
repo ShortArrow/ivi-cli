@@ -414,7 +414,7 @@ internal static class Program
         root.Subcommands.Add(mock);
         root.Subcommands.Add(ServerCommand.Build(services));
         root.Subcommands.Add(ApiCommand.Build(services));
-        root.Subcommands.Add(DiagnoseCommand.Build(services));
+        root.Subcommands.Add(DoctorCommand.Build(services));
         root.Subcommands.Add(DriverCommand.Build(services));
         root.Subcommands.Add(LogicalCommand.Build(services));
         root.Subcommands.Add(CompletionCommand.Build());

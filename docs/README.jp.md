@@ -107,7 +107,7 @@ VISA 計測器を操作するアプリを開発していて、実機を用意せ
 | `mock scenario` | `list` `create` `remove` `show` `activate` `deactivate` `record` `import` + `scene add` / `scene remove` | モックデバイス用シナリオの編集と記録 |
 | `server` | `add` `remove` `list` `route add` / `route remove` / `route list` `start` `stop` `status` `log` | ゲートウェイサーバのライフサイクル |
 | `api` | `start` `stop` `token create` `token list` `token revoke` | Management HTTP JSON API (ADR 0034) + WebSocket サブプロトコル (ADR 0035) + PAT 認証 (ADR 0036) |
-| top-level | `diagnose` `completion <shell>` | 環境ヘルスチェック + シェル補完 |
+| top-level | `doctor` `completion <shell>` | 環境ヘルスチェック + シェル補完 |
 
 ## 詳細度 / フォーマットのフラグ
 

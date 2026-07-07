@@ -10,7 +10,7 @@ Assembly layout and dependency direction are established in 0021. This ADR build
 Constraints derived from the PRD and 0021:
 
 - Polymorphism over `IIviBackend` as a transport abstraction (HiSLIP / VXI-11 / Socket / Fake / Replay)
-- Separation of the Data Plane (visa query/write/read) and the Control Plane (config / server route / diagnose)
+- Separation of the Data Plane (visa query/write/read) and the Control Plane (config / server route / doctor)
 - Separation of static config (`config.toml`) and dynamic session state (`session.json`)
 - SCPI itself distinguishes write (`OUTP ON`) from query (`*IDN?`) by syntax
 
