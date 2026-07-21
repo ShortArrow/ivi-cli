@@ -26,7 +26,13 @@ public sealed class MockReceivedWritesCommandRenderTests
         var writer = new StringWriter();
         var writes = ImmutableArray.Create(Write(":VOLT 1.000"), Write(":VOLT 24.000"));
 
-        var code = MockReceivedWritesCommand.Render(writes, all: false, json: false, writer);
+        var code = MockReceivedWritesCommand.Render(
+            writes,
+            all: false,
+            count: false,
+            json: false,
+            writer
+        );
 
         code.ShouldBe(0);
         writer.ToString().ShouldBe(":VOLT 24.000" + Environment.NewLine);
@@ -38,7 +44,13 @@ public sealed class MockReceivedWritesCommandRenderTests
         var writer = new StringWriter();
         var writes = ImmutableArray.Create(Write(":VOLT 1.000"), Write(":VOLT 24.000"));
 
-        var code = MockReceivedWritesCommand.Render(writes, all: true, json: false, writer);
+        var code = MockReceivedWritesCommand.Render(
+            writes,
+            all: true,
+            count: false,
+            json: false,
+            writer
+        );
 
         code.ShouldBe(0);
         var lines = writer
@@ -56,6 +68,7 @@ public sealed class MockReceivedWritesCommandRenderTests
         var code = MockReceivedWritesCommand.Render(
             ImmutableArray<TrafficEvent>.Empty,
             all: false,
+            count: false,
             json: false,
             writer
         );
@@ -65,16 +78,18 @@ public sealed class MockReceivedWritesCommandRenderTests
     }
 
     [Fact]
-    public void Json_default_emits_the_last_write_as_a_parseable_object()
+    public void Json_default_emits_a_single_element_array()
     {
         var writer = new StringWriter();
         var writes = ImmutableArray.Create(Write(":VOLT 1.000"), Write(":VOLT 24.000"));
 
-        MockReceivedWritesCommand.Render(writes, all: false, json: true, writer);
+        MockReceivedWritesCommand.Render(writes, all: false, count: false, json: true, writer);
 
         using var doc = JsonDocument.Parse(writer.ToString());
-        doc.RootElement.GetProperty("scpi").GetString().ShouldBe(":VOLT 24.000");
-        doc.RootElement.GetProperty("device").GetString().ShouldBe("dut");
+        doc.RootElement.ValueKind.ShouldBe(JsonValueKind.Array);
+        doc.RootElement.GetArrayLength().ShouldBe(1);
+        doc.RootElement[0].GetProperty("scpi").GetString().ShouldBe(":VOLT 24.000");
+        doc.RootElement[0].GetProperty("device").GetString().ShouldBe("dut");
     }
 
     [Fact]
@@ -83,10 +98,57 @@ public sealed class MockReceivedWritesCommandRenderTests
         var writer = new StringWriter();
         var writes = ImmutableArray.Create(Write(":VOLT 1.000"), Write(":VOLT 24.000"));
 
-        MockReceivedWritesCommand.Render(writes, all: true, json: true, writer);
+        MockReceivedWritesCommand.Render(writes, all: true, count: false, json: true, writer);
 
         using var doc = JsonDocument.Parse(writer.ToString());
         doc.RootElement.GetArrayLength().ShouldBe(2);
         doc.RootElement[1].GetProperty("scpi").GetString().ShouldBe(":VOLT 24.000");
+    }
+
+    [Fact]
+    public void Json_empty_emits_an_empty_array_not_null()
+    {
+        var writer = new StringWriter();
+
+        MockReceivedWritesCommand.Render(
+            ImmutableArray<TrafficEvent>.Empty,
+            all: false,
+            count: false,
+            json: true,
+            writer
+        );
+
+        using var doc = JsonDocument.Parse(writer.ToString());
+        doc.RootElement.ValueKind.ShouldBe(JsonValueKind.Array);
+        doc.RootElement.GetArrayLength().ShouldBe(0);
+    }
+
+    [Fact]
+    public void Count_prints_the_number_and_succeeds_even_at_zero()
+    {
+        var writer = new StringWriter();
+
+        var code = MockReceivedWritesCommand.Render(
+            ImmutableArray<TrafficEvent>.Empty,
+            all: false,
+            count: true,
+            json: false,
+            writer
+        );
+
+        code.ShouldBe(0);
+        writer.ToString().Trim().ShouldBe("0");
+    }
+
+    [Fact]
+    public void Count_json_emits_a_count_object()
+    {
+        var writer = new StringWriter();
+        var writes = ImmutableArray.Create(Write(":VOLT 1.000"), Write(":VOLT 24.000"));
+
+        MockReceivedWritesCommand.Render(writes, all: false, count: true, json: true, writer);
+
+        using var doc = JsonDocument.Parse(writer.ToString());
+        doc.RootElement.GetProperty("count").GetInt32().ShouldBe(2);
     }
 }

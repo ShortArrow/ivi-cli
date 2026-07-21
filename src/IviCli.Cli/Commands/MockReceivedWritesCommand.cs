@@ -28,6 +28,11 @@ public static class MockReceivedWritesCommand
         {
             Description = "Only writes whose SCPI contains this substring (e.g. ':VOLT').",
         };
+        var exactOpt = new Option<string?>("--exact")
+        {
+            Description =
+                "Only writes whose SCPI equals this exactly (e.g. ':VOLT 24.000'). Cannot combine with --match.",
+        };
         var captureOpt = new Option<string?>("--capture")
         {
             Description =
@@ -37,6 +42,10 @@ public static class MockReceivedWritesCommand
         {
             Description = "List every matching write (oldest first) instead of only the last.",
         };
+        var countOpt = new Option<bool>("--count")
+        {
+            Description = "Print how many writes matched instead of the writes (exit 0 even at 0).",
+        };
         var jsonOpt = new Option<bool>("--json") { Description = "Emit machine-readable JSON." };
 
         var command = new Command(
@@ -45,8 +54,10 @@ public static class MockReceivedWritesCommand
         );
         command.Arguments.Add(deviceArg);
         command.Options.Add(matchOpt);
+        command.Options.Add(exactOpt);
         command.Options.Add(captureOpt);
         command.Options.Add(allOpt);
+        command.Options.Add(countOpt);
         command.Options.Add(jsonOpt);
 
         command.SetAction(
@@ -54,8 +65,16 @@ public static class MockReceivedWritesCommand
             {
                 var device = parseResult.GetRequiredValue(deviceArg);
                 var match = parseResult.GetValue(matchOpt);
+                var exact = parseResult.GetValue(exactOpt);
                 var all = parseResult.GetValue(allOpt);
+                var count = parseResult.GetValue(countOpt);
                 var json = parseResult.GetValue(jsonOpt);
+
+                if (match is not null && exact is not null)
+                {
+                    Console.Error.WriteLine("error: use --match or --exact, not both.");
+                    return ExitCodeMapper.UsageError;
+                }
 
                 var capture =
                     parseResult.GetValue(captureOpt)
@@ -75,7 +94,7 @@ public static class MockReceivedWritesCommand
                 var logger = services.GetRequiredService<ILogger<MockReceivedWritesQueryHandler>>();
 
                 var result = await handler.HandleAsync(
-                    new MockReceivedWritesQuery(device, match, path),
+                    new MockReceivedWritesQuery(device, match, exact, path),
                     ct
                 );
                 return result switch
@@ -83,7 +102,7 @@ public static class MockReceivedWritesCommand
                     Result<
                         System.Collections.Immutable.ImmutableArray<TrafficEvent>,
                         MockReceivedWritesError
-                    >.Ok ok => Render(ok.Value, all, json, Console.Out),
+                    >.Ok ok => Render(ok.Value, all, count, json, Console.Out),
                     Result<
                         System.Collections.Immutable.ImmutableArray<TrafficEvent>,
                         MockReceivedWritesError
@@ -97,22 +116,40 @@ public static class MockReceivedWritesCommand
     }
 
     /// <summary>
-    /// Renders the selected writes and returns the exit code. Non-empty →
-    /// <see cref="ExitCodeMapper.Success"/>; empty → a distinct non-zero exit so
-    /// a caller can assert "did NOT arrive" without parsing stdout.
+    /// Renders the selected writes and returns the exit code.
+    /// <list type="bullet">
+    /// <item><c>--count</c>: prints the match count; always exit 0 (0 is a valid answer).</item>
+    /// <item>otherwise non-empty → <see cref="ExitCodeMapper.Success"/>; empty → a distinct
+    /// non-zero exit so a caller can assert "did NOT arrive" without parsing stdout.</item>
+    /// </list>
+    /// In JSON mode the write list is <b>always</b> an array (a single-element array by
+    /// default, every match with <c>--all</c>, <c>[]</c> when nothing matched) so a parser
+    /// never has to branch on the mode.
     /// </summary>
     public static int Render(
         System.Collections.Immutable.ImmutableArray<TrafficEvent> writes,
         bool all,
+        bool count,
         bool json,
         TextWriter output
     )
     {
+        if (count)
+        {
+            var inv = System.Globalization.CultureInfo.InvariantCulture;
+            output.WriteLine(
+                json
+                    ? string.Create(inv, $"{{\"count\":{writes.Length}}}")
+                    : writes.Length.ToString(inv)
+            );
+            return ExitCodeMapper.Success;
+        }
+
         if (writes.IsEmpty)
         {
             if (json)
             {
-                output.WriteLine(all ? "[]" : "null");
+                output.WriteLine("[]");
             }
             return ExitCodeMapper.GenericFailure;
         }
@@ -124,11 +161,7 @@ public static class MockReceivedWritesCommand
         if (json)
         {
             var views = selected.Select(w => new WriteView(w.Device, w.Data ?? "", w.Timestamp));
-            output.WriteLine(
-                all
-                    ? JsonSerializer.Serialize(views, JsonOptions)
-                    : JsonSerializer.Serialize(views.First(), JsonOptions)
-            );
+            output.WriteLine(JsonSerializer.Serialize(views, JsonOptions));
         }
         else
         {

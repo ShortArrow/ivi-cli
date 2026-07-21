@@ -99,18 +99,28 @@ NDJSON with shared-read access, a *separate process* can query it while a
 gateway is still writing. That is the substrate for confirming, out of
 band, that a client's SCPI write reached a mock.
 
-`ivicli mock received <device> [--match <substr>] [--all] [--json]` reads
-the capture at `--capture <path>` (defaulting to `IVICLI_CAPTURE`),
-filters to `Write` events for the device, and reports the matching SCPI —
-the last write by default, or every match with `--all`. It exits non-zero
-when nothing matched, so a test can assert "the write did (not) arrive"
-without parsing stdout. The query lives in the Application layer
-(`MockReceivedWritesQueryHandler`) over the existing `INdjsonTrafficReader`; no new
-persistence path is introduced.
+`ivicli mock received <device> [--match <substr> | --exact <scpi>] [--all]
+[--count] [--json]` reads the capture at `--capture <path>` (defaulting to
+`IVICLI_CAPTURE`), filters to `Write` events for the device, and reports the
+matching SCPI — the last write by default, or every match with `--all`.
+`--match` is a substring; `--exact` is a full-string filter (so `:VOLT` does
+not also match `:VOLT:PROT 30`), and the two are mutually exclusive. `--count`
+prints the match count instead. Absent `--count`, it exits non-zero when
+nothing matched, so a test can assert "the write did (not) arrive" without
+parsing stdout. In `--json` mode the write list is **always a JSON array**
+(single element by default, `[]` when empty) so a parser never branches on the
+mode. The query lives in the Application layer
+(`MockReceivedWritesQueryHandler`) over the existing `INdjsonTrafficReader`; no
+new persistence path is introduced.
 
 This is why a client-app integration test can drive the mock through its
 own VISA stack (never sending raw SCPI itself) yet still verify the exact
 bytes that reached the instrument.
+
+Test isolation is a usage concern, not a filter: the capture appends across
+runs, so `last` / `--all` could surface a prior run's write. Point each run at
+a fresh `IVICLI_CAPTURE` path (or truncate between runs) rather than adding a
+time filter.
 
 ## Out of scope (v2 candidates)
 

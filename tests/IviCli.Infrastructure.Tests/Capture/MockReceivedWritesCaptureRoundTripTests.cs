@@ -56,12 +56,18 @@ public sealed class MockReceivedWritesCaptureRoundTripTests
         var handler = new MockReceivedWritesQueryHandler(new NdjsonTrafficReader(fs));
 
         var volt = (
-            await handler.HandleAsync(new MockReceivedWritesQuery("psu1", ":VOLT", Path), default)
+            await handler.HandleAsync(
+                new MockReceivedWritesQuery("psu1", ":VOLT", null, Path),
+                default
+            )
         ).ShouldBeOk();
         volt.Last().Data.ShouldBe(":VOLT 24.000");
 
         var curr = (
-            await handler.HandleAsync(new MockReceivedWritesQuery("psu1", ":CURR", Path), default)
+            await handler.HandleAsync(
+                new MockReceivedWritesQuery("psu1", ":CURR", null, Path),
+                default
+            )
         ).ShouldBeOk();
         curr.Last().Data.ShouldBe(":CURR 3.300");
     }
@@ -76,7 +82,10 @@ public sealed class MockReceivedWritesCaptureRoundTripTests
         var handler = new MockReceivedWritesQueryHandler(new NdjsonTrafficReader(fs));
 
         var volt = (
-            await handler.HandleAsync(new MockReceivedWritesQuery("psu1", ":VOLT", Path), default)
+            await handler.HandleAsync(
+                new MockReceivedWritesQuery("psu1", ":VOLT", null, Path),
+                default
+            )
         ).ShouldBeOk();
         volt.ShouldBeEmpty();
     }

@@ -14,10 +14,20 @@ namespace IviCli.Application.Mock;
 /// <param name="Device">Device alias whose writes to select.</param>
 /// <param name="Match">
 /// Optional substring the SCPI must contain (e.g. <c>:VOLT</c>); <see langword="null"/>
-/// selects every write for the device.
+/// selects every write for the device. Ignored when <paramref name="Exact"/> is set.
+/// </param>
+/// <param name="Exact">
+/// Optional full-string filter: the SCPI must equal this exactly (e.g.
+/// <c>:VOLT 24.000</c>). Takes precedence over <paramref name="Match"/> and avoids
+/// a substring over-matching a longer command (<c>:VOLT</c> vs <c>:VOLT:PROT 30</c>).
 /// </param>
 /// <param name="Path">Filesystem path to the NDJSON capture.</param>
-public sealed record MockReceivedWritesQuery(string Device, string? Match, string Path);
+public sealed record MockReceivedWritesQuery(
+    string Device,
+    string? Match,
+    string? Exact,
+    string Path
+);
 
 /// <summary>
 /// Reads the NDJSON capture via <see cref="INdjsonTrafficReader"/> and returns
@@ -60,7 +70,14 @@ public sealed class MockReceivedWritesQueryHandler
                 {
                     continue;
                 }
-                if (
+                if (query.Exact is { } exact)
+                {
+                    if (!string.Equals(ev.Data, exact, StringComparison.Ordinal))
+                    {
+                        continue;
+                    }
+                }
+                else if (
                     query.Match is { } needle
                     && !ev.Data.Contains(needle, StringComparison.Ordinal)
                 )

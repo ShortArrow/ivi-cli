@@ -53,7 +53,7 @@ public sealed class MockReceivedWritesQueryHandlerTests
         );
 
         var result = await handler.HandleAsync(
-            new MockReceivedWritesQuery("dut", ":VOLT", "run.ndjson"),
+            new MockReceivedWritesQuery("dut", ":VOLT", null, "run.ndjson"),
             default
         );
 
@@ -70,7 +70,7 @@ public sealed class MockReceivedWritesQueryHandlerTests
         );
 
         var result = await handler.HandleAsync(
-            new MockReceivedWritesQuery("dut", ":VOLT", "run.ndjson"),
+            new MockReceivedWritesQuery("dut", ":VOLT", null, "run.ndjson"),
             default
         );
 
@@ -85,7 +85,7 @@ public sealed class MockReceivedWritesQueryHandlerTests
         );
 
         var result = await handler.HandleAsync(
-            new MockReceivedWritesQuery("dut", ":CURR", "run.ndjson"),
+            new MockReceivedWritesQuery("dut", ":CURR", null, "run.ndjson"),
             default
         );
 
@@ -100,7 +100,7 @@ public sealed class MockReceivedWritesQueryHandlerTests
         );
 
         var result = await handler.HandleAsync(
-            new MockReceivedWritesQuery("dut", Match: null, "run.ndjson"),
+            new MockReceivedWritesQuery("dut", Match: null, Exact: null, Path: "run.ndjson"),
             default
         );
 
@@ -109,12 +109,28 @@ public sealed class MockReceivedWritesQueryHandlerTests
     }
 
     [Fact]
+    public async Task Exact_filter_matches_only_the_full_scpi()
+    {
+        // Substring ':VOLT' would also catch ':VOLT:PROT 30'; --exact must not.
+        var handler = new MockReceivedWritesQueryHandler(
+            new FakeReader(Write("dut", ":VOLT 24.000"), Write("dut", ":VOLT:PROT 30"))
+        );
+
+        var result = await handler.HandleAsync(
+            new MockReceivedWritesQuery("dut", Match: null, Exact: ":VOLT 24.000", "run.ndjson"),
+            default
+        );
+
+        result.ShouldBeOk().ShouldHaveSingleItem().Data.ShouldBe(":VOLT 24.000");
+    }
+
+    [Fact]
     public async Task Invalid_device_alias_is_rejected()
     {
         var handler = new MockReceivedWritesQueryHandler(new FakeReader());
 
         var result = await handler.HandleAsync(
-            new MockReceivedWritesQuery("bad alias!", null, "run.ndjson"),
+            new MockReceivedWritesQuery("bad alias!", null, null, "run.ndjson"),
             default
         );
 
@@ -129,7 +145,7 @@ public sealed class MockReceivedWritesQueryHandlerTests
         );
 
         var result = await handler.HandleAsync(
-            new MockReceivedWritesQuery("dut", null, "missing.ndjson"),
+            new MockReceivedWritesQuery("dut", null, null, "missing.ndjson"),
             default
         );
 
