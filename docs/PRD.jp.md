@@ -286,7 +286,7 @@ ivicli visa lint smoke.scpi
 ivicli visa lint smoke.scpi --json | jq
 ```
 
-`.scpi` スクリプトを実行せずに静的解析する。IEEE 488.2 + SCPI Volume 1 の語彙（ADR 0032）に対する未知のコマンドルートを検出する。v1 はルートレベルの不整合のみ報告。フルコロンパス検証 / パラメータ構文検証はベンダー固有拡張と合わせて延期。終了コード: ファイル IO / パース失敗 → usage error、`Error` レベルの finding があれば generic failure、warning のみは 0。
+`.scpi` スクリプトを実行せずに静的解析する。IEEE 488.2 + SCPI Volume 1 の語彙に対する未知のコマンドルートを検出する。v1 はルートレベルの不整合のみ報告。フルコロンパス検証 / パラメータ構文検証はベンダー固有拡張と合わせて延期。終了コード: ファイル IO / パース失敗 → usage error、`Error` レベルの finding があれば generic failure、warning のみは 0。
 
 ---
 
@@ -380,7 +380,7 @@ ivicli doctor
 
 ### visa traffic capture
 
-`IVICLI_CAPTURE=<path>`（絶対パス、または rolling-log ディレクトリからの相対パス）を設定すると、CLI 全体の backend 操作が UTF-8 NDJSON ファイルにストリームされる。1 行 1 イベントで、`timestamp` / `device` / `op` (`Open` / `Close` / `Write` / `Query` / `Read`) / `data` / `response` / `ok` / `latencyMs` / `error` を含む。環境変数未設定なら null sink（ゼロオーバヘッド）。sink 失敗は飲み込まれ、verb は audit sink の失敗で落ちない。詳細は [ADR 0031](adr/0031-visa-traffic-capture.md)。
+`IVICLI_CAPTURE=<path>`（絶対パス、または rolling-log ディレクトリからの相対パス）を設定すると、CLI 全体の backend 操作が UTF-8 NDJSON ファイルにストリームされる。1 行 1 イベントで、`timestamp` / `device` / `op` (`Open` / `Close` / `Write` / `Query` / `Read`) / `data` / `response` / `ok` / `latencyMs` / `error` を含む。環境変数未設定なら null sink（ゼロオーバヘッド）。sink 失敗は飲み込まれ、verb は audit sink の失敗で落ちない。
 
 ---
 
@@ -473,7 +473,7 @@ device = "psu1"
 
 ## 7.3 VXI-11-compatible Server
 
-VXI-11 はサーバ／クライアント両側を Batch D で実装した。`Vxi11GatewayServer` (サーバ、ADR 0029) と `Vxi11Backend` (クライアント) が `create_link` / `device_write` / `device_read` / `device_clear` / `destroy_link` ＋同一ポート上の portmapper GETPORT をサポートする。Abort / Interrupt チャネル、locking、trigger、本来の port-111 portmapper 通信は引き続き未対応。
+VXI-11 はサーバ／クライアント両側を Batch D で実装した。`Vxi11GatewayServer` (サーバ) と `Vxi11Backend` (クライアント) が `create_link` / `device_write` / `device_read` / `device_clear` / `destroy_link` ＋同一ポート上の portmapper GETPORT をサポートする。Abort / Interrupt チャネル、locking、trigger、本来の port-111 portmapper 通信は引き続き未対応。
 
 ```bash
 ivicli server start --protocol vxi11
@@ -514,11 +514,11 @@ HiSLIP / VXI-11 / Socket は既存 VISA client 互換のために提供する。
 * JSON output
 * AI agent integration
 
-**Batch I で HTTP JSON として実装済み**（[ADR 0034](adr/0034-management-api.md)）。ASP.NET Core minimal API を CLI プロセス内に埋め込む形で動作し、`ivicli api start [--port 8080] [--bind 127.0.0.1]` で起動する。v1 エンドポイント: `GET /v1/{devices,servers,scenarios}` + `GET /v1/devices/{name}/status` + `POST /v1/devices/{name}/{query,write}` + `GET /openapi/v1.json` + `GET /healthz`。v1 は既定で loopback バインド。認証 / server lifecycle 系エンドポイント / scenario import / gRPC は v2。
+**Batch I で HTTP JSON として実装済み**。ASP.NET Core minimal API を CLI プロセス内に埋め込む形で動作し、`ivicli api start [--port 8080] [--bind 127.0.0.1]` で起動する。v1 エンドポイント: `GET /v1/{devices,servers,scenarios}` + `GET /v1/devices/{name}/status` + `POST /v1/devices/{name}/{query,write}` + `GET /openapi/v1.json` + `GET /healthz`。v1 は既定で loopback バインド。認証 / server lifecycle 系エンドポイント / scenario import / gRPC は v2。
 
-**Batch J で WebSocket サブプロトコルを追加**（[ADR 0035](adr/0035-visa-over-websocket.md)）: `ws://host:port/v1/devices/{name}/visa` は `{op,scpi}` フレームを受け取り `{event:response|ack|error,...}` を返す。ブラウザ / AI agent ランタイム / ダッシュボード向け。
+**Batch J で WebSocket サブプロトコルを追加**: `ws://host:port/v1/devices/{name}/visa` は `{op,scpi}` フレームを受け取り `{event:response|ack|error,...}` を返す。ブラウザ / AI agent ランタイム / ダッシュボード向け。
 
-**Batch K で PAT 認証を追加**（[ADR 0036](adr/0036-management-api-authentication.md)）: `ivicli api token create` でトークンを生成し、HTTP は `Authorization: Bearer <token>`、WebSocket は `Sec-WebSocket-Protocol: ivi-cli-pat.<token>` で検証する。loopback 以外へバインドする場合は ≥ 1 個のトークン（または `--allow-anonymous` で opt-out）が必須。スコープ / mTLS / 有効期限 / 監査ログは v2。
+**Batch K で PAT 認証を追加**: `ivicli api token create` でトークンを生成し、HTTP は `Authorization: Bearer <token>`、WebSocket は `Sec-WebSocket-Protocol: ivi-cli-pat.<token>` で検証する。loopback 以外へバインドする場合は ≥ 1 個のトークン（または `--allow-anonymous` で opt-out）が必須。スコープ / mTLS / 有効期限 / 監査ログは v2。
 
 ---
 
@@ -827,7 +827,7 @@ Phase 1:
 * visa status
 * doctor
 * driver list — ローカルの IVI Configuration Store からインストール
-  済み IVI ドライバを列挙 (ADR 0045)。機器は通信できているのにドライ
+  済み IVI ドライバを列挙。機器は通信できているのにドライ
   バ DLL が無い / バージョン不一致、といったデバッグで必須。
 * logical list — 同じストアから IVI 論理名を列挙。alias を
   `visa add` する前にどの論理名がどの driver session に紐付いている
@@ -849,13 +849,13 @@ Phase 3 (オペレータ向け自動化):
 * visa monitor — クエリを一定間隔で繰り返しタイムスタンプ付きで標準出力
   および構造化ログに流す。中断まで継続。
 * mock scenario record — 実行中の query/write トラフィックをシナリオファイル
-  に追記し、ADR 0026 の再生ループを閉じる。
+  に追記する。
 * mock scenario import — NDJSON キャプチャ（IVICLI_CAPTURE の出力）を
   既存の MockScenario に変換し、`IVICLI_REPLAY` 経由でそのまま再生可能に
-  する。ADR 0033。
+  する。
 * mock received — デバイスが受信した SCPI 書き込みを IVICLI_CAPTURE トラフィック
   ログから読み返す。モックを自身の VISA スタック経由で駆動するテストが、
-  どの書き込みが実際に届いたかをアウトオブバンドで確認できる。ADR 0031。
+  どの書き込みが実際に届いたかをアウトオブバンドで確認できる。
 * server log — ゲートウェイのサーバ別構造化ログを tail（follow / レベル
   フィルタ）。オペレータ向け観測性。
 
