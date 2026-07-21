@@ -573,6 +573,15 @@ internal static class Program
             else
             {
                 await ActivateOne(store, fake, envTarget, envName, ct);
+                // Persist the env-var activation into the session. The live
+                // scenario-binding refresher treats the session as the source
+                // of truth and deactivates any running binding the session no
+                // longer names; without this write it would tear down an
+                // env-activated scenario (e.g. the mock container's
+                // IVICLI_SCENARIO) on the first request. Mirrors what
+                // `mock scenario activate` records.
+                var bound = session.BindScenario(envTarget, envName);
+                _ = await sessionStore.SaveAsync(bound, ct);
             }
         }
 
