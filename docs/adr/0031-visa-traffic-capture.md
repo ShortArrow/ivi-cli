@@ -92,14 +92,47 @@ insufficient.
   falls back to `NullTrafficWriter`; the CLI continues without
   capture rather than refusing to start.
 
+### 5. Read-side consumer — `mock received`
+
+The capture is not only an audit trail; because the reader opens the
+NDJSON with shared-read access, a *separate process* can query it while a
+gateway is still writing. That is the substrate for confirming, out of
+band, that a client's SCPI write reached a mock.
+
+`ivicli mock received <device> [--match <substr> | --exact <scpi>] [--all]
+[--count] [--json]` reads the capture at `--capture <path>` (defaulting to
+`IVICLI_CAPTURE`), filters to `Write` events for the device, and reports the
+matching SCPI — the last write by default, or every match with `--all`.
+`--match` is a substring; `--exact` is a full-string filter (so `:VOLT` does
+not also match `:VOLT:PROT 30`), and the two are mutually exclusive. `--count`
+prints the match count instead. Absent `--count`, it exits non-zero when
+nothing matched, so a test can assert "the write did (not) arrive" without
+parsing stdout. In `--json` mode the write list is **always a JSON array**
+(single element by default, `[]` when empty) so a parser never branches on the
+mode. The query lives in the Application layer
+(`MockReceivedWritesQueryHandler`) over the existing `INdjsonTrafficReader`; no
+new persistence path is introduced.
+
+This is why a client-app integration test can drive the mock through its
+own VISA stack (never sending raw SCPI itself) yet still verify the exact
+bytes that reached the instrument.
+
+Test isolation is a usage concern, not a filter: the capture appends across
+runs, so `last` / `--all` could surface a prior run's write. Point each run at
+a fresh `IVICLI_CAPTURE` path (or truncate between runs) rather than adding a
+time filter.
+
 ## Out of scope (v2 candidates)
 
-- **Per-command `--capture <path>` flag.** Env var is enough for v1.
+- **Per-command `--capture <path>` flag for *writing*.** The env var is
+  enough to *enable* capture; `mock received --capture` only selects which
+  log to *read*.
 - **File rotation / size cap.** Operators rotate via `logrotate` or
   similar; a built-in cap can land in a follow-up ADR if real usage
   demands it.
-- **Viewer / `ivicli capture tail` verb.** `tail -f` + `jq` is
-  sufficient; a dedicated verb would be ad-hoc.
+- **Generic viewer / `ivicli capture tail` verb.** `tail -f` + `jq`
+  covers ad-hoc inspection; only the focused, machine-readable
+  `mock received` query (§5) is built, for the write-verification use case.
 - **Format compatibility with `MockScenario`.** Different goals,
   different shapes; a converter is a separate concern.
 - **Redaction filters** (drop secrets in SCPI text). Deferred until a

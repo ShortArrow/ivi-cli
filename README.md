@@ -4,7 +4,7 @@
 
 `ivi-cli` is an integrated CLI for managing, diagnosing, and operating instruments addressed via VISA/IVI.
 
-> Status: **v0.2.7 (pre-1.0.0).** Phase 1–3 are landed: CLI core, HiSLIP / VXI-11 / SOCKET gateways, scenario-driven mock-VISA container (ghcr.io/shortarrow/ivi-cli-mock), Management HTTP / WebSocket API with PAT + TLS + audit, OpenTelemetry, and LAN discovery (LXI mDNS + VXI-11 broadcast, plus opt-in `--port` socket sweep). Breaking changes are still possible per [ADR 0022](docs/adr/0022-branching-strategy.md). See [CHANGELOG.md](docs/CHANGELOG.md).
+> Status: **v0.2.7 (pre-1.0.0).** Phase 1–3 are landed: CLI core, HiSLIP / VXI-11 / SOCKET gateways, scenario-driven mock-VISA container (ghcr.io/shortarrow/ivi-cli-mock), Management HTTP / WebSocket API with PAT + TLS + audit, OpenTelemetry, and LAN discovery (LXI mDNS + VXI-11 broadcast, plus opt-in `--port` socket sweep). Breaking changes are still possible. See [CHANGELOG.md](docs/CHANGELOG.md).
 
 ## Highlights
 
@@ -14,19 +14,19 @@
   - **Automation-friendly.** Stdout carries data (including `--json`); stderr carries logs. Exit codes are POSIX-conventional. Shell completion ships for bash / zsh / PowerShell.
 - **Discover & inspect**
   - **Auto-discovery.** `ivicli visa scan` walks the LAN via LXI mDNS / DNS-SD + VXI-11 portmapper broadcast and lists every responder; `--add` registers them all in one shot.
-  - **IVI Configuration Store introspection.** `ivicli driver list` / `ivicli logical list` parse `IviConfigurationStore.xml` to enumerate installed IVI drivers and logical names — debugging "instrument talks but driver mismatched" without opening the Configuration Server GUI ([ADR 0045](docs/adr/0045-ivi-configuration-store.md)).
+  - **IVI Configuration Store introspection.** `ivicli driver list` / `ivicli logical list` parse `IviConfigurationStore.xml` to enumerate installed IVI drivers and logical names — debugging "instrument talks but driver mismatched" without opening the Configuration Server GUI.
 - **Backends & gateways**
   - **Multiple backends.** Local NI-VISA, HiSLIP, VXI-11, raw TCP SOCKET, Fake (programmable + scenario playback), Replay (strict deterministic playback) — all behind a single `IIviBackend` port.
   - **Gateway servers.** Expose a local instrument over HiSLIP (`TCPIP::host::hislip0::INSTR`) or raw socket so remote PyVISA / NI-VISA clients can drive it without redeploying the test.
 - **Test without hardware**
   - **Run a mock instrument.** The `Fake` backend answers SCPI from a *scenario* — a scripted set of `query → response` rules — so `ivicli` (or your own VISA app) can talk to a stand-in with zero bench time.
   - **Capture, then replay.** Record a live session (`IVICLI_CAPTURE=<path>`) or a SCPI script run (`mock scenario record --from-script foo.scpi`) into a scenario, then re-run it deterministically with `IVICLI_REPLAY=<scenario>` — no hardware burned on regression checks.
-  - **Run & lint SCPI scripts.** `visa script foo.scpi` runs a `.scpi` file — [SCPI](https://www.ivifoundation.org/downloads/SCPI/scpi-99.pdf) commands plus ivi-cli's inline assertions ([ADR 0027](docs/adr/0027-phase3-operator-automation.md)) — against the current device; `visa lint foo.scpi` flags unknown SCPI roots (IEEE 488.2 + SCPI core) before you run it.
-  - **Audit-friendly.** Set `IVICLI_CAPTURE=<path>` and every backend operation streams to an NDJSON log for post-hoc inspection — `tail -f path | jq` or hand it to support.
+  - **Run & lint SCPI scripts.** `visa script foo.scpi` runs a `.scpi` file — [SCPI](https://www.ivifoundation.org/downloads/SCPI/scpi-99.pdf) commands plus ivi-cli's inline assertions — against the current device; `visa lint foo.scpi` flags unknown SCPI roots (IEEE 488.2 + SCPI core) before you run it.
+  - **Audit-friendly.** Set `IVICLI_CAPTURE=<path>` and every backend operation streams to an NDJSON log for post-hoc inspection — `tail -f path | jq`, or `ivicli mock received <device> --match ':VOLT'` to confirm out-of-band exactly which SCPI writes reached the mock when a test drives it through its own VISA stack.
 - **Control plane (HTTP / WebSocket API)**
   - **JSON HTTP API.** `ivicli api start` exposes a JSON HTTP API at `http://127.0.0.1:8080/v1` (with `/openapi/v1.json`) so AI agents, dashboards, and CI scripts can list devices / fire SCPI queries / read status without speaking VISA.
-  - **Browser-friendly streaming.** A WebSocket at `ws://127.0.0.1:8080/v1/devices/{name}/visa` carries `{op:'query',scpi:'…'}` frames and replies with `{event:'response',…}` — drop-in for any dashboard or AI agent runtime (ADR 0035).
-  - **Lock down the API.** `ivicli api token create` mints a PAT (shown once, only the hash is stored); the listener validates `Authorization: Bearer …` for HTTP and `ivi-cli-pat.<token>` for WebSocket so binding beyond loopback is safe (ADR 0036).
+  - **Browser-friendly streaming.** A WebSocket at `ws://127.0.0.1:8080/v1/devices/{name}/visa` carries `{op:'query',scpi:'…'}` frames and replies with `{event:'response',…}` — drop-in for any dashboard or AI agent runtime.
+  - **Lock down the API.** `ivicli api token create` mints a PAT (shown once, only the hash is stored); the listener validates `Authorization: Bearer …` for HTTP and `ivi-cli-pat.<token>` for WebSocket so binding beyond loopback is safe.
 
 ## Install
 
@@ -105,8 +105,9 @@ Building an app that drives a VISA instrument and want to test it without the ha
 | --- | --- | --- |
 | `visa` | `add` `remove` `list` `use` `current` `scan` `query` `write` `read` `status` `script` `monitor` `watch` `lint` | Manage and talk to instruments |
 | `mock scenario` | `list` `create` `remove` `show` `activate` `deactivate` `record` `import` + `scene add` / `scene remove` | Author and capture mock-device scenarios |
+| `mock received` | `<device>` | Confirm which SCPI writes a device received, read back from an `IVICLI_CAPTURE` traffic log |
 | `server` | `add` `remove` `list` `route add` / `route remove` / `route list` `start` `stop` `status` `log` | Gateway-server lifecycle |
-| `api` | `start` `stop` `token create` `token list` `token revoke` | Management HTTP JSON API (ADR 0034) + WebSocket subprotocol (ADR 0035) + PAT auth (ADR 0036) |
+| `api` | `start` `stop` `token create` `token list` `token revoke` | Management HTTP JSON API + WebSocket subprotocol + PAT auth |
 | top-level | `doctor` `completion <shell>` | Environment health + shell autocomplete |
 
 ## Verbosity & format flags
@@ -167,12 +168,12 @@ flowchart LR
     a["AI agent / dashboard / CI"] -->|"HTTP / WebSocket API"| c["ivicli"] --> i["instrument"]
 ```
 
-The internal layering (Clean Architecture + one-way dependency direction, enforced by an architecture-test suite) is documented for contributors in [ADR 0003](docs/adr/0003-architecture-style.md) and [ADR 0021](docs/adr/0021-repository-layout.md).
+The internal layering — Clean Architecture with a one-way dependency direction, enforced by an architecture-test suite — is a contributor concern, intentionally omitted from this user-facing README.
 
 ## Documentation
 
 - [PRD](docs/PRD.md) — full product requirements
-- [Architecture Decision Records](docs/adr/) — every Accepted decision behind the implementation. Start with [ADR 0003](docs/adr/0003-architecture-style.md) (architecture style), [ADR 0021](docs/adr/0021-repository-layout.md) (layer assemblies), [ADR 0007](docs/adr/0007-network-transport.md) (HiSLIP / SOCKET).
+- [Architecture Decision Records](docs/adr/) — every Accepted decision behind the implementation.
 - [Domain glossary](docs/domain-glossary.md) — the ubiquitous-language catalog
 - [Guides](docs/guides/) — task-oriented how-tos, starting with [Mock a VISA instrument](docs/guides/mock-a-visa-instrument.md)
 - [Samples](docs/samples/) — ready-made **mock instruments** for testing without hardware: drop-in scenarios + setup scripts (e.g. the [PSU mock](docs/samples/psu/))
@@ -196,6 +197,6 @@ Licensed under either of
 - MIT license ([LICENSE-MIT](LICENSE-MIT) or <http://opensource.org/licenses/MIT>)
 - Apache License, Version 2.0 ([LICENSE-APACHE](LICENSE-APACHE) or <http://www.apache.org/licenses/LICENSE-2.0>)
 
-at your option. See [ADR 0046](docs/adr/0046-licensing.md) for the rationale.
+at your option.
 
 Unless you explicitly state otherwise, any contribution intentionally submitted for inclusion in this project by you, as defined in the Apache-2.0 license, shall be dual licensed as above, without any additional terms or conditions.

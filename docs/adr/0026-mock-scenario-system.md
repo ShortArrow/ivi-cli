@@ -400,3 +400,45 @@ default. Without a current device the variable logs a warning
 and is ignored.
 
 Tracked in [issue #36](https://github.com/ShortArrow/ivi-cli/issues/36).
+
+### 17. Live re-binding — a serving gateway observes an out-of-process `activate`
+
+A gateway populates the FakeBackend's per-device bindings once, at
+process startup, from the session store (`ActivateScenarioIfRequested`).
+Those bindings then live only in that process's memory. A subsequent
+`ivicli mock scenario activate <name>` is a *separate* CLI process: it
+writes the new binding into the shared session store but cannot touch the
+serving gateway's memory. A client that holds a long-lived connection
+therefore kept seeing the scenario that was active when the gateway
+started — the swap only took effect after a gateway restart. This is the
+common operator loop (drive a mock over one connection, swap its behaviour
+between test steps), so the gap was worth closing.
+
+**Decision.** An Application-layer port `IScenarioBindingRefresher`
+re-syncs a device's binding from the persisted session into the running
+scenario-aware backend. Each LAN gateway — SOCKET, HiSLIP, and VXI-11 —
+invokes it before dispatching an incoming SCPI operation (per request line
+for SOCKET, per message for HiSLIP, per completed write for VXI-11), so a
+new binding is picked up on the next operation without reconnecting.
+
+Re-application is **scoped to a changed scenario name**: an unchanged
+binding is left untouched so in-flight scene / transition state (e.g. a
+power-supply state machine the client already toggled to `on`) survives
+the frequent reconnects real apps perform. A session that no longer binds
+the device deactivates the running binding. The port is **no-throw**;
+gateways still guard the call and log, so a store hiccup never drops a
+live connection.
+
+**Wiring.** `SessionScenarioBindingRefresher` (the session/scenario-store
+implementation) lives in the Fake backend assembly and is registered by
+`AddIviCliBackendsFake`. Gateways take the refresher as an *optional*
+constructor dependency defaulting to a no-op `NullScenarioBindingRefresher`;
+a gateway composed without the Fake backend simply retains its
+startup bindings — the pre-feature behaviour — rather than failing to
+resolve. Applying the refresh uniformly across all three gateways keeps
+the mock container's HiSLIP (`4880`) and SOCKET (`5025`) endpoints
+behaving identically for the same `activate`.
+
+**Cost.** The refresh re-reads the session store on every operation. For a
+mock's request rate this is negligible, and it buys a restart-free operator
+loop; a higher-throughput path would cache and invalidate instead.

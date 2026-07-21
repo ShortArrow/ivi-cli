@@ -18,6 +18,7 @@ public static class FakeBackendServiceCollectionExtensions
         services.AddSingleton<IIviBackend>(sp => sp.GetRequiredService<FakeBackend>());
         services.AddSingleton<FakeBackendScanner>();
         services.AddSingleton<IBackendScanner>(sp => sp.GetRequiredService<FakeBackendScanner>());
+        services.AddSingleton<IScenarioBindingRefresher, SessionScenarioBindingRefresher>();
         return services;
     }
 }

@@ -22,13 +22,19 @@ namespace IviCli.Server.Socket;
 public sealed class SocketGatewayServer : IGatewayServer
 {
     private readonly IBackendFactory _backendFactory;
+    private readonly IScenarioBindingRefresher _refresher;
     private readonly ILogger<SocketGatewayServer> _logger;
 
     /// <summary>Creates a new server.</summary>
-    public SocketGatewayServer(IBackendFactory backendFactory, ILogger<SocketGatewayServer> logger)
+    public SocketGatewayServer(
+        IBackendFactory backendFactory,
+        ILogger<SocketGatewayServer> logger,
+        IScenarioBindingRefresher? refresher = null
+    )
     {
         _backendFactory = backendFactory;
         _logger = logger;
+        _refresher = refresher ?? NullScenarioBindingRefresher.Instance;
     }
 
     /// <inheritdoc/>
@@ -195,6 +201,22 @@ public sealed class SocketGatewayServer : IGatewayServer
                     if (trimmed.Length == 0)
                     {
                         continue;
+                    }
+
+                    // Pick up an out-of-process scenario re-binding mid-connection:
+                    // a client may hold one long-lived connection while a separate
+                    // `mock scenario activate` runs. Refreshed per request so the
+                    // change is observed without reconnecting. The refresher
+                    // re-applies only when the bound scenario name changed (scene
+                    // state is preserved otherwise), and is no-throw; guard anyway
+                    // so a refresh failure never kills the connection.
+                    try
+                    {
+                        await _refresher.RefreshAsync(device, ct);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogWarning(ex, "scenario binding refresh failed; continuing");
                     }
 
                     if (trimmed.EndsWith('?'))

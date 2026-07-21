@@ -27,15 +27,21 @@ namespace IviCli.Server.Vxi11;
 public sealed class Vxi11GatewayServer : IGatewayServer
 {
     private readonly IBackendFactory _backendFactory;
+    private readonly IScenarioBindingRefresher _refresher;
     private readonly ILogger<Vxi11GatewayServer> _logger;
     private readonly ConcurrentDictionary<int, LinkState> _links = new();
     private int _linkCounter;
 
     /// <summary>Creates a new VXI-11 gateway.</summary>
-    public Vxi11GatewayServer(IBackendFactory backendFactory, ILogger<Vxi11GatewayServer> logger)
+    public Vxi11GatewayServer(
+        IBackendFactory backendFactory,
+        ILogger<Vxi11GatewayServer> logger,
+        IScenarioBindingRefresher? refresher = null
+    )
     {
         _backendFactory = backendFactory;
         _logger = logger;
+        _refresher = refresher ?? NullScenarioBindingRefresher.Instance;
     }
 
     /// <inheritdoc/>
@@ -439,6 +445,23 @@ public sealed class Vxi11GatewayServer : IGatewayServer
         }
         var scpi = Encoding.ASCII.GetString(pendingWrite).TrimEnd('\r', '\n');
         state.ClearPendingWrite();
+
+        // Pick up an out-of-process scenario re-binding mid-link: a client
+        // may hold one long-lived link while a separate `mock scenario
+        // activate` runs. Refreshed per completed write so the change is
+        // observed without re-creating the link. The refresher re-applies
+        // only when the bound scenario name changed (scene state is
+        // preserved otherwise), and is no-throw; guard anyway so a refresh
+        // failure never kills the link.
+        try
+        {
+            await _refresher.RefreshAsync(state.Device, ct);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "scenario binding refresh failed; continuing");
+        }
+
         using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(ct, state.Cts.Token);
         var opCt = linkedCts.Token;
         if (scpi.EndsWith('?'))

@@ -282,7 +282,7 @@ ivicli visa lint smoke.scpi
 ivicli visa lint smoke.scpi --json | jq
 ```
 
-Static-analyses a `.scpi` script without running it. Flags unknown SCPI command roots against the IEEE 488.2 + SCPI Volume 1 vocabulary (ADR 0032). v1 reports root-level mismatches only; full colon-path validation and parameter-syntax rules are deferred. Vendor-specific extensions are out of scope. Exit codes: file IO / parse failure → usage error, any `Error`-severity finding → generic failure, warnings only → 0.
+Static-analyses a `.scpi` script without running it. Flags unknown SCPI command roots against the IEEE 488.2 + SCPI Volume 1 vocabulary. v1 reports root-level mismatches only; full colon-path validation and parameter-syntax rules are deferred. Vendor-specific extensions are out of scope. Exit codes: file IO / parse failure → usage error, any `Error`-severity finding → generic failure, warnings only → 0.
 
 ---
 
@@ -376,7 +376,7 @@ Diagnoses the following:
 
 ### visa traffic capture
 
-Set `IVICLI_CAPTURE=<path>` (absolute, or relative to the rolling-log directory) and every backend operation across the CLI streams to a UTF-8 NDJSON file: one event per line carrying `timestamp` / `device` / `op` (`Open` / `Close` / `Write` / `Query` / `Read`) / `data` / `response` / `ok` / `latencyMs` / `error`. Activation is opt-in (no env var → null sink, zero overhead). Sink failures are swallowed so the operator's verbs never break because the audit sink does. See [ADR 0031](adr/0031-visa-traffic-capture.md).
+Set `IVICLI_CAPTURE=<path>` (absolute, or relative to the rolling-log directory) and every backend operation across the CLI streams to a UTF-8 NDJSON file: one event per line carrying `timestamp` / `device` / `op` (`Open` / `Close` / `Write` / `Query` / `Read`) / `data` / `response` / `ok` / `latencyMs` / `error`. Activation is opt-in (no env var → null sink, zero overhead). Sink failures are swallowed so the operator's verbs never break because the audit sink does.
 
 ---
 
@@ -468,7 +468,7 @@ device = "psu1"
 
 ## 7.3 VXI-11-compatible Server
 
-Both halves of VXI-11 ship in Batch D — the `Vxi11GatewayServer` (server side, ADR 0029) and the `Vxi11Backend` (client side). v1 implements create_link / device_write / device_read / device_clear / destroy_link plus a co-located portmapper GETPORT. Abort + interrupt channels, locking, trigger, and the real port-111 portmapper conversation remain deferred.
+Both halves of VXI-11 ship in Batch D — the `Vxi11GatewayServer` (server side) and the `Vxi11Backend` (client side). v1 implements create_link / device_write / device_read / device_clear / destroy_link plus a co-located portmapper GETPORT. Abort + interrupt channels, locking, trigger, and the real port-111 portmapper conversation remain deferred.
 
 ```bash
 ivicli server start --protocol vxi11
@@ -509,11 +509,11 @@ The following management features, however, are exposed as a proprietary managem
 * JSON output
 * AI agent integration
 
-**Shipped in Batch I — HTTP JSON** ([ADR 0034](adr/0034-management-api.md)). ASP.NET Core minimal API embedded inside the CLI process; activate with `ivicli api start [--port 8080] [--bind 127.0.0.1]`. v1 endpoints: `GET /v1/{devices,servers,scenarios}` + `GET /v1/devices/{name}/status` + `POST /v1/devices/{name}/{query,write}` + `GET /openapi/v1.json` + `GET /healthz`. v1 binds to loopback by default; authentication, server-lifecycle endpoints, scenario import, and gRPC are v2.
+**Shipped in Batch I — HTTP JSON**. ASP.NET Core minimal API embedded inside the CLI process; activate with `ivicli api start [--port 8080] [--bind 127.0.0.1]`. v1 endpoints: `GET /v1/{devices,servers,scenarios}` + `GET /v1/devices/{name}/status` + `POST /v1/devices/{name}/{query,write}` + `GET /openapi/v1.json` + `GET /healthz`. v1 binds to loopback by default; authentication, server-lifecycle endpoints, scenario import, and gRPC are v2.
 
-**Batch J adds the WebSocket subprotocol** ([ADR 0035](adr/0035-visa-over-websocket.md)): `ws://host:port/v1/devices/{name}/visa` carries `{op,scpi}` frames and replies with `{event:response|ack|error,...}` for browsers / AI-agent runtimes / dashboards.
+**Batch J adds the WebSocket subprotocol**: `ws://host:port/v1/devices/{name}/visa` carries `{op,scpi}` frames and replies with `{event:response|ack|error,...}` for browsers / AI-agent runtimes / dashboards.
 
-**Batch K adds PAT authentication** ([ADR 0036](adr/0036-management-api-authentication.md)): mint tokens with `ivicli api token create`, validate via `Authorization: Bearer <token>` (HTTP) or `Sec-WebSocket-Protocol: ivi-cli-pat.<token>` (WS). Non-loopback bind requires ≥ 1 token (or `--allow-anonymous` to opt out). Token scopes, mTLS, expiry, and audit logging are v2.
+**Batch K adds PAT authentication**: mint tokens with `ivicli api token create`, validate via `Authorization: Bearer <token>` (HTTP) or `Sec-WebSocket-Protocol: ivi-cli-pat.<token>` (WS). Non-loopback bind requires ≥ 1 token (or `--allow-anonymous` to opt out). Token scopes, mTLS, expiry, and audit logging are v2.
 
 ---
 
@@ -822,7 +822,7 @@ Phase 1:
 * visa status
 * doctor
 * driver list — enumerate installed IVI drivers from the local IVI
-  Configuration Store (ADR 0045). Essential for debugging when an
+  Configuration Store. Essential for debugging when an
   instrument is online but the driver assembly is missing or mis-
   versioned.
 * logical list — enumerate IVI logical names from the same store.
@@ -845,10 +845,13 @@ Phase 3 (operator-facing automation):
 * visa monitor — poll a query at a fixed interval and stream timestamped
   responses to stdout (and optional structured log file), until interrupted.
 * mock scenario record — append observed query/write traffic into a
-  scenario file for later playback, closing the loop with ADR 0026.
+  scenario file for later playback.
 * mock scenario import — convert an NDJSON capture (IVICLI_CAPTURE
   output) into a stored MockScenario so the existing IVICLI_REPLAY
-  machinery can serve it. ADR 0033.
+  machinery can serve it.
+* mock received — read back the SCPI writes a device received from an
+  IVICLI_CAPTURE traffic log, so a test that drives the mock through its
+  own VISA stack can confirm out-of-band which writes actually arrived.
 * server log — tail the gateway's per-server structured log file with
   optional follow / level filter (operator-facing observability).
 

@@ -111,8 +111,7 @@ respond = "3.271"
 > **v0.2.x limitations.** Rules match a full SCPI line literally (no
 > parameter capture — `VOLT 7.5` then `VOLT?` still returns the canned
 > value), and rule sets are per-scene (static metadata like `*IDN?` is
-> repeated in every scene). Both are tracked in
-> [ADR 0026](../adr/0026-mock-scenario-system.md) and issue
+> repeated in every scene). Both are tracked in issue
 > [#26](https://github.com/ShortArrow/ivi-cli/issues/26).
 
 ---
@@ -150,6 +149,21 @@ Either way the mock now listens on:
 | HiSLIP | `TCPIP::localhost::hislip0::INSTR` |
 | Raw SOCKET | `TCPIP::localhost::5025::SOCKET` |
 
+### Swap behaviour on a running mock
+
+You can `activate` a different scenario against a gateway that is already
+serving — no restart, no reconnect. The change is picked up on the client's
+next query:
+
+```sh
+ivicli mock scenario activate my-dmm-faulted   # while the app stays connected
+```
+
+The next SCPI operation on the open connection sees the new scenario. An
+unchanged binding keeps its in-flight scene, so re-running `activate` with the
+same scenario does not reset a state machine the client already advanced. This
+works identically over HiSLIP, raw SOCKET, and VXI-11.
+
 ---
 
 ## Point your app at it
@@ -168,6 +182,51 @@ Either way the mock now listens on:
   the HiSLIP sub-address `hislip0` or the raw-socket port `5025`. The
   [PSU sample](../samples/psu/) `setup.ps1` prints the exact NI MAX steps at
   the end of its run.
+
+---
+
+## Verify what your app sent
+
+When your app drives the mock through its own VISA stack, the test never sends
+raw SCPI itself — so how do you assert the app wrote `:VOLT 24.000` and not, say,
+`:VOLT 24` or nothing at all? Start the gateway with traffic capture on, then
+read back the writes out of band:
+
+```sh
+# Start the mock with capture enabled. Use a FRESH path per test run so a
+# previous run's writes don't leak in (see isolation note below).
+IVICLI_CAPTURE=run-$RANDOM.ndjson ivicli server start dmm-srv
+
+# ... your app connects and writes :VOLT 24.000 ...
+
+# Last :VOLT write the device received (substring filter):
+ivicli mock received dut --match ':VOLT' --capture run-*.ndjson
+# → :VOLT 24.000        (exit 0; exit 1 if nothing matched)
+
+# Assert the exact command arrived — ':VOLT' as a substring would also match
+# ':VOLT:PROT 30', so use --exact when you mean the whole line:
+ivicli mock received dut --exact ':VOLT 24.000' --capture run-*.ndjson
+
+# How many times did the app set the voltage? (--count exits 0 even at 0)
+ivicli mock received dut --match ':VOLT' --capture run-*.ndjson --count
+# → 1
+
+# Machine-readable — always a JSON array (single element by default, [] if none):
+ivicli mock received dut --match ':CURR' --capture run-*.ndjson --json
+# → [{"device":"dut","scpi":":CURR 3.300","timestamp":"..."}]
+```
+
+`--match` filters by substring and `--exact` by full string (mutually
+exclusive); the default reports the most recent matching write (add `--all` to
+list every match, oldest first, or `--count` for just the number). Absent
+`--count`, a non-zero exit when nothing matched lets a test assert a write did
+*not* arrive. The capture is the shared audit log; the reader opens it with
+shared access, so you can query it while the gateway is still serving.
+
+**Isolation.** The capture *appends* across runs, so `--all` and the default
+"last" can surface writes from an earlier run. Give each test run its own
+`IVICLI_CAPTURE` file (or truncate it before the run) — there is deliberately no
+time filter.
 
 ---
 
@@ -206,7 +265,3 @@ Override the root with `IVICLI_CONFIG=<path>`.
 
 - **[PSU sample](../samples/psu/)** — a complete, runnable two-state FSM
   (output on/off) with `setup.sh` / `setup.ps1` and the NI MAX steps.
-- **[ADR 0026](../adr/0026-mock-scenario-system.md)** — the scenario system's
-  design and roadmap (variable state, cross-scene rule sharing).
-- **[ADR 0018](../adr/0018-deployment-strategy.md)** — the mock container
-  reference (ports, env vars, mounts).
