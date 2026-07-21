@@ -200,10 +200,10 @@ IVICLI_CAPTURE=run.ndjson ivicli server start dmm-srv
 # ... your app connects and writes :VOLT 24.000 ...
 
 # From the test, confirm the last :VOLT write the device received:
-ivicli mock writes dut --match ':VOLT' --capture run.ndjson
+ivicli mock received dut --match ':VOLT' --capture run.ndjson
 # → :VOLT 24.000        (exit 0; exit 1 if nothing matched)
 
-ivicli mock writes dut --match ':CURR' --capture run.ndjson --json
+ivicli mock received dut --match ':CURR' --capture run.ndjson --json
 # → {"device":"dut","scpi":":CURR 3.300","timestamp":"..."}
 ```
 

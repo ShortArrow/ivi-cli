@@ -22,7 +22,7 @@
   - **Run a mock instrument.** The `Fake` backend answers SCPI from a *scenario* — a scripted set of `query → response` rules — so `ivicli` (or your own VISA app) can talk to a stand-in with zero bench time.
   - **Capture, then replay.** Record a live session (`IVICLI_CAPTURE=<path>`) or a SCPI script run (`mock scenario record --from-script foo.scpi`) into a scenario, then re-run it deterministically with `IVICLI_REPLAY=<scenario>` — no hardware burned on regression checks.
   - **Run & lint SCPI scripts.** `visa script foo.scpi` runs a `.scpi` file — [SCPI](https://www.ivifoundation.org/downloads/SCPI/scpi-99.pdf) commands plus ivi-cli's inline assertions ([ADR 0027](docs/adr/0027-phase3-operator-automation.md)) — against the current device; `visa lint foo.scpi` flags unknown SCPI roots (IEEE 488.2 + SCPI core) before you run it.
-  - **Audit-friendly.** Set `IVICLI_CAPTURE=<path>` and every backend operation streams to an NDJSON log for post-hoc inspection — `tail -f path | jq`, or `ivicli mock writes <device> --match ':VOLT'` to confirm out-of-band exactly which SCPI writes reached the mock when a test drives it through its own VISA stack.
+  - **Audit-friendly.** Set `IVICLI_CAPTURE=<path>` and every backend operation streams to an NDJSON log for post-hoc inspection — `tail -f path | jq`, or `ivicli mock received <device> --match ':VOLT'` to confirm out-of-band exactly which SCPI writes reached the mock when a test drives it through its own VISA stack.
 - **Control plane (HTTP / WebSocket API)**
   - **JSON HTTP API.** `ivicli api start` exposes a JSON HTTP API at `http://127.0.0.1:8080/v1` (with `/openapi/v1.json`) so AI agents, dashboards, and CI scripts can list devices / fire SCPI queries / read status without speaking VISA.
   - **Browser-friendly streaming.** A WebSocket at `ws://127.0.0.1:8080/v1/devices/{name}/visa` carries `{op:'query',scpi:'…'}` frames and replies with `{event:'response',…}` — drop-in for any dashboard or AI agent runtime (ADR 0035).
@@ -105,7 +105,7 @@ Building an app that drives a VISA instrument and want to test it without the ha
 | --- | --- | --- |
 | `visa` | `add` `remove` `list` `use` `current` `scan` `query` `write` `read` `status` `script` `monitor` `watch` `lint` | Manage and talk to instruments |
 | `mock scenario` | `list` `create` `remove` `show` `activate` `deactivate` `record` `import` + `scene add` / `scene remove` | Author and capture mock-device scenarios |
-| `mock writes` | `<device>` | Confirm which SCPI writes a device received, read back from an `IVICLI_CAPTURE` traffic log |
+| `mock received` | `<device>` | Confirm which SCPI writes a device received, read back from an `IVICLI_CAPTURE` traffic log |
 | `server` | `add` `remove` `list` `route add` / `route remove` / `route list` `start` `stop` `status` `log` | Gateway-server lifecycle |
 | `api` | `start` `stop` `token create` `token list` `token revoke` | Management HTTP JSON API (ADR 0034) + WebSocket subprotocol (ADR 0035) + PAT auth (ADR 0036) |
 | top-level | `doctor` `completion <shell>` | Environment health + shell autocomplete |

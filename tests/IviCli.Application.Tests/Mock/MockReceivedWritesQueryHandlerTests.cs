@@ -14,7 +14,7 @@ namespace IviCli.Application.Tests.Mock;
 /// capture a serving gateway produced, a separate process can confirm which
 /// SCPI writes a device actually received (requirement 2).
 /// </summary>
-public sealed class MockWritesQueryHandlerTests
+public sealed class MockReceivedWritesQueryHandlerTests
 {
     private static TrafficEvent Write(string device, string scpi, bool ok = true) =>
         new(
@@ -43,7 +43,7 @@ public sealed class MockWritesQueryHandlerTests
     [Fact]
     public async Task Returns_matching_writes_for_the_device_in_order()
     {
-        var handler = new MockWritesQueryHandler(
+        var handler = new MockReceivedWritesQueryHandler(
             new FakeReader(
                 Write("dut", ":VOLT 1.000"),
                 Query("dut", ":MEAS:VOLT?"),
@@ -53,7 +53,7 @@ public sealed class MockWritesQueryHandlerTests
         );
 
         var result = await handler.HandleAsync(
-            new MockWritesQuery("dut", ":VOLT", "run.ndjson"),
+            new MockReceivedWritesQuery("dut", ":VOLT", "run.ndjson"),
             default
         );
 
@@ -65,12 +65,12 @@ public sealed class MockWritesQueryHandlerTests
     [Fact]
     public async Task Last_matching_write_is_the_most_recent()
     {
-        var handler = new MockWritesQueryHandler(
+        var handler = new MockReceivedWritesQueryHandler(
             new FakeReader(Write("dut", ":VOLT 1.000"), Write("dut", ":VOLT 24.000"))
         );
 
         var result = await handler.HandleAsync(
-            new MockWritesQuery("dut", ":VOLT", "run.ndjson"),
+            new MockReceivedWritesQuery("dut", ":VOLT", "run.ndjson"),
             default
         );
 
@@ -80,12 +80,12 @@ public sealed class MockWritesQueryHandlerTests
     [Fact]
     public async Task Filters_out_other_devices_and_non_write_ops()
     {
-        var handler = new MockWritesQueryHandler(
+        var handler = new MockReceivedWritesQueryHandler(
             new FakeReader(Write("other", ":CURR 3.300"), Query("dut", ":CURR?"))
         );
 
         var result = await handler.HandleAsync(
-            new MockWritesQuery("dut", ":CURR", "run.ndjson"),
+            new MockReceivedWritesQuery("dut", ":CURR", "run.ndjson"),
             default
         );
 
@@ -95,12 +95,12 @@ public sealed class MockWritesQueryHandlerTests
     [Fact]
     public async Task No_match_filter_returns_all_writes_for_the_device()
     {
-        var handler = new MockWritesQueryHandler(
+        var handler = new MockReceivedWritesQueryHandler(
             new FakeReader(Write("dut", ":VOLT 1.000"), Write("dut", ":CURR 3.300"))
         );
 
         var result = await handler.HandleAsync(
-            new MockWritesQuery("dut", Match: null, "run.ndjson"),
+            new MockReceivedWritesQuery("dut", Match: null, "run.ndjson"),
             default
         );
 
@@ -111,29 +111,29 @@ public sealed class MockWritesQueryHandlerTests
     [Fact]
     public async Task Invalid_device_alias_is_rejected()
     {
-        var handler = new MockWritesQueryHandler(new FakeReader());
+        var handler = new MockReceivedWritesQueryHandler(new FakeReader());
 
         var result = await handler.HandleAsync(
-            new MockWritesQuery("bad alias!", null, "run.ndjson"),
+            new MockReceivedWritesQuery("bad alias!", null, "run.ndjson"),
             default
         );
 
-        result.ShouldBeError().ShouldBeOfType<MockWritesInvalidDevice>();
+        result.ShouldBeError().ShouldBeOfType<MockReceivedWritesInvalidDevice>();
     }
 
     [Fact]
     public async Task Unreadable_capture_surfaces_an_io_failure()
     {
-        var handler = new MockWritesQueryHandler(
+        var handler = new MockReceivedWritesQueryHandler(
             new ThrowingReader(new FileNotFoundException("missing"))
         );
 
         var result = await handler.HandleAsync(
-            new MockWritesQuery("dut", null, "missing.ndjson"),
+            new MockReceivedWritesQuery("dut", null, "missing.ndjson"),
             default
         );
 
-        result.ShouldBeError().ShouldBeOfType<MockWritesIoFailure>();
+        result.ShouldBeError().ShouldBeOfType<MockReceivedWritesIoFailure>();
     }
 
     private sealed class FakeReader : INdjsonTrafficReader

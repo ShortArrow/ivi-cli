@@ -853,7 +853,7 @@ Phase 3 (オペレータ向け自動化):
 * mock scenario import — NDJSON キャプチャ（IVICLI_CAPTURE の出力）を
   既存の MockScenario に変換し、`IVICLI_REPLAY` 経由でそのまま再生可能に
   する。ADR 0033。
-* mock writes — デバイスが受信した SCPI 書き込みを IVICLI_CAPTURE トラフィック
+* mock received — デバイスが受信した SCPI 書き込みを IVICLI_CAPTURE トラフィック
   ログから読み返す。モックを自身の VISA スタック経由で駆動するテストが、
   どの書き込みが実際に届いたかをアウトオブバンドで確認できる。ADR 0031。
 * server log — ゲートウェイのサーバ別構造化ログを tail（follow / レベル

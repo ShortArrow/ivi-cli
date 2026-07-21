@@ -92,20 +92,20 @@ insufficient.
   falls back to `NullTrafficWriter`; the CLI continues without
   capture rather than refusing to start.
 
-### 5. Read-side consumer — `mock writes`
+### 5. Read-side consumer — `mock received`
 
 The capture is not only an audit trail; because the reader opens the
 NDJSON with shared-read access, a *separate process* can query it while a
 gateway is still writing. That is the substrate for confirming, out of
 band, that a client's SCPI write reached a mock.
 
-`ivicli mock writes <device> [--match <substr>] [--all] [--json]` reads
+`ivicli mock received <device> [--match <substr>] [--all] [--json]` reads
 the capture at `--capture <path>` (defaulting to `IVICLI_CAPTURE`),
 filters to `Write` events for the device, and reports the matching SCPI —
 the last write by default, or every match with `--all`. It exits non-zero
 when nothing matched, so a test can assert "the write did (not) arrive"
 without parsing stdout. The query lives in the Application layer
-(`MockWritesQueryHandler`) over the existing `INdjsonTrafficReader`; no new
+(`MockReceivedWritesQueryHandler`) over the existing `INdjsonTrafficReader`; no new
 persistence path is introduced.
 
 This is why a client-app integration test can drive the mock through its
@@ -115,14 +115,14 @@ bytes that reached the instrument.
 ## Out of scope (v2 candidates)
 
 - **Per-command `--capture <path>` flag for *writing*.** The env var is
-  enough to *enable* capture; `mock writes --capture` only selects which
+  enough to *enable* capture; `mock received --capture` only selects which
   log to *read*.
 - **File rotation / size cap.** Operators rotate via `logrotate` or
   similar; a built-in cap can land in a follow-up ADR if real usage
   demands it.
 - **Generic viewer / `ivicli capture tail` verb.** `tail -f` + `jq`
   covers ad-hoc inspection; only the focused, machine-readable
-  `mock writes` query (§5) is built, for the write-verification use case.
+  `mock received` query (§5) is built, for the write-verification use case.
 - **Format compatibility with `MockScenario`.** Different goals,
   different shapes; a converter is a separate concern.
 - **Redaction filters** (drop secrets in SCPI text). Deferred until a

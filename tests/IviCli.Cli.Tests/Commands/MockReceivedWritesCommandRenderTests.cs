@@ -6,7 +6,7 @@ using Shouldly;
 
 namespace IviCli.Cli.Tests.Commands;
 
-public sealed class MockWritesCommandRenderTests
+public sealed class MockReceivedWritesCommandRenderTests
 {
     private static TrafficEvent Write(string scpi) =>
         new(
@@ -26,7 +26,7 @@ public sealed class MockWritesCommandRenderTests
         var writer = new StringWriter();
         var writes = ImmutableArray.Create(Write(":VOLT 1.000"), Write(":VOLT 24.000"));
 
-        var code = MockWritesCommand.Render(writes, all: false, json: false, writer);
+        var code = MockReceivedWritesCommand.Render(writes, all: false, json: false, writer);
 
         code.ShouldBe(0);
         writer.ToString().ShouldBe(":VOLT 24.000" + Environment.NewLine);
@@ -38,7 +38,7 @@ public sealed class MockWritesCommandRenderTests
         var writer = new StringWriter();
         var writes = ImmutableArray.Create(Write(":VOLT 1.000"), Write(":VOLT 24.000"));
 
-        var code = MockWritesCommand.Render(writes, all: true, json: false, writer);
+        var code = MockReceivedWritesCommand.Render(writes, all: true, json: false, writer);
 
         code.ShouldBe(0);
         var lines = writer
@@ -53,7 +53,7 @@ public sealed class MockWritesCommandRenderTests
     {
         var writer = new StringWriter();
 
-        var code = MockWritesCommand.Render(
+        var code = MockReceivedWritesCommand.Render(
             ImmutableArray<TrafficEvent>.Empty,
             all: false,
             json: false,
@@ -70,7 +70,7 @@ public sealed class MockWritesCommandRenderTests
         var writer = new StringWriter();
         var writes = ImmutableArray.Create(Write(":VOLT 1.000"), Write(":VOLT 24.000"));
 
-        MockWritesCommand.Render(writes, all: false, json: true, writer);
+        MockReceivedWritesCommand.Render(writes, all: false, json: true, writer);
 
         using var doc = JsonDocument.Parse(writer.ToString());
         doc.RootElement.GetProperty("scpi").GetString().ShouldBe(":VOLT 24.000");
@@ -83,7 +83,7 @@ public sealed class MockWritesCommandRenderTests
         var writer = new StringWriter();
         var writes = ImmutableArray.Create(Write(":VOLT 1.000"), Write(":VOLT 24.000"));
 
-        MockWritesCommand.Render(writes, all: true, json: true, writer);
+        MockReceivedWritesCommand.Render(writes, all: true, json: true, writer);
 
         using var doc = JsonDocument.Parse(writer.ToString());
         doc.RootElement.GetArrayLength().ShouldBe(2);

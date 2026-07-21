@@ -13,7 +13,7 @@ namespace IviCli.Infrastructure.Tests.Capture;
 /// device and SCPI. Exercises the actual on-disk format (not a fake reader),
 /// so an enum-casing or schema drift between writer and query surfaces here.
 /// </summary>
-public sealed class MockWritesCaptureRoundTripTests
+public sealed class MockReceivedWritesCaptureRoundTripTests
 {
     private const string Path = "/var/log/ivi-cli/run.ndjson";
 
@@ -53,15 +53,15 @@ public sealed class MockWritesCaptureRoundTripTests
         await writer.AppendAsync(Write("psu1", ":CURR 3.300"), default);
         await writer.AppendAsync(Write("other", ":VOLT 99.000"), default);
 
-        var handler = new MockWritesQueryHandler(new NdjsonTrafficReader(fs));
+        var handler = new MockReceivedWritesQueryHandler(new NdjsonTrafficReader(fs));
 
         var volt = (
-            await handler.HandleAsync(new MockWritesQuery("psu1", ":VOLT", Path), default)
+            await handler.HandleAsync(new MockReceivedWritesQuery("psu1", ":VOLT", Path), default)
         ).ShouldBeOk();
         volt.Last().Data.ShouldBe(":VOLT 24.000");
 
         var curr = (
-            await handler.HandleAsync(new MockWritesQuery("psu1", ":CURR", Path), default)
+            await handler.HandleAsync(new MockReceivedWritesQuery("psu1", ":CURR", Path), default)
         ).ShouldBeOk();
         curr.Last().Data.ShouldBe(":CURR 3.300");
     }
@@ -73,10 +73,10 @@ public sealed class MockWritesCaptureRoundTripTests
         var writer = new NdjsonTrafficWriter(fs, Path);
         await writer.AppendAsync(Write("other", ":VOLT 99.000"), default);
 
-        var handler = new MockWritesQueryHandler(new NdjsonTrafficReader(fs));
+        var handler = new MockReceivedWritesQueryHandler(new NdjsonTrafficReader(fs));
 
         var volt = (
-            await handler.HandleAsync(new MockWritesQuery("psu1", ":VOLT", Path), default)
+            await handler.HandleAsync(new MockReceivedWritesQuery("psu1", ":VOLT", Path), default)
         ).ShouldBeOk();
         volt.ShouldBeEmpty();
     }

@@ -10,12 +10,12 @@ using Microsoft.Extensions.Logging;
 namespace IviCli.Cli.Commands;
 
 /// <summary>
-/// Wires <c>ivicli mock writes &lt;device&gt;</c>: reads the NDJSON traffic
+/// Wires <c>ivicli mock received &lt;device&gt;</c>: reads the NDJSON traffic
 /// capture a serving gateway produced (enabled with <c>IVICLI_CAPTURE</c>) and
 /// reports the SCPI writes a device received — so a separate process can
 /// confirm out-of-band that a client's write actually reached the mock.
 /// </summary>
-public static class MockWritesCommand
+public static class MockReceivedWritesCommand
 {
     /// <summary>Builds the configured <see cref="Command"/>.</summary>
     public static Command Build(IServiceProvider services)
@@ -40,7 +40,7 @@ public static class MockWritesCommand
         var jsonOpt = new Option<bool>("--json") { Description = "Emit machine-readable JSON." };
 
         var command = new Command(
-            "writes",
+            "received",
             "Report the SCPI writes a device received, read back from an IVICLI_CAPTURE traffic log."
         );
         command.Arguments.Add(deviceArg);
@@ -71,22 +71,22 @@ public static class MockWritesCommand
                     ? capture
                     : Path.Combine(IviPaths.ResolveLogDirectory(), capture);
 
-                var handler = services.GetRequiredService<MockWritesQueryHandler>();
-                var logger = services.GetRequiredService<ILogger<MockWritesQueryHandler>>();
+                var handler = services.GetRequiredService<MockReceivedWritesQueryHandler>();
+                var logger = services.GetRequiredService<ILogger<MockReceivedWritesQueryHandler>>();
 
                 var result = await handler.HandleAsync(
-                    new MockWritesQuery(device, match, path),
+                    new MockReceivedWritesQuery(device, match, path),
                     ct
                 );
                 return result switch
                 {
                     Result<
                         System.Collections.Immutable.ImmutableArray<TrafficEvent>,
-                        MockWritesError
+                        MockReceivedWritesError
                     >.Ok ok => Render(ok.Value, all, json, Console.Out),
                     Result<
                         System.Collections.Immutable.ImmutableArray<TrafficEvent>,
-                        MockWritesError
+                        MockReceivedWritesError
                     >.Error err => Fail(err.Err, logger),
                     _ => ExitCodeMapper.GenericFailure,
                 };
@@ -141,7 +141,7 @@ public static class MockWritesCommand
         return ExitCodeMapper.Success;
     }
 
-    private static int Fail(MockWritesError error, ILogger logger)
+    private static int Fail(MockReceivedWritesError error, ILogger logger)
     {
         logger.Log(
             Logging.SerilogConfiguration.ToLogLevel(error.Severity),
@@ -152,8 +152,8 @@ public static class MockWritesCommand
         Console.Error.WriteLine("error: could not read received writes.");
         return error switch
         {
-            MockWritesInvalidDevice => ExitCodeMapper.UsageError,
-            MockWritesIoFailure => ExitCodeMapper.ConfigurationError,
+            MockReceivedWritesInvalidDevice => ExitCodeMapper.UsageError,
+            MockReceivedWritesIoFailure => ExitCodeMapper.ConfigurationError,
             _ => ExitCodeMapper.GenericFailure,
         };
     }

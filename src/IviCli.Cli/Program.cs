@@ -406,7 +406,7 @@ internal static class Program
 
         var mock = new Command("mock", "Manage mock-device behaviour for the Fake Backend.");
         mock.Subcommands.Add(MockScenarioCommand.Build(services));
-        mock.Subcommands.Add(MockWritesCommand.Build(services));
+        mock.Subcommands.Add(MockReceivedWritesCommand.Build(services));
 
         var root = new RootCommand(
             "ivi-cli: integrated CLI for managing, diagnosing, and operating VISA/IVI instruments."

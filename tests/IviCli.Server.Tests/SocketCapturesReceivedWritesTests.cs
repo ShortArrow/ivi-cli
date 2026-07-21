@@ -21,7 +21,7 @@ namespace IviCli.Server.Tests;
 /// Closes the requirement-2 seam: a client write that reaches the SOCKET
 /// gateway is captured as a <see cref="TrafficOp.Write"/> event (with the exact
 /// SCPI) when the backend factory is wrapped for capture — the substrate the
-/// out-of-band <c>mock writes</c> query then reads back.
+/// out-of-band <c>mock received</c> query then reads back.
 /// </summary>
 public sealed class SocketCapturesReceivedWritesTests
 {

@@ -6,7 +6,7 @@ using IviCli.Domain.Devices;
 namespace IviCli.Application.Mock;
 
 /// <summary>
-/// Query DTO for <c>mock writes</c> (requirement 2). Selects the SCPI writes
+/// Query DTO for <c>mock received</c> (requirement 2). Selects the SCPI writes
 /// a device received, read back from an NDJSON traffic capture (ADR 0031) that
 /// a serving gateway produced — so a separate process can confirm out-of-band
 /// that a client's write (e.g. <c>:VOLT 24.000</c>) actually reached the mock.
@@ -17,7 +17,7 @@ namespace IviCli.Application.Mock;
 /// selects every write for the device.
 /// </param>
 /// <param name="Path">Filesystem path to the NDJSON capture.</param>
-public sealed record MockWritesQuery(string Device, string? Match, string Path);
+public sealed record MockReceivedWritesQuery(string Device, string? Match, string Path);
 
 /// <summary>
 /// Reads the NDJSON capture via <see cref="INdjsonTrafficReader"/> and returns
@@ -25,19 +25,19 @@ public sealed record MockWritesQuery(string Device, string? Match, string Path);
 /// order (oldest first, so the last element is the most recent write). Rendering
 /// "last vs all" is left to the CLI.
 /// </summary>
-public sealed class MockWritesQueryHandler
+public sealed class MockReceivedWritesQueryHandler
 {
     private readonly INdjsonTrafficReader _reader;
 
     /// <summary>Creates a handler over the supplied capture reader.</summary>
-    public MockWritesQueryHandler(INdjsonTrafficReader reader)
+    public MockReceivedWritesQueryHandler(INdjsonTrafficReader reader)
     {
         _reader = reader;
     }
 
     /// <summary>Streams the capture and returns the device's matching writes.</summary>
-    public async Task<Result<ImmutableArray<TrafficEvent>, MockWritesError>> HandleAsync(
-        MockWritesQuery query,
+    public async Task<Result<ImmutableArray<TrafficEvent>, MockReceivedWritesError>> HandleAsync(
+        MockReceivedWritesQuery query,
         CancellationToken ct
     )
     {
@@ -46,8 +46,8 @@ public sealed class MockWritesQueryHandler
             is not Result<DeviceName, DeviceError>.Ok { Value: var device }
         )
         {
-            return Result.Failure<ImmutableArray<TrafficEvent>, MockWritesError>(
-                new MockWritesInvalidDevice(query.Device)
+            return Result.Failure<ImmutableArray<TrafficEvent>, MockReceivedWritesError>(
+                new MockReceivedWritesInvalidDevice(query.Device)
             );
         }
 
@@ -69,7 +69,7 @@ public sealed class MockWritesQueryHandler
                 }
                 matches.Add(ev);
             }
-            return Result.Success<ImmutableArray<TrafficEvent>, MockWritesError>(
+            return Result.Success<ImmutableArray<TrafficEvent>, MockReceivedWritesError>(
                 matches.ToImmutable()
             );
         }
@@ -82,15 +82,15 @@ public sealed class MockWritesQueryHandler
                         or InvalidDataException
             )
         {
-            return Result.Failure<ImmutableArray<TrafficEvent>, MockWritesError>(
-                new MockWritesIoFailure(query.Path, ex.Message, ex)
+            return Result.Failure<ImmutableArray<TrafficEvent>, MockReceivedWritesError>(
+                new MockReceivedWritesIoFailure(query.Path, ex.Message, ex)
             );
         }
     }
 }
 
-/// <summary>Outcomes the <c>mock writes</c> query can fail with.</summary>
-public abstract record MockWritesError : IviError
+/// <summary>Outcomes the <c>mock received</c> query can fail with.</summary>
+public abstract record MockReceivedWritesError : IviError
 {
     /// <inheritdoc/>
     public abstract LogSeverity Severity { get; }
@@ -106,7 +106,7 @@ public abstract record MockWritesError : IviError
 }
 
 /// <summary>Supplied device alias does not parse.</summary>
-public sealed record MockWritesInvalidDevice(string Raw) : MockWritesError
+public sealed record MockReceivedWritesInvalidDevice(string Raw) : MockReceivedWritesError
 {
     /// <inheritdoc/>
     public override LogSeverity Severity => LogSeverity.Warning;
@@ -119,8 +119,11 @@ public sealed record MockWritesInvalidDevice(string Raw) : MockWritesError
 }
 
 /// <summary>The capture file could not be read.</summary>
-public sealed record MockWritesIoFailure(string Path, string Reason, Exception? Inner = null)
-    : MockWritesError
+public sealed record MockReceivedWritesIoFailure(
+    string Path,
+    string Reason,
+    Exception? Inner = null
+) : MockReceivedWritesError
 {
     /// <inheritdoc/>
     public override LogSeverity Severity => LogSeverity.Warning;
