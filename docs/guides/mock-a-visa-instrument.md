@@ -150,6 +150,21 @@ Either way the mock now listens on:
 | HiSLIP | `TCPIP::localhost::hislip0::INSTR` |
 | Raw SOCKET | `TCPIP::localhost::5025::SOCKET` |
 
+### Swap behaviour on a running mock
+
+You can `activate` a different scenario against a gateway that is already
+serving — no restart, no reconnect. The change is picked up on the client's
+next query:
+
+```sh
+ivicli mock scenario activate my-dmm-faulted   # while the app stays connected
+```
+
+The next SCPI operation on the open connection sees the new scenario. An
+unchanged binding keeps its in-flight scene, so re-running `activate` with the
+same scenario does not reset a state machine the client already advanced. This
+works identically over HiSLIP, raw SOCKET, and VXI-11.
+
 ---
 
 ## Point your app at it

@@ -31,6 +31,7 @@ public sealed class HiSlipGatewayServer : IGatewayServer
     public const ulong DefaultMaxMessageSize = 16 * 1024 * 1024; // 16 MiB
 
     private readonly IBackendFactory _backendFactory;
+    private readonly IScenarioBindingRefresher _refresher;
     private readonly ILogger<HiSlipGatewayServer> _logger;
     private readonly object _lockGate = new();
     private ushort _lockHolder; // 0 = unlocked, otherwise the session id holding the lock
@@ -41,10 +42,15 @@ public sealed class HiSlipGatewayServer : IGatewayServer
     private readonly ConcurrentDictionary<ushort, SessionBinding> _sessionBindings = new();
 
     /// <summary>Creates a new HiSLIP gateway.</summary>
-    public HiSlipGatewayServer(IBackendFactory backendFactory, ILogger<HiSlipGatewayServer> logger)
+    public HiSlipGatewayServer(
+        IBackendFactory backendFactory,
+        ILogger<HiSlipGatewayServer> logger,
+        IScenarioBindingRefresher? refresher = null
+    )
     {
         _backendFactory = backendFactory;
         _logger = logger;
+        _refresher = refresher ?? NullScenarioBindingRefresher.Instance;
     }
 
     /// <inheritdoc/>
@@ -600,7 +606,7 @@ public sealed class HiSlipGatewayServer : IGatewayServer
         await stream.WriteAsync(resp, ct);
     }
 
-    private static async Task DispatchScpiAsync(
+    private async Task DispatchScpiAsync(
         NetworkStream stream,
         IIviBackend backend,
         Domain.Devices.Device device,
@@ -609,6 +615,22 @@ public sealed class HiSlipGatewayServer : IGatewayServer
         CancellationToken ct
     )
     {
+        // Pick up an out-of-process scenario re-binding mid-link: a client
+        // may hold one long-lived link while a separate `mock scenario
+        // activate` runs. Refreshed per message so the change is observed
+        // without re-creating the link. The refresher re-applies only when
+        // the bound scenario name changed (scene state is preserved
+        // otherwise), and is no-throw; guard anyway so a refresh failure
+        // never kills the link.
+        try
+        {
+            await _refresher.RefreshAsync(device, ct);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "scenario binding refresh failed; continuing");
+        }
+
         // Real VISA clients (NI-VISA, Keysight, R&S, PyVISA-py) terminate
         // SCPI lines with `\r\n` or `\n` per IEEE 488.2 §7.5. Backends and
         // scenario matchers see canonical, terminator-free strings.
