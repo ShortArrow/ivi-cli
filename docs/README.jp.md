@@ -22,7 +22,7 @@
   - **モック計測器を動かす.** `Fake` backend は *scenario*（`query → response` ルールの集合）に従って SCPI に応答するので、`ivicli`（または自作の VISA アプリ）を実機なしのスタンドインと対話させられます。
   - **録って再生.** 実機セッション（`IVICLI_CAPTURE=<path>`）または SCPI スクリプト実行（`mock scenario record --from-script foo.scpi`）を scenario に録り、`IVICLI_REPLAY=<scenario>` で決定論的に再実行できます — 回帰チェックに実機を消費しません。
   - **SCPI スクリプトの実行と Lint.** `visa script foo.scpi` は `.scpi` ファイル（[SCPI](https://www.ivifoundation.org/downloads/SCPI/scpi-99.pdf) コマンド + ivi-cli 独自のインラインアサーション、[ADR 0027](adr/0027-phase3-operator-automation.md)）を現在の機器に対して実行、`visa lint foo.scpi` は実行前に未知の SCPI ルート（IEEE 488.2 + SCPI core）を検出します。
-  - **監査向け.** `IVICLI_CAPTURE=<path>` を設定するとすべての backend 操作が NDJSON ログにストリームされ、`tail -f path | jq` で後追い確認やサポート提出に利用できます。
+  - **監査向け.** `IVICLI_CAPTURE=<path>` を設定するとすべての backend 操作が NDJSON ログにストリームされ、`tail -f path | jq` で後追い確認できるほか、`ivicli mock writes <device> --match ':VOLT'` でモックへ実際に届いた SCPI 書き込みをアウトオブバンドで確認できます（テストが自身の VISA スタック経由でモックを駆動する場合に有効）。
 - **コントロールプレーン (HTTP / WebSocket API)**
   - **JSON HTTP API.** `ivicli api start` で HTTP JSON API を `http://127.0.0.1:8080/v1` に公開（`/openapi/v1.json` 付き）。AI agent / ダッシュボード / CI スクリプトが VISA を喋らずに device 列挙・SCPI クエリ・status 取得できます。
   - **ブラウザ向けストリーミング.** WebSocket を `ws://127.0.0.1:8080/v1/devices/{name}/visa` に開けば `{op:'query',scpi:'…'}` フレームを送って `{event:'response',…}` で受け取れます。ダッシュボードや AI agent ランタイム向け (ADR 0035)。

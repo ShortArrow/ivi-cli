@@ -849,6 +849,10 @@ Phase 3 (operator-facing automation):
 * mock scenario import — convert an NDJSON capture (IVICLI_CAPTURE
   output) into a stored MockScenario so the existing IVICLI_REPLAY
   machinery can serve it. ADR 0033.
+* mock writes — read back the SCPI writes a device received from an
+  IVICLI_CAPTURE traffic log, so a test that drives the mock through its
+  own VISA stack can confirm out-of-band which writes actually arrived.
+  ADR 0031.
 * server log — tail the gateway's per-server structured log file with
   optional follow / level filter (operator-facing observability).
 
