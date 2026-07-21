@@ -186,6 +186,36 @@ works identically over HiSLIP, raw SOCKET, and VXI-11.
 
 ---
 
+## Verify what your app sent
+
+When your app drives the mock through its own VISA stack, the test never sends
+raw SCPI itself — so how do you assert the app wrote `:VOLT 24.000` and not, say,
+`:VOLT 24` or nothing at all? Start the gateway with traffic capture on, then
+read back the writes out of band:
+
+```sh
+# Start the mock with capture enabled (relative paths resolve under the log dir).
+IVICLI_CAPTURE=run.ndjson ivicli server start dmm-srv
+
+# ... your app connects and writes :VOLT 24.000 ...
+
+# From the test, confirm the last :VOLT write the device received:
+ivicli mock writes dut --match ':VOLT' --capture run.ndjson
+# → :VOLT 24.000        (exit 0; exit 1 if nothing matched)
+
+ivicli mock writes dut --match ':CURR' --capture run.ndjson --json
+# → {"device":"dut","scpi":":CURR 3.300","timestamp":"..."}
+```
+
+`--match` filters by substring, the default reports the most recent matching
+write (add `--all` to list every match, oldest first), and a non-zero exit when
+nothing matched lets a test assert a write did *not* arrive. The capture is the
+shared audit log ([ADR 0031](../adr/0031-visa-traffic-capture.md)); the reader
+opens it with shared access, so you can query it while the gateway is still
+serving.
+
+---
+
 ## Record instead of author
 
 If you have the real instrument available once, capture a session and replay
