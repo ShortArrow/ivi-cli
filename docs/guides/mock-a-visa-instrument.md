@@ -111,8 +111,7 @@ respond = "3.271"
 > **v0.2.x limitations.** Rules match a full SCPI line literally (no
 > parameter capture — `VOLT 7.5` then `VOLT?` still returns the canned
 > value), and rule sets are per-scene (static metadata like `*IDN?` is
-> repeated in every scene). Both are tracked in
-> [ADR 0026](../adr/0026-mock-scenario-system.md) and issue
+> repeated in every scene). Both are tracked in issue
 > [#26](https://github.com/ShortArrow/ivi-cli/issues/26).
 
 ---
@@ -221,8 +220,7 @@ ivicli mock received dut --match ':CURR' --capture run-*.ndjson --json
 exclusive); the default reports the most recent matching write (add `--all` to
 list every match, oldest first, or `--count` for just the number). Absent
 `--count`, a non-zero exit when nothing matched lets a test assert a write did
-*not* arrive. The capture is the shared audit log
-([ADR 0031](../adr/0031-visa-traffic-capture.md)); the reader opens it with
+*not* arrive. The capture is the shared audit log; the reader opens it with
 shared access, so you can query it while the gateway is still serving.
 
 **Isolation.** The capture *appends* across runs, so `--all` and the default
@@ -267,7 +265,3 @@ Override the root with `IVICLI_CONFIG=<path>`.
 
 - **[PSU sample](../samples/psu/)** — a complete, runnable two-state FSM
   (output on/off) with `setup.sh` / `setup.ps1` and the NI MAX steps.
-- **[ADR 0026](../adr/0026-mock-scenario-system.md)** — the scenario system's
-  design and roadmap (variable state, cross-scene rule sharing).
-- **[ADR 0018](../adr/0018-deployment-strategy.md)** — the mock container
-  reference (ports, env vars, mounts).

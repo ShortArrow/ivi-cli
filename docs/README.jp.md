@@ -4,7 +4,7 @@
 
 `ivi-cli` は、VISA/IVI 経由で計測器を管理・診断・操作する統合 CLI です。
 
-> ステータス: **v0.2.7 (pre-1.0.0)。** Phase 1〜3 が landed: CLI core、HiSLIP / VXI-11 / SOCKET gateway、シナリオ駆動 mock-VISA コンテナ (ghcr.io/shortarrow/ivi-cli-mock)、Management HTTP / WebSocket API (PAT + TLS + audit)、OpenTelemetry、LAN discovery (LXI mDNS + VXI-11 broadcast、および opt-in の `--port` socket sweep)。1.0.0 までは [ADR 0022](adr/0022-branching-strategy.md) に従って破壊的変更の可能性が残ります。[CHANGELOG.md](CHANGELOG.md) も参照。
+> ステータス: **v0.2.7 (pre-1.0.0)。** Phase 1〜3 が landed: CLI core、HiSLIP / VXI-11 / SOCKET gateway、シナリオ駆動 mock-VISA コンテナ (ghcr.io/shortarrow/ivi-cli-mock)、Management HTTP / WebSocket API (PAT + TLS + audit)、OpenTelemetry、LAN discovery (LXI mDNS + VXI-11 broadcast、および opt-in の `--port` socket sweep)。1.0.0 までは 破壊的変更の可能性が残ります。[CHANGELOG.md](CHANGELOG.md) も参照。
 
 ## ハイライト
 
@@ -14,19 +14,19 @@
   - **自動化指向.** stdout はデータ (`--json` 含む)、stderr はログ専用。終了コードは POSIX 慣習に従い、bash / zsh / PowerShell の補完をサポートします。
 - **発見と可視化**
   - **自動 discovery.** `ivicli visa scan` で LAN 上の機器を LXI mDNS / DNS-SD + VXI-11 portmapper broadcast で発見、`--add` を付ければそのまま `visa add` でまとめて登録します。
-  - **IVI Configuration Store の中身を覗く.** `ivicli driver list` / `ivicli logical list` で `IviConfigurationStore.xml` を読み、インストール済み IVI ドライバ / 論理名を列挙。「機器とは通信できるけどドライバが合ってない」系のデバッグを Configuration Server GUI を開かずに片付けられます ([ADR 0045](adr/0045-ivi-configuration-store.md))。
+  - **IVI Configuration Store の中身を覗く.** `ivicli driver list` / `ivicli logical list` で `IviConfigurationStore.xml` を読み、インストール済み IVI ドライバ / 論理名を列挙。「機器とは通信できるけどドライバが合ってない」系のデバッグを Configuration Server GUI を開かずに片付けられます。
 - **バックエンドとゲートウェイ**
   - **複数バックエンド.** Local NI-VISA / HiSLIP / VXI-11 / raw TCP SOCKET / Fake (プログラム可能 + scenario 再生) / Replay (厳密な決定論的再生) を単一の `IIviBackend` port 越しに提供します。
   - **ゲートウェイサーバ.** ローカル計測器を HiSLIP (`TCPIP::host::hislip0::INSTR`) または raw socket で公開し、リモートの PyVISA / NI-VISA クライアントから駆動できます。
 - **ハードウェアなしでテスト**
   - **モック計測器を動かす.** `Fake` backend は *scenario*（`query → response` ルールの集合）に従って SCPI に応答するので、`ivicli`（または自作の VISA アプリ）を実機なしのスタンドインと対話させられます。
   - **録って再生.** 実機セッション（`IVICLI_CAPTURE=<path>`）または SCPI スクリプト実行（`mock scenario record --from-script foo.scpi`）を scenario に録り、`IVICLI_REPLAY=<scenario>` で決定論的に再実行できます — 回帰チェックに実機を消費しません。
-  - **SCPI スクリプトの実行と Lint.** `visa script foo.scpi` は `.scpi` ファイル（[SCPI](https://www.ivifoundation.org/downloads/SCPI/scpi-99.pdf) コマンド + ivi-cli 独自のインラインアサーション、[ADR 0027](adr/0027-phase3-operator-automation.md)）を現在の機器に対して実行、`visa lint foo.scpi` は実行前に未知の SCPI ルート（IEEE 488.2 + SCPI core）を検出します。
+  - **SCPI スクリプトの実行と Lint.** `visa script foo.scpi` は `.scpi` ファイル（[SCPI](https://www.ivifoundation.org/downloads/SCPI/scpi-99.pdf) コマンド + ivi-cli 独自のインラインアサーション）を現在の機器に対して実行、`visa lint foo.scpi` は実行前に未知の SCPI ルート（IEEE 488.2 + SCPI core）を検出します。
   - **監査向け.** `IVICLI_CAPTURE=<path>` を設定するとすべての backend 操作が NDJSON ログにストリームされ、`tail -f path | jq` で後追い確認できるほか、`ivicli mock received <device> --match ':VOLT'` でモックへ実際に届いた SCPI 書き込みをアウトオブバンドで確認できます（テストが自身の VISA スタック経由でモックを駆動する場合に有効）。
 - **コントロールプレーン (HTTP / WebSocket API)**
   - **JSON HTTP API.** `ivicli api start` で HTTP JSON API を `http://127.0.0.1:8080/v1` に公開（`/openapi/v1.json` 付き）。AI agent / ダッシュボード / CI スクリプトが VISA を喋らずに device 列挙・SCPI クエリ・status 取得できます。
-  - **ブラウザ向けストリーミング.** WebSocket を `ws://127.0.0.1:8080/v1/devices/{name}/visa` に開けば `{op:'query',scpi:'…'}` フレームを送って `{event:'response',…}` で受け取れます。ダッシュボードや AI agent ランタイム向け (ADR 0035)。
-  - **API の鍵掛け.** `ivicli api token create` で PAT を生成（表示は 1 回限り、保存されるのはハッシュのみ）。HTTP は `Authorization: Bearer …`、WebSocket は `ivi-cli-pat.<token>` サブプロトコルで検証され、loopback の外にもバインドできます (ADR 0036)。
+  - **ブラウザ向けストリーミング.** WebSocket を `ws://127.0.0.1:8080/v1/devices/{name}/visa` に開けば `{op:'query',scpi:'…'}` フレームを送って `{event:'response',…}` で受け取れます。ダッシュボードや AI agent ランタイム向け。
+  - **API の鍵掛け.** `ivicli api token create` で PAT を生成（表示は 1 回限り、保存されるのはハッシュのみ）。HTTP は `Authorization: Bearer …`、WebSocket は `ivi-cli-pat.<token>` サブプロトコルで検証され、loopback の外にもバインドできます。
 
 ## インストール
 
@@ -107,7 +107,7 @@ VISA 計測器を操作するアプリを開発していて、実機を用意せ
 | `mock scenario` | `list` `create` `remove` `show` `activate` `deactivate` `record` `import` + `scene add` / `scene remove` | モックデバイス用シナリオの編集と記録 |
 | `mock received` | `<device>` | デバイスが受信した SCPI 書き込みを `IVICLI_CAPTURE` トラフィックログから確認 |
 | `server` | `add` `remove` `list` `route add` / `route remove` / `route list` `start` `stop` `status` `log` | ゲートウェイサーバのライフサイクル |
-| `api` | `start` `stop` `token create` `token list` `token revoke` | Management HTTP JSON API (ADR 0034) + WebSocket サブプロトコル (ADR 0035) + PAT 認証 (ADR 0036) |
+| `api` | `start` `stop` `token create` `token list` `token revoke` | Management HTTP JSON API + WebSocket サブプロトコル + PAT 認証 |
 | top-level | `doctor` `completion <shell>` | 環境ヘルスチェック + シェル補完 |
 
 ## 詳細度 / フォーマットのフラグ
@@ -168,12 +168,12 @@ flowchart LR
     a["AI agent / dashboard / CI"] -->|"HTTP / WebSocket API"| c["ivicli"] --> i["計測器"]
 ```
 
-内部の層構成（Clean Architecture と一方向の依存方向、アーキテクチャテストで強制）は、コントリビュータ向けに [ADR 0003](adr/0003-architecture-style.md) と [ADR 0021](adr/0021-repository-layout.md) に記載しています。
+内部の層構成（Clean Architecture と一方向の依存方向、アーキテクチャテストで強制）は、コントリビュータ向けの関心事であり、この利用者向け README には含めていません。
 
 ## ドキュメント
 
 - [PRD](PRD.jp.md) — プロダクト要件
-- [Architecture Decision Records](adr/) — Accepted な意思決定。読み始めの推奨: [ADR 0003](adr/0003-architecture-style.md) (アーキテクチャスタイル)、[ADR 0021](adr/0021-repository-layout.md) (層アセンブリ)、[ADR 0007](adr/0007-network-transport.md) (HiSLIP / SOCKET)
+- [Architecture Decision Records](adr/) — Accepted な意思決定。
 - [Domain glossary](domain-glossary.md) — ユビキタス言語カタログ
 - [Guides](guides/) — タスク指向の how-to。まずは [Mock a VISA instrument](guides/mock-a-visa-instrument.md)
 - [Samples](samples/) — ハードウェアなしでテストするための **モック計測器** 一式: そのまま投入できる scenario + セットアップスクリプト (例: [PSU モック](samples/psu/))
@@ -197,6 +197,6 @@ dotnet test --filter "Category!=Integration"
 - MIT ライセンス ([LICENSE-MIT](../LICENSE-MIT) または <http://opensource.org/licenses/MIT>)
 - Apache License, Version 2.0 ([LICENSE-APACHE](../LICENSE-APACHE) または <http://www.apache.org/licenses/LICENSE-2.0>)
 
-利用者の選択で適用できるデュアルライセンスです。判断の根拠は [ADR 0046](adr/0046-licensing.md) を参照。
+利用者の選択で適用できるデュアルライセンスです。
 
 明示的に別段の定めをしない限り、本プロジェクトへ意図的に提出された貢献（Apache-2.0 ライセンスに定義される Contribution）は、追加の条項なしに上記のデュアルライセンスで提供されるものとします。
