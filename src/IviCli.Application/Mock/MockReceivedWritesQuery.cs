@@ -6,10 +6,10 @@ using IviCli.Domain.Devices;
 namespace IviCli.Application.Mock;
 
 /// <summary>
-/// Query DTO for <c>mock received</c> (requirement 2). Selects the SCPI writes
-/// a device received, read back from an NDJSON traffic capture (ADR 0031) that
-/// a serving gateway produced — so a separate process can confirm out-of-band
-/// that a client's write (e.g. <c>:VOLT 24.000</c>) actually reached the mock.
+/// Query DTO for <c>mock received</c>. Selects the SCPI writes a device
+/// received, read back from an NDJSON traffic capture that a serving gateway
+/// produced — so a separate process can confirm out-of-band that a client's
+/// write (e.g. <c>:VOLT 24.000</c>) actually reached the mock.
 /// </summary>
 /// <param name="Device">Device alias whose writes to select.</param>
 /// <param name="Match">

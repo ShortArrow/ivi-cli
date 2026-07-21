@@ -8,7 +8,7 @@ using Shouldly;
 namespace IviCli.Infrastructure.Tests.Capture;
 
 /// <summary>
-/// End-to-end for requirement 2 across the real NDJSON adapters: writes a
+/// End-to-end across the real NDJSON adapters: writes a
 /// serving gateway captured are read back out-of-process and confirmed by
 /// device and SCPI. Exercises the actual on-disk format (not a fake reader),
 /// so an enum-casing or schema drift between writer and query surfaces here.

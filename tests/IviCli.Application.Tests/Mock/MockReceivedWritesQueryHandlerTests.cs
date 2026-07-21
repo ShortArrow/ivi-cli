@@ -12,7 +12,7 @@ namespace IviCli.Application.Tests.Mock;
 /// <summary>
 /// Locks in the out-of-process write-observation contract: reading the NDJSON
 /// capture a serving gateway produced, a separate process can confirm which
-/// SCPI writes a device actually received (requirement 2).
+/// SCPI writes a device actually received.
 /// </summary>
 public sealed class MockReceivedWritesQueryHandlerTests
 {
