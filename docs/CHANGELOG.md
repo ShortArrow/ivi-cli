@@ -4,6 +4,33 @@ All notable changes to ivi-cli are documented here. Format roughly follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning follows
 [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.8] — 2026-07-22
+
+### Added
+
+- **Live mock-scenario re-binding on a running gateway** (#85). The SOCKET,
+  HiSLIP, and VXI-11 gateways re-sync a device's active scenario from the
+  session before each SCPI dispatch, so `ivicli mock scenario activate` run in a
+  separate process takes effect on the next request without restarting the
+  gateway. Re-application is scoped to a changed scenario name, so in-flight
+  scene state is preserved across the frequent reconnects real clients perform.
+  `IVICLI_SCENARIO` activation now records its binding in the session so an
+  env-activated scenario (e.g. the mock container's) survives the reconciliation.
+- **`ivicli mock received <device>`** (#85). Reads the `IVICLI_CAPTURE` traffic
+  log out of band to confirm which SCPI writes a device received — for an
+  integration test that drives a mock through its own VISA stack and never sends
+  raw SCPI itself. `--match <substr>` / `--exact <scpi>` filter the writes,
+  `--all` lists every match, `--count` reports the count, and `--json` emits a
+  JSON array; the command exits non-zero when nothing matched (except `--count`).
+- **Dual license: `MIT OR Apache-2.0`** (#72). `LICENSE-MIT` and `LICENSE-APACHE`
+  ship in the repository and the NuGet package, with the SPDX expression as the
+  canonical declaration. Contributions are dual-licensed under the same terms.
+
+### Changed
+
+- **`ivicli diagnose` renamed to `ivicli doctor`** (#81). `diagnose` remains a
+  deprecated alias for backward compatibility and will be removed at 0.3.0.
+
 ## [0.2.7] — 2026-07-01
 
 ### Added
