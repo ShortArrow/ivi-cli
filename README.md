@@ -188,7 +188,7 @@ dotnet build
 dotnet test --filter "Category!=Integration"
 ```
 
-Local hooks (CSharpier formatter check on commit, build + tests on push) install on first contributor run via `dotnet husky install`.
+A local CSharpier formatter check on commit installs on first contributor run via `dotnet husky install`. Build and tests run in CI, not on push.
 
 ## License
 

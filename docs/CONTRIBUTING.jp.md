@@ -23,7 +23,7 @@ GitHub Flow（単一の `main`、短命の topic branch、squash-merge、Convent
 
 ## ローカル hooks
 
-Husky.Net の pre-commit が CSharpier を実行、pre-push が `dotnet build` + `dotnet test --filter "Category!=Integration"` を実行 — [ADR 0025](adr/0025-dev-automation-hooks.md) を参照。
+Husky.Net の pre-commit が CSharpier を実行します。build とテストは push 時には走らせず CI（`pr.yml`）の担当 — [ADR 0025](adr/0025-dev-automation-hooks.md) を参照。
 
 ## CI ゲーティング
 
@@ -41,7 +41,7 @@ Clean Architecture + DDD + handler レベル CQRS（[ADR 0003](adr/0003-architec
 
 xUnit + Shouldly + Testably.Abstractions。テストは `src/` を 1:1 でミラー (`IviCli.<Layer>.Tests`)。挙動変更には TDD（Red → Green → Refactor）を採用してください。
 
-Integration テストは `[Trait("Category", "Integration")]` を付与し、pre-push hook と PR ビルドでは既定で skip され、`nightly.yml` で実行されます。
+Integration テストは `[Trait("Category", "Integration")]` を付与し、PR ビルドでは既定で skip され、`nightly.yml` で実行されます。
 
 ## ADR
 
