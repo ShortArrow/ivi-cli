@@ -229,7 +229,7 @@
           "Microsoft.Extensions.Logging.Abstractions": "[10.0.9, )",
           "TestableIO.System.IO.Abstractions": "[22.1.1, )",
           "TestableIO.System.IO.Abstractions.Wrappers": "[22.1.1, )",
-          "Tomlyn": "[0.19.0, )"
+          "Tomlyn": "[2.10.1, )"
         }
       },
       "ivicli.plugin": {
@@ -280,9 +280,9 @@
       },
       "Tomlyn": {
         "type": "CentralTransitive",
-        "requested": "[0.19.0, )",
-        "resolved": "0.19.0",
-        "contentHash": "GlI2o8R8jbZIaE+YX6uA/VoAOH7zIxYeqxDm7jHW2hqUhuB+q19oKold35FkMuv8IZDoCqsTMolaBv2eBLBmrQ=="
+        "requested": "[2.10.1, )",
+        "resolved": "2.10.1",
+        "contentHash": "ykjOY3IpYmC4SpPcAZRTl/w2jTmhPMDydHq8xcV7tTBAQ22nKBsOkPqauIrZlMjHm03cmKfV23UOPscKp+J4Og=="
       }
     }
   }
