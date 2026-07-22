@@ -38,7 +38,7 @@ public sealed class TomlApiTokenStore : IApiTokenStore
                 return Result.Success<ApiTokenDocument, ApiTokenStoreError>(ApiTokenDocument.Empty);
             }
             var text = await _fs.File.ReadAllTextAsync(_path, ct);
-            var model = Toml.ToModel(text);
+            var model = TomlSerializer.Deserialize<TomlTable>(text) ?? new TomlTable();
             var tokens = ImmutableArray.CreateBuilder<ApiToken>();
             if (model.TryGetValue("token", out var raw) && raw is TomlTableArray array)
             {
@@ -157,6 +157,6 @@ public sealed class TomlApiTokenStore : IApiTokenStore
             array.Add(table);
         }
         model["token"] = array;
-        return Toml.FromModel(model);
+        return TomlSerializer.Serialize(model);
     }
 }
