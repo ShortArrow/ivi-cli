@@ -54,15 +54,18 @@ Rationale:
 - CSharpier's output is deterministic across machines, so violations are unambiguous.
 - pre-commit must stay fast (sub-second). Format check qualifies; tests do not.
 
-### 4. pre-push: build + unit/architecture tests
+### 4. pre-push: no build or tests (CI owns them)
 
-Run **`dotnet build`** followed by **`dotnet test --filter "Category!=Integration"`** on push. If either fails, the push is rejected.
+Pre-push runs nothing. Build and `dotnet test --filter "Category!=Integration"` run in CI (`pr.yml`) on every PR, in a clean environment with `--locked-mode`. There is no `.husky/pre-push` hook.
 
 Rationale:
 
-- Squash merge means individual commit greenness does not survive to `main`, so blocking every commit with tests fights TDD's Red phase commits unnecessarily.
-- Pre-push is the latest local moment to catch broken code before it touches the remote.
-- Integration tests are excluded (per ADR 0009) — they belong in nightly / manual CI runs.
+- The pre-push build + test duplicated the PR CI gate while diverging from it: a local run has no `--locked-mode` and a different SDK / OS, so a local pass did not imply a CI pass and a local failure was sometimes environmental. CI is the authoritative build / test gate.
+- It added minutes of latency to every non-docs push, and — bypassable with `--no-verify` — was never a hard gate anyway.
+- Keeping it usable had required a docs-only skip script that re-implemented CI's changed-files logic locally; a second copy that could drift. Removing the tests removes the need for the skip.
+- Squash merge means individual commit greenness does not survive to `main`, so there is little value in blocking each local push on the full suite.
+
+The original decision ran `dotnet build` + `dotnet test` on push; it is superseded here.
 
 ### 5. Claude Code PostToolUse hook: auto-format edited C# files
 
@@ -88,11 +91,9 @@ No local `commit-msg` hook is configured.
 - CONTRIBUTING (when written) will reiterate this norm.
 - The CI checks on the server side enforce the same rules regardless of local bypass.
 
-### 8. File-type filtering: deferred
+### 8. File-type filtering: not needed
 
-A `staged-file-type` filter (skipping format/test when only docs are changed, etc.) is **not** introduced in Phase 1. Test runs are expected to be sub-second for the foreseeable future, so the simplicity of unconditional execution is preferred.
-
-If pre-push run time exceeds a few seconds on a routine basis, this decision is revisited.
+No `staged-file-type` filter is required. The only local hook is the pre-commit CSharpier check, which inspects C# and is a no-op on docs-only changes. (An earlier revision briefly ran tests on push behind a docs-only skip script; §4 removed both.)
 
 ### 9. Branch-aware policy: not adopted
 
@@ -112,14 +113,7 @@ dotnet tool restore >/dev/null
 dotnet husky run --group pre-commit
 ```
 
-`.husky/pre-push`:
-
-```sh
-#!/bin/sh
-. "$(dirname "$0")/_/husky.sh"
-dotnet tool restore >/dev/null
-dotnet husky run --group pre-push
-```
+There is no `.husky/pre-push` (§4).
 
 `.claude/settings.json` (PostToolUse hook for CSharpier):
 

@@ -23,7 +23,7 @@ GitHub Flow (single `main`, short-lived topic branches, squash-merge, Convention
 
 ## Local hooks
 
-Husky.Net pre-commit runs CSharpier; pre-push runs `dotnet build` + `dotnet test --filter "Category!=Integration"` — see [ADR 0025](adr/0025-dev-automation-hooks.md).
+Husky.Net pre-commit runs CSharpier. Build and tests are not run on push — that is CI's job (`pr.yml`) — see [ADR 0025](adr/0025-dev-automation-hooks.md).
 
 ## CI gating
 
@@ -41,7 +41,7 @@ Clean Architecture + DDD + handler-level CQRS (see [ADR 0003](adr/0003-architect
 
 xUnit + Shouldly + Testably.Abstractions. Tests mirror `src/` 1:1 (`IviCli.<Layer>.Tests`). TDD (Red → Green → Refactor) is expected for behavioural changes.
 
-Integration tests carry `[Trait("Category", "Integration")]`; they are skipped by default in the pre-push hook and PR build, and run on `nightly.yml`.
+Integration tests carry `[Trait("Category", "Integration")]`; they are skipped by default in the PR build, and run on `nightly.yml`.
 
 ## ADRs
 

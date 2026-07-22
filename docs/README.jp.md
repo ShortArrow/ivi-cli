@@ -188,7 +188,7 @@ dotnet build
 dotnet test --filter "Category!=Integration"
 ```
 
-ローカル hooks (commit 時 CSharpier formatter チェック、push 時 build + tests) は初回 `dotnet husky install` で導入されます。
+ローカルの CSharpier formatter チェック (commit 時) は初回 `dotnet husky install` で導入されます。build とテストは push 時ではなく CI で実行されます。
 
 ## ライセンス
 
