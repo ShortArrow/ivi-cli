@@ -289,6 +289,14 @@ jobs:
             ${{ steps.tags.outputs.image }}:${{ steps.tags.outputs.minor }}
             ${{ steps.tags.outputs.image }}:${{ steps.tags.outputs.sha7 }}
             ${{ steps.tags.outputs.image }}:latest
+          # OCI annotations on the multi-arch index — the manifest GHCR reads
+          # for the package description and repo link. A Dockerfile LABEL does
+          # not reach the index for a multi-arch image, so they are set here.
+          annotations: |
+            index:org.opencontainers.image.title=ivi-cli-mock
+            index:org.opencontainers.image.description=Scenario-driven mock VISA instrument (HiSLIP on 4880 + raw SOCKET on 5025) for testing SCPI clients without hardware. Built from ivi-cli.
+            index:org.opencontainers.image.source=https://github.com/ShortArrow/ivi-cli
+            index:org.opencontainers.image.licenses=MIT OR Apache-2.0
 
   release:
     name: github release
