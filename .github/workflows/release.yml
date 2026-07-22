@@ -18,8 +18,29 @@ defaults:
     shell: bash
 
 jobs:
+  guard:
+    name: version / tag / changelog guard
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - name: Tag matches Version and has a CHANGELOG entry
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          props="$(sed -n 's/.*<Version>\(.*\)<\/Version>.*/\1/p' Directory.Build.props | head -1)"
+          if [ "$version" != "$props" ]; then
+            echo "::error::pushed tag v$version does not match Directory.Build.props <Version> ($props). Bump the version before tagging."
+            exit 1
+          fi
+          if ! grep -qF "## [$version]" docs/CHANGELOG.md; then
+            echo "::error::docs/CHANGELOG.md has no '## [$version]' section for the release."
+            exit 1
+          fi
+          echo "guard ok: tag v$version matches <Version> and has a CHANGELOG entry"
+
   publish:
     name: publish / ${{ matrix.os }}-${{ matrix.rid }}
+    needs: guard
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
     strategy:

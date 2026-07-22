@@ -67,6 +67,23 @@ jobs:
           check_pair 'README.md' 'docs/README.jp.md'
           check_pair 'docs/CONTRIBUTING.md' 'docs/CONTRIBUTING.jp.md'
 
+  version-changelog-sync:
+    name: version / CHANGELOG sync
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - name: Version has a matching CHANGELOG entry
+        shell: bash
+        run: |
+          set -euo pipefail
+          props="$(sed -n 's/.*<Version>\(.*\)<\/Version>.*/\1/p' Directory.Build.props | head -1)"
+          if ! grep -qF "## [$props]" docs/CHANGELOG.md; then
+            echo "::error::Directory.Build.props <Version> ($props) has no matching '## [$props]' section in docs/CHANGELOG.md."
+            exit 1
+          fi
+          echo "sync ok: <Version> $props has a CHANGELOG entry"
+
   changes:
     name: detect code changes
     runs-on: ubuntu-latest
