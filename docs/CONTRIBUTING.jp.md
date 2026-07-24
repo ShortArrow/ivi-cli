@@ -43,6 +43,10 @@ xUnit + Shouldly + Testably.Abstractions。テストは `src/` を 1:1 でミラ
 
 Integration テストは `[Trait("Category", "Integration")]` を付与し、PR ビルドでは既定で skip され、`nightly.yml` で実行されます。
 
+## 品質保証とサポート範囲
+
+各リリースが検証する内容、pre-1.0 の互換性契約、動作確認済み計測器の方針、サポート水準 — [ADR 0047](adr/0047-quality-assurance-and-support-scope.md) を参照。プラットフォームカバレッジ（出荷 RID ごとのネイティブテスト + スモーク）— [ADR 0016](adr/0016-cross-platform-policy.md) を参照。脆弱性は public issue ではなく [SECURITY.md](../SECURITY.md) を通して報告してください。
+
 ## ADR
 
 Accepted な意思決定はすべて [`docs/adr/`](adr/) に置きます。ADR は生きたドキュメントとして通常の PR で更新し、本質的な反転がある場合にのみ supersede します。索引ファイルは設けません。
