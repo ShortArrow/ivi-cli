@@ -43,6 +43,10 @@ xUnit + Shouldly + Testably.Abstractions. Tests mirror `src/` 1:1 (`IviCli.<Laye
 
 Integration tests carry `[Trait("Category", "Integration")]`; they are skipped by default in the PR build, and run on `nightly.yml`.
 
+## Quality assurance & support scope
+
+What each release verifies, the pre-1.0 compatibility contract, the verified-instrument policy, and the support level — see [ADR 0047](adr/0047-quality-assurance-and-support-scope.md). Platform coverage (native test + smoke per shipped RID) — see [ADR 0016](adr/0016-cross-platform-policy.md). Vulnerabilities go through [SECURITY.md](../SECURITY.md), not public issues.
+
 ## ADRs
 
 Every accepted decision lives under [`docs/adr/`](adr/). They are living documents — extend them in place via normal PRs; supersede only on genuine reversal. No index file is maintained.

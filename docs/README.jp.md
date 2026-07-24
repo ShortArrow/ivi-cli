@@ -4,7 +4,7 @@
 
 `ivi-cli` は、VISA/IVI 経由で計測器を管理・診断・操作する統合 CLI です。
 
-> ステータス: **v0.2.7 (pre-1.0.0)。** Phase 1〜3 が landed: CLI core、HiSLIP / VXI-11 / SOCKET gateway、シナリオ駆動 mock-VISA コンテナ (ghcr.io/shortarrow/ivi-cli-mock)、Management HTTP / WebSocket API (PAT + TLS + audit)、OpenTelemetry、LAN discovery (LXI mDNS + VXI-11 broadcast、および opt-in の `--port` socket sweep)。1.0.0 までは 破壊的変更の可能性が残ります。[CHANGELOG.md](CHANGELOG.md) も参照。
+> ステータス: **v0.2.8 (pre-1.0.0)。** Phase 1〜3 が landed: CLI core、HiSLIP / VXI-11 / SOCKET gateway、シナリオ駆動 mock-VISA コンテナ (ghcr.io/shortarrow/ivi-cli-mock)、Management HTTP / WebSocket API (PAT + TLS + audit)、OpenTelemetry、LAN discovery (LXI mDNS + VXI-11 broadcast、および opt-in の `--port` socket sweep)。1.0.0 までは 破壊的変更の可能性が残ります。[CHANGELOG.md](CHANGELOG.md) も参照。
 
 ## ハイライト
 
@@ -169,6 +169,26 @@ flowchart LR
 ```
 
 内部の層構成（Clean Architecture と一方向の依存方向、アーキテクチャテストで強制）は、コントリビュータ向けの関心事であり、この利用者向け README には含めていません。
+
+## サポートと品質
+
+**各リリースが検証していること。** `vX.Y.Z` リリースは、タグ付けされたコミットで以下すべてが通過した場合のみ公開されます:
+
+- 6 種のバイナリ (win / linux / osx × x64 / arm64) それぞれについて、ビルド + unit / architecture テストスイート通過に加え、**同一 OS・同一アーキテクチャのネイティブランナー上で** 起動スモークを実行;
+- mock コンテナが multi-arch push の前に、amd64 / arm64 **両方の** ネイティブ環境で HEALTHCHECK + SCPI round-trip スモークを通過;
+- タグ・プロジェクトバージョン・CHANGELOG エントリの一致。
+
+Integration スイート（実ソケット、PyVISA 相互運用）は 3 OS 上で nightly 実行されますが、リリースゲートではありません。
+
+**互換性の約束 (pre-1.0)。** バージョンが 0.x の間、次の 2 面を安定した契約として扱います: **`--json` 出力スキーマ** と **`config.toml` / scenario TOML スキーマ**。いずれかを破壊する変更には minor バージョンアップ (0.Y → 0.Y+1) と CHANGELOG への明示的な記載が必須です — patch リリースはこれらを壊しません。それ以外（human-readable 出力、ログ文言、Management API の形状、コンテナ内部）は 1.0 まではどのリリースでも変わり得ます。
+
+**動作確認済み計測器。** エントリは point-in-time です: 記録されたバージョンで確認したものであり、以降のリリースで再確認はしません。リストにない計測器は標準規格準拠 (HiSLIP, VXI-11, raw SOCKET, IEEE 488.2 / SCPI) を目標とする best-effort の扱いです — 規格準拠の計測器と互換性がない場合はバグとして扱います。報告には `IVICLI_CAPTURE` のトラフィックログを添付してください。
+
+| 計測器 | 確認バージョン | 結果 |
+| --- | --- | --- |
+| Kikusui PWR801L | v0.2.6 | SOCKET (5025) と HiSLIP (4880) の round-trip が動作。LAN discovery で発見可能。VXI-11 は portmapper 解決まで動作するが、機器側の Core ポート問題により query は不可。 |
+
+**サポート。** GitHub issues による best-effort、SLA なし。サポート対象は最新リリースのみ — 修正は新リリースとして出荷し、backport は行いません。脆弱性は [SECURITY.md](../SECURITY.md) を参照。
 
 ## ドキュメント
 

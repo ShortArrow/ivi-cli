@@ -4,7 +4,7 @@
 
 `ivi-cli` is an integrated CLI for managing, diagnosing, and operating instruments addressed via VISA/IVI.
 
-> Status: **v0.2.7 (pre-1.0.0).** Phase 1–3 are landed: CLI core, HiSLIP / VXI-11 / SOCKET gateways, scenario-driven mock-VISA container (ghcr.io/shortarrow/ivi-cli-mock), Management HTTP / WebSocket API with PAT + TLS + audit, OpenTelemetry, and LAN discovery (LXI mDNS + VXI-11 broadcast, plus opt-in `--port` socket sweep). Breaking changes are still possible. See [CHANGELOG.md](docs/CHANGELOG.md).
+> Status: **v0.2.8 (pre-1.0.0).** Phase 1–3 are landed: CLI core, HiSLIP / VXI-11 / SOCKET gateways, scenario-driven mock-VISA container (ghcr.io/shortarrow/ivi-cli-mock), Management HTTP / WebSocket API with PAT + TLS + audit, OpenTelemetry, and LAN discovery (LXI mDNS + VXI-11 broadcast, plus opt-in `--port` socket sweep). Breaking changes are still possible. See [CHANGELOG.md](docs/CHANGELOG.md).
 
 ## Highlights
 
@@ -169,6 +169,26 @@ flowchart LR
 ```
 
 The internal layering — Clean Architecture with a one-way dependency direction, enforced by an architecture-test suite — is a contributor concern, intentionally omitted from this user-facing README.
+
+## Support & quality
+
+**What every release verifies.** A `vX.Y.Z` release is published only after, at the tagged commit:
+
+- each of the six binaries (win / linux / osx × x64 / arm64) is built, passes the unit + architecture test suite, and is smoke-run **on a native runner of the same OS and architecture**;
+- the mock container passes a HEALTHCHECK + SCPI round-trip smoke natively on **both** amd64 and arm64 before the multi-arch push;
+- the tag, project version, and CHANGELOG entry agree.
+
+The integration suite (real sockets, PyVISA interop) runs nightly on three OSes; it is not a release gate.
+
+**Compatibility promise (pre-1.0).** While the version is 0.x, two surfaces are stable contracts: the **`--json` output schemas** and the **`config.toml` / scenario TOML schema**. Breaking either requires a minor version bump (0.Y → 0.Y+1) with an explicit CHANGELOG entry — patch releases never break them. Everything else (human-readable output, log text, Management API shape, container internals) may change in any release until 1.0.
+
+**Verified instruments.** Entries are point-in-time: verified at the recorded version, not re-verified on later releases. Instruments not listed fall under best-effort standards conformance (HiSLIP, VXI-11, raw SOCKET, IEEE 488.2 / SCPI) — incompatibility with a spec-conforming instrument is a bug; attach an `IVICLI_CAPTURE` traffic log to the report.
+
+| Instrument | Verified at | Result |
+| --- | --- | --- |
+| Kikusui PWR801L | v0.2.6 | SOCKET (5025) and HiSLIP (4880) round-trips work; LAN discovery finds it. VXI-11 portmapper resolution works, but queries are blocked by a device-side Core-port issue. |
+
+**Support.** GitHub issues, best-effort, no SLA. Only the latest release is supported — fixes ship as new releases, no backports. For vulnerabilities see [SECURITY.md](SECURITY.md).
 
 ## Documentation
 
