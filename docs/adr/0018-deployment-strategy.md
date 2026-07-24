@@ -220,11 +220,14 @@ Three smoke gates protect the image quality:
    `src/IviCli.Cli/**`. Publishes, builds single-arch (amd64),
    runs HEALTHCHECK + SCPI roundtrip. No push. Status check
    appears only on relevant PRs.
-3. **Release-time** (`.github/workflows/release.yml` `docker`
-   job): single-arch smoke gate **before** the multi-arch push.
-   Failure aborts the push so `latest` is never updated to a
-   broken image. After smoke passes, buildx pushes the multi-arch
-   manifest with all four tags.
+3. **Release-time** (`.github/workflows/release.yml`): native
+   smoke gates on **both architectures** — amd64 inside the
+   `docker` job, arm64 in `docker-smoke-arm64` on an arm64 runner
+   — **before** the multi-arch push. Failure of either aborts the
+   push so `latest` is never updated to a broken image. After both
+   smokes pass, buildx pushes the multi-arch manifest with all
+   four tags. All three gates share `docker/smoke-test.sh`
+   (HEALTHCHECK + SCPI round-trip).
 
 ### 10. Required runtime composition env
 

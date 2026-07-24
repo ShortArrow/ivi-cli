@@ -45,17 +45,20 @@ jobs:
     timeout-minutes: 30
     strategy:
       fail-fast: false
+      # Each RID builds, tests, and smoke-runs on a runner of the SAME
+      # OS/architecture, so every shipped binary has been executed at
+      # least once before release (ADR 0016).
       matrix:
         include:
           - os: ubuntu-latest
             rid: linux-x64
-          - os: ubuntu-latest
+          - os: ubuntu-24.04-arm
             rid: linux-arm64
           - os: windows-latest
             rid: win-x64
-          - os: windows-latest
+          - os: windows-11-arm
             rid: win-arm64
-          - os: macos-latest
+          - os: macos-15-intel
             rid: osx-x64
           - os: macos-latest
             rid: osx-arm64
@@ -109,6 +112,28 @@ jobs:
             --self-contained false \
             -p:Version=${{ steps.version.outputs.value }} \
             -o ./artifacts/${{ matrix.rid }}-fxdep
+
+      # Execute the exact artifact that ships: the runner arch matches
+      # the RID, so a publish that produces a non-runnable binary
+      # (bad RID mapping, trimming fault, missing native lib) fails
+      # here instead of on a user's machine.
+      - name: Smoke-run published binary
+        shell: bash
+        run: |
+          set -euo pipefail
+          bin="./artifacts/${{ matrix.rid }}-selfcontained/ivicli"
+          [ -f "$bin" ] || bin="${bin}.exe"
+          out="$("$bin" --version)"
+          echo "ivicli --version -> $out"
+          case "$out" in
+            "${{ steps.version.outputs.value }}"*)
+              echo "smoke passed"
+              ;;
+            *)
+              echo "smoke FAILED — expected version ${{ steps.version.outputs.value }}"
+              exit 1
+              ;;
+          esac
 
       - name: Upload binaries
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -175,11 +200,39 @@ jobs:
           name: ivicli-nupkg
           path: ./artifacts/nupkg
 
+  # Native-arm64 counterpart of the amd64 smoke gate inside the
+  # `docker` job below: builds the linux/arm64 single-arch image on an
+  # arm64 runner and runs the same HEALTHCHECK + SCPI round-trip, so
+  # the arm64 half of the multi-arch manifest is executed before the
+  # push (ADR 0016). No QEMU — emulated .NET is slow and flaky.
+  docker-smoke-arm64:
+    name: docker / mock-VISA smoke (arm64)
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 20
+    needs: publish
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Download linux-arm64 self-contained artifact
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: ivicli-linux-arm64
+          path: ./artifacts
+
+      - name: Build single-arch (arm64) for smoke
+        run: |
+          docker build -f docker/Dockerfile \
+            --build-arg RID=linux-arm64 \
+            --tag ivi-cli-mock:smoke-arm64 .
+
+      - name: Run smoke test
+        run: sh docker/smoke-test.sh ivi-cli-mock:smoke-arm64
+
   docker:
     name: docker / mock-VISA container
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    needs: publish
+    needs: [publish, docker-smoke-arm64]
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
@@ -239,38 +292,7 @@ jobs:
             --tag ivi-cli-mock:smoke .
 
       - name: Run smoke test
-        run: |
-          set -euo pipefail
-          docker run -d --name mock-smoke -p 4880:4880 -p 5025:5025 ivi-cli-mock:smoke
-          # Wait until the HEALTHCHECK reports healthy (max 30 s).
-          for i in $(seq 1 30); do
-            status="$(docker inspect --format '{{.State.Health.Status}}' mock-smoke)"
-            if [ "$status" = "healthy" ]; then
-              echo "container healthy after ${i}s"
-              break
-            fi
-            sleep 1
-          done
-          if [ "$(docker inspect --format '{{.State.Health.Status}}' mock-smoke)" != "healthy" ]; then
-            echo "container failed to become healthy"
-            docker logs mock-smoke
-            exit 1
-          fi
-          # SCPI round-trip over the SOCKET gateway (no client framing
-          # required). Expect the baked default IDN response.
-          response="$(docker exec mock-smoke bash -c 'echo "*IDN?" | nc -w 2 127.0.0.1 5025')"
-          echo "got: $response"
-          case "$response" in
-            *IVICLI-MOCK*)
-              echo "smoke passed"
-              ;;
-            *)
-              echo "smoke FAILED — unexpected response"
-              docker logs mock-smoke
-              exit 1
-              ;;
-          esac
-          docker rm -f mock-smoke
+        run: sh docker/smoke-test.sh ivi-cli-mock:smoke
 
       - name: Build + push multi-arch manifest
         uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
