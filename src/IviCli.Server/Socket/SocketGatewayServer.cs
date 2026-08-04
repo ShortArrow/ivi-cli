@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Sockets;
 using System.Text;
 using IviCli.Application.Backends;
+using IviCli.Application.Logging;
 using IviCli.Application.Servers;
 using IviCli.Domain;
 using IviCli.Domain.Configuration;
@@ -166,17 +167,13 @@ public sealed class SocketGatewayServer : IGatewayServer
                 return;
             }
 
-            var backendResult = _backendFactory.CreateFor(device);
-            if (backendResult is not Result<IIviBackend, BackendError>.Ok { Value: var backend })
+            if (Failed(_backendFactory.CreateFor(device), out var backend))
             {
-                _logger.LogError("backend resolution failed");
                 return;
             }
 
-            var openResult = await backend.OpenAsync(device, ct);
-            if (openResult is not Result<Unit, BackendError>.Ok)
+            if (Failed(await backend.OpenAsync(device, ct), out _))
             {
-                _logger.LogError("backend open failed");
                 return;
             }
 
@@ -221,35 +218,24 @@ public sealed class SocketGatewayServer : IGatewayServer
 
                     if (trimmed.EndsWith('?'))
                     {
-                        var queryResult = ScpiQuery.From(trimmed);
-                        if (queryResult is not Result<ScpiQuery, ScpiError>.Ok { Value: var q })
+                        if (Failed(ScpiQuery.From(trimmed), out var q))
                         {
-                            _logger.LogWarning("invalid SCPI query received");
                             continue;
                         }
-                        var resp = await backend.QueryAsync(device, q, ct);
-                        if (resp is Result<string, BackendError>.Ok { Value: var responseText })
+                        if (Failed(await backend.QueryAsync(device, q, ct), out var responseText))
                         {
-                            await writer.WriteLineAsync(responseText.AsMemory(), ct);
-                        }
-                        else
-                        {
-                            _logger.LogWarning("backend query failed");
                             break;
                         }
+                        await writer.WriteLineAsync(responseText.AsMemory(), ct);
                     }
                     else
                     {
-                        var cmdResult = ScpiCommand.From(trimmed);
-                        if (cmdResult is not Result<ScpiCommand, ScpiError>.Ok { Value: var c })
+                        if (Failed(ScpiCommand.From(trimmed), out var c))
                         {
-                            _logger.LogWarning("invalid SCPI command received");
                             continue;
                         }
-                        var writeResult = await backend.WriteAsync(device, c, ct);
-                        if (writeResult is not Result<Unit, BackendError>.Ok)
+                        if (Failed(await backend.WriteAsync(device, c, ct), out _))
                         {
-                            _logger.LogWarning("backend write failed");
                             break;
                         }
                     }
@@ -270,5 +256,28 @@ public sealed class SocketGatewayServer : IGatewayServer
         {
             _logger.LogError(ex, "connection terminated with unexpected error");
         }
+    }
+
+    /// <summary>
+    /// Unwraps a result, logging the error side through the contract it carries
+    /// (severity, message template, structured arguments, cause).
+    /// </summary>
+    /// <returns><c>true</c> when the result failed and the caller should stop.</returns>
+    private bool Failed<T, TError>(Result<T, TError> result, out T value)
+        where TError : IviError
+    {
+        if (result is Result<T, TError>.Ok ok)
+        {
+            value = ok.Value;
+            return false;
+        }
+
+        if (result is Result<T, TError>.Error error)
+        {
+            _logger.LogIviError(error.Err);
+        }
+
+        value = default!;
+        return true;
     }
 }
