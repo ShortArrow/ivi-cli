@@ -4,7 +4,27 @@ All notable changes to ivi-cli are documented here. Format roughly follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning follows
 [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.10] — 2026-08-05
+
+### Fixed
+
+- **Concurrent session saves can no longer lose `session.json`** (#106). Two
+  processes persisting the session at once — as the mock container's two
+  gateway processes do when activating the env-named scenario at startup —
+  could leave no session file at all, and a missing file reads as an empty
+  session, which deactivates every live scenario binding on the next
+  request (the container then answers `*IDN?` with the bare FakeBackend
+  response). Saves now write a uniquely named temp file and replace the
+  destination in one atomic step, retrying briefly on Windows replace
+  contention, and a failed persist of an env-activated binding is logged
+  instead of discarded. Measured on native arm64 runners: 3/10 container
+  boots hit the race before the fix, 0/10 after.
+
 ## [0.2.9] — 2026-08-05
+
+> Published to NuGet only: the release pipeline's arm64 container smoke
+> caught the session-save race fixed in 0.2.10, so the GitHub Release and
+> container image for 0.2.9 never shipped.
 
 ### Fixed
 
