@@ -63,6 +63,54 @@ public class JsonSessionStoreTests
     }
 
     [Fact]
+    public async Task ConcurrentSaves_NeverLoseTheSessionFile()
+    {
+        // Given: two writers persisting the same binding to one session
+        // path, as the mock container's two gateway processes do at startup.
+        // A reader that finds the file missing treats it as an empty session,
+        // which tears down every live scenario binding — so no interleaving
+        // of saves may leave the file absent or a save reporting failure.
+        var fs = new System.IO.Abstractions.FileSystem();
+        var dir = fs.Path.Combine(
+            fs.Path.GetTempPath(),
+            "ivi-session-race-" + Guid.NewGuid().ToString("N")
+        );
+        fs.Directory.CreateDirectory(dir);
+        try
+        {
+            var path = fs.Path.Combine(dir, "session.json");
+            var state = new SessionState(
+                null,
+                ImmutableDictionary<DeviceName, ScenarioName>.Empty.Add(
+                    DeviceName.From("mock1").ShouldBeOk(),
+                    ScenarioName.From("default").ShouldBeOk()
+                )
+            );
+            var writerA = new JsonSessionStore(fs, path);
+            var writerB = new JsonSessionStore(fs, path);
+
+            for (var round = 0; round < 200; round++)
+            {
+                // When
+                var results = await Task.WhenAll(
+                    Task.Run(() => writerA.SaveAsync(state, CancellationToken.None)),
+                    Task.Run(() => writerB.SaveAsync(state, CancellationToken.None))
+                );
+
+                // Then
+                results[0].ShouldBeOk();
+                results[1].ShouldBeOk();
+                var loaded = (await writerA.LoadAsync(CancellationToken.None)).ShouldBeOk();
+                loaded.DeviceScenarios.ShouldNotBeEmpty();
+            }
+        }
+        finally
+        {
+            fs.Directory.Delete(dir, recursive: true);
+        }
+    }
+
+    [Fact]
     public async Task LoadAsync_WithInvalidJson_ReturnsParseFailure()
     {
         // Given

@@ -180,25 +180,59 @@ public sealed class JsonSessionStore : ISessionStore
             }
         }
 
-        var tempPath = _path + ".tmp";
+        // The temp name is unique per write and the rename replaces the
+        // destination in one step, so concurrent writers (e.g. two gateway
+        // processes activating the same env scenario at startup) can never
+        // clobber each other's temp file or leave a window with no session
+        // file — a reader that finds the file missing treats it as an empty
+        // session and tears down every live scenario binding.
+        var tempPath = $"{_path}.{Guid.NewGuid():N}.tmp";
         try
         {
             await _fs.File.WriteAllTextAsync(tempPath, serialized, ct);
             ApplyUserOnlyPermissions(tempPath);
-            if (_fs.File.Exists(_path))
-            {
-                _fs.File.Delete(_path);
-            }
-            _fs.File.Move(tempPath, _path);
+            await ReplaceWithRetryAsync(tempPath, ct);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
+            try
+            {
+                _fs.File.Delete(tempPath);
+            }
+            catch (Exception cleanupEx)
+                when (cleanupEx is IOException or UnauthorizedAccessException) { }
             return Result.Failure<Unit, SessionStoreError>(
                 new SessionStoreWriteFailure($"write failed at {_path}", ex)
             );
         }
 
         return Result.Success<Unit, SessionStoreError>(Unit.Value);
+    }
+
+    /// <summary>
+    /// Renames the written temp file onto the session path, replacing the
+    /// destination in one step. On Windows a concurrent replace of the same
+    /// destination transiently fails; contention between simultaneous
+    /// writers (two gateway processes activating the same env scenario at
+    /// startup) is legitimate, so the rename retries briefly before the
+    /// failure surfaces.
+    /// </summary>
+    private async Task ReplaceWithRetryAsync(string tempPath, CancellationToken ct)
+    {
+        const int maxAttempts = 5;
+        for (var attempt = 1; ; attempt++)
+        {
+            try
+            {
+                _fs.File.Move(tempPath, _path, overwrite: true);
+                return;
+            }
+            catch (Exception ex)
+                when (attempt < maxAttempts && ex is IOException or UnauthorizedAccessException)
+            {
+                await Task.Delay(TimeSpan.FromMilliseconds(10 * attempt), ct);
+            }
+        }
     }
 
     private void ApplyUserOnlyPermissions(string path)

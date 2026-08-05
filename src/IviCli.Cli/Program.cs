@@ -581,7 +581,21 @@ internal static class Program
                 // IVICLI_SCENARIO) on the first request. Mirrors what
                 // `mock scenario activate` records.
                 var bound = session.BindScenario(envTarget, envName);
-                _ = await sessionStore.SaveAsync(bound, ct);
+                var saved = await sessionStore.SaveAsync(bound, ct);
+                if (saved is Result<Unit, SessionStoreError>.Error { Err: var saveError })
+                {
+                    Log.Logger.Write(
+                        Logging.SerilogConfiguration.ToLogEventLevel(saveError.Severity),
+                        saveError.Cause,
+                        saveError.Message,
+                        saveError.LogArgs.ToArray()
+                    );
+                    Log.Logger.Warning(
+                        "scenario binding {Scenario} -> {Device} was not persisted; a gateway session refresh may deactivate it",
+                        envName.Value,
+                        envTarget.Value
+                    );
+                }
             }
         }
 
