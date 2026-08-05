@@ -5,10 +5,7 @@ namespace IviCli.Application.Logging;
 
 /// <summary>
 /// Logs an <see cref="IviError"/> through the contract the error itself carries:
-/// "logging happens at a single point — the composition root", and that point
-/// emits <c>logger.Log(error.Level, error.Cause, error.Message, error.LogArgs)</c>
-/// (ADR 0014 §9). Call sites that substitute a fixed string discard the severity
-/// the variant declares and every structured value it holds.
+/// its declared severity, cause, message template and structured arguments.
 /// </summary>
 public static class IviErrorLoggerExtensions
 {
