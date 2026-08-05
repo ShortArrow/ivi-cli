@@ -101,5 +101,14 @@ jobs:
             --build-arg RID=linux-arm64 \
             --tag ivi-cli-mock:pr-smoke-arm64 .
 
-      - name: Smoke test (HEALTHCHECK + SCPI roundtrip)
-        run: sh docker/smoke-test.sh ivi-cli-mock:pr-smoke-arm64
+      - name: Smoke test x10 (startup-race stress)
+        run: |
+          fails=0
+          for i in $(seq 1 10); do
+            echo "=== round $i ==="
+            if ! sh docker/smoke-test.sh ivi-cli-mock:pr-smoke-arm64; then
+              fails=$((fails+1))
+            fi
+          done
+          echo "failed rounds: $fails/10"
+          [ "$fails" -eq 0 ] || exit 1
