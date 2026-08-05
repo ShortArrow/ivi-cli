@@ -4,6 +4,17 @@ All notable changes to ivi-cli are documented here. Format roughly follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning follows
 [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.9] — 2026-08-05
+
+### Fixed
+
+- **SOCKET gateway failures are logged through the error's own contract**
+  (#102). Every failure call site now logs the severity, message template,
+  structured arguments, and cause the error variant declares, instead of a
+  per-site fixed string. In gateway logs, a pool-lease wait ("another op is
+  in flight", warning) is now distinguishable from a silent instrument
+  (error).
+
 ## [0.2.8] — 2026-07-22
 
 ### Added
