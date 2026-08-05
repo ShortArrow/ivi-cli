@@ -62,3 +62,53 @@ jobs:
 
       - name: Smoke test (HEALTHCHECK + SCPI roundtrip)
         run: sh docker/smoke-test.sh ivi-cli-mock:pr-smoke
+
+  # Native-arm64 twin of the job above. Before this job existed, the
+  # only arm64 execution of the container was the release-tag gate in
+  # release.yml, so an arm64-timing bug could hide until a release run.
+  docker-smoke-arm64:
+    name: docker / mock-VISA smoke (arm64)
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 20
+    env:
+      DOTNET_NOLOGO: true
+      DOTNET_CLI_TELEMETRY_OPTOUT: true
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          global-json-file: global.json
+          cache: true
+          cache-dependency-path: '**/packages.lock.json'
+
+      - name: Restore (locked)
+        run: dotnet restore --locked-mode
+
+      - name: Publish self-contained linux-arm64
+        run: |
+          dotnet publish src/IviCli.Cli/IviCli.Cli.csproj \
+            -c Release -r linux-arm64 \
+            --self-contained true \
+            -p:PublishSingleFile=true \
+            -p:IncludeNativeLibrariesForSelfExtract=true \
+            -o ./artifacts/linux-arm64-selfcontained
+
+      - name: Build single-arch image (no push)
+        run: |
+          docker build -f docker/Dockerfile \
+            --build-arg RID=linux-arm64 \
+            --tag ivi-cli-mock:pr-smoke-arm64 .
+
+      - name: Smoke test x10 (startup-race stress)
+        run: |
+          fails=0
+          for i in $(seq 1 10); do
+            echo "=== round $i ==="
+            if ! sh docker/smoke-test.sh ivi-cli-mock:pr-smoke-arm64; then
+              fails=$((fails+1))
+            fi
+          done
+          echo "failed rounds: $fails/10"
+          [ "$fails" -eq 0 ] || exit 1
