@@ -89,14 +89,5 @@ public static class SerilogConfiguration
     /// <see cref="Microsoft.Extensions.Logging.LogLevel"/>.
     /// </summary>
     public static Microsoft.Extensions.Logging.LogLevel ToLogLevel(Domain.LogSeverity severity) =>
-        severity switch
-        {
-            Domain.LogSeverity.Trace => Microsoft.Extensions.Logging.LogLevel.Trace,
-            Domain.LogSeverity.Debug => Microsoft.Extensions.Logging.LogLevel.Debug,
-            Domain.LogSeverity.Information => Microsoft.Extensions.Logging.LogLevel.Information,
-            Domain.LogSeverity.Warning => Microsoft.Extensions.Logging.LogLevel.Warning,
-            Domain.LogSeverity.Error => Microsoft.Extensions.Logging.LogLevel.Error,
-            Domain.LogSeverity.Critical => Microsoft.Extensions.Logging.LogLevel.Critical,
-            _ => Microsoft.Extensions.Logging.LogLevel.Information,
-        };
+        Application.Logging.IviErrorLoggerExtensions.ToLogLevel(severity);
 }
