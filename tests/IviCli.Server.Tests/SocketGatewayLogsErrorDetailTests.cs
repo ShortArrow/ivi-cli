@@ -69,7 +69,7 @@ public sealed class SocketGatewayLogsErrorDetailTests
             await logger.WaitForWarningAsync(cts.Token);
         }
 
-        var warning = logger.Entries.First(entry => entry.Level == LogLevel.Warning);
+        var warning = logger.Snapshot().First(entry => entry.Level == LogLevel.Warning);
         warning.Text.ShouldContain("invalid SCPI query");
         warning.Text.ShouldContain("exceeds", Case.Insensitive);
 
@@ -115,9 +115,17 @@ public sealed class SocketGatewayLogsErrorDetailTests
             TaskCreationOptions.RunContinuationsAsynchronously
         );
 
-        public List<Entry> Entries { get; } = new();
+        private readonly List<Entry> _entries = new();
 
         public Task WaitForWarningAsync(CancellationToken ct) => _firstWarning.Task.WaitAsync(ct);
+
+        public List<Entry> Snapshot()
+        {
+            lock (_entries)
+            {
+                return _entries.ToList();
+            }
+        }
 
         public IDisposable? BeginScope<TState>(TState state)
             where TState : notnull => null;
@@ -132,9 +140,9 @@ public sealed class SocketGatewayLogsErrorDetailTests
             Func<TState, Exception?, string> formatter
         )
         {
-            lock (Entries)
+            lock (_entries)
             {
-                Entries.Add(new Entry(logLevel, formatter(state, exception)));
+                _entries.Add(new Entry(logLevel, formatter(state, exception)));
             }
 
             if (logLevel == LogLevel.Warning)
