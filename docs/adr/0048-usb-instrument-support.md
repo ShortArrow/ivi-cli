@@ -39,14 +39,26 @@ implemented.
 ### 1. Stage 1 — discovery through the VISA.NET abstraction
 
 A new `IBackendScanner` in `IviCli.Backends.Local` enumerates USB
-instruments by calling `GlobalResourceManager.Find("USB?*::INSTR")`
-through the same reflection bindings the session factory uses:
+instruments by calling `Ivi.Visa.GlobalResourceManager.Find("USB?*::INSTR")`
+against the IVI Foundation's own `IviFoundation.Visa` NuGet package:
 
-- No compile-time package dependency; the scanner binds to `Ivi.Visa`
-  at first use, exactly like `ReflectionVisaSessionFactory`.
-- When the shared component is absent, the scanner contributes nothing
-  and `visa scan` completes from the other sources. `ivicli doctor`
-  remains the place that reports the missing runtime.
+- The package is the abstraction itself — published by the foundation's
+  verified nuget.org account, `lib/net6.0`, no vendor code inside.
+  Vendor implementations are never referenced; the shared components
+  discover the installed provider at runtime (the `VendorAssemblies`
+  layout VISA.NET 7.2 introduced for modern .NET).
+- Reflection over an installer-provided `Ivi.Visa.dll` cannot serve
+  here: the installers place the shared components in the GAC and
+  `Framework64` directories, which modern .NET's `Assembly.Load` never
+  probes. The session factory is likewise typed over the package
+  (`VisaSessionFactory`) — the earlier reflective factory assumed an
+  `Open(string, int, int)` overload the real API does not have
+  (`Open(string, AccessModes, int)`), so it could never open a session.
+- When no vendor implementation is registered — or the implementation
+  reports "no resources found", which VISA surfaces as an exception —
+  the scanner contributes nothing and `visa scan` completes from the
+  other sources. `ivicli doctor` remains the place that reports runtime
+  diagnostics.
 - Discovered resources parse through `VisaResource.Parse` and register
   with the deterministic `usb-<serial>` alias from ADR 0008 §5.
 - Session open is unchanged: `Usb → LocalBackend`, still through the
@@ -103,6 +115,9 @@ VISA runtime is involved.
   runtime — the docs must say so plainly.
 - USBTMC over WinUSB/libusb carries real driver-binding friction on
   Windows; some users will hit the "bound to vendor driver" error first.
+- Self-contained release artifacts now bundle `Ivi.Visa.dll` under the
+  IVI Foundation license (object-code use; free sublicense shipped with
+  a product is expressly permitted, and ivi-cli charges nothing).
 
 **Mitigations**
 

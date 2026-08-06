@@ -192,7 +192,9 @@ public sealed class LocalBackend : IIviBackend
     private static BackendError MapError(LocalVisaError err) =>
         err switch
         {
-            LocalVisaRuntimeMissing m => new TransportDisconnected(m.Message),
+            LocalVisaRuntimeMissing m => new TransportDisconnected(
+                $"VISA runtime not available: {m.Detail}"
+            ),
             LocalVisaOpenFailure o => new TransportDisconnected(
                 $"open failed: {o.Detail}",
                 o.Cause

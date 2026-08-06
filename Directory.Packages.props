@@ -10,6 +10,14 @@
       Version="10.0.10"
     />
     <PackageVersion Include="Microsoft.Extensions.DependencyInjection" Version="10.0.9" />
+    <!--
+      The IVI Foundation's own VISA.NET shared components (the Ivi.Visa
+      abstraction), published by the foundation's verified nuget.org
+      account. Vendor VISA implementations are never referenced; the
+      shared components discover them at runtime. Pinned to the same
+      release line as the installed shared components (8.0.x).
+    -->
+    <PackageVersion Include="IviFoundation.Visa" Version="8.0.2" />
     <PackageVersion Include="Tomlyn" Version="2.10.1" />
     <PackageVersion Include="Microsoft.Extensions.Hosting" Version="10.0.9" />
     <PackageVersion Include="Microsoft.Extensions.Logging" Version="10.0.9" />

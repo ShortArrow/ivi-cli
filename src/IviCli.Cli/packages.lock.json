@@ -478,6 +478,7 @@
         "type": "Project",
         "dependencies": {
           "IviCli.Application": "[0.2.10, )",
+          "IviFoundation.Visa": "[8.0.2, )",
           "Microsoft.Extensions.DependencyInjection.Abstractions": "[10.0.10, )"
         }
       },
@@ -541,6 +542,12 @@
           "Microsoft.Extensions.DependencyInjection.Abstractions": "[10.0.10, )",
           "Microsoft.Extensions.Logging.Abstractions": "[10.0.10, )"
         }
+      },
+      "IviFoundation.Visa": {
+        "type": "CentralTransitive",
+        "requested": "[8.0.2, )",
+        "resolved": "8.0.2",
+        "contentHash": "M7gBB5H9WyPwF5MKK0Q5+I9sYaKH1GMHdezjwsmtYwH7t0oy5nSK7B9ooGnX043eoDkY7o/5DvNy8DEzKHqW3Q=="
       },
       "Makaretu.Dns": {
         "type": "CentralTransitive",

@@ -11,11 +11,11 @@ using Xunit;
 namespace IviCli.Backends.Local.Tests;
 
 /// <summary>
-/// Reflection-only smoke tests for <see cref="ReflectionVisaSessionFactory"/>
+/// Runtime smoke tests for <see cref="VisaSessionFactory"/>
 /// against an installed IVI Shared Components runtime
 /// (NI-VISA / Keysight VISA / compatible) — see ADR 0037.
 ///
-/// These tests exercise the assembly-resolution and reflection plumbing
+/// These tests exercise the VISA.NET runtime plumbing
 /// but never assume a physical instrument is attached. Failures surface
 /// as <see cref="BackendError"/> values, not exceptions. The
 /// <c>[Requires("ni-visa")]</c> gate cache-loads <c>Ivi.Visa</c> once per
@@ -47,7 +47,7 @@ public sealed class LocalBackendVisaInteropTests
             .GetType("Ivi.Visa.IMessageBasedSession")
             .ShouldNotBeNull("the IVI shared components assembly must expose IMessageBasedSession");
 
-        var factory = new ReflectionVisaSessionFactory();
+        var factory = new VisaSessionFactory();
         // First-use trigger: a deliberately-invalid resource should at
         // worst return BackendError — never throw — confirming the
         // bindings record initialised cleanly.
@@ -63,7 +63,7 @@ public sealed class LocalBackendVisaInteropTests
     [Trait("Category", "Integration")]
     public async Task OpenAsync_against_obviously_invalid_resource_returns_BackendError()
     {
-        var backend = new LocalBackend(new ReflectionVisaSessionFactory());
+        var backend = new LocalBackend(new VisaSessionFactory());
 
         // 0.0.0.0 is not a routeable destination; VISA must reject the
         // session open rather than block indefinitely. The 500 ms device
@@ -80,7 +80,7 @@ public sealed class LocalBackendVisaInteropTests
         // 127.0.0.1:nothing-listening exercises the reflection path
         // through to the VISA runtime's TCP code; the failure must
         // surface as a clean BackendError (no thrown exception).
-        var backend = new LocalBackend(new ReflectionVisaSessionFactory());
+        var backend = new LocalBackend(new VisaSessionFactory());
         var result = await backend.OpenAsync(Dev("TCPIP0::127.0.0.1::inst0::INSTR"), default);
 
         result.ShouldBeOfType<Result<Unit, BackendError>.Error>();

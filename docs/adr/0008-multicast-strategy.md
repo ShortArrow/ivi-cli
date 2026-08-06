@@ -156,9 +156,13 @@ resource shape so repeated invocations are idempotent:
 
 | Variant | Alias |
 | --- | --- |
-| TCPIP | Sanitized host portion (lowercase, non-alnum → `-`) |
-| USB | `usb-<serial>` |
-| GPIB | `gpib-<primary-address>` |
+| TCPIP | Sanitized host portion (lowercase, non-alnum → `_`; `host_` prefixed when the result does not start with a letter, e.g. an IP) |
+| USB | `usb_<serial>` |
+| GPIB | `gpib_<primary-address>` |
+
+Every derived alias satisfies the `DeviceName` grammar
+(`[a-z][a-z0-9_]*`) — an alias the grammar rejects could be discovered
+but never registered.
 
 Existing alias collisions are surfaced as "skipped (alias taken)"
 rather than errors.
