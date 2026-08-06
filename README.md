@@ -10,7 +10,7 @@
 
 - **Stateful, VISA-native CLI**
   - **A current device, like a shell's working directory.** `ivicli visa add psu1 <resource>` registers an alias once; `ivicli visa use psu1` makes it *the current device*, so every later `visa query` / `write` / `script` needs no target at all — no VISA resource, not even the alias.
-  - **VISA-compatible.** Parses standard `TCPIP::`, `USB::`, `GPIB::` resource strings without proprietary syntax.
+  - **VISA-compatible.** Parses standard `TCPIP::`, `USB::`, `GPIB::` resource strings without proprietary syntax. `USB::` needs an installed VISA runtime.
   - **Automation-friendly.** Stdout carries data (including `--json`); stderr carries logs. Exit codes are POSIX-conventional. Shell completion ships for bash / zsh / PowerShell.
 - **Discover & inspect**
   - **Auto-discovery.** `ivicli visa scan` walks the LAN via LXI mDNS / DNS-SD + VXI-11 portmapper broadcast and lists every responder; `--add` registers them all in one shot.

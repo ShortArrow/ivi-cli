@@ -1,5 +1,6 @@
 using IviCli.Application.Backends;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace IviCli.Backends.Local;
 
@@ -17,6 +18,24 @@ public static class LocalBackendServiceCollectionExtensions
         services.AddSingleton<IVisaSessionFactory, ReflectionVisaSessionFactory>();
         services.AddSingleton<LocalBackend>();
         services.AddSingleton<IIviBackend>(sp => sp.GetRequiredService<LocalBackend>());
+        return services;
+    }
+
+    /// <summary>
+    /// Registers <see cref="LocalUsbScanner"/> as an additional
+    /// <see cref="IBackendScanner"/>, backed by
+    /// <see cref="VisaResourceFinder"/>, so <c>ivicli visa scan</c>
+    /// surfaces USB instruments visible to the installed VISA runtime.
+    /// </summary>
+    public static IServiceCollection AddIviCliLocalUsbScanner(this IServiceCollection services)
+    {
+        services.TryAddSingleton<IVisaResourceFinder, VisaResourceFinder>();
+        services.AddSingleton<LocalUsbScanner>();
+        services.TryAddEnumerable(
+            ServiceDescriptor.Singleton<IBackendScanner, LocalUsbScanner>(sp =>
+                sp.GetRequiredService<LocalUsbScanner>()
+            )
+        );
         return services;
     }
 }

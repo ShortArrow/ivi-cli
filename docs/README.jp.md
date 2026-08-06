@@ -10,7 +10,7 @@
 
 - **状態保持型・VISA ネイティブな CLI**
   - **シェルのカレントディレクトリのような「現在の機器」.** `ivicli visa add psu1 <resource>` で alias を一度登録し、`ivicli visa use psu1` で *現在の機器* に設定すれば、以降の `visa query` / `write` / `script` は対象指定が一切不要です（VISA リソースはもちろん alias すら書かなくてよい）。
-  - **VISA 互換.** 標準的な `TCPIP::` / `USB::` / `GPIB::` のリソース文字列を独自構文なしで扱います。
+  - **VISA 互換.** 標準的な `TCPIP::` / `USB::` / `GPIB::` のリソース文字列を独自構文なしで扱います。`USB::` にはインストール済みの VISA runtime が必要です。
   - **自動化指向.** stdout はデータ (`--json` 含む)、stderr はログ専用。終了コードは POSIX 慣習に従い、bash / zsh / PowerShell の補完をサポートします。
 - **発見と可視化**
   - **自動 discovery.** `ivicli visa scan` で LAN 上の機器を LXI mDNS / DNS-SD + VXI-11 portmapper broadcast で発見、`--add` を付ければそのまま `visa add` でまとめて登録します。

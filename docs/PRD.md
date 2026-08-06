@@ -159,6 +159,10 @@ Keithley on its vendor port). The sweep is opt-in and bounded to `/24`-or-
 smaller subnets; `--subnet`/`--host` override the target set. `--verbose`
 sends `*IDN?` to each open SOCKET endpoint and reports the model.
 
+USB instruments are enumerated through the installed VISA runtime (the
+VISA.NET shared components plus an implementation); on a machine without
+one, USB entries are simply absent from the results.
+
 Example output:
 
 ```text

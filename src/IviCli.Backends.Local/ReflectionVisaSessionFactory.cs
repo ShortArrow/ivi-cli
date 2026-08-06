@@ -12,9 +12,9 @@ namespace IviCli.Backends.Local;
 /// <see cref="LocalVisaRuntimeMissing"/>.
 /// </summary>
 /// <remarks>
-/// Reflection is used so this assembly compiles without a NuGet
-/// dependency on a vendor SDK that is distributed via the VISA
-/// installer rather than via nuget.org.
+/// The <c>Ivi.Visa</c> assembly resolves from the application directory
+/// (the <c>IviFoundation.Visa</c> package). The reflective binding
+/// tolerates slight VISA.NET API drift across shared-component versions.
 /// </remarks>
 public sealed class ReflectionVisaSessionFactory : IVisaSessionFactory
 {
