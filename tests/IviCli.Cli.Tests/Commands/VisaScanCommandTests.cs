@@ -1,3 +1,5 @@
+using IviCli.Application.Backends;
+using IviCli.Application.Devices;
 using IviCli.Cli.Commands;
 using IviCli.Domain.Visa;
 using IviCli.TestKit;
@@ -54,6 +56,75 @@ public sealed class VisaScanCommandTests
         // `visa scan --add` cannot register what it just discovered
         Domain.Devices.DeviceName.From(alias).ShouldBeOk();
     }
+
+    [Fact]
+    public void RenderHuman_collapses_a_group_that_repeats_its_own_key()
+    {
+        // Given a lone USB resource, whose group key is the resource string itself
+        var scan = ScanOf(Discovered("USB0::0x0b3e::0x1049::DN001677::INSTR"));
+
+        // When the human listing is rendered
+        var lines = VisaScanCommand.RenderHuman(scan);
+
+        // Then the header carries the resource and no child repeats it
+        lines.ShouldBe(["[1] USB0::0x0b3e::0x1049::DN001677::INSTR"]);
+    }
+
+    [Fact]
+    public void RenderHuman_keeps_idn_and_detail_on_a_collapsed_group()
+    {
+        var scan = ScanOf(
+            Discovered("USB0::0x0b3e::0x1049::DN001677::INSTR", "ACME,PSU,1,2.0", "USBTMC")
+        );
+
+        var lines = VisaScanCommand.RenderHuman(scan);
+
+        lines.ShouldBe(["[1] USB0::0x0b3e::0x1049::DN001677::INSTR   [ACME,PSU,1,2.0]   (USBTMC)"]);
+    }
+
+    [Fact]
+    public void RenderHuman_keeps_the_header_and_children_for_a_multi_path_host()
+    {
+        // Given one host reachable over two access paths
+        var scan = ScanOf(
+            Discovered("TCPIP0::192.168.3.10::inst0::INSTR"),
+            Discovered("TCPIP0::192.168.3.10::5025::SOCKET")
+        );
+
+        // When the human listing is rendered
+        var lines = VisaScanCommand.RenderHuman(scan);
+
+        // Then the host heads the group and both paths stay indented under it
+        lines.ShouldBe([
+            "[1] 192.168.3.10",
+            "      TCPIP0::192.168.3.10::5025::SOCKET",
+            "      TCPIP0::192.168.3.10::inst0::INSTR",
+        ]);
+    }
+
+    [Fact]
+    public void RenderHuman_keeps_the_header_for_a_lone_tcpip_resource()
+    {
+        var scan = ScanOf(Discovered("TCPIP0::192.168.3.10::inst0::INSTR"));
+
+        var lines = VisaScanCommand.RenderHuman(scan);
+
+        lines.ShouldBe(["[1] 192.168.3.10", "      TCPIP0::192.168.3.10::inst0::INSTR"]);
+    }
+
+    [Fact]
+    public void RenderHuman_reports_an_empty_scan()
+    {
+        VisaScanCommand.RenderHuman(new ScanResult([])).ShouldBe(["(no resources discovered)"]);
+    }
+
+    private static ScanResult ScanOf(params DiscoveredResource[] resources) => new([.. resources]);
+
+    private static DiscoveredResource Discovered(
+        string raw,
+        string? idn = null,
+        string? detail = null
+    ) => new(VisaResource.Parse(raw).ShouldBeOk(), idn, detail);
 
     [Theory]
     [InlineData("TCPIP0::host::hislip0::INSTR")]
