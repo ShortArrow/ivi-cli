@@ -96,6 +96,7 @@ public sealed class Vxi11BroadcastScanner : IBackendScanner
             {
                 EnableBroadcast = true,
             };
+            DisableConnectionReset(udp);
             await udp.SendAsync(request, new IPEndPoint(target.Broadcast, PortmapperPort), ct)
                 .ConfigureAwait(false);
 
@@ -109,6 +110,15 @@ public sealed class Vxi11BroadcastScanner : IBackendScanner
                 catch (OperationCanceledException)
                 {
                     break; // discovery window elapsed
+                }
+                catch (SocketException ex) when (KeepsListening(ex.SocketErrorCode))
+                {
+                    _logger.LogDebug(
+                        "VXI-11 probe receive reset on {Local} ({Code}); continuing",
+                        target.Local,
+                        ex.SocketErrorCode
+                    );
+                    continue;
                 }
                 catch (SocketException ex)
                 {
@@ -154,6 +164,40 @@ public sealed class Vxi11BroadcastScanner : IBackendScanner
         }
         return new IPAddress(b);
     }
+
+    // Windows surfaces an ICMP Port Unreachable from any probed host as a
+    // ConnectionReset on the *next* receive unless SIO_UDP_CONNRESET is
+    // cleared, which a broadcast probe provokes on every reply-less host.
+    // Best effort: KeepsListening still guards the receive loop.
+    private static void DisableConnectionReset(UdpClient udp)
+    {
+        if (!OperatingSystem.IsWindows())
+        {
+            return;
+        }
+        try
+        {
+            udp.Client.IOControl(unchecked((int)0x9800000C), [0], null);
+        }
+        catch (SocketException)
+        {
+            // Older stacks and non-Winsock providers reject the ioctl.
+        }
+    }
+
+    /// <summary>
+    /// Decides whether the discovery window survives a receive failure.
+    ///
+    /// <see cref="SocketError.ConnectionReset"/> (WSAECONNRESET) on a UDP
+    /// socket reports only that one previously sent datagram was refused by
+    /// its destination with an ICMP Port Unreachable — a routine outcome of
+    /// broadcasting to a subnet where most hosts run no portmapper. The
+    /// socket stays usable, so the window must keep listening: VXI-11
+    /// responders that answer later arrive on this same socket and would
+    /// otherwise be missed. Every other error is treated as fatal for this
+    /// interface.
+    /// </summary>
+    public static bool KeepsListening(SocketError error) => error == SocketError.ConnectionReset;
 
     /// <summary>
     /// Decides whether a unicast address belongs on the probe list: it must

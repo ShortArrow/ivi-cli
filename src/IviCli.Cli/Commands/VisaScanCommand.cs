@@ -227,38 +227,58 @@ public static class VisaScanCommand
             }
             Console.WriteLine("]}");
         }
-        else if (scan.Resources.IsEmpty)
-        {
-            Console.WriteLine("(no resources discovered)");
-        }
         else
         {
-            var groups = scan
-                .Resources.GroupBy(GroupKey, StringComparer.OrdinalIgnoreCase)
-                .OrderBy(g => g.Key, StringComparer.OrdinalIgnoreCase)
-                .ToList();
-            for (var i = 0; i < groups.Count; i++)
+            foreach (var line in RenderHuman(scan))
             {
-                var group = groups[i];
-                Console.WriteLine(string.Create(inv, $"[{i + 1}] {group.Key}"));
-                foreach (
-                    var r in group.OrderBy(r => FormatResource(r.Resource), StringComparer.Ordinal)
-                )
-                {
-                    var line = $"      {FormatResource(r.Resource)}";
-                    if (r.Idn is not null)
-                    {
-                        line += $"   [{r.Idn}]";
-                    }
-                    if (r.Detail is not null)
-                    {
-                        line += $"   ({r.Detail})";
-                    }
-                    Console.WriteLine(line);
-                }
+                Console.WriteLine(line);
             }
         }
         return ExitCodeMapper.Success;
+    }
+
+    /// <summary>
+    /// Renders the human-readable scan listing: one numbered group per
+    /// endpoint, its access paths indented beneath it. A group whose single
+    /// member already spells out the group key — a USB or GPIB resource,
+    /// which groups by its own resource string — collapses to that one line
+    /// instead of repeating itself as its own child.
+    /// </summary>
+    public static IReadOnlyList<string> RenderHuman(ScanResult scan)
+    {
+        var inv = CultureInfo.InvariantCulture;
+        if (scan.Resources.IsEmpty)
+        {
+            return ["(no resources discovered)"];
+        }
+
+        var lines = new List<string>();
+        var groups = scan
+            .Resources.GroupBy(GroupKey, StringComparer.OrdinalIgnoreCase)
+            .OrderBy(g => g.Key, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        for (var i = 0; i < groups.Count; i++)
+        {
+            var group = groups[i];
+            var members = group
+                .OrderBy(r => FormatResource(r.Resource), StringComparer.Ordinal)
+                .ToList();
+            var header = string.Create(inv, $"[{i + 1}] {group.Key}");
+            if (members is [var only] && FormatResource(only.Resource) == group.Key)
+            {
+                lines.Add($"{header}{Suffixes(only)}");
+                continue;
+            }
+            lines.Add(header);
+            lines.AddRange(members.Select(r => $"      {FormatResource(r.Resource)}{Suffixes(r)}"));
+        }
+        return lines;
+    }
+
+    private static string Suffixes(DiscoveredResource r)
+    {
+        var suffix = r.Idn is not null ? $"   [{r.Idn}]" : string.Empty;
+        return r.Detail is not null ? $"{suffix}   ({r.Detail})" : suffix;
     }
 
     /// <summary>

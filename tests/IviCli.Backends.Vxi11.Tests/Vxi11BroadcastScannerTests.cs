@@ -62,6 +62,24 @@ public sealed class Vxi11BroadcastScannerTests
     }
 
     [Fact]
+    public void KeepsListening_survives_a_windows_icmp_port_unreachable()
+    {
+        // Given a UDP probe whose previous datagram was refused via ICMP
+        // When the next receive reports ConnectionReset
+        // Then the discovery window must continue on the same socket
+        Vxi11BroadcastScanner.KeepsListening(SocketError.ConnectionReset).ShouldBeTrue();
+    }
+
+    [Theory]
+    [InlineData(SocketError.OperationAborted)]
+    [InlineData(SocketError.AddressNotAvailable)]
+    [InlineData(SocketError.NotSocket)]
+    public void KeepsListening_abandons_the_window_on_a_fatal_socket_error(SocketError error)
+    {
+        Vxi11BroadcastScanner.KeepsListening(error).ShouldBeFalse();
+    }
+
+    [Fact]
     public void ShouldProbe_rejects_a_missing_or_empty_mask()
     {
         Vxi11BroadcastScanner
