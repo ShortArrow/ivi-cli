@@ -1,3 +1,4 @@
+using System.Threading.Channels;
 using IviCli.Application.Backends;
 using IviCli.Domain;
 using IviCli.Domain.Devices;
@@ -16,7 +17,7 @@ public sealed class LocalBackend : IIviBackend
 {
     private readonly IVisaSessionFactory _factory;
     private readonly TimeSpan _openTimeout;
-    private readonly Dictionary<DeviceName, IVisaSessionHandle> _sessions = new();
+    private readonly Dictionary<DeviceName, LocalSession> _sessions = new();
     private readonly object _gate = new();
 
     /// <summary>
@@ -46,7 +47,7 @@ public sealed class LocalBackend : IIviBackend
             {
                 existing.Dispose();
             }
-            _sessions[device.Name] = handle;
+            _sessions[device.Name] = new LocalSession(handle, device.Name);
         }
         return Task.FromResult(Result.Success<Unit, BackendError>(Unit.Value));
     }
@@ -57,9 +58,9 @@ public sealed class LocalBackend : IIviBackend
         ct.ThrowIfCancellationRequested();
         lock (_gate)
         {
-            if (_sessions.Remove(device.Name, out var handle))
+            if (_sessions.Remove(device.Name, out var session))
             {
-                handle.Dispose();
+                session.Dispose();
             }
         }
         return Task.FromResult(Result.Success<Unit, BackendError>(Unit.Value));
@@ -149,9 +150,8 @@ public sealed class LocalBackend : IIviBackend
         }
         // v1 sends the SCPI *TRG common-command through the existing
         // Write path — works against every IEEE-488.2 instrument. A v2
-        // can switch to IMessageBasedSession.AssertTrigger via
-        // reflection once the IVisaSessionHandle port grows a Trigger()
-        // method (ADR 0041 §4).
+        // can switch to IMessageBasedSession.AssertTrigger once the
+        // IVisaSessionHandle port grows a Trigger() method (ADR 0041 §4).
         var write = handle.Write("*TRG");
         if (write is Result<Unit, LocalVisaError>.Error err)
         {
@@ -161,25 +161,102 @@ public sealed class LocalBackend : IIviBackend
     }
 
     /// <inheritdoc/>
-#pragma warning disable CS1998
     public async IAsyncEnumerable<ServiceRequest> ServiceRequestStream(
         Device device,
         [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct
     )
     {
-        // v1 returns an empty stream — wiring Ivi.Visa's ServiceRequest
-        // event through the reflection-based IVisaSessionHandle takes a
-        // dedicated batch. Operators who need real SRQ today drive the
-        // instrument over HiSlip / VXI-11 instead.
-        yield break;
+        var session = TryGetSession(device);
+        if (session is null || !session.TryEnableServiceRequests())
+        {
+            // Best-effort per ADR 0041: no open session, or a VISA runtime
+            // that refuses the subscription, yields an empty stream.
+            yield break;
+        }
+        var reader = session.ServiceRequests.Reader;
+        while (true)
+        {
+            bool ready;
+            try
+            {
+                ready = await reader.WaitToReadAsync(ct);
+            }
+            catch (OperationCanceledException)
+            {
+                yield break;
+            }
+            if (!ready)
+            {
+                yield break;
+            }
+            while (reader.TryRead(out var srq))
+            {
+                yield return srq;
+            }
+        }
     }
-#pragma warning restore CS1998
 
-    private IVisaSessionHandle? TryGetHandle(Device device)
+    private IVisaSessionHandle? TryGetHandle(Device device) => TryGetSession(device)?.Handle;
+
+    private LocalSession? TryGetSession(Device device)
     {
         lock (_gate)
         {
-            return _sessions.TryGetValue(device.Name, out var h) ? h : null;
+            return _sessions.TryGetValue(device.Name, out var s) ? s : null;
+        }
+    }
+
+    /// <summary>
+    /// Per-Device session state: the VISA handle plus the SRQ fan-out
+    /// channel its service request callback writes into.
+    /// </summary>
+    private sealed class LocalSession : IDisposable
+    {
+        private readonly DeviceName _device;
+        private readonly object _srqGate = new();
+        private bool _srqAttempted;
+        private bool _srqEnabled;
+
+        public LocalSession(IVisaSessionHandle handle, DeviceName device)
+        {
+            Handle = handle;
+            _device = device;
+        }
+
+        public IVisaSessionHandle Handle { get; }
+
+        public Channel<ServiceRequest> ServiceRequests { get; } =
+            Channel.CreateUnbounded<ServiceRequest>();
+
+        /// <summary>
+        /// Subscribes to the handle's service requests on first call and
+        /// reports whether SRQs can be delivered. Later calls replay the
+        /// first outcome — the handle contract assumes a single consumer.
+        /// </summary>
+        public bool TryEnableServiceRequests()
+        {
+            lock (_srqGate)
+            {
+                if (_srqAttempted)
+                {
+                    return _srqEnabled;
+                }
+                _srqAttempted = true;
+                _srqEnabled =
+                    Handle.EnableServiceRequests(OnStatusByte) is Result<Unit, LocalVisaError>.Ok;
+                return _srqEnabled;
+            }
+        }
+
+        private void OnStatusByte(byte statusByte) =>
+            ServiceRequests.Writer.TryWrite(
+                new ServiceRequest(_device, statusByte, DateTimeOffset.UtcNow)
+            );
+
+        public void Dispose()
+        {
+            ServiceRequests.Writer.TryComplete();
+            Handle.Dispose();
         }
     }
 

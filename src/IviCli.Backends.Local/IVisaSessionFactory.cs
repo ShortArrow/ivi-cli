@@ -32,4 +32,14 @@ public interface IVisaSessionHandle : IDisposable
 
     /// <summary>Reads a single response message.</summary>
     Result<string, LocalVisaError> Read();
+
+    /// <summary>
+    /// Subscribes <paramref name="onStatusByte"/> to the instrument's
+    /// service requests. After a successful call every service request the
+    /// instrument raises invokes the callback exactly once with the status
+    /// byte read back from the instrument. A single consumer is assumed —
+    /// implementations need not support enabling twice. Disposing the
+    /// handle tears the subscription down.
+    /// </summary>
+    Result<Unit, LocalVisaError> EnableServiceRequests(Action<byte> onStatusByte);
 }

@@ -68,7 +68,7 @@ default to zero.
 | Fake | Counter (`TriggerCountFor`) | `Channel<ServiceRequest>` populated by `RaiseServiceRequest` test affordance |
 | Replay | `BackendOperationNotSupported` | empty |
 | Socket | `BackendOperationNotSupported` | empty |
-| Local | `Write("*TRG")` via existing IVisaSessionHandle | empty (reflection event subscription = v2) |
+| Local | `Write("*TRG")` via existing IVisaSessionHandle | `IMessageBasedSession.ServiceRequest` event via `IVisaSessionHandle.EnableServiceRequests` |
 | HiSlip | Send `Trigger` (type 24) on sync channel | Read `ServiceRequest` (type 20) on async channel |
 | VXI-11 | `device_trigger` (proc 17) on Core channel | Interrupt channel ([ADR 0042](0042-vxi11-interrupt-channel.md)) — gateway reverse-connects via `device_intr_srq` |
 
@@ -136,11 +136,18 @@ Decorator chain pass-through:
   invoked `IMessageBasedSession.AssertTrigger()` is a Tidy-First
   refactor that pairs naturally with Ivi.Visa event subscription
   for SRQ.
-- **Reflection-based SRQ subscription on the Local backend.**
-  `IMessageBasedSession.ServiceRequest` is a CLR event; surfacing
-  it through the reflection-only `IVisaSessionHandle` requires
-  delegate construction at runtime. Deferred to the same batch
-  as `AssertTrigger`.
+- ~~**Reflection-based SRQ subscription on the Local backend.**~~
+  Superseded: the project references `IviFoundation.Visa` directly,
+  so no reflection is involved. `IVisaSessionHandle` carries
+  `EnableServiceRequests(Action<byte>)`; the production handle
+  subscribes to `IMessageBasedSession.ServiceRequest`, arms it with
+  `EnableEvent(EventType.ServiceRequest)`, and reads the status byte
+  with `ReadStatusByte()` per callback. `LocalBackend.ServiceRequestStream`
+  enables the subscription on first consumption and drains an unbounded
+  `Channel<ServiceRequest>`. Delivery stays best-effort: no open session
+  or a refused enable yields an empty stream, and a status byte that
+  cannot be read drops that one SRQ rather than faulting the VISA event
+  thread.
 - **CapturingBackend NDJSON entry per SRQ.** Capture passes the
   stream through transparently; if operators want SRQs recorded
   they tee the stream at the handler level.
@@ -149,7 +156,7 @@ Decorator chain pass-through:
 
 - HiSLIP clients can now trigger an instrument through the gateway
   and observe its SRQ notifications end-to-end — the path
-  client → gateway → FakeBackend (or future Local backend) is
+  client → gateway → FakeBackend (or Local backend) is
   exercised by the new tests.
 - The `IIviBackend` port stays sealed: existing decorators (capture,
   pool, instrumenting) updated in one pass; future backends (e.g.

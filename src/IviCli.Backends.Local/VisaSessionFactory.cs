@@ -53,6 +53,7 @@ public sealed class VisaSessionFactory : IVisaSessionFactory
     private sealed class VisaSessionHandle : IVisaSessionHandle
     {
         private readonly IMessageBasedSession _session;
+        private EventHandler<VisaEventArgs>? _serviceRequestHandler;
         private bool _disposed;
 
         public VisaSessionHandle(IMessageBasedSession session)
@@ -102,7 +103,48 @@ public sealed class VisaSessionFactory : IVisaSessionFactory
             }
         }
 
+        public Result<Unit, LocalVisaError> EnableServiceRequests(Action<byte> onStatusByte)
+        {
+            EventHandler<VisaEventArgs> handler = (_, _) =>
+            {
+                StatusByteFlags status;
+                try
+                {
+                    status = _session.ReadStatusByte();
+                }
+                catch (Exception)
+                {
+                    // An SRQ whose status byte cannot be read must not crash the VISA event thread.
+                    return;
+                }
+                onStatusByte((byte)status);
+            };
+            try
+            {
+                _session.ServiceRequest += handler;
+                _session.EnableEvent(EventType.ServiceRequest);
+                _serviceRequestHandler = handler;
+                return Result.Success<Unit, LocalVisaError>(Unit.Value);
+            }
+            catch (Exception ex)
+            {
+                Unhook(handler);
+                return Result.Failure<Unit, LocalVisaError>(new LocalVisaIoFailure(ex.Message, ex));
+            }
+        }
+
         private string ReadResponse() => _session.FormattedIO.ReadLine().TrimEnd('\r', '\n');
+
+        private void Unhook(EventHandler<VisaEventArgs> handler)
+        {
+            try
+            {
+                _session.ServiceRequest -= handler;
+            }
+            catch (Exception)
+            { /* teardown is best-effort */
+            }
+        }
 
         public void Dispose()
         {
@@ -111,6 +153,11 @@ public sealed class VisaSessionFactory : IVisaSessionFactory
                 return;
             }
             _disposed = true;
+            if (_serviceRequestHandler is not null)
+            {
+                Unhook(_serviceRequestHandler);
+                _serviceRequestHandler = null;
+            }
             _session.Dispose();
         }
     }
