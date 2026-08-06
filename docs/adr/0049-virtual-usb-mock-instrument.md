@@ -79,9 +79,16 @@ finds it like any other instrument.
 
 ### 5. Debuggable by generic tools, not only through VISA
 
-A mock that can only be observed through a VISA API is hard to debug.
-Two properties keep ordinary tooling in the loop:
+A mock is only as debuggable as the tools that can watch it. Three
+observation layers, each served by tooling that already exists:
 
+- **The VISA API layer stays traceable.** Because the device enumerates
+  through every vendor VISA as an ordinary resource, the vendors' own
+  call monitors — NI I/O Trace, Keysight IO Monitor, TekVISA's
+  OpenChoice Call Monitor — record each `viOpen` / `viWrite` /
+  `viReadSTB` against the mock exactly as against real hardware.
+  Vendor-VISA enumeration is therefore a debugging channel in its own
+  right, not merely a compatibility checkbox.
 - **Wire captures need no USB capture driver.** Every URB travels as
   USB/IP over TCP, and Wireshark dissects that natively (the built-in
   `usbip` dissector) — a loopback capture shows every transfer,
