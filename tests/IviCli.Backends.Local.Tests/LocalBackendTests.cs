@@ -170,10 +170,24 @@ internal sealed class FakeVisaSessionFactory : IVisaSessionFactory
 
 internal sealed class FakeVisaSession : IVisaSessionHandle
 {
+    private readonly TaskCompletionSource _enabled = new(
+        TaskCreationOptions.RunContinuationsAsynchronously
+    );
+    private Action<byte>? _onStatusByte;
+
     public List<string> Writes { get; } = new();
     public Dictionary<string, string> QueryResponses { get; } = new();
     public string? ReadResponse { get; set; }
     public bool Disposed { get; private set; }
+
+    /// <summary>Makes <see cref="EnableServiceRequests"/> report an IO failure.</summary>
+    public bool FailServiceRequestEnable { get; set; }
+
+    /// <summary>Completes once a consumer has subscribed to service requests.</summary>
+    public Task ServiceRequestsEnabled => _enabled.Task;
+
+    /// <summary>Delivers <paramref name="statusByte"/> to the registered callback.</summary>
+    public void RaiseServiceRequest(byte statusByte) => _onStatusByte?.Invoke(statusByte);
 
     public Result<Unit, LocalVisaError> Write(string text)
     {
@@ -202,6 +216,19 @@ internal sealed class FakeVisaSession : IVisaSessionHandle
             );
         }
         return Result.Success<string, LocalVisaError>(ReadResponse);
+    }
+
+    public Result<Unit, LocalVisaError> EnableServiceRequests(Action<byte> onStatusByte)
+    {
+        if (FailServiceRequestEnable)
+        {
+            return Result.Failure<Unit, LocalVisaError>(
+                new LocalVisaIoFailure("service requests unavailable (test)", null)
+            );
+        }
+        _onStatusByte = onStatusByte;
+        _enabled.TrySetResult();
+        return Result.Success<Unit, LocalVisaError>(Unit.Value);
     }
 
     public void Dispose() => Disposed = true;
