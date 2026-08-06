@@ -196,7 +196,9 @@ public static class ApiCommand
                         var loadErr = (
                             (Result<TlsCertificateBundle, TlsLoadError>.Error)loaded
                         ).Err;
-                        Console.Error.WriteLine($"error: {loadErr.Message}");
+                        Console.Error.WriteLine(
+                            $"error: {IviCli.Application.Logging.IviErrorMessages.Render(loadErr)}"
+                        );
                         return ExitCodeMapper.DeviceError;
                     }
                     bundle = b;

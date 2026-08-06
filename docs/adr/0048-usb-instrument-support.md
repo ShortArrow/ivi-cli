@@ -50,9 +50,10 @@ against the IVI Foundation's own `IviFoundation.Visa` NuGet package:
 - Reflection over an installer-provided `Ivi.Visa.dll` cannot serve
   here: the installers place the shared components in the GAC and
   `Framework64` directories, which modern .NET's `Assembly.Load` never
-  probes. `ReflectionVisaSessionFactory` keeps its reflective binding —
-  which now resolves the package-provided assembly from the application
-  directory — and moving it to direct calls is a follow-up.
+  probes. The session factory is likewise typed over the package
+  (`VisaSessionFactory`) — the earlier reflective factory assumed an
+  `Open(string, int, int)` overload the real API does not have
+  (`Open(string, AccessModes, int)`), so it could never open a session.
 - When no vendor implementation is registered — or the implementation
   reports "no resources found", which VISA surfaces as an exception —
   the scanner contributes nothing and `visa scan` completes from the

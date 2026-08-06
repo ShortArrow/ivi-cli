@@ -41,6 +41,23 @@ public class LocalBackendTests
     }
 
     [Fact]
+    public async Task Runtime_missing_maps_to_a_reason_without_template_placeholders()
+    {
+        // Given a factory reporting the runtime as missing
+        var factory = new FakeVisaSessionFactory { ReturnRuntimeMissing = true };
+        var backend = new LocalBackend(factory);
+
+        // When the open fails
+        var result = await backend.OpenAsync(Dev("psu"), default);
+
+        // Then the mapped reason is rendered text, never a raw {Placeholder}
+        var err = ((Result<Unit, BackendError>.Error)result).Err;
+        var reason = err.ShouldBeOfType<TransportDisconnected>().Reason;
+        reason.ShouldNotContain("{");
+        reason.ShouldContain("VISA runtime not available");
+    }
+
+    [Fact]
     public async Task WriteAsync_forwards_to_session_after_open()
     {
         var factory = new FakeVisaSessionFactory();

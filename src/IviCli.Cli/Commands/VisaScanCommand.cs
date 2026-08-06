@@ -3,6 +3,7 @@ using System.CommandLine;
 using System.Globalization;
 using IviCli.Application.Backends;
 using IviCli.Application.Devices;
+using IviCli.Application.Logging;
 using IviCli.Domain;
 using IviCli.Domain.Visa;
 using Microsoft.Extensions.DependencyInjection;
@@ -140,7 +141,9 @@ public static class VisaScanCommand
                     skipped++;
                     break;
                 case Result<Domain.Devices.DeviceName, AddDeviceError>.Error err:
-                    Console.Error.WriteLine($"  failed to add {alias}: {err.Err.Message}");
+                    Console.Error.WriteLine(
+                        $"  failed to add {alias}: {IviErrorMessages.Render(err.Err)}"
+                    );
                     break;
             }
         }
@@ -151,7 +154,7 @@ public static class VisaScanCommand
     /// <summary>
     /// Derives a CLI alias from a discovered resource. Preference order:
     /// <list type="number">
-    /// <item>TCPIP host portion lowercased, hyphenated.</item>
+    /// <item>TCPIP host portion lowercased, underscored.</item>
     /// <item>USB serial number.</item>
     /// <item>GPIB primary address.</item>
     /// </list>
@@ -161,12 +164,22 @@ public static class VisaScanCommand
     public static string DeriveAlias(VisaResource resource) =>
         resource switch
         {
-            VisaResource.Tcpip t => Sanitize(t.Host),
-            VisaResource.TcpipSocket s => $"{Sanitize(s.Host)}-{s.Port}",
-            VisaResource.Usb u => $"usb-{Sanitize(u.SerialNumber)}",
-            VisaResource.Gpib g => $"gpib-{g.PrimaryAddress}",
+            VisaResource.Tcpip t => HostAlias(t.Host),
+            VisaResource.TcpipSocket s => $"{HostAlias(s.Host)}_{s.Port}",
+            VisaResource.Usb u => $"usb_{Sanitize(u.SerialNumber)}",
+            VisaResource.Gpib g => $"gpib_{g.PrimaryAddress}",
             _ => "device",
         };
+
+    // A DeviceName must start with a lowercase letter, which a numeric
+    // host (an IP address) cannot supply on its own.
+    private static string HostAlias(string host)
+    {
+        var sanitized = Sanitize(host);
+        return sanitized.Length > 0 && char.IsAsciiLetterLower(sanitized[0])
+            ? sanitized
+            : $"host_{sanitized}".TrimEnd('_');
+    }
 
     /// <summary>
     /// Renders an unmasked VISA resource string suitable for
@@ -176,13 +189,17 @@ public static class VisaScanCommand
     /// </summary>
     public static string FormatResource(VisaResource resource) => resource.ToCanonical();
 
+    // The output must satisfy the DeviceName grammar ([a-z][a-z0-9_]*),
+    // so anything outside it — including '-' — maps to '_'.
     private static string Sanitize(string raw)
     {
         var lower = raw.ToLowerInvariant();
         var safe = new string(
-            lower.Select(c => char.IsLetterOrDigit(c) || c is '-' or '_' ? c : '-').ToArray()
+            lower
+                .Select(c => char.IsAsciiLetterLower(c) || char.IsAsciiDigit(c) ? c : '_')
+                .ToArray()
         );
-        return safe.Trim('-');
+        return safe.Trim('_');
     }
 
     private static int Success(ScanResult scan, bool emitJson)

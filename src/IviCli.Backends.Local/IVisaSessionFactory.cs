@@ -5,10 +5,9 @@ namespace IviCli.Backends.Local;
 
 /// <summary>
 /// Port for opening VISA-compatible sessions against a resource string.
-/// The production implementation reflectively loads the IVI VISA shared
-/// component (NI-VISA / Keysight VISA) at runtime; tests provide an
-/// in-memory fake. This keeps the LocalBackend project free of a
-/// compile-time dependency on any vendor SDK.
+/// The production implementation calls the IVI Foundation VISA.NET shared
+/// components, which locate an installed vendor implementation at runtime;
+/// tests provide an in-memory fake. No vendor SDK is ever referenced.
 /// </summary>
 public interface IVisaSessionFactory
 {
