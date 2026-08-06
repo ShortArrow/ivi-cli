@@ -52,8 +52,10 @@ public sealed class VisaSessionFactory : IVisaSessionFactory
 
     private sealed class VisaSessionHandle : IVisaSessionHandle
     {
+        private static readonly TimeSpan SrqWaitSlice = TimeSpan.FromMilliseconds(500);
+
         private readonly IMessageBasedSession _session;
-        private EventHandler<VisaEventArgs>? _serviceRequestHandler;
+        private CancellationTokenSource? _srqPumpStop;
         private bool _disposed;
 
         public VisaSessionHandle(IMessageBasedSession session)
@@ -105,46 +107,66 @@ public sealed class VisaSessionFactory : IVisaSessionFactory
 
         public Result<Unit, LocalVisaError> EnableServiceRequests(Action<byte> onStatusByte)
         {
-            EventHandler<VisaEventArgs> handler = (_, _) =>
-            {
-                StatusByteFlags status;
-                try
-                {
-                    status = _session.ReadStatusByte();
-                }
-                catch (Exception)
-                {
-                    // An SRQ whose status byte cannot be read must not crash the VISA event thread.
-                    return;
-                }
-                onStatusByte((byte)status);
-            };
+            // The CLR ServiceRequest event arms VISA's handler mechanism,
+            // which NI-VISA rejects for service requests on USB sessions
+            // (its add accessor throws). The queue mechanism is supported
+            // across transports, so a dedicated pump waits on the queue.
             try
             {
-                _session.ServiceRequest += handler;
                 _session.EnableEvent(EventType.ServiceRequest);
-                _serviceRequestHandler = handler;
-                return Result.Success<Unit, LocalVisaError>(Unit.Value);
             }
             catch (Exception ex)
             {
-                Unhook(handler);
                 return Result.Failure<Unit, LocalVisaError>(new LocalVisaIoFailure(ex.Message, ex));
+            }
+
+            var stop = new CancellationTokenSource();
+            _srqPumpStop = stop;
+            _ = Task.Factory.StartNew(
+                () => PumpServiceRequests(onStatusByte, stop.Token),
+                stop.Token,
+                TaskCreationOptions.LongRunning,
+                TaskScheduler.Default
+            );
+            return Result.Success<Unit, LocalVisaError>(Unit.Value);
+        }
+
+        private void PumpServiceRequests(Action<byte> onStatusByte, CancellationToken stop)
+        {
+            while (!stop.IsCancellationRequested)
+            {
+                try
+                {
+                    _session.WaitOnEvent(EventType.ServiceRequest, SrqWaitSlice);
+                }
+                catch (IOTimeoutException)
+                {
+                    continue; // quiet slice; keep waiting
+                }
+                catch (NativeVisaException ex) when (ex.ErrorCode == NativeErrorCode.Timeout)
+                {
+                    continue;
+                }
+                catch (Exception)
+                {
+                    return; // session closed or faulted; the pump ends quietly
+                }
+
+                byte status;
+                try
+                {
+                    status = (byte)_session.ReadStatusByte();
+                }
+                catch (Exception)
+                {
+                    // An SRQ whose status byte cannot be read must not kill the pump.
+                    continue;
+                }
+                onStatusByte(status);
             }
         }
 
         private string ReadResponse() => _session.FormattedIO.ReadLine().TrimEnd('\r', '\n');
-
-        private void Unhook(EventHandler<VisaEventArgs> handler)
-        {
-            try
-            {
-                _session.ServiceRequest -= handler;
-            }
-            catch (Exception)
-            { /* teardown is best-effort */
-            }
-        }
 
         public void Dispose()
         {
@@ -153,10 +175,11 @@ public sealed class VisaSessionFactory : IVisaSessionFactory
                 return;
             }
             _disposed = true;
-            if (_serviceRequestHandler is not null)
+            if (_srqPumpStop is not null)
             {
-                Unhook(_serviceRequestHandler);
-                _serviceRequestHandler = null;
+                _srqPumpStop.Cancel();
+                _srqPumpStop.Dispose();
+                _srqPumpStop = null;
             }
             _session.Dispose();
         }

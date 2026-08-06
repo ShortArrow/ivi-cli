@@ -139,15 +139,19 @@ Decorator chain pass-through:
 - ~~**Reflection-based SRQ subscription on the Local backend.**~~
   Superseded: the project references `IviFoundation.Visa` directly,
   so no reflection is involved. `IVisaSessionHandle` carries
-  `EnableServiceRequests(Action<byte>)`; the production handle
-  subscribes to `IMessageBasedSession.ServiceRequest`, arms it with
-  `EnableEvent(EventType.ServiceRequest)`, and reads the status byte
-  with `ReadStatusByte()` per callback. `LocalBackend.ServiceRequestStream`
-  enables the subscription on first consumption and drains an unbounded
-  `Channel<ServiceRequest>`. Delivery stays best-effort: no open session
-  or a refused enable yields an empty stream, and a status byte that
-  cannot be read drops that one SRQ rather than faulting the VISA event
-  thread.
+  `EnableServiceRequests(Action<byte>)`; the production handle enables
+  the VISA event **queue** (`EnableEvent(EventType.ServiceRequest)`)
+  and drives a dedicated pump thread that alternates `WaitOnEvent`
+  slices with `ReadStatusByte()` per delivered event. The CLR
+  `ServiceRequest` event is deliberately not used: its add accessor
+  arms VISA's handler mechanism, which NI-VISA rejects for service
+  requests on USB sessions (verified against NI-VISA with a USBTMC
+  instrument). `LocalBackend.ServiceRequestStream` enables the
+  subscription on first consumption and drains an unbounded
+  `Channel<ServiceRequest>`. Delivery stays best-effort: no open
+  session or a refused enable yields an empty stream, and a status
+  byte that cannot be read drops that one SRQ rather than killing
+  the pump.
 - **CapturingBackend NDJSON entry per SRQ.** Capture passes the
   stream through transparently; if operators want SRQs recorded
   they tee the stream at the handler level.
