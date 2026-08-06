@@ -446,14 +446,14 @@
       "ivicli.api": {
         "type": "Project",
         "dependencies": {
-          "IviCli.Application": "[0.2.8, )",
-          "Microsoft.AspNetCore.OpenApi": "[10.0.9, )"
+          "IviCli.Application": "[0.2.10, )",
+          "Microsoft.AspNetCore.OpenApi": "[10.0.10, )"
         }
       },
       "ivicli.application": {
         "type": "Project",
         "dependencies": {
-          "IviCli.Domain": "[0.2.8, )",
+          "IviCli.Domain": "[0.2.10, )",
           "Microsoft.Extensions.DependencyInjection.Abstractions": "[10.0.9, )",
           "Microsoft.Extensions.Logging.Abstractions": "[10.0.9, )",
           "TestableIO.System.IO.Abstractions": "[22.2.0, )"
@@ -462,7 +462,7 @@
       "ivicli.backends.fake": {
         "type": "Project",
         "dependencies": {
-          "IviCli.Application": "[0.2.8, )",
+          "IviCli.Application": "[0.2.10, )",
           "Microsoft.Extensions.DependencyInjection.Abstractions": "[10.0.9, )",
           "Microsoft.Extensions.Logging.Abstractions": "[10.0.9, )"
         }
@@ -470,21 +470,21 @@
       "ivicli.backends.hislip": {
         "type": "Project",
         "dependencies": {
-          "IviCli.Application": "[0.2.8, )",
+          "IviCli.Application": "[0.2.10, )",
           "Microsoft.Extensions.DependencyInjection.Abstractions": "[10.0.9, )"
         }
       },
       "ivicli.backends.local": {
         "type": "Project",
         "dependencies": {
-          "IviCli.Application": "[0.2.8, )",
+          "IviCli.Application": "[0.2.10, )",
           "Microsoft.Extensions.DependencyInjection.Abstractions": "[10.0.9, )"
         }
       },
       "ivicli.backends.lxi": {
         "type": "Project",
         "dependencies": {
-          "IviCli.Application": "[0.2.8, )",
+          "IviCli.Application": "[0.2.10, )",
           "Makaretu.Dns": "[2.0.1, )",
           "Makaretu.Dns.Multicast": "[0.27.0, )",
           "Microsoft.Extensions.DependencyInjection.Abstractions": "[10.0.9, )",
@@ -494,21 +494,21 @@
       "ivicli.backends.replay": {
         "type": "Project",
         "dependencies": {
-          "IviCli.Application": "[0.2.8, )",
+          "IviCli.Application": "[0.2.10, )",
           "Microsoft.Extensions.DependencyInjection.Abstractions": "[10.0.9, )"
         }
       },
       "ivicli.backends.socket": {
         "type": "Project",
         "dependencies": {
-          "IviCli.Application": "[0.2.8, )",
+          "IviCli.Application": "[0.2.10, )",
           "Microsoft.Extensions.DependencyInjection.Abstractions": "[10.0.9, )"
         }
       },
       "ivicli.backends.vxi11": {
         "type": "Project",
         "dependencies": {
-          "IviCli.Application": "[0.2.8, )",
+          "IviCli.Application": "[0.2.10, )",
           "Microsoft.Extensions.DependencyInjection.Abstractions": "[10.0.9, )",
           "Microsoft.Extensions.Logging.Abstractions": "[10.0.9, )"
         }
@@ -519,8 +519,8 @@
       "ivicli.infrastructure": {
         "type": "Project",
         "dependencies": {
-          "IviCli.Application": "[0.2.8, )",
-          "IviCli.Plugin": "[0.2.8, )",
+          "IviCli.Application": "[0.2.10, )",
+          "IviCli.Plugin": "[0.2.10, )",
           "Microsoft.Extensions.DependencyInjection.Abstractions": "[10.0.9, )",
           "Microsoft.Extensions.Logging.Abstractions": "[10.0.9, )",
           "TestableIO.System.IO.Abstractions": "[22.2.0, )",
@@ -531,13 +531,13 @@
       "ivicli.plugin": {
         "type": "Project",
         "dependencies": {
-          "IviCli.Application": "[0.2.8, )"
+          "IviCli.Application": "[0.2.10, )"
         }
       },
       "ivicli.server": {
         "type": "Project",
         "dependencies": {
-          "IviCli.Application": "[0.2.8, )",
+          "IviCli.Application": "[0.2.10, )",
           "Microsoft.Extensions.DependencyInjection.Abstractions": "[10.0.9, )",
           "Microsoft.Extensions.Logging.Abstractions": "[10.0.9, )"
         }
@@ -565,9 +565,9 @@
       },
       "Microsoft.AspNetCore.OpenApi": {
         "type": "CentralTransitive",
-        "requested": "[10.0.9, )",
-        "resolved": "10.0.9",
-        "contentHash": "1ihb8FO9cGgEK1/m3CTtT/SfnynwmiZib0W2pcDVj3KSWk/Sca4VOXEtaptKQc582zpFrzTFiwkGRCglt6H+WQ==",
+        "requested": "[10.0.10, )",
+        "resolved": "10.0.10",
+        "contentHash": "d4Atx9IHq7JgX0F/h7Db+m9zAUzC+cKdI9k+OWnnyQIOUQtfvjIEuhvbjPigVMkAmPUgCbJ8Yp6M9ghUqHtJSQ==",
         "dependencies": {
           "Microsoft.OpenApi": "2.0.0"
         }
