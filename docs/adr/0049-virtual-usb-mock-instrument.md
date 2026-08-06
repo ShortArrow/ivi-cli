@@ -77,12 +77,33 @@ inbox class driver binds, every vendor VISA lists it as
 `USB0::<vid>::<pid>::<serial>::INSTR`, and ivi-cli's own USB scanner
 finds it like any other instrument.
 
-### 5. Out of scope
+### 5. Debuggable by generic tools, not only through VISA
+
+A mock that can only be observed through a VISA API is hard to debug.
+Two properties keep ordinary tooling in the loop:
+
+- **Wire captures need no USB capture driver.** Every URB travels as
+  USB/IP over TCP, and Wireshark dissects that natively (the built-in
+  `usbip` dissector) — a loopback capture shows every transfer,
+  descriptor, and interrupt-IN notification. USBPcap, which inserts a
+  filter driver on physical host controllers and whose behavior on an
+  emulated controller is unverified, is never required.
+- **A serial-shaped profile for serial-shaped tools.** Besides the
+  USBTMC-USB488 profile, the server can export a **CDC-ACM** device;
+  the inbox `usbser.sys` binds and a real COM port appears, so serial
+  terminals (TeraTerm and kin) talk SCPI to the same scenario engine —
+  and a vendor VISA sees an `ASRL` resource. The profile is selected
+  per exported device; USBTMC remains the default. (Raw-TCP terminals
+  already reach the mock today through the SOCKET gateway; the CDC-ACM
+  profile exists for tools that only speak COM.)
+
+### 6. Out of scope
 
 - Tier C (gadget hardware) — stays open as a possible future step; this
   ADR neither commits to nor forecloses it.
-- Isochronous transfers, multiple configurations or interfaces, USB 3
-  features, and device firmware update surfaces.
+- Isochronous transfers, USB 3 features, device firmware update
+  surfaces, and interfaces beyond what the selected profile requires
+  (USBTMC uses one; CDC-ACM uses its standard control + data pair).
 - Automated driver installation of any kind.
 
 ## Consequences
@@ -96,6 +117,9 @@ finds it like any other instrument.
 - The stage-2 native USBTMC backend (ADR 0048) gains a loopback partner:
   the host stack under development and this device server verify each
   other on one machine, no vendor instrument required.
+- Debugging stays in ordinary tools: Wireshark decodes the whole USB
+  conversation from a loopback capture, and the CDC-ACM profile puts
+  the mock behind a plain COM port for serial terminals.
 
 **Cons**
 
