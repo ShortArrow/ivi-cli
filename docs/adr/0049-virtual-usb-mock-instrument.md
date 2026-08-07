@@ -77,6 +77,13 @@ inbox class driver binds, every vendor VISA lists it as
 `USB0::<vid>::<pid>::<serial>::INSTR`, and ivi-cli's own USB scanner
 finds it like any other instrument.
 
+Neither client is a dependency of this design. The dependency is the
+USB/IP wire protocol itself — usbip-win2 and the kernel's `vhci-hcd` are
+interchangeable peers speaking it, and any conforming client attaches the
+same exported device. ADR 0048 §1 draws that line for VISA, where the IVI
+Foundation abstraction may be depended on and a vendor implementation may
+not; the same line runs through the transport here.
+
 ### 5. Debuggable by generic tools, not only through VISA
 
 A mock is only as debuggable as the tools that can watch it. Three
@@ -140,9 +147,22 @@ observation layers, each served by tooling that already exists:
 
 Protocol layers are unit-tested with fakes (descriptor tables, USBTMC
 framing codecs, URB dispatch, the USB488 control requests) — no kernel
-attach in CI. The end-to-end path is verified once on a real host before
-release, per the ADR 0047 policy: attach via usbip-win2, confirm the
-device binds to the inbox USBTMC class driver, confirm a vendor VISA and
-`ivicli visa scan` both enumerate it, run a query round-trip and the
-IEEE 488.2 SRQ sequence against a scenario, and observe the SRQ arriving
+attach in CI. Two attach routes cover the rest, and only one of them
+needs anything installed.
+
+The zero-dependency route runs against the kernel's own client: WSL2
+carries `vhci-hcd`, and under mirrored networking the Windows listener
+is reachable at `localhost`, so a `usbip list -r localhost` and a
+`usbip attach` exercise devlist, import, and full enumeration —
+configuration and string descriptors included — against the reference
+implementation, with no third-party driver anywhere. That route ends at
+enumeration: the Microsoft WSL kernel ships no `usbtmc` class module, so
+no class driver binds and no SCPI traffic crosses it.
+
+The Windows-side attach is the release-gating end-to-end check, verified
+once on a real host before release per the ADR 0047 policy: attach via
+usbip-win2, confirm the device binds to the inbox USBTMC class driver,
+confirm a vendor VISA and `ivicli visa scan` both enumerate it, run a
+query round-trip against a scenario, and — once the interrupt-IN path
+exists — run the IEEE 488.2 SRQ sequence and observe the SRQ arriving
 through `ServiceRequestStream`.
