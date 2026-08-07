@@ -12,6 +12,7 @@ public sealed class UsbControlPipeTests
     private const byte DeviceToHostStandardDevice = 0x80;
     private const byte HostToDeviceStandardDevice = 0x00;
     private const byte DeviceToHostClassInterface = 0xA1;
+    private const byte HostToDeviceClassInterface = 0x21;
 
     private static UsbControlPipe Pipe() => new(UsbGoldenDevice.Definition);
 
@@ -419,6 +420,139 @@ public sealed class UsbControlPipeTests
         reply.Status.ShouldBe(UsbControlPipe.EndpointStalledStatus);
         reply.ActualLength.ShouldBe(0);
         payload.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void HandleEp0_hands_the_out_data_stage_to_the_class_fallback()
+    {
+        // SET_LINE_CODING is the first class request of ADR 0049 §5 whose
+        // meaning is in the OUT data stage rather than in the setup
+        // packet, so the fallback has to see those bytes.
+        byte[] coding = [0x00, 0xC2, 0x01, 0x00, 0x00, 0x00, 0x08];
+        var received = Array.Empty<byte>();
+        var submit = Submit(
+            seqNum: 14,
+            direction: UsbIpConstants.DirOut,
+            setup: new UsbSetupPacket(HostToDeviceClassInterface, 0x20, 0, 0, 7).ToArray(),
+            transferBufferLength: coding.Length
+        );
+
+        var (reply, payload) = Pipe()
+            .HandleEp0(
+                submit,
+                coding,
+                (_, outPayload) =>
+                {
+                    received = outPayload.ToArray();
+                    return UsbControlResult.HandledEmpty();
+                }
+            );
+
+        received.ShouldBe(coding);
+        reply.Status.ShouldBe(0);
+        payload.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void HandleEp0_reports_the_data_stage_a_handled_out_transfer_accepted()
+    {
+        // actual_length answers "how many bytes moved", and on an OUT
+        // transfer those are the ones the host sent, not the empty
+        // response.
+        byte[] coding = [0x00, 0xC2, 0x01, 0x00, 0x00, 0x00, 0x08];
+        var submit = Submit(
+            seqNum: 15,
+            direction: UsbIpConstants.DirOut,
+            setup: new UsbSetupPacket(HostToDeviceClassInterface, 0x20, 0, 0, 7).ToArray(),
+            transferBufferLength: coding.Length
+        );
+
+        var (reply, _) = Pipe()
+            .HandleEp0(submit, coding, (_, _) => UsbControlResult.HandledEmpty());
+
+        reply.ActualLength.ShouldBe(7);
+    }
+
+    [Fact]
+    public void HandleEp0_reports_zero_for_a_handled_out_transfer_with_no_data_stage()
+    {
+        var submit = Submit(
+            seqNum: 16,
+            direction: UsbIpConstants.DirOut,
+            setup: new UsbSetupPacket(
+                HostToDeviceStandardDevice,
+                UsbStandardRequest.SetConfiguration,
+                1,
+                0,
+                0
+            ).ToArray(),
+            transferBufferLength: 0
+        );
+
+        var (reply, _) = Pipe()
+            .HandleEp0(submit, ReadOnlyMemory<byte>.Empty, (_, _) => UsbControlResult.Stall());
+
+        reply.Status.ShouldBe(0);
+        reply.ActualLength.ShouldBe(0);
+    }
+
+    [Fact]
+    public void HandleEp0_reports_the_returned_length_for_an_in_transfer_whatever_arrived_out()
+    {
+        var submit = Submit(
+            seqNum: 17,
+            direction: UsbIpConstants.DirIn,
+            setup: GetDescriptor(UsbDescriptorType.Device, 0, 64).ToArray(),
+            transferBufferLength: 64
+        );
+
+        var (reply, payload) = Pipe()
+            .HandleEp0(submit, new byte[] { 1, 2, 3 }, (_, _) => UsbControlResult.Stall());
+
+        reply.ActualLength.ShouldBe(18);
+        payload.ShouldBe(UsbGoldenDevice.DeviceDescriptor);
+    }
+
+    [Fact]
+    public void HandleEp0_reports_zero_when_an_out_transfer_with_a_data_stage_stalls()
+    {
+        var submit = Submit(
+            seqNum: 18,
+            direction: UsbIpConstants.DirOut,
+            setup: new UsbSetupPacket(HostToDeviceClassInterface, 0x20, 0, 0, 7).ToArray(),
+            transferBufferLength: 7
+        );
+
+        var (reply, _) = Pipe().HandleEp0(submit, new byte[7], (_, _) => UsbControlResult.Stall());
+
+        reply.Status.ShouldBe(UsbControlPipe.EndpointStalledStatus);
+        reply.ActualLength.ShouldBe(0);
+    }
+
+    [Fact]
+    public void HandleEp0_still_composes_a_setup_only_class_fallback()
+    {
+        // The Phase 3 overload keeps working unchanged, which is what lets
+        // the USBTMC handler stay a one-argument function.
+        var submit = Submit(
+            seqNum: 19,
+            direction: UsbIpConstants.DirIn,
+            setup: new UsbSetupPacket(
+                DeviceToHostClassInterface,
+                UsbTmcConstants.RequestGetCapabilities,
+                0,
+                0,
+                UsbTmcConstants.CapabilitiesResponseSize
+            ).ToArray(),
+            transferBufferLength: UsbTmcConstants.CapabilitiesResponseSize
+        );
+        var classHandler = new UsbTmcControlHandler(new UsbTmcMessagePump(), new Usb488Notifier());
+
+        var (reply, payload) = Pipe()
+            .HandleEp0(submit, ReadOnlyMemory<byte>.Empty, classHandler.Handle);
+
+        reply.Status.ShouldBe(0);
+        payload.Length.ShouldBe(UsbTmcConstants.CapabilitiesResponseSize);
     }
 
     private static UsbSetupPacket GetDescriptor(byte descriptorType, byte index, ushort wLength) =>

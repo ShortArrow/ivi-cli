@@ -115,7 +115,7 @@ public sealed class UsbControlPipe
     /// proper (little-endian SETUP and descriptors).
     ///
     /// A handled transfer completes with status 0 and
-    /// <c>actual_length</c> equal to the returned data; a stalled or
+    /// <c>actual_length</c> equal to the bytes that moved; a stalled or
     /// unhandled one with <see cref="EndpointStalledStatus"/> and no
     /// data. The reply header echoes the request's <c>seqnum</c> and
     /// zeroes <c>devid</c>, <c>direction</c> and <c>ep</c>, as the
@@ -141,7 +141,8 @@ public sealed class UsbControlPipe
     /// <param name="outPayload">The OUT data stage, empty when there is none.</param>
     /// <param name="classFallback">
     /// The class layer — <see cref="UsbTmcControlHandler.Handle"/> for the
-    /// USBTMC-USB488 profile.
+    /// USBTMC-USB488 profile, whose every request is decided by the setup
+    /// packet alone.
     /// </param>
     public (UsbIpRetSubmit Reply, byte[] Payload) HandleEp0(
         UsbIpCmdSubmit submit,
@@ -151,11 +152,43 @@ public sealed class UsbControlPipe
     {
         ArgumentNullException.ThrowIfNull(classFallback);
 
+        return HandleEp0(submit, outPayload, (setup, _) => classFallback(setup));
+    }
+
+    /// <summary>
+    /// Answers a USBIP_CMD_SUBMIT addressed to endpoint 0 with a class
+    /// layer that reads the OUT data stage as well as the setup packet —
+    /// SET_LINE_CODING of the CDC-ACM profile (ADR 0049 §5) is the first
+    /// request whose meaning lives there.
+    ///
+    /// The standard state machine runs first; only what it leaves
+    /// <see cref="UsbControlOutcome.NotHandled"/> — every class and vendor
+    /// request — reaches <paramref name="classFallback"/>. A fallback that
+    /// declines in turn leaves the transfer stalled.
+    ///
+    /// <c>actual_length</c> reports the bytes that moved on the data
+    /// stage, which the direction bit of the setup packet decides: the
+    /// returned payload for an IN transfer, the accepted OUT payload for
+    /// an OUT one, and zero whenever the transfer stalls.
+    /// </summary>
+    /// <param name="submit">The URB the host submitted to endpoint 0.</param>
+    /// <param name="outPayload">The OUT data stage, empty when there is none.</param>
+    /// <param name="classFallback">
+    /// The class layer — the CDC-ACM control handler of ADR 0049 §5.
+    /// </param>
+    public (UsbIpRetSubmit Reply, byte[] Payload) HandleEp0(
+        UsbIpCmdSubmit submit,
+        ReadOnlyMemory<byte> outPayload,
+        Func<UsbSetupPacket, ReadOnlyMemory<byte>, UsbControlResult> classFallback
+    )
+    {
+        ArgumentNullException.ThrowIfNull(classFallback);
+
         var setup = UsbSetupPacket.Read(submit.Setup);
         var result = Handle(setup, outPayload);
         if (result.Outcome == UsbControlOutcome.NotHandled)
         {
-            result = classFallback(setup);
+            result = classFallback(setup, outPayload);
         }
 
         var handled = result.Outcome == UsbControlOutcome.Handled;
@@ -170,7 +203,7 @@ public sealed class UsbControlPipe
                 Ep: 0
             ),
             Status: handled ? 0 : EndpointStalledStatus,
-            ActualLength: payload.Length,
+            ActualLength: handled ? TransferredLength(setup, outPayload, payload) : 0,
             StartFrame: 0,
             NumberOfPackets: UsbIpConstants.NumberOfPacketsNonIso,
             ErrorCount: 0
@@ -178,6 +211,18 @@ public sealed class UsbControlPipe
 
         return (reply, payload);
     }
+
+    /// <summary>
+    /// The data-stage bytes a completed transfer moved. An OUT transfer
+    /// moves the host's payload — the device answers it with a status
+    /// stage, not with data — so reporting the response length there
+    /// would tell the host nothing arrived.
+    /// </summary>
+    private static int TransferredLength(
+        UsbSetupPacket setup,
+        ReadOnlyMemory<byte> outPayload,
+        byte[] payload
+    ) => setup.Direction == UsbTransferDirection.HostToDevice ? outPayload.Length : payload.Length;
 
     /// <summary>
     /// GET_DESCRIPTOR. Only the types endpoint 0 serves standalone are
