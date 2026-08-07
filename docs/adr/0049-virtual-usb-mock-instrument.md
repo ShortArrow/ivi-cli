@@ -40,6 +40,14 @@ emulated USB device per bound mock device. No native code and no kernel
 component on the server side — the same "speak the protocol ourselves"
 property the HiSLIP / VXI-11 / SOCKET backends already have.
 
+An exported busid carries one attach at a time, the way a physical port
+does. A second `OP_REQ_IMPORT` for a busid already attached is answered
+with the error status — the same reply an unknown busid gets — so the
+client reports a failed attach and commits no port; detaching frees the
+busid for the next import. `OP_REQ_DEVLIST` still lists the device,
+because the reply has nowhere to say otherwise and a client learns a
+device is taken by being refused it.
+
 ### 2. The exported device is USBTMC-USB488
 
 The emulated device presents interface class `0xFE`, subclass `0x03`,

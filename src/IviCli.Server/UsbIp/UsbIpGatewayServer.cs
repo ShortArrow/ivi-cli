@@ -264,6 +264,12 @@ public sealed class UsbIpGatewayServer : IGatewayServer
     /// <summary>
     /// Answers OP_REQ_DEVLIST with every exported device. The protocol
     /// ends the connection there, so the caller closes it afterwards.
+    ///
+    /// An attached device is listed like any other. The reply has no
+    /// field an in-use marker could go in, and the reference
+    /// <c>usbipd</c> lists what the server exports rather than what is
+    /// free; a client learns a device is taken by being refused the
+    /// import, which is where <see cref="ImportAsync"/> puts it.
     /// </summary>
     private static async Task SendDevlistAsync(
         NetworkStream stream,
@@ -286,7 +292,19 @@ public sealed class UsbIpGatewayServer : IGatewayServer
 
     /// <summary>
     /// Answers OP_REQ_IMPORT and, when the busid names an exported
-    /// device, hands the connection to that device's URB loop.
+    /// device no one holds, hands the connection to that device's URB
+    /// loop.
+    ///
+    /// One instrument has one owner, so the attach is claimed before the
+    /// OK reply is written and released when the URB loop returns. A
+    /// busid already attached is refused with the reply an unknown busid
+    /// gets: the client commits no port and reports a failed attach,
+    /// instead of enumerating a device that would vanish the moment the
+    /// backend refused to open twice.
+    ///
+    /// Connections are handled concurrently, which is why the claim is
+    /// an atomic compare-and-exchange rather than a read followed by a
+    /// write.
     /// </summary>
     private async Task ImportAsync(
         NetworkStream stream,
@@ -318,20 +336,38 @@ public sealed class UsbIpGatewayServer : IGatewayServer
             return;
         }
 
-        await WriteImportReplyAsync(
-            stream,
-            version,
-            UsbIpConstants.StatusOk,
-            export.Exported.Device,
-            ct
-        );
-        _logger.LogInformation(
-            "device {BusId} imported (device {Device})",
-            export.BusId,
-            export.Device.Name.Value
-        );
+        if (!export.TryClaimAttach())
+        {
+            _logger.LogInformation(
+                "import refused: device {BusId} is already attached (device {Device})",
+                export.BusId,
+                export.Device.Name.Value
+            );
+            await WriteImportReplyAsync(stream, version, UsbIpConstants.StatusError, null, ct);
+            return;
+        }
 
-        await ServeAsync(stream, export, ct);
+        try
+        {
+            await WriteImportReplyAsync(
+                stream,
+                version,
+                UsbIpConstants.StatusOk,
+                export.Exported.Device,
+                ct
+            );
+            _logger.LogInformation(
+                "device {BusId} imported (device {Device})",
+                export.BusId,
+                export.Device.Name.Value
+            );
+
+            await ServeAsync(stream, export, ct);
+        }
+        finally
+        {
+            export.ReleaseAttach();
+        }
     }
 
     private static async Task WriteImportReplyAsync(
@@ -972,6 +1008,10 @@ public sealed class UsbIpGatewayServer : IGatewayServer
     /// One route as the protocol sees it: the busid a client attaches by,
     /// the device definition its descriptors come from, and the mock
     /// device its messages reach.
+    ///
+    /// One instance exists per busid for the life of the server, which is
+    /// what lets it hold the attach claim — the only state here that two
+    /// connections ever touch at once.
     /// </summary>
     private sealed record ExportedDevice(
         Route Route,
@@ -980,7 +1020,19 @@ public sealed class UsbIpGatewayServer : IGatewayServer
         UsbIpExportedDevice Exported
     )
     {
+        private int _attached;
+
         public string BusId => Route.Endpoint.Value;
+
+        /// <summary>
+        /// Takes the attach, or reports that another connection already
+        /// holds it. Only the caller that took it may
+        /// <see cref="ReleaseAttach"/>.
+        /// </summary>
+        public bool TryClaimAttach() => Interlocked.CompareExchange(ref _attached, 1, 0) == 0;
+
+        /// <summary>Hands the busid back, so a later import may have it.</summary>
+        public void ReleaseAttach() => Interlocked.Exchange(ref _attached, 0);
 
         /// <summary>
         /// The state one attach of this device owns, built for the

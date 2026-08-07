@@ -1,5 +1,6 @@
 using System.Text;
 using IviCli.Domain.Protocols;
+using IviCli.Domain.Servers;
 using IviCli.Server.UsbIp;
 using IviCli.TestKit;
 using Shouldly;
@@ -63,6 +64,55 @@ public sealed class UsbIpGatewayServerTests
 
         reply.Status.ShouldBe(UsbIpConstants.StatusError);
         reply.Device.ShouldBeNull();
+    }
+
+    [Fact]
+    public async Task Import_of_a_busid_whose_device_is_attached_answers_an_error_status()
+    {
+        await using var bench = await UsbIpBench.StartAsync();
+        var attached = await bench.ImportAsync();
+        await Enumerate(attached, bench.Token);
+
+        var reply = await bench.Connect().RequestImportAsync(BusId, bench.Token);
+
+        // The same reply an unknown busid gets: no device block, so the
+        // client commits no port and never starts enumerating one.
+        reply.Status.ShouldBe(UsbIpConstants.StatusError);
+        reply.Device.ShouldBeNull();
+    }
+
+    [Fact]
+    public async Task A_busid_freed_by_a_detach_can_be_imported_again()
+    {
+        await using var bench = await UsbIpBench.StartAsync();
+        var attached = await bench.ImportAsync();
+        await Enumerate(attached, bench.Token);
+        attached.Dispose();
+
+        var client = await bench.ImportWhenFreeAsync(BusId);
+
+        var descriptor = await Enumerate(client, bench.Token);
+        descriptor.Payload.Length.ShouldBe(UsbDescriptors.DeviceDescriptorLength);
+    }
+
+    [Fact]
+    public async Task Two_busids_on_different_devices_are_attached_at_once_and_both_serve_traffic()
+    {
+        await using var bench = await UsbIpBench.StartAsync(
+            (BusId, UsbExportProfile.UsbTmc, FirstDeviceName),
+            (SecondBusId, UsbExportProfile.UsbTmc, SecondDeviceName)
+        );
+
+        var first = await bench.ImportAsync(BusId);
+        var second = await bench.ImportAsync(SecondBusId);
+
+        await WriteAsync(first, ":VOLT 1.000", bench.Token);
+        await WriteAsync(second, ":VOLT 2.000", bench.Token);
+
+        var one = await bench.Backend.ReadAsync(bench.DeviceNamed(FirstDeviceName), bench.Token);
+        one.ShouldBeOk().ShouldBe(":VOLT 1.000");
+        var other = await bench.Backend.ReadAsync(bench.DeviceNamed(SecondDeviceName), bench.Token);
+        other.ShouldBeOk().ShouldBe(":VOLT 2.000");
     }
 
     [Fact]
@@ -355,4 +405,41 @@ public sealed class UsbIpGatewayServerTests
         var recorded = await bench.Backend.ReadAsync(bench.Device, bench.Token);
         recorded.ShouldBeOk().ShouldBe(":VOLT 24.000");
     }
+
+    /// <summary>
+    /// One round trip on endpoint 0, which is what proves an attach is
+    /// live: the import reply alone says only that the server answered.
+    /// </summary>
+    private static async Task<SubmitReply> Enumerate(UsbIpTestClient client, CancellationToken ct)
+    {
+        var descriptor = await client.ControlInAsync(
+            UsbIpTestClient.DeviceToHostStandardDevice,
+            UsbStandardRequest.GetDescriptor,
+            wValue: UsbDescriptorType.Device << 8,
+            wIndex: 0,
+            wLength: 64,
+            ct
+        );
+        descriptor.Reply.Status.ShouldBe(0);
+        return descriptor;
+    }
+
+    private static async Task WriteAsync(UsbIpTestClient client, string scpi, CancellationToken ct)
+    {
+        var written = await client.BulkOutAsync(
+            UsbTmcCodec.WriteDevDepMsgOut(
+                new UsbTmcDevDepMsgOut(
+                    BTag: 1,
+                    EndOfMessage: true,
+                    Encoding.ASCII.GetBytes(scpi + "\n")
+                )
+            ),
+            ct
+        );
+        written.Reply.Status.ShouldBe(0);
+    }
+
+    private const string SecondBusId = "1-3";
+    private const string FirstDeviceName = "dut_a";
+    private const string SecondDeviceName = "dut_b";
 }
