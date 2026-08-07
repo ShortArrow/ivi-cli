@@ -29,6 +29,9 @@ public static class TomlConfigParser
     private const string PortField = "port";
     private const string ServerField = "server";
     private const string EndpointField = "endpoint";
+    private const string ProfileField = "profile";
+    private const string UsbTmcProfileName = "usbtmc";
+    private const string CdcAcmProfileName = "cdc-acm";
     private const string ResourceField = "resource";
     private const string TimeoutMillisecondsField = "timeout_ms";
     private const string PoolEnabledField = "enabled";
@@ -412,6 +415,17 @@ public static class TomlConfigParser
             builder.AppendLine(inv, $"{ServerField} = \"{route.ServerName.Value}\"");
             builder.AppendLine(inv, $"{EndpointField} = \"{route.Endpoint.Value}\"");
             builder.AppendLine(inv, $"{DeviceField} = \"{route.DeviceName.Value}\"");
+            // Written only when it is a choice. Every configuration file
+            // that predates the field parses to the default, so emitting
+            // it unconditionally would rewrite documents that did not
+            // change.
+            if (route.Profile != UsbExportProfile.UsbTmc)
+            {
+                builder.AppendLine(
+                    inv,
+                    $"{ProfileField} = \"{FormatExportProfile(route.Profile)}\""
+                );
+            }
             builder.AppendLine();
         }
 
@@ -427,6 +441,13 @@ public static class TomlConfigParser
             ServerType.Vxi11 => "vxi11",
             ServerType.UsbIp => "usbip",
             _ => "local",
+        };
+
+    private static string FormatExportProfile(UsbExportProfile profile) =>
+        profile switch
+        {
+            UsbExportProfile.CdcAcm => CdcAcmProfileName,
+            _ => UsbTmcProfileName,
         };
 
     private static Result<Server, ConfigStoreError> ParseServer(TomlTable table)
@@ -522,8 +543,35 @@ public static class TomlConfigParser
             return FailRoute($"invalid route device name: {deviceRaw}");
         }
 
+        var profile = UsbExportProfile.UsbTmc;
+        if (table.TryGetValue(ProfileField, out var profileValue))
+        {
+            if (profileValue is not string profileRaw)
+            {
+                return FailRoute(
+                    $"[[{RoutesArray}]] entry '{serverRaw}/{endpointRaw}' has a non-string '{ProfileField}'"
+                );
+            }
+            var parsed = profileRaw.ToLowerInvariant() switch
+            {
+                UsbTmcProfileName => UsbExportProfile.UsbTmc,
+                CdcAcmProfileName => UsbExportProfile.CdcAcm,
+                _ => (UsbExportProfile?)null,
+            };
+            if (parsed is null)
+            {
+                return FailRoute(
+                    $"unknown route profile '{profileRaw}' for '{serverRaw}/{endpointRaw}'"
+                );
+            }
+            profile = parsed.Value;
+        }
+
         return Result.Success<Route, ConfigStoreError>(
             new Route(serverNameOk.Value, endpointOk.Value, deviceNameOk.Value)
+            {
+                Profile = profile,
+            }
         );
     }
 

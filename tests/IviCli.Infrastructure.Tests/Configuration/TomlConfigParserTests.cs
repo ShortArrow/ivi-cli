@@ -227,6 +227,127 @@ public class TomlConfigParserTests
     }
 
     [Fact]
+    public void Parse_RouteWithoutProfile_ExportsTheInstrumentProfile()
+    {
+        // Given / When
+        var config = TomlConfigParser.Parse(UsbIpDocument("")).ShouldBeOk();
+
+        // Then
+        config.Routes.Single().Profile.ShouldBe(UsbExportProfile.UsbTmc);
+    }
+
+    [Fact]
+    public void Parse_RouteWithCdcAcmProfile_ExportsTheSerialProfile()
+    {
+        // Given / When
+        var config = TomlConfigParser.Parse(UsbIpDocument("profile = \"cdc-acm\"")).ShouldBeOk();
+
+        // Then
+        config.Routes.Single().Profile.ShouldBe(UsbExportProfile.CdcAcm);
+    }
+
+    [Fact]
+    public void Parse_RouteWithExplicitUsbtmcProfile_ExportsTheInstrumentProfile()
+    {
+        // Given / When
+        var config = TomlConfigParser.Parse(UsbIpDocument("profile = \"usbtmc\"")).ShouldBeOk();
+
+        // Then
+        config.Routes.Single().Profile.ShouldBe(UsbExportProfile.UsbTmc);
+    }
+
+    [Fact]
+    public void Parse_RouteWithUnknownProfile_ReturnsParseFailure()
+    {
+        // Given / When
+        var result = TomlConfigParser.Parse(UsbIpDocument("profile = \"rs232\""));
+
+        // Then
+        result.ShouldBeError().ShouldBeOfType<ConfigStoreParseFailure>();
+    }
+
+    [Fact]
+    public void Serialize_OmitsTheProfileFieldWhenTheRouteExportsTheDefault()
+    {
+        // Given: the document every configuration file written before the
+        // profile existed parses to.
+        var original = UsbIpConfig(UsbExportProfile.UsbTmc);
+
+        // When
+        var serialized = TomlConfigParser.Serialize(original);
+
+        // Then
+        serialized.ShouldNotContain("profile");
+    }
+
+    [Fact]
+    public void Serialize_RoundTrips_ACdcAcmRoute()
+    {
+        // Given
+        var original = UsbIpConfig(UsbExportProfile.CdcAcm);
+
+        // When
+        var serialized = TomlConfigParser.Serialize(original);
+        var roundtripped = TomlConfigParser.Parse(serialized).ShouldBeOk();
+
+        // Then
+        serialized.ShouldContain("profile = \"cdc-acm\"");
+        roundtripped.ShouldBe(original);
+        roundtripped.Routes.Single().Profile.ShouldBe(UsbExportProfile.CdcAcm);
+    }
+
+    private static string UsbIpDocument(string routeExtras) =>
+        $"""
+            [[devices]]
+            name = "dut"
+            resource = "TCPIP0::127.0.0.1::5025::SOCKET"
+            timeout_ms = 3000
+
+            [[servers]]
+            name = "usb-srv"
+            type = "usbip"
+            bind = "127.0.0.1"
+            port = 3240
+
+            [[routes]]
+            server = "usb-srv"
+            endpoint = "1-1"
+            device = "dut"
+            {routeExtras}
+            """;
+
+    private static ConfigDocument UsbIpConfig(UsbExportProfile profile)
+    {
+        var deviceName = DeviceName.From("dut").ShouldBeOk();
+        var serverName = ServerName.From("usb-srv").ShouldBeOk();
+        return ConfigDocument
+            .Empty.AddDevice(
+                new Device(
+                    deviceName,
+                    VisaResource.Parse("TCPIP0::127.0.0.1::5025::SOCKET").ShouldBeOk(),
+                    Timeout.FromMilliseconds(3000).ShouldBeOk()
+                )
+            )
+            .ShouldBeOk()
+            .AddServer(
+                new Server(
+                    serverName,
+                    ServerType.UsbIp,
+                    IpAddress.From("127.0.0.1").ShouldBeOk(),
+                    Port.From(3240).ShouldBeOk()
+                )
+            )
+            .ShouldBeOk()
+            .AddRoute(
+                new Route(serverName, PublicEndpoint.From("1-1").ShouldBeOk(), deviceName)
+                {
+                    Profile = profile,
+                }
+            )
+            .ShouldBeOk();
+    }
+
+    [Fact]
     public void Parse_PoolTable_RoundTripsAllFields()
     {
         var toml = """
