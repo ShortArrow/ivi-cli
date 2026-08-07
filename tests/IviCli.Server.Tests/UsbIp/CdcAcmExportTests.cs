@@ -216,6 +216,122 @@ public sealed class CdcAcmExportTests
     }
 
     [Fact]
+    public async Task Dropping_DTR_discards_the_half_line_the_previous_session_left()
+    {
+        await using var bench = await UsbIpBench.StartCdcAcmAsync();
+        var client = await bench.ImportAsync(UsbIpBench.CdcAcmBusId);
+
+        // Open the port, type half a command, close it, reopen it.
+        await SetControlLineStateAsync(client, DtrHigh, bench.Token);
+        await client.BulkOutAsync(Encoding.ASCII.GetBytes(":VOLT "), bench.Token);
+        await SetControlLineStateAsync(client, DtrLow, bench.Token);
+        await SetControlLineStateAsync(client, DtrHigh, bench.Token);
+        await client.BulkOutAsync(Line(":FREQ 50"), bench.Token);
+
+        // The abandoned ":VOLT " never joins the next session's first
+        // line, which is what closing and reopening a COM port means.
+        (await bench.Backend.ReadAsync(bench.Device, bench.Token))
+            .ShouldBeOk()
+            .ShouldBe(":FREQ 50");
+    }
+
+    [Fact]
+    public async Task Dropping_DTR_discards_an_answer_no_transfer_collected()
+    {
+        await using var bench = await UsbIpBench.StartCdcAcmAsync();
+        var client = await bench.ImportAsync(UsbIpBench.CdcAcmBusId);
+
+        // The answer is queued with no read outstanding, so it is still
+        // sitting in the exchange when the terminal closes the port.
+        await SetControlLineStateAsync(client, DtrHigh, bench.Token);
+        await client.BulkOutAsync(Line("*IDN?"), bench.Token);
+        await SetControlLineStateAsync(client, DtrLow, bench.Token);
+        await SetControlLineStateAsync(client, DtrHigh, bench.Token);
+
+        var parked = client.SubmitBulkIn(bufferLength: 512);
+        await client.FlushAsync(bench.Token);
+        await ProbeAsync(client, bench.Token);
+
+        // Nothing stale reached the read: it completes only once the new
+        // session asks a question of its own, and carries one answer.
+        await client.BulkOutAsync(Line("*IDN?"), bench.Token);
+        var answer = await client.ReadSubmitReplyAsync(bench.Token);
+        answer.Reply.Header.SeqNum.ShouldBe(parked);
+        Encoding.ASCII.GetString(answer.Payload).ShouldBe(UsbIpBench.IdnResponse + "\n");
+    }
+
+    [Fact]
+    public async Task A_bulk_in_urb_parked_when_DTR_falls_stays_parked()
+    {
+        await using var bench = await UsbIpBench.StartCdcAcmAsync();
+        var client = await bench.ImportAsync(UsbIpBench.CdcAcmBusId);
+
+        await SetControlLineStateAsync(client, DtrHigh, bench.Token);
+        var parked = client.SubmitBulkIn(bufferLength: 512);
+        await client.FlushAsync(bench.Token);
+        await SetControlLineStateAsync(client, DtrLow, bench.Token);
+
+        // A read outstanding when the line drops is neither completed
+        // empty — which a host reads as a successful short read — nor
+        // failed. It stays outstanding, the way a read on a modem whose
+        // carrier went away waits for data or for the host to cancel it.
+        await ProbeAsync(client, bench.Token);
+
+        await SetControlLineStateAsync(client, DtrHigh, bench.Token);
+        await client.BulkOutAsync(Line("*IDN?"), bench.Token);
+        var answer = await client.ReadSubmitReplyAsync(bench.Token);
+
+        answer.Reply.Header.SeqNum.ShouldBe(parked);
+        Encoding.ASCII.GetString(answer.Payload).ShouldBe(UsbIpBench.IdnResponse + "\n");
+    }
+
+    [Fact]
+    public async Task DTR_asserted_again_while_it_is_already_high_keeps_the_line_being_typed()
+    {
+        await using var bench = await UsbIpBench.StartCdcAcmAsync();
+        var client = await bench.ImportAsync(UsbIpBench.CdcAcmBusId);
+
+        await SetControlLineStateAsync(client, DtrHigh, bench.Token);
+        await client.BulkOutAsync(Encoding.ASCII.GetBytes(":VOLT "), bench.Token);
+        // A driver re-asserts the control lines whenever anything about
+        // them changes — raising RTS here — and none of that is a new
+        // session.
+        await SetControlLineStateAsync(client, DtrHigh | RtsHigh, bench.Token);
+        await client.BulkOutAsync(Encoding.ASCII.GetBytes("24.000\n"), bench.Token);
+
+        (await bench.Backend.ReadAsync(bench.Device, bench.Token))
+            .ShouldBeOk()
+            .ShouldBe(":VOLT 24.000");
+    }
+
+    [Fact]
+    public async Task A_host_that_never_raises_DTR_still_gets_its_line_assembled()
+    {
+        await using var bench = await UsbIpBench.StartCdcAcmAsync();
+        var client = await bench.ImportAsync(UsbIpBench.CdcAcmBusId);
+
+        // DTR is low for the whole exchange, and control transfers keep
+        // arriving. Only a falling edge ends a session, so none of this
+        // is one: a rule that read the level instead would discard the
+        // half-line at the GET_LINE_CODING in the middle.
+        await client.BulkOutAsync(Encoding.ASCII.GetBytes(":VOLT "), bench.Token);
+        await client.ControlInAsync(
+            UsbIpTestClient.DeviceToHostClassInterface,
+            CdcAcmConstants.RequestGetLineCoding,
+            wValue: 0,
+            wIndex: CdcAcmDeviceProfile.CommunicationsInterfaceNumber,
+            wLength: LineCodingLength,
+            bench.Token
+        );
+        await SetControlLineStateAsync(client, DtrLow, bench.Token);
+        await client.BulkOutAsync(Encoding.ASCII.GetBytes("24.000\n"), bench.Token);
+
+        (await bench.Backend.ReadAsync(bench.Device, bench.Token))
+            .ShouldBeOk()
+            .ShouldBe(":VOLT 24.000");
+    }
+
+    [Fact]
     public async Task Unlinking_a_parked_interrupt_urb_answers_ECONNRESET()
     {
         await using var bench = await UsbIpBench.StartCdcAcmAsync();
@@ -285,6 +401,38 @@ public sealed class CdcAcmExportTests
     }
 
     private static byte[] Line(string scpi) => Encoding.ASCII.GetBytes(scpi + "\n");
+
+    private static Task<SubmitReply> SetControlLineStateAsync(
+        UsbIpTestClient client,
+        ushort lines,
+        CancellationToken ct
+    ) =>
+        client.ControlOutAsync(
+            UsbIpTestClient.HostToDeviceClassInterface,
+            CdcAcmConstants.RequestSetControlLineState,
+            wValue: lines,
+            wIndex: CdcAcmDeviceProfile.CommunicationsInterfaceNumber,
+            ct
+        );
+
+    /// <summary>
+    /// A round trip on endpoint 0, whose reply proves that whatever was
+    /// submitted before it has been answered or parked — a parked URB is
+    /// not the reply that comes next.
+    /// </summary>
+    private static Task<SubmitReply> ProbeAsync(UsbIpTestClient client, CancellationToken ct) =>
+        client.ControlInAsync(
+            UsbIpTestClient.DeviceToHostStandardDevice,
+            UsbStandardRequest.GetDescriptor,
+            wValue: UsbDescriptorType.Device << 8,
+            wIndex: 0,
+            wLength: 64,
+            ct
+        );
+
+    private const ushort DtrLow = 0x0000;
+    private const ushort DtrHigh = CdcAcmConstants.ControlLineStateDtr;
+    private const ushort RtsHigh = CdcAcmConstants.ControlLineStateRts;
 
     private const uint EndpointNumberMask = 0x0F;
 }

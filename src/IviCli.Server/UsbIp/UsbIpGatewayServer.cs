@@ -1279,10 +1279,40 @@ public sealed class UsbIpGatewayServer : IGatewayServer
 
         public override bool ForwardsServiceRequests => false;
 
+        /// <summary>
+        /// Answers the transfer, then reads DTR for the one thing this
+        /// profile treats as a session boundary. A terminal raises DTR on
+        /// opening the port and drops it on closing, so the falling edge
+        /// is where the previous session ends: the half-line nobody
+        /// terminated and the answer no transfer collected are that
+        /// session's, and the next one must not read them.
+        ///
+        /// The edge, not the level. A driver re-issues
+        /// SET_CONTROL_LINE_STATE whenever anything about the lines
+        /// changes — raising RTS, for one — and clearing on every request
+        /// that finds DTR low would be indistinguishable from clearing
+        /// mid-session.
+        ///
+        /// A bulk-IN URB already parked when the line falls is left
+        /// parked. Completing it holds nothing to complete it with, and a
+        /// zero-length completion is what a host reads as a successful
+        /// short read rather than as a closed port; leaving it
+        /// outstanding is what a read on a modem that lost its carrier
+        /// does, and the host still has USBIP_CMD_UNLINK.
+        /// </summary>
         public override (UsbIpRetSubmit Reply, byte[] Payload) HandleControl(
             UsbIpCmdSubmit submit,
             byte[] outPayload
-        ) => Pipe.HandleEp0(submit, outPayload, _classHandler.Handle);
+        )
+        {
+            var wasReady = _classHandler.DataTerminalReady;
+            var answer = Pipe.HandleEp0(submit, outPayload, _classHandler.Handle);
+            if (wasReady && !_classHandler.DataTerminalReady)
+            {
+                _pump.Clear();
+            }
+            return answer;
+        }
 
         /// <summary>
         /// A stream has no framing to reject, so every transfer is taken;
