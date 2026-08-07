@@ -11,7 +11,20 @@ namespace IviCli.Application.Servers;
 // ===== DTOs =====================================================
 
 /// <summary>Command DTO for adding a route.</summary>
-public sealed record AddRouteCommand(string Server, string Endpoint, string Device);
+/// <param name="Server">The owning gateway server's alias.</param>
+/// <param name="Endpoint">The public endpoint name.</param>
+/// <param name="Device">The device alias to bind.</param>
+/// <param name="Profile">
+/// The USB profile a USB/IP export presents — <c>usbtmc</c> or
+/// <c>cdc-acm</c> (ADR 0049 §5). Null leaves the route on the default,
+/// which is what every route on every other server type stays on.
+/// </param>
+public sealed record AddRouteCommand(
+    string Server,
+    string Endpoint,
+    string Device,
+    string? Profile = null
+);
 
 /// <summary>Command DTO for removing a route.</summary>
 public sealed record RemoveRouteCommand(string Server, string Endpoint);
@@ -54,6 +67,14 @@ public sealed record AddRouteInvalidDevice(string Raw) : AddRouteError
 {
     public override LogSeverity Severity => LogSeverity.Warning;
     public override string Message => "invalid device name: {Raw}";
+    public override IReadOnlyList<object?> LogArgs => new object?[] { Raw };
+}
+
+/// <summary>The USB export profile is not one this build exports.</summary>
+public sealed record AddRouteInvalidProfile(string Raw) : AddRouteError
+{
+    public override LogSeverity Severity => LogSeverity.Warning;
+    public override string Message => "unknown USB export profile: {Raw}";
     public override IReadOnlyList<object?> LogArgs => new object?[] { Raw };
 }
 
@@ -204,6 +225,19 @@ public sealed class AddRouteCommandHandler
         {
             return Result.Failure<Route, AddRouteError>(new AddRouteInvalidDevice(command.Device));
         }
+        var profile = command.Profile?.ToLowerInvariant() switch
+        {
+            null => UsbExportProfile.UsbTmc,
+            "usbtmc" => UsbExportProfile.UsbTmc,
+            "cdc-acm" => (UsbExportProfile?)UsbExportProfile.CdcAcm,
+            _ => null,
+        };
+        if (profile is null)
+        {
+            return Result.Failure<Route, AddRouteError>(
+                new AddRouteInvalidProfile(command.Profile!)
+            );
+        }
 
         var loadResult = await _store.LoadAsync(ct);
         if (loadResult is not Result<ConfigDocument, ConfigStoreError>.Ok { Value: var config })
@@ -212,7 +246,7 @@ public sealed class AddRouteCommandHandler
             return Result.Failure<Route, AddRouteError>(new AddRouteStoreFailure(err));
         }
 
-        var route = new Route(serverName, endpoint, deviceName);
+        var route = new Route(serverName, endpoint, deviceName) { Profile = profile.Value };
         var addResult = config.AddRoute(route);
         if (addResult is not Result<ConfigDocument, ConfigError>.Ok { Value: var updated })
         {

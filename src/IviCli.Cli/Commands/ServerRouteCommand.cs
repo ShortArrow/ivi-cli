@@ -75,10 +75,20 @@ public static class ServerRouteCommand
             Description = "Device alias to bind to this endpoint.",
         };
 
+        var profileOpt = new Option<string>("--profile")
+        {
+            Description =
+                "USB profile a usbip export presents: usbtmc (default; a VISA "
+                + "USB::…::INSTR resource) or cdc-acm (a COM port through the "
+                + "inbox serial driver). Ignored by every other server type.",
+            DefaultValueFactory = _ => "usbtmc",
+        };
+
         var cmd = new Command("add", "Bind a public endpoint to a local device.");
         cmd.Arguments.Add(serverArg);
         cmd.Arguments.Add(endpointArg);
         cmd.Arguments.Add(deviceArg);
+        cmd.Options.Add(profileOpt);
 
         cmd.SetAction(
             async (parseResult, ct) =>
@@ -86,11 +96,12 @@ public static class ServerRouteCommand
                 var server = parseResult.GetRequiredValue(serverArg);
                 var endpoint = parseResult.GetRequiredValue(endpointArg);
                 var device = parseResult.GetRequiredValue(deviceArg);
+                var profile = parseResult.GetValue(profileOpt);
 
                 var handler = services.GetRequiredService<AddRouteCommandHandler>();
                 var logger = services.GetRequiredService<ILogger<AddRouteCommandHandler>>();
                 var result = await handler.HandleAsync(
-                    new AddRouteCommand(server, endpoint, device),
+                    new AddRouteCommand(server, endpoint, device, profile),
                     ct
                 );
                 return result switch
@@ -116,6 +127,12 @@ public static class ServerRouteCommand
                             err.Err,
                             logger,
                             $"error: invalid device name '{i.Raw}'.",
+                            ExitCodeMapper.UsageError
+                        ),
+                        AddRouteInvalidProfile i => ServerCommand.Log(
+                            err.Err,
+                            logger,
+                            $"error: unknown USB export profile '{i.Raw}' (expected usbtmc or cdc-acm).",
                             ExitCodeMapper.UsageError
                         ),
                         AddRouteServerMissing m => ServerCommand.Log(
