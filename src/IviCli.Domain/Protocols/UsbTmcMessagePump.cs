@@ -27,6 +27,13 @@ public enum UsbTmcBulkOutOutcome
     /// endpoint stalls and the exchange keeps whatever state it had.
     /// </summary>
     Rejected = 3,
+
+    /// <summary>
+    /// A USB488 TRIGGER: the host asked the device to trigger. It carries
+    /// no message and leaves the exchange as it found it, so what the
+    /// caller does with it is a backend call, not an answer to assemble.
+    /// </summary>
+    TriggerRequested = 4,
 }
 
 /// <summary>
@@ -60,6 +67,10 @@ public readonly record struct UsbTmcBulkOutResult(
     /// <summary>The host asked for an answer.</summary>
     public static UsbTmcBulkOutResult InRequested() =>
         new(UsbTmcBulkOutOutcome.InRequested, null, null);
+
+    /// <summary>The host asked the device to trigger.</summary>
+    public static UsbTmcBulkOutResult TriggerRequested() =>
+        new(UsbTmcBulkOutOutcome.TriggerRequested, null, null);
 
     /// <summary>The transfer is not one this device can act on.</summary>
     public static UsbTmcBulkOutResult Rejected(string reason) =>
@@ -136,6 +147,7 @@ public sealed class UsbTmcMessagePump
         {
             UsbTmcConstants.MsgIdDevDepMsgOut => AcceptMessageData(transfer),
             UsbTmcConstants.MsgIdRequestDevDepMsgIn => AcceptInRequest(transfer),
+            UsbTmcConstants.MsgIdTrigger => AcceptTrigger(transfer),
             _ => UsbTmcBulkOutResult.Rejected(
                 $"USBTMC MsgID {msgId} is not part of the device profile"
             ),
@@ -270,6 +282,29 @@ public sealed class UsbTmcMessagePump
             TermChar: request.TermChar
         );
         return UsbTmcBulkOutResult.InRequested();
+    }
+
+    /// <summary>
+    /// USB488 1.00 §3.2.2: a TRIGGER is a header on its own. It touches
+    /// none of the exchange's state — a message half assembled when one
+    /// arrives goes on being assembled — beyond the <c>bTag</c> every
+    /// Bulk-OUT header takes part in.
+    /// </summary>
+    private UsbTmcBulkOutResult AcceptTrigger(ReadOnlySpan<byte> transfer)
+    {
+        UsbTmcTrigger trigger;
+        try
+        {
+            trigger = UsbTmcCodec.ReadTrigger(transfer);
+        }
+        catch (InvalidDataException failure)
+        {
+            return UsbTmcBulkOutResult.Rejected(failure.Message);
+        }
+
+        return RepeatsPreviousBTag(trigger.BTag, out var rejection)
+            ? rejection
+            : UsbTmcBulkOutResult.TriggerRequested();
     }
 
     /// <summary>

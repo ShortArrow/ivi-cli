@@ -31,7 +31,11 @@ public static class UsbTmcConstants
     /// <summary>MsgID of a vendor-specific IN message — out of scope.</summary>
     public const byte MsgIdVendorSpecificIn = 127;
 
-    /// <summary>MsgID of the USB488 TRIGGER message; Phase 4 territory.</summary>
+    /// <summary>
+    /// MsgID of the USB488 TRIGGER message (USB488 1.00 §3.2.2): a
+    /// header-only bulk-OUT transfer asking the device to trigger, the
+    /// wire form of the IEEE 488.1 GET message.
+    /// </summary>
     public const byte MsgIdTrigger = 128;
 
     /// <summary>INITIATE_ABORT_BULK_OUT — an endpoint request.</summary>
@@ -58,16 +62,22 @@ public static class UsbTmcConstants
     /// <summary>INDICATOR_PULSE — an interface request, optional by capability.</summary>
     public const byte RequestIndicatorPulse = 64;
 
-    /// <summary>USB488 READ_STATUS_BYTE; arrives with the SRQ path in Phase 4.</summary>
+    /// <summary>
+    /// USB488 READ_STATUS_BYTE — an interface request, and the serial
+    /// poll of IEEE 488.1 as USB carries it (USB488 1.00 §4.3.1).
+    /// </summary>
     public const byte Request488ReadStatusByte = 128;
 
-    /// <summary>USB488 REN_CONTROL; Phase 4.</summary>
+    /// <summary>
+    /// USB488 REN_CONTROL — an interface request, refused while the
+    /// device declares RL0 (see <see cref="Device488CapabilityRl1"/>).
+    /// </summary>
     public const byte Request488RenControl = 160;
 
-    /// <summary>USB488 GO_TO_LOCAL; Phase 4.</summary>
+    /// <summary>USB488 GO_TO_LOCAL — an interface request, refused under RL0.</summary>
     public const byte Request488GoToLocal = 161;
 
-    /// <summary>USB488 LOCAL_LOCKOUT; Phase 4.</summary>
+    /// <summary>USB488 LOCAL_LOCKOUT — an interface request, refused under RL0.</summary>
     public const byte Request488LocalLockout = 162;
 
     /// <summary>USBTMC_STATUS_SUCCESS.</summary>
@@ -176,9 +186,8 @@ public static class UsbTmcConstants
 
     /// <summary>
     /// <c>bmDevCapabilities488</c> bit 2: SR1, the device generates
-    /// service requests on the interrupt-IN endpoint. Clear (SR0) until
-    /// that endpoint is driven — see
-    /// <see cref="UsbTmcControlHandler"/>.
+    /// service requests on the interrupt-IN endpoint —
+    /// <see cref="Usb488Notifier"/> is what drives it.
     /// </summary>
     public const byte Device488CapabilitySr1 = 0x04;
 
@@ -190,6 +199,50 @@ public static class UsbTmcConstants
     /// driver steps over it when its counter wraps.
     /// </summary>
     public const byte MinimumBTag = 1;
+
+    /// <summary>
+    /// Size of every USB488 notification the interrupt-IN endpoint
+    /// carries: <c>bNotify1</c> and <c>bNotify2</c>, USB488 1.00 §3.4.1.
+    /// </summary>
+    public const int NotificationSize = 2;
+
+    /// <summary>
+    /// <c>bNotify1</c> of the SRQ notification. Bit 7 marks a notification
+    /// the USB488 subclass defines, and the <c>bTag</c> in the low seven
+    /// bits is fixed at 1 for a service request (USB488 1.00 §3.4.1), so
+    /// the whole byte is a constant.
+    /// </summary>
+    public const byte NotifyServiceRequest = 0x81;
+
+    /// <summary>
+    /// <c>bNotify1</c> bit 7, set on every USB488 notification; the
+    /// READ_STATUS_BYTE answer carries it over the <c>bTag</c> the host
+    /// asked with.
+    /// </summary>
+    public const byte NotifyFlag = 0x80;
+
+    /// <summary>
+    /// Lowest <c>bTag</c> a READ_STATUS_BYTE may carry. A host reads
+    /// <c>bNotify1</c> 0x81 as the SRQ notification, so tags 0 and 1
+    /// cannot name a serial poll without being mistaken for one.
+    /// </summary>
+    public const byte MinimumStatusByteBTag = 2;
+
+    /// <summary>
+    /// Highest <c>bTag</c> a READ_STATUS_BYTE may carry: bit 7 belongs to
+    /// <see cref="NotifyFlag"/>, so the tag has seven bits.
+    /// </summary>
+    public const byte MaximumStatusByteBTag = 127;
+
+    /// <summary>Size of the READ_STATUS_BYTE response, USB488 1.00 §4.3.1.</summary>
+    public const int ReadStatusByteResponseSize = 3;
+
+    /// <summary>
+    /// Status byte bit 6, RQS as a serial poll reads it: the device is
+    /// requesting service. Reading the status byte clears it, which is
+    /// what ends one service request (IEEE 488.2 §11.2).
+    /// </summary>
+    public const byte StatusByteRequestService = 0x40;
 
     /// <summary>
     /// Length of <paramref name="payloadLength"/> bytes of message data

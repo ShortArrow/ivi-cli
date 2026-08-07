@@ -9,22 +9,25 @@ namespace IviCli.Domain.Protocols;
 /// <see cref="UsbControlOutcome.NotHandled"/> for everything class-typed,
 /// which is what this handler takes.
 ///
-/// The layout of each response is USBTMC 1.00 §4.2, little endian
-/// throughout. Recipients follow the specification rather than a single
-/// convention: the four abort requests address an <em>endpoint</em>
-/// (<c>wIndex</c> names it), while clear, capabilities and indicator
-/// pulse address the interface.
+/// The layout of each response is USBTMC 1.00 §4.2 and USB488 1.00 §4.3,
+/// little endian throughout. Recipients follow the specification rather
+/// than a single convention: the four abort requests address an
+/// <em>endpoint</em> (<c>wIndex</c> names it), while clear, capabilities,
+/// indicator pulse and the USB488 requests address the interface.
 /// </summary>
 public sealed class UsbTmcControlHandler
 {
     private readonly UsbTmcMessagePump _pump;
+    private readonly Usb488Notifier _notifier;
 
     /// <summary>
-    /// Binds the handler to the exchange INITIATE_CLEAR resets.
+    /// Binds the handler to the exchange INITIATE_CLEAR resets and to the
+    /// service-request state READ_STATUS_BYTE polls.
     /// </summary>
-    public UsbTmcControlHandler(UsbTmcMessagePump pump)
+    public UsbTmcControlHandler(UsbTmcMessagePump pump, Usb488Notifier notifier)
     {
         _pump = pump;
+        _notifier = notifier;
     }
 
     /// <summary>
@@ -68,9 +71,16 @@ public sealed class UsbTmcControlHandler
                 CapabilitiesResponse(),
                 setup.WLength
             ),
+            UsbTmcConstants.Request488ReadStatusByte => ReadStatusByte(setup),
             // The capabilities deny the indicator pulse, so answering one
             // would contradict what the device just told the host.
             UsbTmcConstants.RequestIndicatorPulse => UsbControlResult.Stall(),
+            // RL0 for the same reason: the mock has no front panel to take
+            // remote or local, so it declares no RL1 and refuses the three
+            // requests that capability would have brought with it.
+            UsbTmcConstants.Request488RenControl => UsbControlResult.Stall(),
+            UsbTmcConstants.Request488GoToLocal => UsbControlResult.Stall(),
+            UsbTmcConstants.Request488LocalLockout => UsbControlResult.Stall(),
             _ => UsbControlResult.Stall(),
         };
 
@@ -101,6 +111,22 @@ public sealed class UsbTmcControlHandler
         };
 
     /// <summary>
+    /// READ_STATUS_BYTE (USB488 1.00 §4.3.1): the serial poll. The device
+    /// answers three bytes and queues the matching notification for the
+    /// interrupt-IN endpoint, which is where a host that claimed that
+    /// endpoint reads the status from.
+    ///
+    /// <c>wValue</c> carries the <c>bTag</c>, and one outside the range
+    /// the notification format can carry stalls rather than being
+    /// silently corrected — the stance this handler takes on every
+    /// malformed request.
+    /// </summary>
+    private UsbControlResult ReadStatusByte(UsbSetupPacket setup) =>
+        Usb488Notifier.IsReadableStatusByteTag(setup.WValue)
+            ? Truncate(_notifier.ReadStatusByte((byte)setup.WValue), setup.WLength)
+            : UsbControlResult.Stall();
+
+    /// <summary>
     /// The GET_CAPABILITIES response of USBTMC 1.00 §4.2.1.8 with the
     /// USB488 subsection of USB488 1.00 §4.2.1.8 appended: 24 bytes
     /// describing an interface that is neither talk-only nor listen-only,
@@ -121,14 +147,15 @@ public sealed class UsbTmcControlHandler
             response.AsSpan(BcdUsb488Offset, BcdLength),
             UsbTmcConstants.BcdUsb488
         );
-        response[Interface488CapabilitiesOffset] = NoCapabilities;
+        response[Interface488CapabilitiesOffset] = UsbTmcConstants.Interface488CapabilityTrigger;
 
-        // SR0: the device declares that it raises no service requests.
-        // The interrupt-IN endpoint exists in the descriptors but nothing
-        // drives it yet, and a host told SR1 would wait on notifications
-        // that never come. Phase 4 builds that path and turns this into
-        // UsbTmcConstants.Device488CapabilitySr1.
-        response[Device488CapabilitiesOffset] = NoCapabilities;
+        // SR1 and DT1 are what this device implements and no more: the
+        // interrupt-IN endpoint carries service requests and the TRIGGER
+        // message reaches the backend. RL0 stays clear because nothing
+        // here has a front panel to take, and the 488.2 and SCPI bits
+        // because neither compliance is claimed.
+        response[Device488CapabilitiesOffset] =
+            UsbTmcConstants.Device488CapabilitySr1 | UsbTmcConstants.Device488CapabilityDt1;
 
         return response;
     }
