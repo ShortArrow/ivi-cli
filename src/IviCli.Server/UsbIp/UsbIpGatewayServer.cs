@@ -16,8 +16,8 @@ namespace IviCli.Server.UsbIp;
 
 /// <summary>
 /// USB/IP device server (ADR 0049 §1): every route bound to this server
-/// is one emulated USBTMC-USB488 instrument, exported under the route's
-/// endpoint as its <c>busid</c> and attached with
+/// is one emulated USB instrument, exported under the route's endpoint as
+/// its <c>busid</c> and attached with
 /// <c>usbip attach -r &lt;host&gt; -b &lt;busid&gt;</c>.
 ///
 /// The connection carries two protocols in sequence. Before an import it
@@ -25,11 +25,16 @@ namespace IviCli.Server.UsbIp;
 /// answered once; after a successful import it is a stream of URBs, and
 /// the socket becomes that one device's bus. What a URB <em>means</em>
 /// belongs to the layers underneath: endpoint 0 to
-/// <see cref="UsbControlPipe"/> with <see cref="UsbTmcControlHandler"/>
-/// behind it, the bulk endpoints to <see cref="UsbTmcMessagePump"/>, the
-/// interrupt endpoint to <see cref="Usb488Notifier"/>, and the SCPI a
-/// complete message turns out to be to the same
-/// <see cref="IIviBackend"/> the LAN gateways dispatch to.
+/// <see cref="UsbControlPipe"/> with a class handler behind it, the bulk
+/// endpoints to the profile's exchange, and the SCPI a complete message
+/// turns out to be to the same <see cref="IIviBackend"/> the LAN gateways
+/// dispatch to.
+///
+/// Which layers those are is the route's choice
+/// (<see cref="UsbExportProfile"/>, ADR 0049 §5): a USBTMC-USB488
+/// instrument or a CDC-ACM serial port. The choice is made once per
+/// attach, in <see cref="DeviceSession"/>; everything above it — the
+/// event loop, the parked URBs, the dispatch rule — is the same for both.
 /// </summary>
 public sealed class UsbIpGatewayServer : IGatewayServer
 {
@@ -43,8 +48,23 @@ public sealed class UsbIpGatewayServer : IGatewayServer
     /// </summary>
     public const ushort MockVendorId = 0x1209;
 
-    /// <summary><c>idProduct</c> of every exported mock — see <see cref="MockVendorId"/>.</summary>
+    /// <summary>
+    /// <c>idProduct</c> of a mock exported as a USBTMC instrument — see
+    /// <see cref="MockVendorId"/>.
+    /// </summary>
     public const ushort MockProductId = 0x0001;
+
+    /// <summary>
+    /// <c>idProduct</c> of a mock exported as a CDC-ACM serial port. The
+    /// pid.codes block reserves 0x0001–0x0010 under
+    /// <see cref="MockVendorId"/> for testing, so the same rationale that
+    /// gives the instrument 0x0001 gives the serial port the next one.
+    /// The two must differ: a host keys its driver store, and Windows its
+    /// COM port assignment, on the VID/PID pair, so one pair for two
+    /// different device shapes is one device the host cannot tell apart
+    /// from the other.
+    /// </summary>
+    public const ushort MockCdcAcmProductId = 0x0002;
 
     /// <summary><c>bcdDevice</c>: release 1.00 of the emulated instrument.</summary>
     public const ushort MockBcdDevice = 0x0100;
@@ -347,6 +367,12 @@ public sealed class UsbIpGatewayServer : IGatewayServer
     /// channel, the consumer runs out of events, and cancelling the
     /// linked source ends the service-request task before the backend is
     /// closed.
+    ///
+    /// Only a profile with somewhere to deliver a service request
+    /// subscribes to them. A CDC-ACM export has none — a COM port carries
+    /// no SRQ channel, which is why the SOCKET gateway does not forward
+    /// them either — so the forwarder is not started rather than started
+    /// and ignored, and the backend sees no subscriber it has to feed.
     /// </summary>
     private async Task ServeAsync(NetworkStream stream, ExportedDevice export, CancellationToken ct)
     {
@@ -361,20 +387,23 @@ public sealed class UsbIpGatewayServer : IGatewayServer
             return;
         }
 
+        var session = export.CreateSession();
         using var attach = CancellationTokenSource.CreateLinkedTokenSource(ct);
         var events = Channel.CreateUnbounded<DeviceEvent>();
         var commands = Task.Run(
             () => ReadCommandsAsync(stream, events.Writer, attach.Token),
             attach.Token
         );
-        var serviceRequests = Task.Run(
-            () => ForwardServiceRequestsAsync(device, backend, events.Writer, attach.Token),
-            attach.Token
-        );
+        var serviceRequests = session.ForwardsServiceRequests
+            ? Task.Run(
+                () => ForwardServiceRequestsAsync(device, backend, events.Writer, attach.Token),
+                attach.Token
+            )
+            : Task.CompletedTask;
 
         try
         {
-            await ConsumeAsync(stream, events.Reader, export, device, backend, attach.Token);
+            await ConsumeAsync(stream, events.Reader, session, device, backend, attach.Token);
         }
         finally
         {
@@ -505,13 +534,12 @@ public sealed class UsbIpGatewayServer : IGatewayServer
     private async Task ConsumeAsync(
         NetworkStream stream,
         ChannelReader<DeviceEvent> events,
-        ExportedDevice export,
+        DeviceSession session,
         Domain.Devices.Device device,
         IIviBackend backend,
         CancellationToken ct
     )
     {
-        var session = new DeviceSession(export.Definition);
         await foreach (var next in events.ReadAllAsync(ct))
         {
             switch (next)
@@ -533,7 +561,7 @@ public sealed class UsbIpGatewayServer : IGatewayServer
                     break;
 
                 case DeviceEvent.ServiceRequested raised:
-                    session.Notifier.RaiseServiceRequest(raised.StatusByte);
+                    session.RaiseServiceRequest(raised.StatusByte);
                     await ServeParkedInterruptAsync(stream, session, ct);
                     break;
             }
@@ -558,11 +586,7 @@ public sealed class UsbIpGatewayServer : IGatewayServer
 
         if (endpoint == ControlEndpoint)
         {
-            var (reply, payload) = session.Pipe.HandleEp0(
-                submit,
-                outPayload,
-                session.ClassHandler.Handle
-            );
+            var (reply, payload) = session.HandleControl(submit, outPayload);
             await WriteSubmitReplyAsync(stream, reply, payload, ct);
             // READ_STATUS_BYTE queues a notification of its own, so the
             // interrupt endpoint is served after every control transfer.
@@ -627,11 +651,11 @@ public sealed class UsbIpGatewayServer : IGatewayServer
     }
 
     /// <summary>
-    /// One bulk-OUT transfer: through the USBTMC exchange, and — when it
-    /// completed a message or asked for a trigger — through the backend,
-    /// before the URB is acknowledged. Dispatching first is what makes
-    /// the completion mean what a host reads into it: the device has the
-    /// message, not merely the bytes.
+    /// One bulk-OUT transfer: through the profile's exchange, and — for
+    /// every message it completed, and for a trigger it asked for —
+    /// through the backend, before the URB is acknowledged. Dispatching
+    /// first is what makes the completion mean what a host reads into it:
+    /// the device has the message, not merely the bytes.
     /// </summary>
     private async Task BulkOutAsync(
         NetworkStream stream,
@@ -643,11 +667,11 @@ public sealed class UsbIpGatewayServer : IGatewayServer
         CancellationToken ct
     )
     {
-        var result = session.Pump.SubmitBulkOut(transfer);
+        var outcome = session.SubmitBulkOut(transfer);
 
-        if (result.Outcome == UsbTmcBulkOutOutcome.Rejected)
+        if (outcome.Rejection is { } reason)
         {
-            _logger.LogWarning("bulk-OUT transfer rejected: {Reason}", result.Reason);
+            _logger.LogWarning("bulk-OUT transfer rejected: {Reason}", reason);
             await WriteSubmitReplyAsync(
                 stream,
                 Completion(submit.Header.SeqNum, UsbControlPipe.EndpointStalledStatus, 0),
@@ -657,12 +681,12 @@ public sealed class UsbIpGatewayServer : IGatewayServer
             return;
         }
 
-        if (result.Message is { } message)
+        foreach (var message in outcome.Messages)
         {
             await DispatchAsync(session, message, device, backend, ct);
         }
 
-        if (result.Outcome == UsbTmcBulkOutOutcome.TriggerRequested)
+        if (outcome.TriggerRequested)
         {
             _ = Failed(await backend.TriggerAsync(device, ct), out _);
         }
@@ -689,7 +713,10 @@ public sealed class UsbIpGatewayServer : IGatewayServer
         CancellationToken ct
     )
     {
-        if (!session.HasParked(BulkEndpoint) && session.Pump.TryTakeBulkIn(out var transfer))
+        if (
+            !session.HasParked(BulkEndpoint)
+            && session.TryTakeBulkIn(submit.TransferBufferLength, out var transfer)
+        )
         {
             await CompleteInAsync(
                 stream,
@@ -712,7 +739,7 @@ public sealed class UsbIpGatewayServer : IGatewayServer
     {
         while (
             session.TryPeekParked(BulkEndpoint, out var parked)
-            && session.Pump.TryTakeBulkIn(out var transfer)
+            && session.TryTakeBulkIn(parked.BufferLength, out var transfer)
         )
         {
             session.Unpark(parked.SeqNum);
@@ -726,6 +753,10 @@ public sealed class UsbIpGatewayServer : IGatewayServer
     /// that can queue one — a service request from the backend and a
     /// READ_STATUS_BYTE from the host — so a notification is never left
     /// sitting behind a URB that could have taken it.
+    ///
+    /// A profile that queues none leaves every such URB parked until the
+    /// host unlinks it, which is what a CDC-ACM notification endpoint
+    /// with no SERIAL_STATE to report is supposed to look like.
     /// </summary>
     private static async Task ServeParkedInterruptAsync(
         NetworkStream stream,
@@ -735,7 +766,7 @@ public sealed class UsbIpGatewayServer : IGatewayServer
     {
         while (
             session.TryPeekParked(InterruptEndpoint, out var parked)
-            && session.Notifier.TryTakeNotification(out var packet)
+            && session.TryTakeNotification(out var packet)
         )
         {
             session.Unpark(parked.SeqNum);
@@ -789,20 +820,21 @@ public sealed class UsbIpGatewayServer : IGatewayServer
     }
 
     /// <summary>
-    /// Turns one complete USBTMC message into the SCPI operation it is,
-    /// by the rule every gateway here shares: a trailing <c>?</c> makes it
-    /// a query, and the answer goes back to the pump for the host's
-    /// bulk-IN transfer to collect.
+    /// Turns one complete message into the SCPI operation it is, by the
+    /// rule every gateway here shares: a blank one is nothing, a trailing
+    /// <c>?</c> makes it a query, and the answer goes back to the
+    /// profile's exchange for the host's bulk-IN transfer to collect,
+    /// newline included.
     /// </summary>
     private async Task DispatchAsync(
         DeviceSession session,
-        UsbTmcOutboundMessage message,
+        byte[] message,
         Domain.Devices.Device device,
         IIviBackend backend,
         CancellationToken ct
     )
     {
-        var text = Encoding.UTF8.GetString(message.Content).TrimEnd('\n').TrimEnd('\r');
+        var text = Encoding.UTF8.GetString(message).TrimEnd('\n').TrimEnd('\r');
         if (text.Length == 0)
         {
             return;
@@ -832,7 +864,7 @@ public sealed class UsbIpGatewayServer : IGatewayServer
             {
                 return;
             }
-            session.Pump.SupplyResponse(Encoding.UTF8.GetBytes(response + "\n"));
+            session.SupplyResponse(Encoding.UTF8.GetBytes(response + "\n"));
             return;
         }
 
@@ -919,9 +951,18 @@ public sealed class UsbIpGatewayServer : IGatewayServer
 
     private const uint ControlEndpoint = 0;
 
+    /// <summary>
+    /// The endpoint number both bulk pipes carry. A URB is dispatched by
+    /// endpoint before the profile is consulted, which is only sound
+    /// because the two profiles picked the same numbers independently —
+    /// endpoint 1 for the bulk pair, endpoint 2 for the interrupt-IN.
+    /// A profile that moved either would need this dispatch to become
+    /// profile-aware; <c>CdcAcmExportTests</c> fails first if one does.
+    /// </summary>
     private const uint BulkEndpoint =
         UsbTmcDeviceProfile.BulkOutEndpointAddress & EndpointNumberMask;
 
+    /// <summary>The endpoint number both profiles notify on — see <see cref="BulkEndpoint"/>.</summary>
     private const uint InterruptEndpoint =
         UsbTmcDeviceProfile.InterruptInEndpointAddress & EndpointNumberMask;
 
@@ -941,6 +982,17 @@ public sealed class UsbIpGatewayServer : IGatewayServer
     {
         public string BusId => Route.Endpoint.Value;
 
+        /// <summary>
+        /// The state one attach of this device owns, built for the
+        /// profile the route declared.
+        /// </summary>
+        public DeviceSession CreateSession() =>
+            Route.Profile switch
+            {
+                UsbExportProfile.CdcAcm => new CdcAcmSession(Definition),
+                _ => new UsbTmcSession(Definition),
+            };
+
         public static ExportedDevice Create(
             Domain.Servers.Server server,
             Route route,
@@ -948,14 +1000,7 @@ public sealed class UsbIpGatewayServer : IGatewayServer
             uint ordinal
         )
         {
-            var definition = UsbTmcDeviceProfile.Create(
-                idVendor: MockVendorId,
-                idProduct: MockProductId,
-                bcdDevice: MockBcdDevice,
-                manufacturer: MockManufacturer,
-                product: MockProduct,
-                serialNumber: device.Name.Value
-            );
+            var definition = Define(route.Profile, device.Name.Value);
             var configuration = definition.Configuration;
 
             var info = new UsbIpDeviceInfo(
@@ -993,6 +1038,35 @@ public sealed class UsbIpGatewayServer : IGatewayServer
             );
         }
 
+        /// <summary>
+        /// The descriptors of one exported mock. Manufacturer and product
+        /// are the same either way — it is the same mock — and the serial
+        /// number stays the device's own name, which is what a host keys
+        /// a COM port number or a VISA resource to. Only the product ID
+        /// and the descriptor tree differ, and those are what decide
+        /// which driver binds.
+        /// </summary>
+        private static UsbDeviceDefinition Define(UsbExportProfile profile, string serialNumber) =>
+            profile switch
+            {
+                UsbExportProfile.CdcAcm => CdcAcmDeviceProfile.Create(
+                    idVendor: MockVendorId,
+                    idProduct: MockCdcAcmProductId,
+                    bcdDevice: MockBcdDevice,
+                    manufacturer: MockManufacturer,
+                    product: MockProduct,
+                    serialNumber: serialNumber
+                ),
+                _ => UsbTmcDeviceProfile.Create(
+                    idVendor: MockVendorId,
+                    idProduct: MockProductId,
+                    bcdDevice: MockBcdDevice,
+                    manufacturer: MockManufacturer,
+                    product: MockProduct,
+                    serialNumber: serialNumber
+                ),
+            };
+
         private const byte SingleConfiguration = 1;
     }
 
@@ -1026,29 +1100,85 @@ public sealed class UsbIpGatewayServer : IGatewayServer
     }
 
     /// <summary>
-    /// Everything one attached device remembers for as long as the attach
-    /// lasts. Owned by the event loop's single consumer, hence
-    /// unsynchronised.
+    /// What one bulk-OUT transfer asks the event loop to do. Shaped by
+    /// the loop rather than by either profile: whether to stall, which
+    /// complete messages to dispatch before acknowledging the URB, and
+    /// whether the transfer was itself a trigger.
     /// </summary>
-    private sealed class DeviceSession
+    private readonly record struct BulkOutOutcome(
+        IReadOnlyList<byte[]> Messages,
+        bool TriggerRequested,
+        string? Rejection
+    )
+    {
+        /// <summary>The transfer is malformed for the profile; the endpoint stalls.</summary>
+        public static BulkOutOutcome Rejected(string reason) => new([], false, reason);
+
+        /// <summary>The transfer was taken, and closed the messages it names.</summary>
+        public static BulkOutOutcome Accepted(
+            IReadOnlyList<byte[]> messages,
+            bool triggerRequested = false
+        ) => new(messages, triggerRequested, null);
+    }
+
+    /// <summary>
+    /// Everything one attached device remembers for as long as the attach
+    /// lasts, and every question the event loop's single consumer asks
+    /// it. Owned by that consumer, hence unsynchronised.
+    ///
+    /// The shape is the loop's, not either profile's: endpoint 0, a
+    /// bulk-OUT that says what to dispatch, a bulk-IN that hands over
+    /// whatever it holds, the interrupt endpoint, and the intake for a
+    /// service request. The parked URBs belong to the USB/IP protocol
+    /// rather than to any profile, so they live here once and neither
+    /// implementation restates them.
+    /// </summary>
+    private abstract class DeviceSession
     {
         private readonly List<ParkedUrb> _parked = [];
 
-        public DeviceSession(UsbDeviceDefinition definition)
+        protected DeviceSession(UsbDeviceDefinition definition)
         {
             Pipe = new UsbControlPipe(definition);
-            Pump = new UsbTmcMessagePump();
-            Notifier = new Usb488Notifier();
-            ClassHandler = new UsbTmcControlHandler(Pump, Notifier);
         }
 
-        public UsbControlPipe Pipe { get; }
+        /// <summary>The endpoint-0 state machine, shared by both profiles.</summary>
+        protected UsbControlPipe Pipe { get; }
 
-        public UsbTmcMessagePump Pump { get; }
+        /// <summary>
+        /// Whether this attach subscribes to the backend's service
+        /// requests. A profile with no way to deliver one says no, and
+        /// the forwarder is never started.
+        /// </summary>
+        public abstract bool ForwardsServiceRequests { get; }
 
-        public Usb488Notifier Notifier { get; }
+        /// <summary>Answers one control transfer, class requests included.</summary>
+        public abstract (UsbIpRetSubmit Reply, byte[] Payload) HandleControl(
+            UsbIpCmdSubmit submit,
+            byte[] outPayload
+        );
 
-        public UsbTmcControlHandler ClassHandler { get; }
+        /// <summary>Feeds one bulk-OUT transfer through the profile's exchange.</summary>
+        public abstract BulkOutOutcome SubmitBulkOut(byte[] transfer);
+
+        /// <summary>Hands the exchange the bytes that answer the host.</summary>
+        public abstract void SupplyResponse(byte[] response);
+
+        /// <summary>
+        /// Takes what a bulk-IN URB of <paramref name="maxLength"/> bytes
+        /// can carry; false when there is nothing, which is when the URB
+        /// parks.
+        /// </summary>
+        public abstract bool TryTakeBulkIn(int maxLength, out byte[] transfer);
+
+        /// <summary>Records a service request the backend raised.</summary>
+        public abstract void RaiseServiceRequest(byte statusByte);
+
+        /// <summary>
+        /// Takes the next packet the interrupt endpoint owes the host;
+        /// false when none is queued.
+        /// </summary>
+        public abstract bool TryTakeNotification(out byte[] packet);
 
         public void Park(uint seqNum, uint endpoint, int bufferLength) =>
             _parked.Add(new ParkedUrb(seqNum, endpoint, bufferLength));
@@ -1065,5 +1195,124 @@ public sealed class UsbIpGatewayServer : IGatewayServer
 
         /// <summary>Drops a parked URB; false when it is not (or no longer) parked.</summary>
         public bool Unpark(uint seqNum) => _parked.RemoveAll(u => u.SeqNum == seqNum) > 0;
+    }
+
+    /// <summary>
+    /// The USBTMC-USB488 attach (ADR 0049 §2): bulk framing through
+    /// <see cref="UsbTmcMessagePump"/>, the class requests through
+    /// <see cref="UsbTmcControlHandler"/>, and SRQ notifications through
+    /// <see cref="Usb488Notifier"/> — the profile that declares SR1, and
+    /// therefore the one that wants the backend's service requests.
+    /// </summary>
+    private sealed class UsbTmcSession : DeviceSession
+    {
+        private readonly UsbTmcMessagePump _pump = new();
+        private readonly Usb488Notifier _notifier = new();
+        private readonly UsbTmcControlHandler _classHandler;
+
+        public UsbTmcSession(UsbDeviceDefinition definition)
+            : base(definition)
+        {
+            _classHandler = new UsbTmcControlHandler(_pump, _notifier);
+        }
+
+        public override bool ForwardsServiceRequests => true;
+
+        public override (UsbIpRetSubmit Reply, byte[] Payload) HandleControl(
+            UsbIpCmdSubmit submit,
+            byte[] outPayload
+        ) => Pipe.HandleEp0(submit, outPayload, _classHandler.Handle);
+
+        /// <summary>
+        /// One USBTMC transfer carries at most one complete message, so
+        /// the list the loop dispatches is empty or a single element.
+        /// </summary>
+        public override BulkOutOutcome SubmitBulkOut(byte[] transfer)
+        {
+            var result = _pump.SubmitBulkOut(transfer);
+            return result.Outcome == UsbTmcBulkOutOutcome.Rejected
+                ? BulkOutOutcome.Rejected(result.Reason ?? string.Empty)
+                : BulkOutOutcome.Accepted(
+                    result.Message is { } message ? [message.Content] : [],
+                    result.Outcome == UsbTmcBulkOutOutcome.TriggerRequested
+                );
+        }
+
+        public override void SupplyResponse(byte[] response) => _pump.SupplyResponse(response);
+
+        /// <summary>
+        /// The transfer size is the one REQUEST_DEV_DEP_MSG_IN named, so
+        /// the pump has already cut the message to it and the URB's own
+        /// buffer length decides nothing here.
+        /// </summary>
+        public override bool TryTakeBulkIn(int maxLength, out byte[] transfer) =>
+            _pump.TryTakeBulkIn(out transfer);
+
+        public override void RaiseServiceRequest(byte statusByte) =>
+            _notifier.RaiseServiceRequest(statusByte);
+
+        public override bool TryTakeNotification(out byte[] packet) =>
+            _notifier.TryTakeNotification(out packet);
+    }
+
+    /// <summary>
+    /// The CDC-ACM attach (ADR 0049 §5): a byte stream on the bulk pair
+    /// through <see cref="CdcAcmStreamPump"/>, the PSTN class requests
+    /// through <see cref="CdcAcmControlHandler"/>, and nothing at all on
+    /// the notification endpoint.
+    ///
+    /// The dispatch rule is the SOCKET gateway's, because what a terminal
+    /// sends is what a raw TCP client sends: every closed line is a
+    /// message, a blank one is nothing, and the caller decides which is
+    /// which. There is no SRQ channel on a COM port — a serial device
+    /// would signal one through SERIAL_STATE, which this profile does not
+    /// claim and does not send — so service requests are not subscribed
+    /// to at all rather than raised into a queue no URB ever drains.
+    /// </summary>
+    private sealed class CdcAcmSession : DeviceSession
+    {
+        private readonly CdcAcmStreamPump _pump = new();
+        private readonly CdcAcmControlHandler _classHandler = new();
+
+        public CdcAcmSession(UsbDeviceDefinition definition)
+            : base(definition) { }
+
+        public override bool ForwardsServiceRequests => false;
+
+        public override (UsbIpRetSubmit Reply, byte[] Payload) HandleControl(
+            UsbIpCmdSubmit submit,
+            byte[] outPayload
+        ) => Pipe.HandleEp0(submit, outPayload, _classHandler.Handle);
+
+        /// <summary>
+        /// A stream has no framing to reject, so every transfer is taken;
+        /// one may close several lines, or none.
+        /// </summary>
+        public override BulkOutOutcome SubmitBulkOut(byte[] transfer) =>
+            BulkOutOutcome.Accepted(_pump.SubmitBulkOut(transfer));
+
+        public override void SupplyResponse(byte[] response) => _pump.SupplyResponse(response);
+
+        public override bool TryTakeBulkIn(int maxLength, out byte[] transfer) =>
+            _pump.TryTakeBulkIn(maxLength, out transfer);
+
+        /// <summary>
+        /// Unreachable: <see cref="ForwardsServiceRequests"/> is false, so
+        /// no service request ever becomes an event on this attach.
+        /// </summary>
+        public override void RaiseServiceRequest(byte statusByte) { }
+
+        /// <summary>
+        /// Always false. The notification endpoint exists because CDC 1.1
+        /// §3.3.1 requires the communications interface to own one, and
+        /// this device raises no SERIAL_STATE, so a URB submitted to it
+        /// waits until the host unlinks it — which is what a host that
+        /// polls an idle modem-status endpoint expects to happen.
+        /// </summary>
+        public override bool TryTakeNotification(out byte[] packet)
+        {
+            packet = [];
+            return false;
+        }
     }
 }
