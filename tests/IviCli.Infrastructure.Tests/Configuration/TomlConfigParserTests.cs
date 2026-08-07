@@ -2,6 +2,7 @@ using IviCli.Application.Configuration;
 using IviCli.Domain;
 using IviCli.Domain.Configuration;
 using IviCli.Domain.Devices;
+using IviCli.Domain.Servers;
 using IviCli.Domain.Visa;
 using IviCli.Infrastructure.Configuration;
 using IviCli.TestKit;
@@ -165,6 +166,64 @@ public class TomlConfigParserTests
 
         // Then
         roundtripped.ShouldBe(original);
+    }
+
+    [Fact]
+    public void Parse_UsbIpServerType_IsRecognised()
+    {
+        // Given
+        var toml = """
+            [[servers]]
+            name = "usb-srv"
+            type = "usbip"
+            bind = "127.0.0.1"
+            port = 3240
+            """;
+
+        // When
+        var config = TomlConfigParser.Parse(toml).ShouldBeOk();
+
+        // Then
+        config.Servers.Single().Type.ShouldBe(ServerType.UsbIp);
+    }
+
+    [Fact]
+    public void Serialize_RoundTrips_UsbIpServerAndItsBusIdRoute()
+    {
+        // Given: a USB/IP gateway whose route endpoint is a busid, the
+        // shape `usbip attach -b` names on the client side (ADR 0049 §4).
+        var deviceName = DeviceName.From("dut").ShouldBeOk();
+        var serverName = ServerName.From("usb-srv").ShouldBeOk();
+        var original = ConfigDocument
+            .Empty.AddDevice(
+                new Device(
+                    deviceName,
+                    VisaResource.Parse("TCPIP0::127.0.0.1::5025::SOCKET").ShouldBeOk(),
+                    Timeout.FromMilliseconds(3000).ShouldBeOk()
+                )
+            )
+            .ShouldBeOk()
+            .AddServer(
+                new Server(
+                    serverName,
+                    ServerType.UsbIp,
+                    IpAddress.From("127.0.0.1").ShouldBeOk(),
+                    Port.From(3240).ShouldBeOk()
+                )
+            )
+            .ShouldBeOk()
+            .AddRoute(new Route(serverName, PublicEndpoint.From("1-1").ShouldBeOk(), deviceName))
+            .ShouldBeOk();
+
+        // When
+        var roundtripped = TomlConfigParser
+            .Parse(TomlConfigParser.Serialize(original))
+            .ShouldBeOk();
+
+        // Then
+        roundtripped.ShouldBe(original);
+        roundtripped.Servers.Single().Type.ShouldBe(ServerType.UsbIp);
+        roundtripped.Routes.Single().Endpoint.Value.ShouldBe("1-1");
     }
 
     [Fact]

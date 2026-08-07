@@ -124,9 +124,40 @@ public sealed class UsbControlPipe
     public (UsbIpRetSubmit Reply, byte[] Payload) HandleEp0(
         UsbIpCmdSubmit submit,
         ReadOnlyMemory<byte> outPayload
+    ) => HandleEp0(submit, outPayload, NoClassLayer);
+
+    /// <summary>
+    /// Answers a USBIP_CMD_SUBMIT addressed to endpoint 0 with a class
+    /// layer behind the standard requests.
+    ///
+    /// The standard state machine runs first; only what it leaves
+    /// <see cref="UsbControlOutcome.NotHandled"/> — every class and vendor
+    /// request — reaches <paramref name="classFallback"/>. A fallback that
+    /// declines in turn leaves the transfer stalled, so the two-layer
+    /// composition has exactly the completion semantics the single-layer
+    /// overload has.
+    /// </summary>
+    /// <param name="submit">The URB the host submitted to endpoint 0.</param>
+    /// <param name="outPayload">The OUT data stage, empty when there is none.</param>
+    /// <param name="classFallback">
+    /// The class layer — <see cref="UsbTmcControlHandler.Handle"/> for the
+    /// USBTMC-USB488 profile.
+    /// </param>
+    public (UsbIpRetSubmit Reply, byte[] Payload) HandleEp0(
+        UsbIpCmdSubmit submit,
+        ReadOnlyMemory<byte> outPayload,
+        Func<UsbSetupPacket, UsbControlResult> classFallback
     )
     {
-        var result = Handle(UsbSetupPacket.Read(submit.Setup), outPayload);
+        ArgumentNullException.ThrowIfNull(classFallback);
+
+        var setup = UsbSetupPacket.Read(submit.Setup);
+        var result = Handle(setup, outPayload);
+        if (result.Outcome == UsbControlOutcome.NotHandled)
+        {
+            result = classFallback(setup);
+        }
+
         var handled = result.Outcome == UsbControlOutcome.Handled;
         var payload = handled ? result.Data : [];
 
@@ -231,6 +262,13 @@ public sealed class UsbControlPipe
     /// </summary>
     private static UsbControlResult Truncate(byte[] data, ushort wLength) =>
         UsbControlResult.Handled(data.Length <= wLength ? data : data[..wLength]);
+
+    /// <summary>
+    /// The class layer of a device that has none: everything the standard
+    /// requests declined stays declined, and therefore stalls.
+    /// </summary>
+    private static UsbControlResult NoClassLayer(UsbSetupPacket setup) =>
+        UsbControlResult.NotHandled();
 
     private const byte SelfPoweredStatusBit = 0x01;
 }

@@ -1,6 +1,7 @@
 using System.CommandLine;
 using IviCli.Application.Servers;
 using IviCli.Domain;
+using IviCli.Domain.Protocols;
 using IviCli.Domain.Servers;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -113,6 +114,7 @@ public static class ServerCommand
                     {
                         "socket" => 5025,
                         "hislip" => 4880,
+                        "usbip" => UsbIpConstants.DefaultPort,
                         _ => 0,
                     };
                 }
