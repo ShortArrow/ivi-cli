@@ -31,7 +31,7 @@ public static class ServerRouteCommand
                 var result = await handler.HandleAsync(new ListRoutesQuery(), ct);
                 return result switch
                 {
-                    Result<RouteListing, ListRoutesError>.Ok ok => Render(ok.Value),
+                    Result<RouteListing, ListRoutesError>.Ok ok => Render(ok.Value, Console.Out),
                     Result<RouteListing, ListRoutesError>.Error err => ServerCommand.Log(
                         err.Err,
                         logger,
@@ -45,23 +45,40 @@ public static class ServerRouteCommand
         return cmd;
     }
 
-    private static int Render(RouteListing listing)
+    /// <summary>Renders the route listing as plain text for human consumption.</summary>
+    public static int Render(RouteListing listing, TextWriter writer)
     {
+        ArgumentNullException.ThrowIfNull(listing);
+        ArgumentNullException.ThrowIfNull(writer);
+
         if (listing.Routes.IsEmpty)
         {
-            Console.WriteLine("(no routes configured)");
+            writer.WriteLine("(no routes configured)");
         }
         else
         {
             foreach (var r in listing.Routes)
             {
-                Console.WriteLine(
-                    $"[{r.Endpoint.Value}] {r.ServerName.Value} -> {r.DeviceName.Value}"
+                writer.WriteLine(
+                    $"[{r.Endpoint.Value}] {r.ServerName.Value} -> {r.DeviceName.Value}{ProfileMarker(r)}"
                 );
             }
         }
         return ExitCodeMapper.Success;
     }
+
+    /// <summary>
+    /// The profile suffix, empty for the default. Shown only when it is a
+    /// choice, the way the configuration file writes it only then: a
+    /// route that says nothing about its profile reads the same as it did
+    /// before routes had one.
+    /// </summary>
+    private static string ProfileMarker(Route route) =>
+        route.Profile switch
+        {
+            UsbExportProfile.CdcAcm => " (cdc-acm)",
+            _ => string.Empty,
+        };
 
     private static Command BuildAdd(IServiceProvider services)
     {
