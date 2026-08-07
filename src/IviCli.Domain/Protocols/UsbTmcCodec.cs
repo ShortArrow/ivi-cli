@@ -58,6 +58,23 @@ public static class UsbTmcCodec
         );
     }
 
+    /// <summary>Decodes one USB488 TRIGGER transfer.</summary>
+    /// <exception cref="InvalidDataException">The transfer is malformed.</exception>
+    public static UsbTmcTrigger ReadTrigger(ReadOnlySpan<byte> transfer) =>
+        new(BTag: ReadHeader(transfer, UsbTmcConstants.MsgIdTrigger));
+
+    /// <summary>
+    /// Encodes one USB488 TRIGGER transfer: a header whose whole tail is
+    /// reserved, hence twelve zero-padded bytes and no message data
+    /// (USB488 1.00 §3.2.2).
+    /// </summary>
+    public static byte[] WriteTrigger(UsbTmcTrigger trigger)
+    {
+        var transfer = new byte[UsbTmcConstants.BulkHeaderSize];
+        WriteHeader(transfer, UsbTmcConstants.MsgIdTrigger, trigger.BTag);
+        return transfer;
+    }
+
     /// <summary>
     /// Decodes one DEV_DEP_MSG_IN transfer — the direction the device
     /// writes, read back by tests and by anything replaying a capture.

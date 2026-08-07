@@ -97,6 +97,27 @@ internal static class UsbTmcGoldenTransfers
             0x00, // pad  |_ to the 4-byte boundary
             0x00, // pad /
         ];
+
+    /// <summary>
+    /// A USB488 TRIGGER with bTag 3: a bare header whose whole tail is
+    /// reserved, so the transfer is 12 bytes and carries no data
+    /// (USB488 1.00 §3.2.2).
+    /// </summary>
+    internal static byte[] Trigger =>
+        [
+            0x80, // MsgID = TRIGGER (128)
+            0x03, // bTag = 3
+            0xFC, // bTagInverse = ~3
+            0x00, // reserved
+            0x00, // reserved \
+            0x00, // reserved  |
+            0x00, // reserved  |
+            0x00, // reserved  |_ USB488 reserved, offsets 4..11
+            0x00, // reserved  |
+            0x00, // reserved  |
+            0x00, // reserved  |
+            0x00, // reserved /
+        ];
 }
 
 /// <summary>
@@ -313,6 +334,37 @@ public sealed class UsbTmcCodecTests
     }
 
     [Fact]
+    public void WriteTrigger_emits_the_twelve_byte_header_and_nothing_after_it()
+    {
+        var transfer = UsbTmcCodec.WriteTrigger(new UsbTmcTrigger(BTag: 3));
+
+        transfer.ShouldBe(UsbTmcGoldenTransfers.Trigger);
+    }
+
+    [Fact]
+    public void ReadTrigger_reads_the_golden_back_into_its_one_field()
+    {
+        UsbTmcCodec.ReadTrigger(UsbTmcGoldenTransfers.Trigger).BTag.ShouldBe((byte)3);
+    }
+
+    [Fact]
+    public void ReadTrigger_rejects_a_header_carrying_another_MsgID()
+    {
+        Should.Throw<InvalidDataException>(() =>
+            UsbTmcCodec.ReadTrigger(UsbTmcGoldenTransfers.DevDepMsgOutIdn)
+        );
+    }
+
+    [Fact]
+    public void ReadTrigger_rejects_a_broken_bTagInverse()
+    {
+        var transfer = UsbTmcGoldenTransfers.Trigger;
+        transfer[2] = 0x03;
+
+        Should.Throw<InvalidDataException>(() => UsbTmcCodec.ReadTrigger(transfer));
+    }
+
+    [Fact]
     public void ReadMsgId_names_the_header_without_decoding_the_rest_of_it()
     {
         UsbTmcCodec
@@ -321,6 +373,7 @@ public sealed class UsbTmcCodecTests
         UsbTmcCodec
             .ReadMsgId(UsbTmcGoldenTransfers.RequestDevDepMsgIn)
             .ShouldBe(UsbTmcConstants.MsgIdRequestDevDepMsgIn);
+        UsbTmcCodec.ReadMsgId(UsbTmcGoldenTransfers.Trigger).ShouldBe(UsbTmcConstants.MsgIdTrigger);
     }
 
     [Fact]

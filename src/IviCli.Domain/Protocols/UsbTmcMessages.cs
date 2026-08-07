@@ -32,6 +32,15 @@ public readonly record struct UsbTmcRequestDevDepMsgIn(
 );
 
 /// <summary>
+/// A USB488 TRIGGER bulk transfer (USB488 1.00 §3.2.2): the host asking
+/// the device to trigger, the wire form of the IEEE 488.1 GET message.
+/// The <c>bTag</c> is all it carries — everything after the common
+/// four-byte prefix is reserved and zero — so it names the transfer for
+/// the <c>bTag</c> discipline and nothing else.
+/// </summary>
+public readonly record struct UsbTmcTrigger(byte BTag);
+
+/// <summary>
 /// A DEV_DEP_MSG_IN bulk transfer: the device's answer.
 /// <c>TransferSize</c> counts the bytes in <em>this</em> transfer rather
 /// than in the whole message, so a long answer is split across several

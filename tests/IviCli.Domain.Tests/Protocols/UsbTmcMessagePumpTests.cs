@@ -284,6 +284,51 @@ public sealed class UsbTmcMessagePumpTests
             .Outcome.ShouldBe(UsbTmcBulkOutOutcome.MessageComplete);
     }
 
+    [Fact]
+    public void A_TRIGGER_message_asks_for_a_trigger_and_completes_no_message()
+    {
+        var result = new UsbTmcMessagePump().SubmitBulkOut(UsbTmcGoldenTransfers.Trigger);
+
+        result.Outcome.ShouldBe(UsbTmcBulkOutOutcome.TriggerRequested);
+        result.Message.ShouldBeNull();
+    }
+
+    [Fact]
+    public void A_TRIGGER_repeating_the_previous_bTag_is_rejected_like_any_other_header()
+    {
+        var pump = new UsbTmcMessagePump();
+        pump.SubmitBulkOut(Out(bTag: 3, endOfMessage: true, "*RST\n"));
+
+        var result = pump.SubmitBulkOut(UsbTmcGoldenTransfers.Trigger);
+
+        result.Outcome.ShouldBe(UsbTmcBulkOutOutcome.Rejected);
+    }
+
+    [Fact]
+    public void A_TRIGGER_leaves_a_half_assembled_message_where_it_was()
+    {
+        var pump = new UsbTmcMessagePump();
+        pump.SubmitBulkOut(Out(bTag: 1, endOfMessage: false, "*ID"));
+
+        pump.SubmitBulkOut(UsbTmcGoldenTransfers.Trigger)
+            .Outcome.ShouldBe(UsbTmcBulkOutOutcome.TriggerRequested);
+
+        var result = pump.SubmitBulkOut(Out(bTag: 2, endOfMessage: true, "N?\n"));
+        result.Outcome.ShouldBe(UsbTmcBulkOutOutcome.MessageComplete);
+        result.Message!.Value.Content.ShouldBe(UsbTmcGoldenTransfers.IdnQuery);
+    }
+
+    [Fact]
+    public void A_TRIGGER_with_a_broken_header_is_rejected_rather_than_thrown_at_the_caller()
+    {
+        var transfer = UsbTmcGoldenTransfers.Trigger;
+        transfer[2] = 0x03;
+
+        var result = new UsbTmcMessagePump().SubmitBulkOut(transfer);
+
+        result.Outcome.ShouldBe(UsbTmcBulkOutOutcome.Rejected);
+    }
+
     private static byte[] Out(byte bTag, bool endOfMessage, string content) =>
         UsbTmcCodec.WriteDevDepMsgOut(
             new UsbTmcDevDepMsgOut(bTag, endOfMessage, Encoding.ASCII.GetBytes(content))
