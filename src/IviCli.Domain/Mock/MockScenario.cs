@@ -23,11 +23,17 @@ namespace IviCli.Domain.Mock;
 /// matches <c>*IDN?</c>.
 /// </param>
 /// <param name="Scenes">The set of scenes that make up this scenario.</param>
+/// <param name="Quirks">
+/// Optional firmware misbehaviour the mock reproduces while this
+/// scenario is bound (issue #115). <see langword="null"/> — the default
+/// — means an ideally behaved mock.
+/// </param>
 public sealed record MockScenario(
     ScenarioName Name,
     SceneName InitialScene,
     string? IdnDefault,
-    ImmutableArray<MockScene> Scenes
+    ImmutableArray<MockScene> Scenes,
+    MockQuirks? Quirks = null
 )
 {
     /// <summary>Creates an empty scenario with the supplied name and a
@@ -113,6 +119,7 @@ public sealed record MockScenario(
         && Name == other.Name
         && InitialScene == other.InitialScene
         && IdnDefault == other.IdnDefault
+        && Quirks == other.Quirks
         && Scenes.SequenceEqual(other.Scenes);
 
     /// <inheritdoc/>
@@ -122,6 +129,7 @@ public sealed record MockScenario(
         hash.Add(Name);
         hash.Add(InitialScene);
         hash.Add(IdnDefault);
+        hash.Add(Quirks);
         foreach (var s in Scenes)
         {
             hash.Add(s);

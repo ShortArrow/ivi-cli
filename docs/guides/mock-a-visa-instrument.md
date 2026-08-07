@@ -114,6 +114,31 @@ respond = "3.271"
 > repeated in every scene). Both are tracked in issue
 > [#26](https://github.com/ShortArrow/ivi-cli/issues/26).
 
+### Quirk profiles
+
+Real instruments misbehave, and code that talks to them has to survive it.
+A scenario can ask the mock to reproduce a specific firmware fault through
+an optional `[quirks]` table:
+
+```toml
+[quirks]
+srq_notify_wedge_after = 1
+```
+
+`srq_notify_wedge_after` counts service requests delivered to the SRQ
+stream. Past that count the mock keeps recording the status byte — a
+serial poll still shows the request standing — but no notification is
+ever sent again, so a gateway forwarding SRQs to a remote client goes
+quiet. This is a Kikusui PWR401L on the bench: after certain session
+histories its USB488 notification machinery wedged, and nothing short of
+a power cycle brought it back (recorded on PR
+[#114](https://github.com/ShortArrow/ivi-cli/pull/114)). Closing and
+reopening the device is the mock's power cycle; `0` wedges the stream
+before the first notification.
+
+Quirks are hand-written TOML only — there is no CLI flag for them, so
+author the file and `ivicli mock scenario import ./wedged.toml`.
+
 ---
 
 ## Serve it

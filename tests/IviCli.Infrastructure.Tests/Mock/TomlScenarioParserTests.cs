@@ -122,6 +122,138 @@ public sealed class TomlScenarioParserTests
     }
 
     [Fact]
+    public void Quirks_table_loads_the_srq_notify_wedge_threshold()
+    {
+        const string toml = """
+            idn = "ACME,X,1,1.0"
+
+            [quirks]
+            srq_notify_wedge_after = 1
+
+            [[scenes]]
+            match = "*IDN?"
+            respond = "ACME,X,1,1.0"
+            """;
+        var scenario = TomlScenarioParser
+            .Parse(ScenarioName.From("wedge").ShouldBeOk(), toml)
+            .ShouldBeOk();
+
+        scenario.Quirks!.SrqNotifyWedgeAfter.ShouldBe(1);
+        scenario.Scenes[0].Rules.Length.ShouldBe(1);
+    }
+
+    [Fact]
+    public void Quirks_threshold_of_zero_loads_as_zero_not_as_absent()
+    {
+        const string toml = """
+            [quirks]
+            srq_notify_wedge_after = 0
+            """;
+        var scenario = TomlScenarioParser
+            .Parse(ScenarioName.From("wedge").ShouldBeOk(), toml)
+            .ShouldBeOk();
+
+        scenario.Quirks!.SrqNotifyWedgeAfter.ShouldBe(0);
+    }
+
+    [Fact]
+    public void Negative_quirks_threshold_surfaces_a_parse_failure()
+    {
+        const string toml = """
+            [quirks]
+            srq_notify_wedge_after = -1
+            """;
+        var err = TomlScenarioParser
+            .Parse(ScenarioName.From("wedge").ShouldBeOk(), toml)
+            .ShouldBeError();
+        err.ShouldBeOfType<IviCli.Application.Mock.ScenarioStoreParseFailure>();
+    }
+
+    [Fact]
+    public void Non_integer_quirks_threshold_surfaces_a_parse_failure()
+    {
+        const string toml = """
+            [quirks]
+            srq_notify_wedge_after = "soon"
+            """;
+        var err = TomlScenarioParser
+            .Parse(ScenarioName.From("wedge").ShouldBeOk(), toml)
+            .ShouldBeError();
+        err.ShouldBeOfType<IviCli.Application.Mock.ScenarioStoreParseFailure>();
+    }
+
+    [Fact]
+    public void Empty_quirks_table_loads_as_no_quirks()
+    {
+        const string toml = """
+            [quirks]
+            """;
+        var scenario = TomlScenarioParser
+            .Parse(ScenarioName.From("wedge").ShouldBeOk(), toml)
+            .ShouldBeOk();
+
+        scenario.Quirks.ShouldBeNull();
+    }
+
+    [Fact]
+    public void Quirks_round_trip_through_both_emitted_shapes()
+    {
+        var quirks = new MockQuirks(SrqNotifyWedgeAfter: 2);
+        var flat = MockScenario.SingleScene(
+            ScenarioName.From("wedge").ShouldBeOk(),
+            idnDefault: "ACME,X,1,1.0",
+            rules: ImmutableArray.Create(new MockRule("OUTP ON", new RuleAction.Ack()))
+        ) with
+        {
+            Quirks = quirks,
+        };
+        var multi = flat with
+        {
+            InitialScene = SceneName.From("off").ShouldBeOk(),
+            Scenes = ImmutableArray.Create(
+                MockScene.Empty(SceneName.From("off").ShouldBeOk()),
+                MockScene.Empty(SceneName.From("on").ShouldBeOk())
+            ),
+        };
+
+        foreach (var scenario in new[] { flat, multi })
+        {
+            var serialized = TomlScenarioParser.Serialize(scenario);
+            serialized.ShouldContain("[quirks]");
+            serialized.ShouldContain("srq_notify_wedge_after = 2");
+
+            TomlScenarioParser
+                .Parse(ScenarioName.From("wedge").ShouldBeOk(), serialized)
+                .ShouldBeOk()
+                .Quirks.ShouldBe(quirks);
+        }
+    }
+
+    [Fact]
+    public void Scenario_without_quirks_serializes_without_the_table()
+    {
+        var scenario = MockScenario.SingleScene(
+            ScenarioName.From("demo").ShouldBeOk(),
+            idnDefault: "ACME,X,1,1.0",
+            rules: ImmutableArray.Create(new MockRule("OUTP ON", new RuleAction.Ack()))
+        );
+
+        TomlScenarioParser
+            .Serialize(scenario)
+            .ShouldBe(
+                """
+                idn = "ACME,X,1,1.0"
+
+                [[scenes]]
+                match = "OUTP ON"
+                ack = true
+
+
+                """.ReplaceLineEndings()
+            );
+    }
+
+    [Fact]
     public void Invalid_initial_scene_reference_surfaces_a_parse_failure()
     {
         const string toml = """
