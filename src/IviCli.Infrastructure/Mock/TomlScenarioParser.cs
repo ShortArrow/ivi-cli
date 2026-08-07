@@ -31,6 +31,9 @@ namespace IviCli.Infrastructure.Mock;
 /// </description></item>
 /// </list>
 ///
+/// Both shapes accept the optional <c>[quirks]</c> table, which names
+/// the firmware misbehaviour the mock reproduces (issue #115).
+///
 /// Serialisation always emits the v0.2.0 multi-scene shape, *except*
 /// for scenarios that have a single scene named <c>default</c> with
 /// no transitions — those are written back in the v0.1.x flat form to
@@ -50,6 +53,8 @@ public static class TomlScenarioParser
     private const string FailField = "fail";
     private const string FailDetailField = "fail_detail";
     private const string TransitionToField = "transition_to";
+    private const string QuirksTable = "quirks";
+    private const string SrqNotifyWedgeAfterField = "srq_notify_wedge_after";
 
     /// <summary>
     /// Parses a TOML document into a <see cref="MockScenario"/>. The scenario's
@@ -88,10 +93,21 @@ public static class TomlScenarioParser
             initialSceneRaw = initString;
         }
 
+        var quirksResult = ParseQuirks(model);
+        if (quirksResult is not Result<MockQuirks?, ScenarioStoreError>.Ok quirksOk)
+        {
+            return Result.Failure<MockScenario, ScenarioStoreError>(
+                ((Result<MockQuirks?, ScenarioStoreError>.Error)quirksResult).Err
+            );
+        }
+
         if (!model.TryGetValue(ScenesArray, out var scenesValue))
         {
-            return Result.Success<MockScenario, ScenarioStoreError>(
-                MockScenario.SingleScene(name, idnDefault, ImmutableArray<MockRule>.Empty)
+            return WithQuirks(
+                Result.Success<MockScenario, ScenarioStoreError>(
+                    MockScenario.SingleScene(name, idnDefault, ImmutableArray<MockRule>.Empty)
+                ),
+                quirksOk.Value
             );
         }
         if (scenesValue is not TomlTableArray sceneTables)
@@ -103,9 +119,56 @@ public static class TomlScenarioParser
             sceneTables.Count > 0
             && sceneTables[0].ContainsKey(NameField)
             && !sceneTables[0].ContainsKey(MatchField);
-        return isV02Schema
-            ? ParseMultiScene(name, idnDefault, initialSceneRaw, sceneTables)
-            : ParseFlatRules(name, idnDefault, sceneTables);
+        return WithQuirks(
+            isV02Schema
+                ? ParseMultiScene(name, idnDefault, initialSceneRaw, sceneTables)
+                : ParseFlatRules(name, idnDefault, sceneTables),
+            quirksOk.Value
+        );
+    }
+
+    private static Result<MockScenario, ScenarioStoreError> WithQuirks(
+        Result<MockScenario, ScenarioStoreError> scenario,
+        MockQuirks? quirks
+    ) =>
+        scenario is Result<MockScenario, ScenarioStoreError>.Ok ok
+            ? Result.Success<MockScenario, ScenarioStoreError>(ok.Value with { Quirks = quirks })
+            : scenario;
+
+    /// <summary>
+    /// Reads the optional <c>[quirks]</c> table. A missing table and a
+    /// table that names no quirk both yield <see langword="null"/>, so
+    /// serialising either back omits the table entirely.
+    /// </summary>
+    private static Result<MockQuirks?, ScenarioStoreError> ParseQuirks(TomlTable model)
+    {
+        if (!model.TryGetValue(QuirksTable, out var quirksValue))
+        {
+            return Result.Success<MockQuirks?, ScenarioStoreError>(null);
+        }
+        if (quirksValue is not TomlTable quirksTable)
+        {
+            return FailQuirks($"expected `[{QuirksTable}]` to be a table");
+        }
+
+        int? srqNotifyWedgeAfter = null;
+        if (quirksTable.TryGetValue(SrqNotifyWedgeAfterField, out var wedgeValue))
+        {
+            if (wedgeValue is not long wedgeLong)
+            {
+                return FailQuirks($"expected `{SrqNotifyWedgeAfterField}` to be an integer");
+            }
+            if (wedgeLong is < 0 or > int.MaxValue)
+            {
+                return FailQuirks(
+                    $"`{SrqNotifyWedgeAfterField}` must be zero or more (0 wedges the stream before the first delivery)"
+                );
+            }
+            srqNotifyWedgeAfter = (int)wedgeLong;
+        }
+
+        var quirks = new MockQuirks(srqNotifyWedgeAfter);
+        return Result.Success<MockQuirks?, ScenarioStoreError>(quirks.IsEmpty ? null : quirks);
     }
 
     /// <summary>Serializes a scenario back to TOML.</summary>
@@ -134,6 +197,7 @@ public static class TomlScenarioParser
             {
                 builder.AppendLine();
             }
+            AppendQuirks(builder, scenario.Quirks, inv);
             foreach (var rule in scenario.Scenes[0].Rules)
             {
                 builder.AppendLine("[[scenes]]");
@@ -146,6 +210,7 @@ public static class TomlScenarioParser
         // v0.2.0 multi-scene shape.
         builder.AppendLine(inv, $"initial_scene = \"{Escape(scenario.InitialScene.Value)}\"");
         builder.AppendLine();
+        AppendQuirks(builder, scenario.Quirks, inv);
 
         foreach (var scene in scenario.Scenes)
         {
@@ -161,6 +226,29 @@ public static class TomlScenarioParser
         }
 
         return builder.ToString();
+    }
+
+    /// <summary>
+    /// Emits the <c>[quirks]</c> table, or nothing at all when the
+    /// scenario names no quirk — scenario files written before quirks
+    /// existed must survive a load-save cycle byte for byte.
+    /// </summary>
+    private static void AppendQuirks(
+        StringBuilder builder,
+        MockQuirks? quirks,
+        System.Globalization.CultureInfo inv
+    )
+    {
+        if (quirks is not { IsEmpty: false })
+        {
+            return;
+        }
+        builder.AppendLine(inv, $"[{QuirksTable}]");
+        if (quirks.SrqNotifyWedgeAfter is { } wedgeAfter)
+        {
+            builder.AppendLine(inv, $"{SrqNotifyWedgeAfterField} = {wedgeAfter}");
+        }
+        builder.AppendLine();
     }
 
     private static void AppendRuleBody(
@@ -380,6 +468,9 @@ public static class TomlScenarioParser
 
     private static Result<MockScenario, ScenarioStoreError> Fail(string reason) =>
         Result.Failure<MockScenario, ScenarioStoreError>(new ScenarioStoreParseFailure(reason));
+
+    private static Result<MockQuirks?, ScenarioStoreError> FailQuirks(string reason) =>
+        Result.Failure<MockQuirks?, ScenarioStoreError>(new ScenarioStoreParseFailure(reason));
 
     private static Result<MockRule, ScenarioStoreError> FailRule(string reason) =>
         Result.Failure<MockRule, ScenarioStoreError>(new ScenarioStoreParseFailure(reason));
