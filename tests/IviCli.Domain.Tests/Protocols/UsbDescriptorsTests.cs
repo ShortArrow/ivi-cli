@@ -199,6 +199,65 @@ public sealed class UsbDescriptorsTests
     }
 
     [Fact]
+    public void BuildConfigurationBlob_places_class_specific_descriptors_after_their_interface()
+    {
+        // USB 2.0 §9.6.3: descriptors a class defines follow the
+        // interface descriptor they belong to and precede that
+        // interface's endpoint descriptors.
+        var definition = WithClassSpecificDescriptors([
+            [0x04, 0x24, 0x02, 0x02],
+            [0x03, 0x24, 0x06],
+        ]);
+
+        var blob = UsbDescriptors.BuildConfigurationBlob(definition);
+
+        blob[9..18].ShouldBe(UsbGoldenDevice.ConfigurationBlob[9..18]);
+        blob[18..22].ShouldBe([0x04, 0x24, 0x02, 0x02]);
+        blob[22..25].ShouldBe([0x03, 0x24, 0x06]);
+        blob[25..32].ShouldBe(UsbGoldenDevice.ConfigurationBlob[18..25]);
+    }
+
+    [Fact]
+    public void BuildConfigurationBlob_counts_class_specific_descriptors_in_wTotalLength()
+    {
+        var definition = WithClassSpecificDescriptors([
+            [0x04, 0x24, 0x02, 0x02],
+            [0x03, 0x24, 0x06],
+        ]);
+
+        var blob = UsbDescriptors.BuildConfigurationBlob(definition);
+
+        var expected = UsbGoldenDevice.ConfigurationBlobLength + 7;
+        UsbDescriptors.ConfigurationTotalLength(definition.Configuration).ShouldBe(expected);
+        blob.Length.ShouldBe(expected);
+        blob[2].ShouldBe((byte)expected);
+        blob[3].ShouldBe((byte)0x00);
+    }
+
+    [Fact]
+    public void BuildConfigurationBlob_emits_no_class_specific_descriptors_by_default()
+    {
+        // The whole addition is opt-in: an interface that declares none
+        // produces the byte-for-byte hierarchy it produced before.
+        UsbGoldenDevice
+            .Definition.Configuration.Interfaces[0]
+            .ClassSpecificDescriptors.ShouldBeEmpty();
+    }
+
+    private static UsbDeviceDefinition WithClassSpecificDescriptors(byte[][] descriptors)
+    {
+        var definition = UsbGoldenDevice.Definition;
+        var descriptor = definition.Configuration.Interfaces[0] with
+        {
+            ClassSpecificDescriptors = descriptors,
+        };
+        return definition with
+        {
+            Configuration = definition.Configuration with { Interfaces = [descriptor] },
+        };
+    }
+
+    [Fact]
     public void BuildConfigurationBlob_clears_the_self_powered_bit_for_a_bus_powered_device()
     {
         var busPowered = UsbGoldenDevice.Definition with { SelfPowered = false };

@@ -78,8 +78,9 @@ public static class UsbDescriptors
     /// <summary>
     /// Builds the whole configuration hierarchy a
     /// GET_DESCRIPTOR(CONFIGURATION) returns: the configuration
-    /// descriptor, then each interface descriptor followed by its own
-    /// endpoint descriptors, in declaration order.
+    /// descriptor, then each interface descriptor followed by the
+    /// descriptors its class defines and then its own endpoint
+    /// descriptors, in declaration order.
     /// </summary>
     public static byte[] BuildConfigurationBlob(UsbDeviceDefinition definition)
     {
@@ -107,6 +108,11 @@ public static class UsbDescriptors
             writer.WriteByte(descriptor.InterfaceProtocol);
             writer.WriteByte(UnnamedStringIndex);
 
+            foreach (var classSpecific in descriptor.ClassSpecificDescriptors)
+            {
+                writer.WriteBytes(classSpecific);
+            }
+
             foreach (var endpoint in descriptor.Endpoints)
             {
                 writer.WriteByte(EndpointDescriptorLength);
@@ -123,7 +129,7 @@ public static class UsbDescriptors
 
     /// <summary>
     /// <c>wTotalLength</c>: the configuration descriptor plus every
-    /// interface and endpoint descriptor beneath it.
+    /// interface, class-specific and endpoint descriptor beneath it.
     /// </summary>
     public static int ConfigurationTotalLength(UsbConfigurationDefinition configuration)
     {
@@ -132,6 +138,10 @@ public static class UsbDescriptors
         {
             total +=
                 InterfaceDescriptorLength + (descriptor.Endpoints.Count * EndpointDescriptorLength);
+            foreach (var classSpecific in descriptor.ClassSpecificDescriptors)
+            {
+                total += classSpecific.Length;
+            }
         }
         return total;
     }
