@@ -208,6 +208,112 @@ public sealed class UsbIpGatewayServerTests
     }
 
     [Fact]
+    public async Task A_service_request_completes_an_interrupt_urb_the_host_had_parked()
+    {
+        await using var bench = await Bench.StartAsync();
+        var client = await bench.ImportAsync();
+
+        var interrupt = client.SubmitInterruptIn(UsbTmcConstants.NotificationSize);
+        await client.FlushAsync(bench.Token);
+
+        // A round trip on another endpoint proves the interrupt URB
+        // reached the device and parked: its reply is not the one the
+        // wire carries next.
+        await client.ControlInAsync(
+            UsbIpTestClient.DeviceToHostStandardDevice,
+            UsbStandardRequest.GetDescriptor,
+            wValue: UsbDescriptorType.Device << 8,
+            wIndex: 0,
+            wLength: 64,
+            bench.Token
+        );
+
+        // Nothing arrives from the host now. The URB completes because
+        // the backend raised a service request, which is the whole point
+        // of the endpoint.
+        bench.Backend.RaiseServiceRequest(bench.Device.Name);
+
+        var notification = await client.ReadSubmitReplyAsync(bench.Token);
+        notification.Reply.Header.SeqNum.ShouldBe(interrupt);
+        notification.Reply.Status.ShouldBe(0);
+        notification.Payload.ShouldBe([
+            0x81, // bNotify1: the SRQ notification of USB488 1.00 §3.4.1
+            0x40, // bNotify2: the status byte, RQS set
+        ]);
+    }
+
+    [Fact]
+    public async Task A_service_request_raised_before_the_urb_completes_it_on_submit()
+    {
+        await using var bench = await Bench.StartAsync();
+        var client = await bench.ImportAsync();
+
+        bench.Backend.RaiseServiceRequest(bench.Device.Name, statusByte: 0x50);
+
+        var notification = await client.InterruptInAsync(
+            UsbTmcConstants.NotificationSize,
+            bench.Token
+        );
+
+        notification.Reply.Status.ShouldBe(0);
+        notification.Payload.ShouldBe([0x81, 0x50]);
+    }
+
+    [Fact]
+    public async Task A_serial_poll_answers_the_control_transfer_and_the_interrupt_endpoint()
+    {
+        await using var bench = await Bench.StartAsync();
+        var client = await bench.ImportAsync();
+
+        bench.Backend.RaiseServiceRequest(bench.Device.Name);
+        var srq = await client.InterruptInAsync(UsbTmcConstants.NotificationSize, bench.Token);
+        srq.Payload.ShouldBe([0x81, 0x40]);
+
+        // The host queues the next interrupt URB before polling, the way
+        // a driver that never wants to miss a notification does.
+        var interrupt = client.SubmitInterruptIn(UsbTmcConstants.NotificationSize);
+        var poll = await client.ControlInAsync(
+            UsbIpTestClient.DeviceToHostClassInterface,
+            UsbTmcConstants.Request488ReadStatusByte,
+            wValue: 2,
+            wIndex: UsbTmcDeviceProfile.InterfaceNumber,
+            wLength: UsbTmcConstants.ReadStatusByteResponseSize,
+            bench.Token
+        );
+
+        poll.Reply.Status.ShouldBe(0);
+        poll.Payload.ShouldBe([
+            0x01, // USBTMC_status = SUCCESS
+            0x02, // bTag, echoed from wValue
+            0x40, // the status byte
+        ]);
+
+        var answer = await client.ReadSubmitReplyAsync(bench.Token);
+        answer.Reply.Header.SeqNum.ShouldBe(interrupt);
+        answer.Payload.ShouldBe([
+            0x82, // bNotify1: 0x80 | bTag — a READ_STATUS_BYTE answer
+            0x40, // bNotify2: the status byte
+        ]);
+    }
+
+    [Fact]
+    public async Task A_TRIGGER_message_is_acknowledged_and_reaches_the_backend()
+    {
+        await using var bench = await Bench.StartAsync();
+        var client = await bench.ImportAsync();
+
+        var transfer = UsbTmcCodec.WriteTrigger(new UsbTmcTrigger(BTag: 1));
+        var triggered = await client.BulkOutAsync(transfer, bench.Token);
+
+        triggered.Reply.Status.ShouldBe(0);
+        triggered.Reply.ActualLength.ShouldBe(transfer.Length);
+
+        // The URB is acknowledged only after the trigger reached the
+        // backend, so no wait is needed to observe it.
+        bench.Backend.TriggerCountFor(bench.Device.Name).ShouldBe(1);
+    }
+
+    [Fact]
     public async Task Unlinking_a_parked_interrupt_urb_answers_ECONNRESET_and_never_completes_it()
     {
         await using var bench = await Bench.StartAsync();
@@ -490,6 +596,9 @@ public sealed class UsbIpGatewayServerTests
 
         public Task<SubmitReply> BulkInAsync(int bufferLength, CancellationToken ct) =>
             RoundTripAsync(SubmitBulkIn(bufferLength), ct);
+
+        public Task<SubmitReply> InterruptInAsync(int bufferLength, CancellationToken ct) =>
+            RoundTripAsync(SubmitInterruptIn(bufferLength), ct);
 
         public uint SubmitBulkOut(byte[] transfer) =>
             Submit(UsbIpConstants.DirOut, endpoint: 1, NoSetup, transfer.Length, transfer);

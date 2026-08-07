@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
+using System.Threading.Channels;
 using IviCli.Application.Backends;
 using IviCli.Application.Logging;
 using IviCli.Application.Servers;
@@ -25,8 +26,9 @@ namespace IviCli.Server.UsbIp;
 /// the socket becomes that one device's bus. What a URB <em>means</em>
 /// belongs to the layers underneath: endpoint 0 to
 /// <see cref="UsbControlPipe"/> with <see cref="UsbTmcControlHandler"/>
-/// behind it, the bulk endpoints to <see cref="UsbTmcMessagePump"/>, and
-/// the SCPI a complete message turns out to be to the same
+/// behind it, the bulk endpoints to <see cref="UsbTmcMessagePump"/>, the
+/// interrupt endpoint to <see cref="Usb488Notifier"/>, and the SCPI a
+/// complete message turns out to be to the same
 /// <see cref="IIviBackend"/> the LAN gateways dispatch to.
 /// </summary>
 public sealed class UsbIpGatewayServer : IGatewayServer
@@ -326,12 +328,25 @@ public sealed class UsbIpGatewayServer : IGatewayServer
     }
 
     /// <summary>
-    /// The URB loop of one imported device: a single reader that decodes
-    /// each command, answers it, and completes whatever parked URB the
-    /// answer made serviceable. Being single-threaded is the point — the
-    /// device state (endpoint 0, the message pump, the parked URBs) needs
-    /// no locking, and replies leave in the order the transfers that
-    /// caused them were accepted.
+    /// The event loop of one imported device. Two things reach the device
+    /// asynchronously and neither may wait on the other: the host's URBs
+    /// arrive on the socket, and the backend's service requests arrive on
+    /// <see cref="IIviBackend.ServiceRequestStream"/> — a parked
+    /// interrupt-IN URB has to complete when one fires even though the
+    /// host sent nothing to make it happen.
+    ///
+    /// So the two producers post to one unbounded channel and a single
+    /// consumer drains it. The device state (endpoint 0, the message
+    /// pump, the notifier, the parked URBs) has exactly one owner and
+    /// needs no locking, every byte written to the socket is written by
+    /// that consumer, and replies leave in the order the events that
+    /// caused them were accepted — the properties the single reader of
+    /// Phase 3b had, kept while gaining a second source of events.
+    ///
+    /// The attach ends when the socket does: the reader completes the
+    /// channel, the consumer runs out of events, and cancelling the
+    /// linked source ends the service-request task before the backend is
+    /// closed.
     /// </summary>
     private async Task ServeAsync(NetworkStream stream, ExportedDevice export, CancellationToken ct)
     {
@@ -346,9 +361,46 @@ public sealed class UsbIpGatewayServer : IGatewayServer
             return;
         }
 
+        using var attach = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        var events = Channel.CreateUnbounded<DeviceEvent>();
+        var commands = Task.Run(
+            () => ReadCommandsAsync(stream, events.Writer, attach.Token),
+            attach.Token
+        );
+        var serviceRequests = Task.Run(
+            () => ForwardServiceRequestsAsync(device, backend, events.Writer, attach.Token),
+            attach.Token
+        );
+
         try
         {
-            var session = new DeviceSession(export.Definition);
+            await ConsumeAsync(stream, events.Reader, export, device, backend, attach.Token);
+        }
+        finally
+        {
+            await attach.CancelAsync();
+            await SettleAsync(commands);
+            await SettleAsync(serviceRequests);
+            _ = await backend.CloseAsync(device, ct);
+        }
+    }
+
+    /// <summary>
+    /// The socket half of the event loop: one complete command per
+    /// iteration — a header, and for a USBIP_CMD_SUBMIT carrying an OUT
+    /// data stage the buffer behind it — posted to the channel and never
+    /// answered here. A cut-short buffer, an end of stream, or a command
+    /// code the protocol has no room for all end the attach, which is
+    /// what completing the channel says.
+    /// </summary>
+    private async Task ReadCommandsAsync(
+        NetworkStream stream,
+        ChannelWriter<DeviceEvent> events,
+        CancellationToken ct
+    )
+    {
+        try
+        {
             while (!ct.IsCancellationRequested)
             {
                 var header = await ReadExactlyAsync(stream, UsbIpConstants.CommandHeaderSize, ct);
@@ -359,17 +411,21 @@ public sealed class UsbIpGatewayServer : IGatewayServer
 
                 var probe = new UsbIpCodec.UsbIpReader(header);
                 var command = probe.ReadUInt32();
+                var reader = new UsbIpCodec.UsbIpReader(header);
 
                 if (command == UsbIpConstants.CmdSubmit)
                 {
-                    if (!await SubmitAsync(stream, session, header, device, backend, ct))
+                    var submit = UsbIpCodec.ReadCmdSubmit(ref reader);
+                    var payload = await ReadOutPayloadAsync(stream, submit, ct);
+                    if (payload is null)
                     {
                         break;
                     }
+                    events.TryWrite(new DeviceEvent.Submitted(submit, payload));
                 }
                 else if (command == UsbIpConstants.CmdUnlink)
                 {
-                    await UnlinkAsync(stream, session, header, ct);
+                    events.TryWrite(new DeviceEvent.Unlinked(UsbIpCodec.ReadCmdUnlink(ref reader)));
                 }
                 else
                 {
@@ -381,40 +437,122 @@ public sealed class UsbIpGatewayServer : IGatewayServer
                 }
             }
         }
+        catch (OperationCanceledException)
+        {
+            // The attach is being torn down.
+        }
+        catch (IOException)
+        {
+            _logger.LogInformation("client detached");
+        }
         finally
         {
-            _ = await backend.CloseAsync(device, ct);
+            events.TryComplete();
         }
     }
 
     /// <summary>
-    /// Handles one USBIP_CMD_SUBMIT. Returns false when the transfer
-    /// buffer was cut short, which leaves the stream unusable.
+    /// The OUT data stage of a USBIP_CMD_SUBMIT, empty when it has none
+    /// and null when the stream ended in the middle of one.
     /// </summary>
-    private async Task<bool> SubmitAsync(
+    private static async Task<byte[]?> ReadOutPayloadAsync(
         NetworkStream stream,
-        DeviceSession session,
-        byte[] header,
+        UsbIpCmdSubmit submit,
+        CancellationToken ct
+    )
+    {
+        var length = UsbIpCodec.CmdSubmitPayloadLength(submit);
+        return length > 0 ? await ReadExactlyAsync(stream, length, ct) : [];
+    }
+
+    /// <summary>
+    /// The backend half of the event loop: every service request the
+    /// device raises becomes an event, and the status byte it carries is
+    /// what the host will read from the interrupt endpoint and from a
+    /// serial poll.
+    /// </summary>
+    private async Task ForwardServiceRequestsAsync(
+        Domain.Devices.Device device,
+        IIviBackend backend,
+        ChannelWriter<DeviceEvent> events,
+        CancellationToken ct
+    )
+    {
+        try
+        {
+            await foreach (var request in backend.ServiceRequestStream(device, ct))
+            {
+                events.TryWrite(new DeviceEvent.ServiceRequested(request.StatusByte));
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // The attach is being torn down.
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(
+                ex,
+                "service request stream ended; no further SRQ reaches this host"
+            );
+        }
+    }
+
+    /// <summary>
+    /// The single owner of the device: it answers every event and writes
+    /// every reply, so nothing below it is ever touched from two threads.
+    /// </summary>
+    private async Task ConsumeAsync(
+        NetworkStream stream,
+        ChannelReader<DeviceEvent> events,
+        ExportedDevice export,
         Domain.Devices.Device device,
         IIviBackend backend,
         CancellationToken ct
     )
     {
-        var reader = new UsbIpCodec.UsbIpReader(header);
-        var submit = UsbIpCodec.ReadCmdSubmit(ref reader);
-
-        var payloadLength = UsbIpCodec.CmdSubmitPayloadLength(submit);
-        var outPayload = Array.Empty<byte>();
-        if (payloadLength > 0)
+        var session = new DeviceSession(export.Definition);
+        await foreach (var next in events.ReadAllAsync(ct))
         {
-            var read = await ReadExactlyAsync(stream, payloadLength, ct);
-            if (read is null)
+            switch (next)
             {
-                return false;
-            }
-            outPayload = read;
-        }
+                case DeviceEvent.Submitted submitted:
+                    await SubmitAsync(
+                        stream,
+                        session,
+                        submitted.Submit,
+                        submitted.OutPayload,
+                        device,
+                        backend,
+                        ct
+                    );
+                    break;
 
+                case DeviceEvent.Unlinked unlinked:
+                    await UnlinkAsync(stream, session, unlinked.Unlink, ct);
+                    break;
+
+                case DeviceEvent.ServiceRequested raised:
+                    session.Notifier.RaiseServiceRequest(raised.StatusByte);
+                    await ServeParkedInterruptAsync(stream, session, ct);
+                    break;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Answers one USBIP_CMD_SUBMIT, on whichever endpoint it addresses.
+    /// </summary>
+    private async Task SubmitAsync(
+        NetworkStream stream,
+        DeviceSession session,
+        UsbIpCmdSubmit submit,
+        byte[] outPayload,
+        Domain.Devices.Device device,
+        IIviBackend backend,
+        CancellationToken ct
+    )
+    {
         var endpoint = submit.Header.Ep;
         var inbound = submit.Header.Direction == UsbIpConstants.DirIn;
 
@@ -426,28 +564,32 @@ public sealed class UsbIpGatewayServer : IGatewayServer
                 session.ClassHandler.Handle
             );
             await WriteSubmitReplyAsync(stream, reply, payload, ct);
-            return true;
+            // READ_STATUS_BYTE queues a notification of its own, so the
+            // interrupt endpoint is served after every control transfer.
+            await ServeParkedInterruptAsync(stream, session, ct);
+            return;
         }
 
         if (endpoint == BulkEndpoint && !inbound)
         {
             await BulkOutAsync(stream, session, submit, outPayload, device, backend, ct);
-            return true;
+            return;
         }
 
         if (endpoint == BulkEndpoint && inbound)
         {
             await BulkInAsync(stream, session, submit, ct);
-            return true;
+            return;
         }
 
         if (endpoint == InterruptEndpoint && inbound)
         {
-            // SR0 this phase: nothing raises a service request, so the
-            // URB waits. It is still unlinkable, which is the only thing
-            // a host that polls anyway depends on.
+            // Parked first and served immediately after, so a URB that
+            // arrives when a notification is already waiting completes at
+            // once and one that arrives before waits in order.
             session.Park(submit.Header.SeqNum, InterruptEndpoint, submit.TransferBufferLength);
-            return true;
+            await ServeParkedInterruptAsync(stream, session, ct);
+            return;
         }
 
         _logger.LogWarning(
@@ -461,15 +603,35 @@ public sealed class UsbIpGatewayServer : IGatewayServer
             [],
             ct
         );
-        return true;
+    }
+
+    /// <summary>
+    /// Waits for one of the attach's helper tasks to finish after the
+    /// attach was cancelled, where an abandoned socket read or an
+    /// interrupted stream is the ordinary ending rather than a fault.
+    /// </summary>
+    private async Task SettleAsync(Task task)
+    {
+        try
+        {
+            await task;
+        }
+        catch (OperationCanceledException)
+        {
+            // The teardown this method exists to perform.
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "attach helper task ended with an error");
+        }
     }
 
     /// <summary>
     /// One bulk-OUT transfer: through the USBTMC exchange, and — when it
-    /// completed a message — through the backend, before the URB is
-    /// acknowledged. Dispatching first is what makes the completion mean
-    /// what a host reads into it: the device has the message, not merely
-    /// the bytes.
+    /// completed a message or asked for a trigger — through the backend,
+    /// before the URB is acknowledged. Dispatching first is what makes
+    /// the completion mean what a host reads into it: the device has the
+    /// message, not merely the bytes.
     /// </summary>
     private async Task BulkOutAsync(
         NetworkStream stream,
@@ -500,6 +662,11 @@ public sealed class UsbIpGatewayServer : IGatewayServer
             await DispatchAsync(session, message, device, backend, ct);
         }
 
+        if (result.Outcome == UsbTmcBulkOutOutcome.TriggerRequested)
+        {
+            _ = Failed(await backend.TriggerAsync(device, ct), out _);
+        }
+
         await WriteSubmitReplyAsync(
             stream,
             Completion(submit.Header.SeqNum, 0, transfer.Length),
@@ -524,7 +691,7 @@ public sealed class UsbIpGatewayServer : IGatewayServer
     {
         if (!session.HasParked(BulkEndpoint) && session.Pump.TryTakeBulkIn(out var transfer))
         {
-            await CompleteBulkInAsync(
+            await CompleteInAsync(
                 stream,
                 submit.Header.SeqNum,
                 transfer,
@@ -549,11 +716,38 @@ public sealed class UsbIpGatewayServer : IGatewayServer
         )
         {
             session.Unpark(parked.SeqNum);
-            await CompleteBulkInAsync(stream, parked.SeqNum, transfer, parked.BufferLength, ct);
+            await CompleteInAsync(stream, parked.SeqNum, transfer, parked.BufferLength, ct);
         }
     }
 
-    private static Task CompleteBulkInAsync(
+    /// <summary>
+    /// Hands the notifications waiting for the interrupt endpoint to the
+    /// URBs waiting to carry them, oldest first. Called after everything
+    /// that can queue one — a service request from the backend and a
+    /// READ_STATUS_BYTE from the host — so a notification is never left
+    /// sitting behind a URB that could have taken it.
+    /// </summary>
+    private static async Task ServeParkedInterruptAsync(
+        NetworkStream stream,
+        DeviceSession session,
+        CancellationToken ct
+    )
+    {
+        while (
+            session.TryPeekParked(InterruptEndpoint, out var parked)
+            && session.Notifier.TryTakeNotification(out var packet)
+        )
+        {
+            session.Unpark(parked.SeqNum);
+            await CompleteInAsync(stream, parked.SeqNum, packet, parked.BufferLength, ct);
+        }
+    }
+
+    /// <summary>
+    /// Completes one IN URB with the bytes it carries, cut to the buffer
+    /// the host offered.
+    /// </summary>
+    private static Task CompleteInAsync(
         NetworkStream stream,
         uint seqNum,
         byte[] transfer,
@@ -579,13 +773,10 @@ public sealed class UsbIpGatewayServer : IGatewayServer
     private static async Task UnlinkAsync(
         NetworkStream stream,
         DeviceSession session,
-        byte[] header,
+        UsbIpCmdUnlink unlink,
         CancellationToken ct
     )
     {
-        var reader = new UsbIpCodec.UsbIpReader(header);
-        var unlink = UsbIpCodec.ReadCmdUnlink(ref reader);
-
         var writer = new UsbIpCodec.UsbIpWriter();
         UsbIpCodec.WriteRetUnlink(
             writer,
@@ -812,8 +1003,32 @@ public sealed class UsbIpGatewayServer : IGatewayServer
     private readonly record struct ParkedUrb(uint SeqNum, uint Endpoint, int BufferLength);
 
     /// <summary>
+    /// Something the device has to answer. The two producers of the
+    /// event loop put these in the channel and
+    /// <see cref="ConsumeAsync"/> takes them out: the socket reader posts
+    /// the host's commands, the backend forwarder posts the instrument's
+    /// service requests, and the ordering between them is whatever
+    /// arrived first.
+    /// </summary>
+    private abstract record DeviceEvent
+    {
+        /// <summary>A USBIP_CMD_SUBMIT with its OUT data stage, if any.</summary>
+        public sealed record Submitted(UsbIpCmdSubmit Submit, byte[] OutPayload) : DeviceEvent;
+
+        /// <summary>A USBIP_CMD_UNLINK.</summary>
+        public sealed record Unlinked(UsbIpCmdUnlink Unlink) : DeviceEvent;
+
+        /// <summary>
+        /// A service request the backend raised, with the status byte a
+        /// serial poll will report.
+        /// </summary>
+        public sealed record ServiceRequested(byte StatusByte) : DeviceEvent;
+    }
+
+    /// <summary>
     /// Everything one attached device remembers for as long as the attach
-    /// lasts. Owned by a single reader loop, hence unsynchronised.
+    /// lasts. Owned by the event loop's single consumer, hence
+    /// unsynchronised.
     /// </summary>
     private sealed class DeviceSession
     {
