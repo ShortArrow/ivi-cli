@@ -174,7 +174,8 @@ public sealed class UsbControlPipe
     /// <param name="submit">The URB the host submitted to endpoint 0.</param>
     /// <param name="outPayload">The OUT data stage, empty when there is none.</param>
     /// <param name="classFallback">
-    /// The class layer — the CDC-ACM control handler of ADR 0049 §5.
+    /// The class layer — <see cref="CdcAcmControlHandler.Handle"/> for the
+    /// CDC-ACM profile.
     /// </param>
     public (UsbIpRetSubmit Reply, byte[] Payload) HandleEp0(
         UsbIpCmdSubmit submit,
