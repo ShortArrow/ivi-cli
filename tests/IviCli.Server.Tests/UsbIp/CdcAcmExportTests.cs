@@ -362,9 +362,11 @@ public sealed class CdcAcmExportTests
     [Fact]
     public async Task One_server_serves_a_usbtmc_export_and_a_cdc_export_side_by_side()
     {
+        // One instrument each, because the two attaches here are
+        // concurrent and one instrument carries one attach.
         await using var bench = await UsbIpBench.StartAsync(
-            (UsbIpBench.BusId, UsbExportProfile.UsbTmc),
-            (UsbIpBench.CdcAcmBusId, UsbExportProfile.CdcAcm)
+            (UsbIpBench.BusId, UsbExportProfile.UsbTmc, "scope"),
+            (UsbIpBench.CdcAcmBusId, UsbExportProfile.CdcAcm, "supply")
         );
 
         var devlist = await bench.Connect().RequestDevlistAsync(bench.Token);
@@ -395,6 +397,42 @@ public sealed class CdcAcmExportTests
             .ShouldBe(UsbIpBench.IdnResponse + "\n");
 
         var terminal = await bench.ImportAsync(UsbIpBench.CdcAcmBusId);
+        await terminal.BulkOutAsync(Line("*IDN?"), bench.Token);
+        var plain = await terminal.BulkInAsync(bufferLength: 512, bench.Token);
+        Encoding.ASCII.GetString(plain.Payload).ShouldBe(UsbIpBench.IdnResponse + "\n");
+    }
+
+    [Fact]
+    public async Task Two_routes_of_one_device_take_turns_instead_of_attaching_at_once()
+    {
+        // Two routes onto one instrument is how an operator switches
+        // profiles without editing the configuration: both are exported,
+        // and the one attached decides which the host sees. What they
+        // cannot be is attached at the same time.
+        await using var bench = await UsbIpBench.StartAsync(
+            (UsbIpBench.BusId, UsbExportProfile.UsbTmc),
+            (UsbIpBench.CdcAcmBusId, UsbExportProfile.CdcAcm)
+        );
+
+        var instrument = await bench.ImportAsync(UsbIpBench.BusId);
+        await instrument.BulkOutAsync(
+            UsbTmcCodec.WriteDevDepMsgOut(
+                new UsbTmcDevDepMsgOut(
+                    BTag: 1,
+                    EndOfMessage: true,
+                    Encoding.ASCII.GetBytes("*IDN?\n")
+                )
+            ),
+            bench.Token
+        );
+
+        var refused = await bench.Connect().RequestImportAsync(UsbIpBench.CdcAcmBusId, bench.Token);
+        refused.Status.ShouldBe(UsbIpConstants.StatusError);
+        refused.Device.ShouldBeNull();
+
+        instrument.Dispose();
+
+        var terminal = await bench.ImportWhenFreeAsync(UsbIpBench.CdcAcmBusId);
         await terminal.BulkOutAsync(Line("*IDN?"), bench.Token);
         var plain = await terminal.BulkInAsync(bufferLength: 512, bench.Token);
         Encoding.ASCII.GetString(plain.Payload).ShouldBe(UsbIpBench.IdnResponse + "\n");

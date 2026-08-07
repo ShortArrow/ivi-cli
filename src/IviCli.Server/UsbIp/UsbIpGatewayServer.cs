@@ -172,6 +172,14 @@ public sealed class UsbIpGatewayServer : IGatewayServer
     /// order, 1-based: nothing on this side is a real bus, so the only
     /// requirement is that <c>devid</c> tells two exports apart and that
     /// a given configuration always yields the same numbers.
+    ///
+    /// Routes that name the same instrument share one
+    /// <see cref="AttachClaim"/>, because the thing that can only have
+    /// one owner is the instrument and not the busid it is reached
+    /// through. Two routes onto one device is a supported shape — it is
+    /// how an operator switches an instrument between profiles without
+    /// editing the configuration — and the shared claim is what makes
+    /// them take turns.
     /// </summary>
     private static List<ExportedDevice> BuildExports(
         Domain.Servers.Server server,
@@ -179,6 +187,7 @@ public sealed class UsbIpGatewayServer : IGatewayServer
     )
     {
         var exports = new List<ExportedDevice>();
+        var claims = new Dictionary<Domain.Devices.DeviceName, AttachClaim>();
         foreach (var route in config.Routes)
         {
             if (route.ServerName != server.Name)
@@ -192,8 +201,20 @@ public sealed class UsbIpGatewayServer : IGatewayServer
                 continue;
             }
 
+            if (!claims.TryGetValue(device.Name, out var claim))
+            {
+                claim = new AttachClaim();
+                claims[device.Name] = claim;
+            }
+
             exports.Add(
-                ExportedDevice.Create(server, route, device, ordinal: (uint)exports.Count + 1)
+                ExportedDevice.Create(
+                    server,
+                    route,
+                    device,
+                    claim,
+                    ordinal: (uint)exports.Count + 1
+                )
             );
         }
         return exports;
@@ -264,6 +285,12 @@ public sealed class UsbIpGatewayServer : IGatewayServer
     /// <summary>
     /// Answers OP_REQ_DEVLIST with every exported device. The protocol
     /// ends the connection there, so the caller closes it afterwards.
+    ///
+    /// An attached device is listed like any other. The reply has no
+    /// field an in-use marker could go in, and the reference
+    /// <c>usbipd</c> lists what the server exports rather than what is
+    /// free; a client learns a device is taken by being refused the
+    /// import, which is where <see cref="ImportAsync"/> puts it.
     /// </summary>
     private static async Task SendDevlistAsync(
         NetworkStream stream,
@@ -286,7 +313,16 @@ public sealed class UsbIpGatewayServer : IGatewayServer
 
     /// <summary>
     /// Answers OP_REQ_IMPORT and, when the busid names an exported
-    /// device, hands the connection to that device's URB loop.
+    /// device no one holds, hands the connection to that device's URB
+    /// loop.
+    ///
+    /// One instrument has one owner, so the attach is claimed before the
+    /// OK reply is written and released when the URB loop returns. An
+    /// instrument already attached — through this busid or through any
+    /// other route that exports it — is refused with the reply an
+    /// unknown busid gets: the client commits no port and reports a
+    /// failed attach, instead of enumerating a device that would vanish
+    /// the moment the backend refused to open it twice.
     /// </summary>
     private async Task ImportAsync(
         NetworkStream stream,
@@ -318,20 +354,39 @@ public sealed class UsbIpGatewayServer : IGatewayServer
             return;
         }
 
-        await WriteImportReplyAsync(
-            stream,
-            version,
-            UsbIpConstants.StatusOk,
-            export.Exported.Device,
-            ct
-        );
-        _logger.LogInformation(
-            "device {BusId} imported (device {Device})",
-            export.BusId,
-            export.Device.Name.Value
-        );
+        if (!export.TryClaimAttach())
+        {
+            _logger.LogInformation(
+                "import of {BusId} refused: device {Device} is already attached through {Holder}",
+                export.BusId,
+                export.Device.Name.Value,
+                export.AttachedThrough
+            );
+            await WriteImportReplyAsync(stream, version, UsbIpConstants.StatusError, null, ct);
+            return;
+        }
 
-        await ServeAsync(stream, export, ct);
+        try
+        {
+            await WriteImportReplyAsync(
+                stream,
+                version,
+                UsbIpConstants.StatusOk,
+                export.Exported.Device,
+                ct
+            );
+            _logger.LogInformation(
+                "device {BusId} imported (device {Device})",
+                export.BusId,
+                export.Device.Name.Value
+            );
+
+            await ServeAsync(stream, export, ct);
+        }
+        finally
+        {
+            export.ReleaseAttach();
+        }
     }
 
     private static async Task WriteImportReplyAsync(
@@ -969,6 +1024,37 @@ public sealed class UsbIpGatewayServer : IGatewayServer
     private const uint EndpointNumberMask = 0x0F;
 
     /// <summary>
+    /// The sole ownership of one instrument, held for the length of an
+    /// attach. Every route that exports the same device shares the claim,
+    /// so the second import loses whichever busid it names.
+    ///
+    /// The claim and the busid holding it are one reference, taken with a
+    /// single compare-and-exchange: connections are handled
+    /// concurrently, so a read followed by a write would let two imports
+    /// both find the device free. Reading <see cref="Holder"/> after a
+    /// lost race is a log message and nothing more — by then the winner
+    /// may already have detached.
+    /// </summary>
+    private sealed class AttachClaim
+    {
+        private string? _holder;
+
+        /// <summary>The busid the live attach came in through, if any.</summary>
+        public string Holder => Volatile.Read(ref _holder) ?? "another connection";
+
+        /// <summary>
+        /// Takes the instrument for <paramref name="busId"/>, or reports
+        /// that someone else has it. Only the caller that took it may
+        /// <see cref="Release"/>.
+        /// </summary>
+        public bool TryTake(string busId) =>
+            Interlocked.CompareExchange(ref _holder, busId, null) is null;
+
+        /// <summary>Hands the instrument back, so a later import may have it.</summary>
+        public void Release() => Interlocked.Exchange(ref _holder, null);
+    }
+
+    /// <summary>
     /// One route as the protocol sees it: the busid a client attaches by,
     /// the device definition its descriptors come from, and the mock
     /// device its messages reach.
@@ -977,10 +1063,20 @@ public sealed class UsbIpGatewayServer : IGatewayServer
         Route Route,
         Domain.Devices.Device Device,
         UsbDeviceDefinition Definition,
-        UsbIpExportedDevice Exported
+        UsbIpExportedDevice Exported,
+        AttachClaim Claim
     )
     {
         public string BusId => Route.Endpoint.Value;
+
+        /// <summary>The busid this instrument's live attach came in through.</summary>
+        public string AttachedThrough => Claim.Holder;
+
+        /// <inheritdoc cref="AttachClaim.TryTake"/>
+        public bool TryClaimAttach() => Claim.TryTake(BusId);
+
+        /// <inheritdoc cref="AttachClaim.Release"/>
+        public void ReleaseAttach() => Claim.Release();
 
         /// <summary>
         /// The state one attach of this device owns, built for the
@@ -997,6 +1093,7 @@ public sealed class UsbIpGatewayServer : IGatewayServer
             Domain.Servers.Server server,
             Route route,
             Domain.Devices.Device device,
+            AttachClaim claim,
             uint ordinal
         )
         {
@@ -1034,7 +1131,8 @@ public sealed class UsbIpGatewayServer : IGatewayServer
                 route,
                 device,
                 definition,
-                new UsbIpExportedDevice(info, interfaces)
+                new UsbIpExportedDevice(info, interfaces),
+                claim
             );
         }
 
