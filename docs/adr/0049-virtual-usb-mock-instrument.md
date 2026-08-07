@@ -40,13 +40,20 @@ emulated USB device per bound mock device. No native code and no kernel
 component on the server side — the same "speak the protocol ourselves"
 property the HiSLIP / VXI-11 / SOCKET backends already have.
 
-An exported busid carries one attach at a time, the way a physical port
-does. A second `OP_REQ_IMPORT` for a busid already attached is answered
-with the error status — the same reply an unknown busid gets — so the
-client reports a failed attach and commits no port; detaching frees the
-busid for the next import. `OP_REQ_DEVLIST` still lists the device,
-because the reply has nowhere to say otherwise and a client learns a
-device is taken by being refused it.
+An instrument carries one attach at a time, the way a physical one does
+— not one attach per exported busid. `OP_REQ_IMPORT` for a device
+already attached, through the busid asked for or through any other route
+that exports it, is answered with the error status, the same reply an
+unknown busid gets: the client reports a failed attach and commits no
+port. Detaching frees the instrument for the next import.
+`OP_REQ_DEVLIST` still lists it, because the reply has nowhere to say
+otherwise and a client learns a device is taken by being refused it.
+
+Per-instrument rather than per-busid is what makes two routes onto one
+device a usable shape instead of a misconfiguration: export the same
+mock as USBTMC and as CDC-ACM, and the operator picks which one the host
+sees by attaching that busid, with no configuration edit between. The
+two simply take turns.
 
 ### 2. The exported device is USBTMC-USB488
 
