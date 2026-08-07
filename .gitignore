@@ -80,3 +80,6 @@ appsettings.Local.json
 plans/
 scratch/
 work/
+
+# Claude Code agent worktrees
+.claude/worktrees/

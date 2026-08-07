@@ -182,11 +182,7 @@ The integration suite (real sockets, PyVISA interop) runs nightly on three OSes;
 
 **Compatibility promise (pre-1.0).** While the version is 0.x, two surfaces are stable contracts: the **`--json` output schemas** and the **`config.toml` / scenario TOML schema**. Breaking either requires a minor version bump (0.Y → 0.Y+1) with an explicit CHANGELOG entry — patch releases never break them. Everything else (human-readable output, log text, Management API shape, container internals) may change in any release until 1.0.
 
-**Verified instruments.** Entries are point-in-time: verified at the recorded version, not re-verified on later releases. Instruments not listed fall under best-effort standards conformance (HiSLIP, VXI-11, raw SOCKET, IEEE 488.2 / SCPI) — incompatibility with a spec-conforming instrument is a bug; attach an `IVICLI_CAPTURE` traffic log to the report.
-
-| Instrument | Verified at | Result |
-| --- | --- | --- |
-| Kikusui PWR801L | v0.2.6 | SOCKET (5025) and HiSLIP (4880) round-trips work; LAN discovery finds it. VXI-11 portmapper resolution works, but queries are blocked by a device-side Core-port issue. |
+**Verified instruments.** Real-instrument verification records live in [docs/verified-instruments.md](docs/verified-instruments.md): point-in-time entries, with unlisted instruments under best-effort standards conformance.
 
 **Support.** GitHub issues, best-effort, no SLA. Only the latest release is supported — fixes ship as new releases, no backports. For vulnerabilities see [SECURITY.md](SECURITY.md).
 

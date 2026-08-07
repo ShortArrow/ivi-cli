@@ -66,7 +66,8 @@ Versioning applies to the whole public surface.
 ### 3. Real-instrument compatibility: point-in-time verified list
 
 Compatibility with physical instruments is handled by a
-**verified-instrument list** (published in the README):
+**verified-instrument list** (published in
+[docs/verified-instruments.md](../verified-instruments.md)):
 
 - An entry records the instrument model, the protocols exercised,
   the ivi-cli version at which the verification happened, and any
