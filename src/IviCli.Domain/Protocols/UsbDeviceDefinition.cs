@@ -57,7 +57,18 @@ public sealed record UsbInterfaceDefinition(
     byte InterfaceSubClass,
     byte InterfaceProtocol,
     IReadOnlyList<UsbEndpointDefinition> Endpoints
-);
+)
+{
+    /// <summary>
+    /// Descriptors the interface's own class defines, each already
+    /// encoded — a CDC functional descriptor (CDC 1.1 §5.2.3) is one.
+    /// USB 2.0 §9.6.3 returns them inside the configuration hierarchy,
+    /// after this interface's descriptor and before its endpoints, in the
+    /// order declared here. A class that defines none leaves it empty,
+    /// which is every interface USBTMC needs.
+    /// </summary>
+    public IReadOnlyList<byte[]> ClassSpecificDescriptors { get; init; } = [];
+}
 
 /// <summary>
 /// The single configuration the mock device offers.
