@@ -182,11 +182,7 @@ Integration スイート（実ソケット、PyVISA 相互運用）は 3 OS 上�
 
 **互換性の約束 (pre-1.0)。** バージョンが 0.x の間、次の 2 面を安定した契約として扱います: **`--json` 出力スキーマ** と **`config.toml` / scenario TOML スキーマ**。いずれかを破壊する変更には minor バージョンアップ (0.Y → 0.Y+1) と CHANGELOG への明示的な記載が必須です — patch リリースはこれらを壊しません。それ以外（human-readable 出力、ログ文言、Management API の形状、コンテナ内部）は 1.0 まではどのリリースでも変わり得ます。
 
-**動作確認済み計測器。** エントリは point-in-time です: 記録されたバージョンで確認したものであり、以降のリリースで再確認はしません。リストにない計測器は標準規格準拠 (HiSLIP, VXI-11, raw SOCKET, IEEE 488.2 / SCPI) を目標とする best-effort の扱いです — 規格準拠の計測器と互換性がない場合はバグとして扱います。報告には `IVICLI_CAPTURE` のトラフィックログを添付してください。
-
-| 計測器 | 確認バージョン | 結果 |
-| --- | --- | --- |
-| Kikusui PWR801L | v0.2.6 | SOCKET (5025) と HiSLIP (4880) の round-trip が動作。LAN discovery で発見可能。VXI-11 は portmapper 解決まで動作するが、機器側の Core ポート問題により query は不可。 |
+**動作確認済み計測器。** 実機での確認記録は [docs/verified-instruments.md](verified-instruments.md) にあります: point-in-time のエントリで、リストにない計測器は標準規格準拠を目標とする best-effort の扱いです。
 
 **サポート。** GitHub issues による best-effort、SLA なし。サポート対象は最新リリースのみ — 修正は新リリースとして出荷し、backport は行いません。脆弱性は [SECURITY.md](../SECURITY.md) を参照。
 
