@@ -30,29 +30,36 @@ internal sealed class UsbIpBench : IAsyncDisposable
     /// <summary>What the bound scenario answers <c>*IDN?</c> with.</summary>
     public const string IdnResponse = "FAKE,USBIP,0,1.0";
 
+    /// <summary>The device every export is bound to unless one names another.</summary>
+    public const string DefaultDeviceName = "dut";
+
     private readonly CancellationTokenSource _cts;
     private readonly Task _serverTask;
     private readonly int _port;
     private readonly List<UsbIpTestClient> _clients = [];
+    private readonly IReadOnlyDictionary<string, Device> _devices;
 
     private UsbIpBench(
         CancellationTokenSource cts,
         Task serverTask,
         int port,
         FakeBackend backend,
-        Device device
+        IReadOnlyDictionary<string, Device> devices
     )
     {
         _cts = cts;
         _serverTask = serverTask;
         _port = port;
         Backend = backend;
-        Device = device;
+        _devices = devices;
     }
 
     public FakeBackend Backend { get; }
 
-    public Device Device { get; }
+    /// <summary>The device of a bench whose exports all share one.</summary>
+    public Device Device => DeviceNamed(DefaultDeviceName);
+
+    public Device DeviceNamed(string name) => _devices[name];
 
     public CancellationToken Token => _cts.Token;
 
@@ -63,17 +70,20 @@ internal sealed class UsbIpBench : IAsyncDisposable
     public static Task<UsbIpBench> StartCdcAcmAsync() =>
         StartAsync((CdcAcmBusId, UsbExportProfile.CdcAcm));
 
-    public static async Task<UsbIpBench> StartAsync(
+    /// <summary>A gateway whose exports all speak for <see cref="DefaultDeviceName"/>.</summary>
+    public static Task<UsbIpBench> StartAsync(
         params (string BusId, UsbExportProfile Profile)[] exports
+    ) => StartAsync([.. exports.Select(e => (e.BusId, e.Profile, DefaultDeviceName))]);
+
+    /// <summary>
+    /// A gateway whose exports each name the device behind them, so a
+    /// test can put two busids on two instruments rather than on one.
+    /// </summary>
+    public static async Task<UsbIpBench> StartAsync(
+        params (string BusId, UsbExportProfile Profile, string DeviceName)[] exports
     )
     {
         var port = GetFreePort();
-        var deviceName = DeviceName.From("dut").ShouldBeOk();
-        var device = new Device(
-            deviceName,
-            VisaResource.Parse("TCPIP0::127.0.0.1::5025::SOCKET").ShouldBeOk(),
-            Timeout.FromMilliseconds(3000).ShouldBeOk()
-        );
         var serverName = ServerName.From("usb-srv").ShouldBeOk();
         var server = new IviCli.Domain.Servers.Server(
             serverName,
@@ -81,16 +91,28 @@ internal sealed class UsbIpBench : IAsyncDisposable
             IpAddress.From("127.0.0.1").ShouldBeOk(),
             Port.From(port).ShouldBeOk()
         );
-        var config = ConfigDocument
-            .Empty.AddDevice(device)
-            .ShouldBeOk()
-            .AddServer(server)
-            .ShouldBeOk();
-        foreach (var (busId, profile) in exports)
+
+        var devices = exports
+            .Select(e => e.DeviceName)
+            .Distinct(StringComparer.Ordinal)
+            .ToDictionary(name => name, Define, StringComparer.Ordinal);
+
+        var config = ConfigDocument.Empty.AddServer(server).ShouldBeOk();
+        var backend = new FakeBackend();
+        foreach (var device in devices.Values)
+        {
+            config = config.AddDevice(device).ShouldBeOk();
+            backend.ConfigureDevice(device.Name, IdnResponse);
+        }
+        foreach (var (busId, profile, deviceName) in exports)
         {
             config = config
                 .AddRoute(
-                    new Route(serverName, PublicEndpoint.From(busId).ShouldBeOk(), deviceName)
+                    new Route(
+                        serverName,
+                        PublicEndpoint.From(busId).ShouldBeOk(),
+                        devices[deviceName].Name
+                    )
                     {
                         Profile = profile,
                     }
@@ -98,7 +120,6 @@ internal sealed class UsbIpBench : IAsyncDisposable
                 .ShouldBeOk();
         }
 
-        var backend = new FakeBackend().ConfigureDevice(deviceName, IdnResponse);
         var gateway = new UsbIpGatewayServer(
             new FakeBackendFactory(backend),
             NullLogger<UsbIpGatewayServer>.Instance
@@ -107,8 +128,15 @@ internal sealed class UsbIpBench : IAsyncDisposable
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(20));
         var serverTask = gateway.RunAsync(server, config, cts.Token);
         await WaitForListenerAsync(port, cts.Token);
-        return new UsbIpBench(cts, serverTask, port, backend, device);
+        return new UsbIpBench(cts, serverTask, port, backend, devices);
     }
+
+    private static Device Define(string name) =>
+        new(
+            DeviceName.From(name).ShouldBeOk(),
+            VisaResource.Parse("TCPIP0::127.0.0.1::5025::SOCKET").ShouldBeOk(),
+            Timeout.FromMilliseconds(3000).ShouldBeOk()
+        );
 
     public UsbIpTestClient Connect()
     {
@@ -125,6 +153,28 @@ internal sealed class UsbIpBench : IAsyncDisposable
         var reply = await client.RequestImportAsync(busId, Token);
         reply.Status.ShouldBe(UsbIpConstants.StatusOk);
         return client;
+    }
+
+    /// <summary>
+    /// Imports <paramref name="busId"/> once the attach that held it has
+    /// let go. A detach is a closed socket, and the server releases the
+    /// busid when the teardown behind that close finishes — nothing the
+    /// client can observe on the wire — so the import is retried.
+    /// </summary>
+    public async Task<UsbIpTestClient> ImportWhenFreeAsync(string busId)
+    {
+        for (var attempt = 0; attempt < 100; attempt++)
+        {
+            var client = Connect();
+            var reply = await client.RequestImportAsync(busId, Token);
+            if (reply.Status == UsbIpConstants.StatusOk)
+            {
+                return client;
+            }
+            await Task.Delay(20, Token);
+        }
+
+        throw new TimeoutException($"busid {busId} was still refused after the attach ended");
     }
 
     public async ValueTask DisposeAsync()
