@@ -14,6 +14,9 @@ namespace IviCli.Backends.Fake;
 /// In-memory <see cref="IIviBackend"/> for tests and the local default
 /// configuration. Implements the fault-injection surface declared in
 /// ADR 0009 §6 and the scenario-playback hook declared in ADR 0026 §4.
+/// A bound scenario may also carry <see cref="MockQuirks"/>, which bend
+/// this backend's behaviour towards a specific instrument's firmware
+/// (issue #115).
 /// </summary>
 public sealed class FakeBackend : IIviBackend, IScenarioAwareBackend
 {
@@ -157,6 +160,16 @@ public sealed class FakeBackend : IIviBackend, IScenarioAwareBackend
     }
 
     /// <inheritdoc/>
+    /// <remarks>
+    /// Besides the lifecycle bookkeeping, opening clears
+    /// the SRQ delivery count, which is what un-wedges a scenario
+    /// carrying <see cref="MockQuirks.SrqNotifyWedgeAfter"/>: nothing
+    /// else in the mock's per-device state resets, so open is the one
+    /// point that stands for the instrument power cycle the real
+    /// PWR401L needed. A USB re-plug did not recover the bench
+    /// instrument; the mock is deliberately kinder, because a test that
+    /// wants the wedge back can simply raise past the threshold again.
+    /// </remarks>
     public Task<Result<Unit, BackendError>> OpenAsync(Device device, CancellationToken ct)
     {
         ct.ThrowIfCancellationRequested();
@@ -168,6 +181,7 @@ public sealed class FakeBackend : IIviBackend, IScenarioAwareBackend
         }
         state.IsOpen = true;
         state.OpenCount++;
+        state.ServiceRequestsDelivered = 0;
         return Task.FromResult(Result.Success<Unit, BackendError>(Unit.Value));
     }
 
@@ -196,17 +210,47 @@ public sealed class FakeBackend : IIviBackend, IScenarioAwareBackend
         _devices.TryGetValue(name, out var state) ? state.TriggerCount : 0;
 
     /// <summary>
+    /// Status byte of the most recent <see cref="RaiseServiceRequest"/>
+    /// for <paramref name="name"/>, or <c>0</c> when none was raised.
+    /// Records the request whether or not a notification went out, so a
+    /// serial poll — and any future <c>*STB?</c> wiring — sees a request
+    /// standing while a wedged stream stays silent.
+    /// </summary>
+    public byte LastStatusByteFor(DeviceName name) =>
+        _devices.TryGetValue(name, out var state) ? state.LastStatusByte : (byte)0;
+
+    /// <summary>
     /// Pushes a synthetic Service Request onto the per-device SRQ channel
     /// so any <see cref="ServiceRequestStream"/> consumer observes it
-    /// (test affordance — production code does not call this).
+    /// (test affordance — production code does not call this). The
+    /// status byte is always recorded; the notification is withheld once
+    /// the bound scenario's
+    /// <see cref="MockQuirks.SrqNotifyWedgeAfter"/> deliveries have gone
+    /// out, reproducing the notify wedge of issue #115.
     /// </summary>
     public void RaiseServiceRequest(DeviceName name, byte statusByte = 0x40)
     {
         var state = _devices.GetOrAdd(name, _ => new FakeDeviceState());
+        state.LastStatusByte = statusByte;
+        if (IsSrqNotifyWedged(name, state))
+        {
+            return;
+        }
+        state.ServiceRequestsDelivered++;
         state.ServiceRequestChannel.Writer.TryWrite(
             new ServiceRequest(name, statusByte, DateTimeOffset.UtcNow)
         );
     }
+
+    /// <summary>
+    /// Whether the notification path for <paramref name="name"/> has
+    /// wedged. Handing a request to the channel counts as a delivery —
+    /// the mock cannot tell whether anyone is enumerating the stream,
+    /// and neither could the instrument.
+    /// </summary>
+    private bool IsSrqNotifyWedged(DeviceName name, FakeDeviceState state) =>
+        GetActiveScenario(name)?.Quirks?.SrqNotifyWedgeAfter is { } threshold
+        && state.ServiceRequestsDelivered >= threshold;
 
     /// <inheritdoc/>
     public Task<Result<Unit, BackendError>> WriteAsync(
@@ -377,6 +421,8 @@ public sealed class FakeBackend : IIviBackend, IScenarioAwareBackend
         public int OpenCount { get; set; }
         public int CloseCount { get; set; }
         public int TriggerCount { get; set; }
+        public int ServiceRequestsDelivered { get; set; }
+        public byte LastStatusByte { get; set; }
         public BackendError? OpenFailure { get; set; }
         public Dictionary<string, string> QueryResponses { get; } = new(StringComparer.Ordinal);
         public Dictionary<string, BackendError> QueryFailures { get; } =
