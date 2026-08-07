@@ -107,9 +107,20 @@ observation layers, each served by tooling that already exists:
   the inbox `usbser.sys` binds and a real COM port appears, so serial
   terminals (TeraTerm and kin) talk SCPI to the same scenario engine —
   and a vendor VISA sees an `ASRL` resource. The profile is selected
-  per exported device; USBTMC remains the default. (Raw-TCP terminals
-  already reach the mock today through the SOCKET gateway; the CDC-ACM
-  profile exists for tools that only speak COM.)
+  per exported device — `profile = "cdc-acm"` on the route, or
+  `server route add <server> <busid> <device> --profile cdc-acm`;
+  USBTMC remains the default and a route that says nothing keeps it.
+  (Raw-TCP terminals already reach the mock today through the SOCKET
+  gateway; the CDC-ACM profile exists for tools that only speak COM.)
+
+  What travels over a CDC export is a byte stream, so the framing is
+  the SOCKET gateway's: a line ends at a newline, a blank line is
+  nothing, and a trailing `?` makes a query. What does not travel is
+  the service request — a COM port has no channel for one, the profile
+  claims no `SERIAL_STATE` notification, and the notification endpoint
+  CDC 1.1 §3.3.1 obliges it to declare stays idle for the life of the
+  attach. An SRQ-shaped test therefore belongs to the USBTMC profile,
+  which is the other reason USBTMC is the default.
 
 ### 6. Out of scope
 
