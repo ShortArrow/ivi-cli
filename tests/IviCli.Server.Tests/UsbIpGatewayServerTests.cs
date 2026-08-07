@@ -112,8 +112,17 @@ public sealed class UsbIpGatewayServerTests
         capabilities.Reply.Status.ShouldBe(0);
         capabilities.Payload.Length.ShouldBe(UsbTmcConstants.CapabilitiesResponseSize);
         capabilities.Payload[0].ShouldBe(UsbTmcConstants.StatusSuccess);
-        // SR0 this phase: nothing drives the interrupt endpoint yet.
-        capabilities.Payload[15].ShouldBe((byte)0x00);
+        // bmIntfcCapabilities488: the interface accepts TRIGGER.
+        capabilities.Payload[14].ShouldBe(UsbTmcConstants.Interface488CapabilityTrigger);
+        // bmDevCapabilities488: SR1 and DT1, so a host subscribes to the
+        // interrupt endpoint and may trigger the device.
+        capabilities
+            .Payload[15]
+            .ShouldBe(
+                (byte)(
+                    UsbTmcConstants.Device488CapabilitySr1 | UsbTmcConstants.Device488CapabilityDt1
+                )
+            );
     }
 
     [Fact]

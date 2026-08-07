@@ -365,7 +365,7 @@ public sealed class UsbControlPipeTests
             ).ToArray(),
             transferBufferLength: UsbTmcConstants.CapabilitiesResponseSize
         );
-        var classHandler = new UsbTmcControlHandler(new UsbTmcMessagePump());
+        var classHandler = new UsbTmcControlHandler(new UsbTmcMessagePump(), new Usb488Notifier());
 
         var (reply, payload) = Pipe()
             .HandleEp0(submit, ReadOnlyMemory<byte>.Empty, classHandler.Handle);

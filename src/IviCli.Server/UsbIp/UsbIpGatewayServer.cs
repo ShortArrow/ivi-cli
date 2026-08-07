@@ -823,12 +823,15 @@ public sealed class UsbIpGatewayServer : IGatewayServer
         {
             Pipe = new UsbControlPipe(definition);
             Pump = new UsbTmcMessagePump();
-            ClassHandler = new UsbTmcControlHandler(Pump);
+            Notifier = new Usb488Notifier();
+            ClassHandler = new UsbTmcControlHandler(Pump, Notifier);
         }
 
         public UsbControlPipe Pipe { get; }
 
         public UsbTmcMessagePump Pump { get; }
+
+        public Usb488Notifier Notifier { get; }
 
         public UsbTmcControlHandler ClassHandler { get; }
 

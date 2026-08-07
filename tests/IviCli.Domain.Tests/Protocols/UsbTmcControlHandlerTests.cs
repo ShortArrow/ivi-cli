@@ -24,7 +24,8 @@ public sealed class UsbTmcControlHandlerTests
     private const byte BulkOutEndpoint = 0x01;
     private const byte BulkInEndpoint = 0x81;
 
-    private static UsbTmcControlHandler Handler() => new(new UsbTmcMessagePump());
+    private static UsbTmcControlHandler Handler() =>
+        new(new UsbTmcMessagePump(), new Usb488Notifier());
 
     [Fact]
     public void GetCapabilities_answers_the_twenty_four_byte_golden()
@@ -58,10 +59,10 @@ public sealed class UsbTmcControlHandlerTests
             0x00, // reserved /
             0x00, // bcdUSB488 lo \_ 0x0100, little endian
             0x01, // bcdUSB488 hi /
-            0x00, // bmIntfcCapabilities488: no trigger (b0), no
+            0x01, // bmIntfcCapabilities488: TRIGGER accepted (b0), no
             //       REN/GTL/LLO (b1), not 488.2 (b2)
-            0x00, // bmDevCapabilities488: DT0 (b0), RL0 (b1),
-            //       **SR0** (b2), no SCPI (b3)
+            0x05, // bmDevCapabilities488: DT1 (b0), RL0 (b1),
+            //       **SR1** (b2), no SCPI (b3)
             0x00, // reserved \
             0x00, // reserved  |
             0x00, // reserved  |
@@ -74,7 +75,7 @@ public sealed class UsbTmcControlHandlerTests
     }
 
     [Fact]
-    public void GetCapabilities_declares_SR0_until_the_interrupt_in_path_exists()
+    public void GetCapabilities_declares_SR1_because_the_interrupt_in_path_is_driven()
     {
         var result = Handler()
             .Handle(
@@ -87,10 +88,29 @@ public sealed class UsbTmcControlHandlerTests
                 )
             );
 
-        // Offset 15 is bmDevCapabilities488; bit 2 is SR1. Phase 4 turns
-        // it on together with the interrupt-IN SRQ endpoint, and this
-        // assertion is what will fail when it does.
-        (result.Data[15] & UsbTmcConstants.Device488CapabilitySr1).ShouldBe(0);
+        // Offset 15 is bmDevCapabilities488; bit 2 is SR1. A host told
+        // SR1 subscribes to the interrupt endpoint, so the bit is a
+        // promise Usb488Notifier has to keep.
+        (result.Data[15] & UsbTmcConstants.Device488CapabilitySr1).ShouldBe(
+            UsbTmcConstants.Device488CapabilitySr1
+        );
+    }
+
+    [Fact]
+    public void GetCapabilities_declares_RL0_so_the_remote_local_requests_may_be_refused()
+    {
+        var result = Handler()
+            .Handle(
+                Setup(
+                    DeviceToHostClassInterface,
+                    UsbTmcConstants.RequestGetCapabilities,
+                    0,
+                    0,
+                    0x18
+                )
+            );
+
+        (result.Data[15] & UsbTmcConstants.Device488CapabilityRl1).ShouldBe(0);
     }
 
     [Fact]
@@ -109,7 +129,7 @@ public sealed class UsbTmcControlHandlerTests
     public void InitiateClear_drops_a_message_the_pump_was_still_accumulating()
     {
         var pump = new UsbTmcMessagePump();
-        var handler = new UsbTmcControlHandler(pump);
+        var handler = new UsbTmcControlHandler(pump, new Usb488Notifier());
 
         // A first transfer without EOM: the message is half-delivered.
         pump.SubmitBulkOut(
@@ -264,10 +284,63 @@ public sealed class UsbTmcControlHandlerTests
     }
 
     [Fact]
+    public void ReadStatusByte_answers_the_status_the_notifier_holds()
+    {
+        var notifier = new Usb488Notifier();
+        var handler = new UsbTmcControlHandler(new UsbTmcMessagePump(), notifier);
+        notifier.RaiseServiceRequest(0x40);
+
+        var result = handler.Handle(ReadStatusByte(bTag: 2));
+
+        result.Outcome.ShouldBe(UsbControlOutcome.Handled);
+        result.Data.ShouldBe([
+            0x01, // USBTMC_status = SUCCESS
+            0x02, // bTag, echoed from wValue
+            0x40, // the status byte, RQS set
+        ]);
+    }
+
+    [Fact]
+    public void ReadStatusByte_leaves_the_notification_for_the_interrupt_endpoint()
+    {
+        var notifier = new Usb488Notifier();
+        var handler = new UsbTmcControlHandler(new UsbTmcMessagePump(), notifier);
+        notifier.RaiseServiceRequest(0x40);
+        notifier.TryTakeNotification(out _).ShouldBeTrue();
+
+        handler.Handle(ReadStatusByte(bTag: 2));
+
+        notifier.TryTakeNotification(out var packet).ShouldBeTrue();
+        packet.ShouldBe([0x82, 0x40]);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(1)]
+    [InlineData(128)]
+    public void ReadStatusByte_stalls_on_a_tag_the_notification_format_cannot_carry(ushort bTag)
+    {
+        // 0x80 | bTag has to stay clear of 0x81, the SRQ notification.
+        var result = Handler().Handle(ReadStatusByte(bTag));
+
+        result.Outcome.ShouldBe(UsbControlOutcome.Stall);
+    }
+
+    [Theory]
+    [InlineData(UsbTmcConstants.Request488RenControl)]
+    [InlineData(UsbTmcConstants.Request488GoToLocal)]
+    [InlineData(UsbTmcConstants.Request488LocalLockout)]
+    public void A_remote_local_request_stalls_because_the_capabilities_declare_RL0(byte bRequest)
+    {
+        var result = Handler().Handle(Setup(DeviceToHostClassInterface, bRequest, 0, 0, 0x01));
+
+        result.Outcome.ShouldBe(UsbControlOutcome.Stall);
+    }
+
+    [Fact]
     public void A_class_request_the_device_does_not_implement_stalls()
     {
-        // READ_STATUS_BYTE is USB488 and arrives in Phase 4.
-        var result = Handler().Handle(Setup(DeviceToHostClassInterface, 128, 0, 0, 0x03));
+        var result = Handler().Handle(Setup(DeviceToHostClassInterface, 0x7F, 0, 0, 0x01));
 
         result.Outcome.ShouldBe(UsbControlOutcome.Stall);
     }
@@ -324,6 +397,20 @@ public sealed class UsbTmcControlHandlerTests
         result.Outcome.ShouldBe(UsbControlOutcome.Handled);
         result.Data.ShouldBe([0x01, 0x00, 0x00, 0x01]);
     }
+
+    /// <summary>
+    /// The SETUP packet of a READ_STATUS_BYTE: <c>wValue</c> is the
+    /// <c>bTag</c>, <c>wIndex</c> the interface, and the host reads the
+    /// three bytes of USB488 1.00 §4.3.1.
+    /// </summary>
+    private static UsbSetupPacket ReadStatusByte(ushort bTag) =>
+        Setup(
+            DeviceToHostClassInterface,
+            UsbTmcConstants.Request488ReadStatusByte,
+            wValue: bTag,
+            wIndex: UsbTmcDeviceProfile.InterfaceNumber,
+            wLength: UsbTmcConstants.ReadStatusByteResponseSize
+        );
 
     private static UsbSetupPacket Setup(
         byte bmRequestType,
