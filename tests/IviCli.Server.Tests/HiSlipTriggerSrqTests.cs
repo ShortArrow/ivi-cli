@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Net;
 using System.Net.Sockets;
 using IviCli.Application.Backends;
@@ -6,6 +7,7 @@ using IviCli.Backends.HiSlip;
 using IviCli.Domain;
 using IviCli.Domain.Configuration;
 using IviCli.Domain.Devices;
+using IviCli.Domain.Mock;
 using IviCli.Domain.Servers;
 using IviCli.Domain.Visa;
 using IviCli.Server.HiSlip;
@@ -18,7 +20,9 @@ namespace IviCli.Server.Tests;
 
 /// <summary>
 /// End-to-end Trigger + ServiceRequest tests across the
-/// HiSlipBackend → HiSlipGatewayServer → FakeBackend stack (ADR 0041).
+/// HiSlipBackend → HiSlipGatewayServer → FakeBackend stack (ADR 0041),
+/// including the scenario notify-wedge quirk (issue #115) — the
+/// forwarding path is what that quirk exists to exercise.
 /// </summary>
 public sealed class HiSlipTriggerSrqTests
 {
@@ -90,6 +94,70 @@ public sealed class HiSlipTriggerSrqTests
 
         observed.Count.ShouldBeGreaterThanOrEqualTo(1);
         observed[0].StatusByte.ShouldBe<byte>(0x41);
+
+        await client.CloseAsync(device, cts.Token);
+        await cts.CancelAsync();
+        try
+        {
+            await serverTask;
+        }
+        catch (OperationCanceledException) { }
+    }
+
+    [Fact]
+    public async Task Notify_wedge_quirk_stops_SRQs_at_the_gateway_while_the_status_byte_stands()
+    {
+        var (gateway, server, config, port, fake, deviceName) = BuildHarness();
+        fake.ActivateScenario(
+            MockScenario.SingleScene(
+                ScenarioName.From("wedge").ShouldBeOk(),
+                idnDefault: null,
+                rules: ImmutableArray<MockRule>.Empty
+            ) with
+            {
+                Quirks = new MockQuirks(SrqNotifyWedgeAfter: 1),
+            },
+            deviceName
+        );
+
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        var serverTask = gateway.RunAsync(server, config, cts.Token);
+        await WaitForListenerAsync(port, cts.Token);
+
+        var device = config.FindDevice(deviceName)!;
+        var client = new HiSlipBackend(port);
+        (await client.OpenAsync(device, cts.Token)).ShouldBeOk();
+
+        var observed = new List<ServiceRequest>();
+        var consumerCts = CancellationTokenSource.CreateLinkedTokenSource(cts.Token);
+        var consumer = Task.Run(async () =>
+        {
+            try
+            {
+                await foreach (var srq in client.ServiceRequestStream(device, consumerCts.Token))
+                {
+                    observed.Add(srq);
+                }
+            }
+            catch (OperationCanceledException) { }
+        });
+
+        await Task.Delay(300, cts.Token);
+        fake.RaiseServiceRequest(deviceName, statusByte: 0x41);
+        await WaitForAsync(() => observed.Count >= 1);
+        fake.RaiseServiceRequest(deviceName, statusByte: 0x44);
+        await Task.Delay(500, cts.Token);
+
+        consumerCts.Cancel();
+        try
+        {
+            await consumer.WaitAsync(TimeSpan.FromSeconds(3));
+        }
+        catch (TaskCanceledException) { }
+
+        observed.Count.ShouldBe(1);
+        observed[0].StatusByte.ShouldBe<byte>(0x41);
+        fake.LastStatusByteFor(deviceName).ShouldBe<byte>(0x44);
 
         await client.CloseAsync(device, cts.Token);
         await cts.CancelAsync();
