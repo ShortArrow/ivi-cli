@@ -347,6 +347,80 @@ public sealed class UsbControlPipeTests
         pipe.ConfigurationValue.ShouldBe((byte)1);
     }
 
+    [Fact]
+    public void HandleEp0_hands_a_class_request_to_the_fallback_and_answers_with_its_data()
+    {
+        // The composition Phase 3b needs: standard requests first, the
+        // USBTMC class handler behind them, in one place rather than at
+        // every call site of the URB loop.
+        var submit = Submit(
+            seqNum: 11,
+            direction: UsbIpConstants.DirIn,
+            setup: new UsbSetupPacket(
+                DeviceToHostClassInterface,
+                UsbTmcConstants.RequestGetCapabilities,
+                0,
+                0,
+                UsbTmcConstants.CapabilitiesResponseSize
+            ).ToArray(),
+            transferBufferLength: UsbTmcConstants.CapabilitiesResponseSize
+        );
+        var classHandler = new UsbTmcControlHandler(new UsbTmcMessagePump());
+
+        var (reply, payload) = Pipe()
+            .HandleEp0(submit, ReadOnlyMemory<byte>.Empty, classHandler.Handle);
+
+        reply.Status.ShouldBe(0);
+        reply.ActualLength.ShouldBe(UsbTmcConstants.CapabilitiesResponseSize);
+        payload.Length.ShouldBe(UsbTmcConstants.CapabilitiesResponseSize);
+        payload[0].ShouldBe(UsbTmcConstants.StatusSuccess);
+    }
+
+    [Fact]
+    public void HandleEp0_answers_a_standard_request_without_consulting_the_fallback()
+    {
+        var consulted = false;
+        var submit = Submit(
+            seqNum: 12,
+            direction: UsbIpConstants.DirIn,
+            setup: GetDescriptor(UsbDescriptorType.Device, 0, 64).ToArray(),
+            transferBufferLength: 64
+        );
+
+        var (reply, payload) = Pipe()
+            .HandleEp0(
+                submit,
+                ReadOnlyMemory<byte>.Empty,
+                _ =>
+                {
+                    consulted = true;
+                    return UsbControlResult.Stall();
+                }
+            );
+
+        consulted.ShouldBeFalse();
+        reply.Status.ShouldBe(0);
+        payload.ShouldBe(UsbGoldenDevice.DeviceDescriptor);
+    }
+
+    [Fact]
+    public void HandleEp0_stalls_when_the_fallback_declines_the_class_request_too()
+    {
+        var submit = Submit(
+            seqNum: 13,
+            direction: UsbIpConstants.DirIn,
+            setup: new UsbSetupPacket(DeviceToHostClassInterface, 200, 0, 0, 3).ToArray(),
+            transferBufferLength: 3
+        );
+
+        var (reply, payload) = Pipe()
+            .HandleEp0(submit, ReadOnlyMemory<byte>.Empty, _ => UsbControlResult.NotHandled());
+
+        reply.Status.ShouldBe(UsbControlPipe.EndpointStalledStatus);
+        reply.ActualLength.ShouldBe(0);
+        payload.ShouldBeEmpty();
+    }
+
     private static UsbSetupPacket GetDescriptor(byte descriptorType, byte index, ushort wLength) =>
         new(
             BmRequestType: DeviceToHostStandardDevice,

@@ -425,6 +425,7 @@ public static class TomlConfigParser
             ServerType.Socket => "socket",
             ServerType.HiSlip => "hislip",
             ServerType.Vxi11 => "vxi11",
+            ServerType.UsbIp => "usbip",
             _ => "local",
         };
 
@@ -450,6 +451,7 @@ public static class TomlConfigParser
             "socket" => ServerType.Socket,
             "hislip" => ServerType.HiSlip,
             "vxi11" => ServerType.Vxi11,
+            "usbip" => ServerType.UsbIp,
             _ => (ServerType?)null,
         };
         if (type is null)

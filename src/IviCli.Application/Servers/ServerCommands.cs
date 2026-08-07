@@ -186,6 +186,7 @@ public sealed class AddServerCommandHandler
             "socket" => ServerType.Socket,
             "hislip" => ServerType.HiSlip,
             "vxi11" => ServerType.Vxi11,
+            "usbip" => ServerType.UsbIp,
             _ => null,
         };
         if (type is null)
