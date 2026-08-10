@@ -29,9 +29,9 @@
       },
       "NSubstitute": {
         "type": "Direct",
-        "requested": "[6.0.0, )",
-        "resolved": "6.0.0",
-        "contentHash": "0gvKMbiJ+/WrfbcfBfqRZZrvfLJcd3rqkqVMjjlY5dtmLRVzMY+o/K/rJUStofQ2haSr9Vd04YDfvZtVVGS3/A==",
+        "requested": "[6.1.0, )",
+        "resolved": "6.1.0",
+        "contentHash": "4RKj/p9l0rylPcH+8EXMVbC4yNyfadUdzBFxog2caVThkMQpDw8Q+468mkFMjEmsFt+jXJSdtTwgVNkWzyCsHw==",
         "dependencies": {
           "Castle.Core": "5.1.1"
         }
@@ -219,7 +219,7 @@
           "IviCli.Backends.Fake": "[0.2.10, )",
           "IviCli.Domain": "[0.2.10, )",
           "Microsoft.Extensions.Logging.Abstractions": "[10.0.10, )",
-          "NSubstitute": "[6.0.0, )",
+          "NSubstitute": "[6.1.0, )",
           "Shouldly": "[4.3.0, )",
           "TestableIO.System.IO.Abstractions": "[22.2.0, )",
           "TestableIO.System.IO.Abstractions.TestingHelpers": "[22.2.0, )",
