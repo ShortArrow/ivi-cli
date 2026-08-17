@@ -183,4 +183,23 @@ public sealed class FakeBackendRuleSrqTests
         observed.ShouldHaveSingleItem().StatusByte.ShouldBe<byte>(0x41);
         fake.LastStatusByteFor(DevName()).ShouldBe<byte>(0x44);
     }
+
+    [Fact]
+    public async Task Requests_raised_with_nobody_reading_are_capped_keeping_the_newest()
+    {
+        var fake = new FakeBackend().ActivateScenario(
+            Scenario(new MockRule("*OPC", new RuleAction.Ack(), Srq: 0x60)),
+            DevName()
+        );
+        var overflow = 3;
+
+        for (var i = 0; i < ServiceRequestBuffer.Capacity + overflow; i++)
+        {
+            fake.RaiseServiceRequest(DevName(), (byte)(i % 256));
+        }
+
+        var observed = await DrainAsync(fake);
+        observed.Count.ShouldBe(ServiceRequestBuffer.Capacity);
+        observed[0].StatusByte.ShouldBe((byte)overflow);
+    }
 }

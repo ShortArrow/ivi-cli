@@ -445,6 +445,6 @@ public sealed class FakeBackend : IIviBackend, IScenarioAwareBackend
         public Dictionary<string, BackendError> QueryFailures { get; } =
             new(StringComparer.Ordinal);
         public Channel<ServiceRequest> ServiceRequestChannel { get; } =
-            Channel.CreateUnbounded<ServiceRequest>();
+            ServiceRequestBuffer.Create();
     }
 }

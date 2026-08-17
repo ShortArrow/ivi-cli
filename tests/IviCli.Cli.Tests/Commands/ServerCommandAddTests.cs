@@ -43,7 +43,7 @@ public sealed class ServerCommandAddTests
         var exitCode = await ServerCommand
             .Build(Services(store))
             .Parse(["add", "srv", "--type", type])
-            .InvokeAsync(CancellationToken.None);
+            .InvokeAsync(cancellationToken: CancellationToken.None);
 
         exitCode.ShouldBe(0);
         var config = (await store.LoadAsync(CancellationToken.None)).ShouldBeOk();
