@@ -271,10 +271,9 @@ public sealed class UsbIpGatewayServer : IGatewayServer
         {
             // Graceful shutdown.
         }
-        catch (IOException)
+        catch (IOException ex)
         {
-            // The client detached, which is how every attach ends.
-            _logger.LogInformation("client detached");
+            _logger.LogDebug(ex, "connection ended with an I/O error");
         }
         catch (Exception ex)
         {
@@ -386,6 +385,11 @@ public sealed class UsbIpGatewayServer : IGatewayServer
         finally
         {
             export.ReleaseAttach();
+            _logger.LogInformation(
+                "device {BusId} detached (device {Device})",
+                export.BusId,
+                export.Device.Name.Value
+            );
         }
     }
 
@@ -525,9 +529,9 @@ public sealed class UsbIpGatewayServer : IGatewayServer
         {
             // The attach is being torn down.
         }
-        catch (IOException)
+        catch (IOException ex)
         {
-            _logger.LogInformation("client detached");
+            _logger.LogDebug(ex, "attach ended with an I/O error");
         }
         finally
         {

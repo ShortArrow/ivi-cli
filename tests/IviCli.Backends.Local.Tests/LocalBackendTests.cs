@@ -129,6 +129,14 @@ public class LocalBackendTests
         write.ShouldBeOfType<Result<Unit, BackendError>.Error>();
     }
 
+    [Theory]
+    [InlineData("TCPIP0::192.168.0.10::hislip0,5000::INSTR")]
+    [InlineData("TCPIP0::192.168.0.10::gpib0,5::INSTR")]
+    public void VisaResourceFormatter_keeps_the_lan_device_suffix(string resource)
+    {
+        VisaResourceFormatter.Format(VisaResource.Parse(resource).ShouldBeOk()).ShouldBe(resource);
+    }
+
     [Fact]
     public void VisaResourceFormatter_round_trips_USB_with_interface()
     {

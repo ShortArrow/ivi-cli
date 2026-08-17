@@ -6,6 +6,7 @@ using IviCli.Domain.Protocols;
 using IviCli.Domain.Servers;
 using IviCli.Server.UsbIp;
 using IviCli.TestKit;
+using Microsoft.Extensions.Logging;
 using Shouldly;
 using Xunit;
 
@@ -82,6 +83,35 @@ public sealed class UsbIpGatewayServerTests
         // client commits no port and never starts enumerating one.
         reply.Status.ShouldBe(UsbIpConstants.StatusError);
         reply.Device.ShouldBeNull();
+    }
+
+    [Fact]
+    public async Task An_orderly_detach_is_logged_with_the_busid_and_device()
+    {
+        var logger = new RecordingLogger<UsbIpGatewayServer>();
+        await using var bench = await UsbIpBench.StartAsync(
+            logger,
+            (BusId, UsbExportProfile.UsbTmc, FirstDeviceName)
+        );
+        var attached = await bench.ImportAsync();
+        await Enumerate(attached, bench.Token);
+
+        attached.Dispose();
+
+        var deadline = DateTime.UtcNow.AddSeconds(5);
+        while (
+            !logger.Entries.Any(e => e.Message.Contains("detached", StringComparison.Ordinal))
+            && DateTime.UtcNow < deadline
+        )
+        {
+            await Task.Delay(20, bench.Token);
+        }
+        var detached = logger.Entries.Single(e =>
+            e.Message.Contains("detached", StringComparison.Ordinal)
+        );
+        detached.Level.ShouldBe(LogLevel.Information);
+        detached.Message.ShouldContain(BusId);
+        detached.Message.ShouldContain(FirstDeviceName);
     }
 
     [Fact]

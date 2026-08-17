@@ -8,6 +8,7 @@ using IviCli.Domain.Servers;
 using IviCli.Domain.Visa;
 using IviCli.Server.UsbIp;
 using IviCli.TestKit;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Shouldly;
 
@@ -79,7 +80,13 @@ internal sealed class UsbIpBench : IAsyncDisposable
     /// A gateway whose exports each name the device behind them, so a
     /// test can put two busids on two instruments rather than on one.
     /// </summary>
+    public static Task<UsbIpBench> StartAsync(
+        params (string BusId, UsbExportProfile Profile, string DeviceName)[] exports
+    ) => StartAsync(NullLogger<UsbIpGatewayServer>.Instance, exports);
+
+    /// <summary>Starts the bench with a logger the test can read back.</summary>
     public static async Task<UsbIpBench> StartAsync(
+        ILogger<UsbIpGatewayServer> logger,
         params (string BusId, UsbExportProfile Profile, string DeviceName)[] exports
     )
     {
@@ -120,10 +127,7 @@ internal sealed class UsbIpBench : IAsyncDisposable
                 .ShouldBeOk();
         }
 
-        var gateway = new UsbIpGatewayServer(
-            new FakeBackendFactory(backend),
-            NullLogger<UsbIpGatewayServer>.Instance
-        );
+        var gateway = new UsbIpGatewayServer(new FakeBackendFactory(backend), logger);
 
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(20));
         var serverTask = gateway.RunAsync(server, config, cts.Token);
