@@ -464,8 +464,7 @@ public sealed class HiSlipBackend : IIviBackend
 
         public NetworkStream Stream { get; }
 
-        public Channel<ServiceRequest> ServiceRequests { get; } =
-            Channel.CreateUnbounded<ServiceRequest>();
+        public Channel<ServiceRequest> ServiceRequests { get; } = ServiceRequestBuffer.Create();
 
         public void StartAsyncReader()
         {
