@@ -4,6 +4,91 @@ All notable changes to ivi-cli are documented here. Format roughly follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning follows
 [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] — 2026-08-18
+
+### Added
+
+- **A mock instrument can be a USB device** (#118, #119, #121, #122, #124,
+  #126, #128, #138). A new gateway type, `server add --type usbip`, exports
+  each routed device over the USB/IP protocol; a USB/IP client on the host
+  (usbip-win2 on Windows, the kernel's `vhci-hcd` on Linux) attaches it as
+  if it were plugged in. The default profile is a USBTMC-USB488 instrument
+  — VID `0x1209` PID `0x0001`, serial = the device alias — that the
+  vendor VISA runtime lists as `USB0::0x1209::0x0001::<device>::INSTR`,
+  answers SCPI from the device's scenario, reports its status byte, and
+  raises service requests over the interrupt-IN endpoint. `route add
+  --profile cdc-acm` exports the same device as a CDC-ACM serial port
+  instead (PID `0x0002`; the inbox serial driver binds and a COM port /
+  `/dev/ttyACM*` appears, 115200 8-N-1, one SCPI line per newline). One
+  attach per device at a time; a second import while one is up is
+  refused. Verified on Windows 11 through usbip-win2 and NI-VISA, and on
+  Linux (WSL2) through `vhci-hcd`; a Wireshark loopback capture decodes
+  the whole exchange with the built-in `usbip` dissector.
+- **A scenario rule can raise a service request** (#138). `srq = <status
+  byte>` on a rule (`rule add --srq 0x60`) makes the mock raise one SRQ
+  with that status byte, verbatim, whenever the rule fires — after any
+  transition, on respond, ack, and fail alike — so the IEEE 488.2 pattern
+  (`*ESE 1; *SRE 32; *OPC` → SRQ) is a three-rule scenario. Delivered
+  through every gateway that carries SRQs: HiSLIP, VXI-11, USB.
+- **Quirk profiles** (#129). A scenario's optional `[quirks]` table asks
+  the mock to reproduce a firmware fault; the first quirk,
+  `srq_notify_wedge_after = <n>`, stops SRQ notifications after *n*
+  deliveries while the status byte keeps recording — the shape a Kikusui
+  PWR401L showed on the bench. A restart of the serving process is the
+  mock's power cycle.
+- **USB instruments in `visa scan`** (#112). Discovery enumerates
+  `USB?*::INSTR` through the installed VISA runtime (via the IVI
+  Foundation's `IviFoundation.Visa` shared components); without a runtime
+  the USB entries are simply absent.
+- **Service requests from Local-backend devices reach the gateways**
+  (#114). Devices routed through the Local (vendor VISA) backend — USB,
+  GPIB, local TCPIP — now deliver SRQs to `ServiceRequestStream`, so a
+  HiSLIP or VXI-11 gateway forwards them to remote clients.
+- **`ivicli server add --type usbip`** and **`server route add --profile`**
+  (#122, #126, #137); `mock scenario show` renders a rule's `srq` (#138).
+- **Guide: how `mock` and `server` fit together** (#137). A device is an
+  alias, an activated scenario makes the mock answer that device, a
+  server routes endpoints to devices without inspecting them — and the
+  serving recipes now register the device before binding a scenario to it.
+- **Verified instruments moved to `docs/verified-instruments.md`** (#120)
+  with a per-transport column layout.
+
+### Changed
+
+- **System.CommandLine 2.0.11** (#146). The CLI moves from the 2.0
+  beta to the stable release; help, completion, and exit codes are
+  unchanged.
+- **Undelivered service requests are capped** (#139). A device keeps its
+  newest 256 requests and drops the oldest when nobody reads them, so a
+  scenario raising SRQs into a raw-socket or CDC-ACM gateway no longer
+  grows the process without bound.
+- **USB/IP detaches are logged** (#144): every attach ends with `device
+  <busid> detached (device <name>)`.
+
+### Fixed
+
+- **A LAN device's port suffix survived nowhere it was written out**
+  (#144). `visa add dut 'TCPIP0::…::hislip0,5000::INSTR'` was saved as
+  `hislip0` and dialled on 4880 afterwards; the API's device DTO and the
+  string handed to the vendor VISA runtime dropped the same suffix — for
+  `gpib0,5`, the instrument's address. All three now write the canonical
+  resource string.
+- **`CLEAR_FEATURE(ENDPOINT_HALT)` on an exported USB device is
+  accepted** (#147) instead of stalled; the Windows USBTMC driver sends
+  it at close.
+- **VXI-11 broadcast discovery survives Windows UDP resets** (#113). An
+  ICMP Port Unreachable from any probed host no longer ends the discovery
+  window for that interface, and USB/GPIB resources print once in the
+  human scan listing.
+- **Two routes of one device no longer race** (#128): a second USB/IP
+  import of an instrument already attached is refused cleanly instead of
+  resetting mid-enumeration.
+
+### Removed
+
+- **`ivicli diagnose`** — the alias deprecated at 0.2.8 is gone; use
+  `ivicli doctor`.
+
 ## [0.2.10] — 2026-08-05
 
 ### Fixed

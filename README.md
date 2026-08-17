@@ -6,7 +6,7 @@
 
 `ivi-cli` is an integrated CLI for managing, diagnosing, and operating instruments addressed via VISA/IVI.
 
-> Status: **v0.2.8 (pre-1.0.0).** Phase 1–3 are landed: CLI core, HiSLIP / VXI-11 / SOCKET gateways, scenario-driven mock-VISA container (ghcr.io/shortarrow/ivi-cli-mock), Management HTTP / WebSocket API with PAT + TLS + audit, OpenTelemetry, and LAN discovery (LXI mDNS + VXI-11 broadcast, plus opt-in `--port` socket sweep). Breaking changes are still possible. See [CHANGELOG.md](docs/CHANGELOG.md).
+> Status: **v0.3.0 (pre-1.0.0).** Landed: CLI core, HiSLIP / VXI-11 / SOCKET gateways, scenario-driven mock-VISA container (ghcr.io/shortarrow/ivi-cli-mock), a USB/IP gateway that exports a mock as a USB instrument or a COM port, Management HTTP / WebSocket API with PAT + TLS + audit, OpenTelemetry, and LAN + USB discovery (LXI mDNS + VXI-11 broadcast, the installed VISA runtime for USB, plus opt-in `--port` socket sweep). Breaking changes are still possible. See [CHANGELOG.md](docs/CHANGELOG.md).
 
 ## Highlights
 
@@ -21,7 +21,8 @@
   - **Multiple backends.** Local NI-VISA, HiSLIP, VXI-11, raw TCP SOCKET, Fake (programmable + scenario playback), Replay (strict deterministic playback) — all behind a single `IIviBackend` port.
   - **Gateway servers.** Expose a local instrument over HiSLIP (`TCPIP::host::hislip0::INSTR`) or raw socket so remote PyVISA / NI-VISA clients can drive it without redeploying the test.
 - **Test without hardware**
-  - **Run a mock instrument.** The `Fake` backend answers SCPI from a *scenario* — a scripted set of `query → response` rules — so `ivicli` (or your own VISA app) can talk to a stand-in with zero bench time.
+  - **Run a mock instrument.** The `Fake` backend answers SCPI from a *scenario* — a scripted set of `query → response` rules, with a status byte a rule can raise a service request with — so `ivicli` (or your own VISA app) can talk to a stand-in with zero bench time.
+  - **Plug the mock in over USB.** A `usbip` gateway exports a scenario-backed device over USB/IP; attach it with usbip-win2 (Windows) or `vhci-hcd` (Linux) and the host's own USB stack and vendor VISA see a USBTMC instrument (`USB0::0x1209::0x0001::<device>::INSTR`), or a plain COM port with the CDC-ACM profile.
   - **Capture, then replay.** Record a live session (`IVICLI_CAPTURE=<path>`) or a SCPI script run (`mock scenario record --from-script foo.scpi`) into a scenario, then re-run it deterministically with `IVICLI_REPLAY=<scenario>` — no hardware burned on regression checks.
   - **Run & lint SCPI scripts.** `visa script foo.scpi` runs a `.scpi` file — [SCPI](https://www.ivifoundation.org/downloads/SCPI/scpi-99.pdf) commands plus ivi-cli's inline assertions — against the current device; `visa lint foo.scpi` flags unknown SCPI roots (IEEE 488.2 + SCPI core) before you run it.
   - **Audit-friendly.** Set `IVICLI_CAPTURE=<path>` and every backend operation streams to an NDJSON log for post-hoc inspection — `tail -f path | jq`, or `ivicli mock received <device> --match ':VOLT'` to confirm out-of-band exactly which SCPI writes reached the mock when a test drives it through its own VISA stack.
