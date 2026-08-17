@@ -220,9 +220,11 @@ public sealed class FakeBackend : IIviBackend, IScenarioAwareBackend
         _devices.TryGetValue(name, out var state) ? state.LastStatusByte : (byte)0;
 
     /// <summary>
-    /// Pushes a synthetic Service Request onto the per-device SRQ channel
-    /// so any <see cref="ServiceRequestStream"/> consumer observes it
-    /// (test affordance — production code does not call this). The
+    /// Pushes a Service Request onto the per-device SRQ channel so any
+    /// <see cref="ServiceRequestStream"/> consumer observes it. Every
+    /// service request the mock raises comes through here: a scenario
+    /// rule carrying <see cref="MockRule.Srq"/> calls it when the rule
+    /// fires, and a test calls it directly to raise one out of band. The
     /// status byte is always recorded; the notification is withheld once
     /// the bound scenario's
     /// <see cref="MockQuirks.SrqNotifyWedgeAfter"/> deliveries have gone
@@ -251,6 +253,21 @@ public sealed class FakeBackend : IIviBackend, IScenarioAwareBackend
     private bool IsSrqNotifyWedged(DeviceName name, FakeDeviceState state) =>
         GetActiveScenario(name)?.Quirks?.SrqNotifyWedgeAfter is { } threshold
         && state.ServiceRequestsDelivered >= threshold;
+
+    /// <summary>
+    /// Applies the after-effects a fired <paramref name="rule"/> leaves
+    /// behind: the scene it moves to, then the service request it
+    /// raises. A rule that matched has fired, so the request goes out
+    /// whether the action answered, acknowledged, or failed.
+    /// </summary>
+    private void ApplyRuleAftermath(DeviceName name, MockRule rule)
+    {
+        ApplyTransition(name, rule.Action.Transition);
+        if (rule.Srq is { } statusByte)
+        {
+            RaiseServiceRequest(name, statusByte);
+        }
+    }
 
     /// <inheritdoc/>
     public Task<Result<Unit, BackendError>> WriteAsync(
@@ -287,7 +304,7 @@ public sealed class FakeBackend : IIviBackend, IScenarioAwareBackend
                 ),
                 _ => Result.Success<Unit, BackendError>(Unit.Value),
             };
-            ApplyTransition(device.Name, rule.Action.Transition);
+            ApplyRuleAftermath(device.Name, rule);
             return Task.FromResult(effect);
         }
 
@@ -325,7 +342,7 @@ public sealed class FakeBackend : IIviBackend, IScenarioAwareBackend
                 ),
                 _ => Result.Success<string, BackendError>(query.Value),
             };
-            ApplyTransition(device.Name, rule.Action.Transition);
+            ApplyRuleAftermath(device.Name, rule);
             return Task.FromResult(effect);
         }
 
