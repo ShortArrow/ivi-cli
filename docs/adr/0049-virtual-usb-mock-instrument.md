@@ -11,7 +11,7 @@ distinction between them matters enough to fix the vocabulary here:
 | Tier | USB device | Instrument content | What it exercises |
 | --- | --- | --- | --- |
 | A | none (in-process `FakeBackend`) | mock | application layer and gateways; VISA, kernel drivers, and USB transport are bypassed |
-| B | **software-emulated** ("a virtual device behaving as a virtual instrument") | mock | the whole host stack — Windows USB core, the inbox USBTMC class driver, any vendor VISA, ivi-cli's own backends |
+| B | **software-emulated** ("a virtual device behaving as a virtual instrument") | mock | the whole host stack — Windows USB core, the USBTMC class driver a vendor VISA installs, that VISA itself, ivi-cli's own backends |
 | C | **physical gadget silicon** ("a real device behaving as a virtual instrument") | mock | everything, cable and enumeration timing included |
 | D | physical instrument | real | everything, plus uncontrollable firmware quirks |
 
