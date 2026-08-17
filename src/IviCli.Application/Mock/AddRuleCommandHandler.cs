@@ -124,7 +124,7 @@ public sealed class AddRuleCommandHandler
         }
 
         var updated = scenario.ReplaceScene(
-            targetScene.AddRule(new MockRule(command.Match, action))
+            targetScene.AddRule(new MockRule(command.Match, action, command.Srq))
         )!;
         var saveResult = await _store.SaveAsync(updated, overwriteIfExists: true, ct);
         if (saveResult is not Result<Unit, ScenarioStoreError>.Ok)
