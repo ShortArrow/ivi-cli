@@ -227,8 +227,8 @@ Either way the mock now listens on:
 
 A `usbip` server exports the device over the USB/IP protocol, and a USB/IP
 client on the host attaches it as if it were plugged in: the operating
-system enumerates it, the class driver binds, and vendor VISA runtimes list
-it like any USB instrument. On the ivicli side only the server type and the
+system enumerates it, the class driver binds, and NI-VISA lists it like any
+USB instrument. On the ivicli side only the server type and the
 shape of the endpoint change: the endpoint is a USB bus id such as `1-1`.
 
 ```sh
@@ -240,12 +240,11 @@ ivicli server route add usb-srv 1-2 dut --profile cdc-acm   # the same device as
 ivicli server start usb-srv
 ```
 
-The client is the operating system's own USB/IP tooling; ivicli installs no
-driver.
+The client is USB/IP tooling on the host; ivicli installs no driver.
 
 | Host | Client | Attach |
 | --- | --- | --- |
-| Windows 11 | [usbip-win2](https://github.com/vadimgrn/usbip-win2) (WHLK-certified drivers) | `usbip.exe attach -r 127.0.0.1 -b 1-1` |
+| Windows 11 | [usbip-win2](https://github.com/vadimgrn/usbip-win2), a release whose drivers are WHLK-certified | `usbip.exe attach -r 127.0.0.1 -b 1-1` |
 | Linux | in-kernel `vhci-hcd` + `usbip` from `linux-tools` | `sudo usbip attach -r <host> -b 1-1` |
 
 `usbip list -r <host>` shows the exports before you attach; `usbip detach -p
@@ -256,7 +255,7 @@ What the host then sees depends on the route's profile:
 
 | Profile | Enumerates as | Reach it with |
 | --- | --- | --- |
-| `usbtmc` (default) | USB Test & Measurement device, VID `0x1209` PID `0x0001`, serial = the device alias | `USB0::0x1209::0x0001::dut::INSTR` in NI-VISA, Keysight VISA, PyVISA, `ivicli visa scan` |
+| `usbtmc` (default) | USB Test & Measurement device, VID `0x1209` PID `0x0001`, serial = the device alias | `USB0::0x1209::0x0001::dut::INSTR` in NI-VISA and `ivicli visa scan` |
 | `cdc-acm` | USB serial device, VID `0x1209` PID `0x0002` | a COM port on Windows, `/dev/ttyACM*` on Linux; 115200 8-N-1, one SCPI line per newline |
 
 Use the USBTMC profile when the code under test goes through a vendor VISA
