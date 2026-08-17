@@ -58,17 +58,5 @@ public static class ApiMapping
     public static IResult ProblemJson(int status, string code, string message) =>
         Results.Json(Error(code, message), statusCode: status);
 
-    private static string FormatResource(VisaResource resource) =>
-        resource switch
-        {
-            VisaResource.Tcpip t => $"TCPIP{t.Board}::{t.Host}::{t.LanDevice}::INSTR",
-            VisaResource.Usb u when u.InterfaceNumber is int iface =>
-                $"USB{u.Board}::{u.VendorId}::{u.ProductId}::{u.SerialNumber}::{iface}::INSTR",
-            VisaResource.Usb u =>
-                $"USB{u.Board}::{u.VendorId}::{u.ProductId}::{u.SerialNumber}::INSTR",
-            VisaResource.Gpib g when g.SecondaryAddress is int sec =>
-                $"GPIB{g.Board}::{g.PrimaryAddress}::{sec}::INSTR",
-            VisaResource.Gpib g => $"GPIB{g.Board}::{g.PrimaryAddress}::INSTR",
-            _ => resource.ToLogString(),
-        };
+    private static string FormatResource(VisaResource resource) => resource.ToCanonical();
 }
