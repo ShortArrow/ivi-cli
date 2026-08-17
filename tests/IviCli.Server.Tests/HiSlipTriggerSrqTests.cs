@@ -105,6 +105,68 @@ public sealed class HiSlipTriggerSrqTests
     }
 
     [Fact]
+    public async Task A_rule_srq_reaches_the_hislip_client()
+    {
+        var (gateway, server, config, port, fake, deviceName) = BuildHarness();
+        fake.ActivateScenario(
+            MockScenario.SingleScene(
+                ScenarioName.From("opc").ShouldBeOk(),
+                idnDefault: null,
+                rules: ImmutableArray.Create(new MockRule("*OPC", new RuleAction.Ack(), Srq: 0x60))
+            ),
+            deviceName
+        );
+
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        var serverTask = gateway.RunAsync(server, config, cts.Token);
+        await WaitForListenerAsync(port, cts.Token);
+
+        var device = config.FindDevice(deviceName)!;
+        var client = new HiSlipBackend(port);
+        (await client.OpenAsync(device, cts.Token)).ShouldBeOk();
+
+        var observed = new List<ServiceRequest>();
+        var consumerCts = CancellationTokenSource.CreateLinkedTokenSource(cts.Token);
+        var consumer = Task.Run(async () =>
+        {
+            try
+            {
+                await foreach (var srq in client.ServiceRequestStream(device, consumerCts.Token))
+                {
+                    observed.Add(srq);
+                    consumerCts.Cancel();
+                }
+            }
+            catch (OperationCanceledException) { }
+        });
+
+        await Task.Delay(300, cts.Token);
+        (
+            await client.WriteAsync(
+                device,
+                IviCli.Domain.Scpi.ScpiCommand.From("*OPC").ShouldBeOk(),
+                cts.Token
+            )
+        ).ShouldBeOk();
+
+        try
+        {
+            await consumer.WaitAsync(TimeSpan.FromSeconds(3));
+        }
+        catch (TaskCanceledException) { }
+
+        observed.ShouldHaveSingleItem().StatusByte.ShouldBe<byte>(0x60);
+
+        await client.CloseAsync(device, cts.Token);
+        await cts.CancelAsync();
+        try
+        {
+            await serverTask;
+        }
+        catch (OperationCanceledException) { }
+    }
+
+    [Fact]
     public async Task Notify_wedge_quirk_stops_SRQs_at_the_gateway_while_the_status_byte_stands()
     {
         var (gateway, server, config, port, fake, deviceName) = BuildHarness();

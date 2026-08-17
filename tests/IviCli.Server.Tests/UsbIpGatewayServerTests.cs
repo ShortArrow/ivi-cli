@@ -1,4 +1,7 @@
+using System.Collections.Immutable;
 using System.Text;
+using IviCli.Domain;
+using IviCli.Domain.Mock;
 using IviCli.Domain.Protocols;
 using IviCli.Domain.Servers;
 using IviCli.Server.UsbIp;
@@ -281,6 +284,52 @@ public sealed class UsbIpGatewayServerTests
         notification.Payload.ShouldBe([
             0x81, // bNotify1: the SRQ notification of USB488 1.00 §3.4.1
             0x40, // bNotify2: the status byte, RQS set
+        ]);
+    }
+
+    [Fact]
+    public async Task A_rule_srq_completes_the_parked_interrupt_urb_with_the_status_byte()
+    {
+        await using var bench = await UsbIpBench.StartAsync();
+        bench.Backend.ActivateScenario(
+            MockScenario.SingleScene(
+                ScenarioName.From("opc").ShouldBeOk(),
+                idnDefault: null,
+                rules: ImmutableArray.Create(new MockRule("*OPC", new RuleAction.Ack(), Srq: 0x60))
+            ),
+            bench.Device.Name
+        );
+        var client = await bench.ImportAsync();
+
+        var interrupt = client.SubmitInterruptIn(UsbTmcConstants.NotificationSize);
+        await client.FlushAsync(bench.Token);
+
+        // Nothing but the rule firing can complete that URB: the host
+        // sends a plain write, and the scenario says what the
+        // instrument reports once it has run.
+        var write = client.SubmitBulkOut(
+            UsbTmcCodec.WriteDevDepMsgOut(
+                new UsbTmcDevDepMsgOut(
+                    BTag: 1,
+                    EndOfMessage: true,
+                    Encoding.ASCII.GetBytes("*OPC\n")
+                )
+            )
+        );
+        await client.FlushAsync(bench.Token);
+
+        var first = await client.ReadSubmitReplyAsync(bench.Token);
+        var second = await client.ReadSubmitReplyAsync(bench.Token);
+        var acknowledged = first.Reply.Header.SeqNum == write ? first : second;
+        var notification = first.Reply.Header.SeqNum == interrupt ? first : second;
+
+        acknowledged.Reply.Header.SeqNum.ShouldBe(write);
+        acknowledged.Reply.Status.ShouldBe(0);
+        notification.Reply.Header.SeqNum.ShouldBe(interrupt);
+        notification.Reply.Status.ShouldBe(0);
+        notification.Payload.ShouldBe([
+            0x81, // bNotify1: the SRQ notification of USB488 1.00 §3.4.1
+            0x60, // bNotify2: the status byte the rule carries, verbatim
         ]);
     }
 
