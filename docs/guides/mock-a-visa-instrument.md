@@ -209,8 +209,11 @@ ever sent again, so a gateway forwarding SRQs to a remote client goes
 quiet. This is a Kikusui PWR401L on the bench: after certain session
 histories its USB488 notification machinery wedged, and nothing short of
 a power cycle brought it back (recorded on PR
-[#114](https://github.com/ShortArrow/ivi-cli/pull/114)). Closing and
-reopening the device is the mock's power cycle; `0` wedges the stream
+[#114](https://github.com/ShortArrow/ivi-cli/pull/114)). The mock's power
+cycle is a restart of the process serving it: behind a gateway the device
+stays open across client connections, so a client that disconnects and
+reconnects — or detaches and re-attaches a USB export — finds the wedge
+where it left it, as it would on the instrument. `0` wedges the stream
 before the first notification.
 
 Quirks are hand-written TOML only — there is no CLI flag for them, so

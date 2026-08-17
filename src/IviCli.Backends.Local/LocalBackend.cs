@@ -225,8 +225,7 @@ public sealed class LocalBackend : IIviBackend
 
         public IVisaSessionHandle Handle { get; }
 
-        public Channel<ServiceRequest> ServiceRequests { get; } =
-            Channel.CreateUnbounded<ServiceRequest>();
+        public Channel<ServiceRequest> ServiceRequests { get; } = ServiceRequestBuffer.Create();
 
         /// <summary>
         /// Subscribes to the handle's service requests on first call and
