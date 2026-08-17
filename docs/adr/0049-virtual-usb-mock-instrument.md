@@ -11,7 +11,7 @@ distinction between them matters enough to fix the vocabulary here:
 | Tier | USB device | Instrument content | What it exercises |
 | --- | --- | --- | --- |
 | A | none (in-process `FakeBackend`) | mock | application layer and gateways; VISA, kernel drivers, and USB transport are bypassed |
-| B | **software-emulated** ("a virtual device behaving as a virtual instrument") | mock | the whole host stack — Windows USB core, the inbox USBTMC class driver, any vendor VISA, ivi-cli's own backends |
+| B | **software-emulated** ("a virtual device behaving as a virtual instrument") | mock | the whole host stack — Windows USB core, the USBTMC class driver a vendor VISA installs, that VISA itself, ivi-cli's own backends |
 | C | **physical gadget silicon** ("a real device behaving as a virtual instrument") | mock | everything, cable and enumeration timing included |
 | D | physical instrument | real | everything, plus uncontrollable firmware quirks |
 
@@ -79,9 +79,12 @@ over HiSLIP, VXI-11, raw socket, or USB.
 
 ### 4. Client attach is the operator's, documented, never automated
 
-- Windows: [usbip-win2](https://github.com/vadimgrn/usbip-win2) — its
-  drivers carry a Microsoft attestation signature, so a stock Windows 11
-  host attaches without test mode. It is a user-installed tool; ivi-cli
+- Windows: [usbip-win2](https://github.com/vadimgrn/usbip-win2), pinned
+  to a release whose drivers are WHLK-certified — signed by Microsoft
+  through the Windows Hardware Compatibility Program — so a stock
+  Windows 11 host attaches without test mode. Signing varies from
+  release to release of that project, so the pin is to a certified
+  release, not to the project. It is a user-installed tool; ivi-cli
   never bundles or installs drivers (the stance ADR 0048 §2 fixed for
   the host side holds for the mock side too).
 - Linux: the in-kernel `vhci-hcd` client that ships with the kernel's
@@ -171,24 +174,69 @@ observation layers, each served by tooling that already exists:
 
 ## Verification
 
-Protocol layers are unit-tested with fakes (descriptor tables, USBTMC
-framing codecs, URB dispatch, the USB488 control requests) — no kernel
-attach in CI. Two attach routes cover the rest, and only one of them
-needs anything installed.
+The claim under test: a scenario-backed device exported by a `usbip`
+server is, to the host's USB stack and to the VISA runtime above it, a
+USBTMC-USB488 instrument (or, with the CDC-ACM profile, a serial port)
+that enumerates, answers SCPI, reports its status byte, and raises
+service requests — indistinguishable from hardware for the code under
+test.
 
-The zero-dependency route runs against the kernel's own client: WSL2
-carries `vhci-hcd`, and under mirrored networking the Windows listener
-is reachable at `localhost`, so a `usbip list -r localhost` and a
-`usbip attach` exercise devlist, import, and full enumeration —
-configuration and string descriptors included — against the reference
-implementation, with no third-party driver anywhere. That route ends at
-enumeration: the Microsoft WSL kernel ships no `usbtmc` class module, so
-no class driver binds and no SCPI traffic crosses it.
+**Context.** Windows 11 x64 with usbip-win2 (WHLK-certified release)
+and NI-VISA, which supplies the USBTMC class driver (Windows ships
+none); Linux through the kernel's `vhci-hcd` client. **Assumptions.**
+One attach per instrument at a time; device names are distinct, since
+the host tells devices apart by VID/PID/serial and the serial is the
+device name; the mock has no status-register model, so a scenario rule
+declares the status byte it raises a service request with. **Out of
+scope.** Defects of the host's USB/IP client; VISA runtimes other than
+the one named above; several `server start` processes exporting the
+same device name (each process is its own mock, so their scene state
+and service requests are not shared); more than a few devices per
+server; USB/IP across a network.
 
-The Windows-side attach is the release-gating end-to-end check, verified
-once on a real host before release per the ADR 0047 policy: attach via
-usbip-win2, confirm the device binds to the inbox USBTMC class driver,
-confirm a vendor VISA and `ivicli visa scan` both enumerate it, run a
-query round-trip against a scenario, and — once the interrupt-IN path
-exists — run the IEEE 488.2 SRQ sequence and observe the SRQ arriving
-through `ServiceRequestStream`.
+**What the suite holds.** Every claim a test can express lives in the
+test suite and nowhere else: descriptor tables and the golden
+configuration blobs, USBTMC framing and the bTag discipline, the USB488
+control requests and the interrupt-IN notification format, CDC-ACM line
+coding and the DTR session boundary, devlist/import/unlink over a
+kernel-free USB/IP client, per-instrument attach exclusivity, several
+devices served side by side, and a scenario rule's service request
+reaching a HiSLIP client and a parked interrupt URB. No kernel attach
+runs in CI.
+
+**What only a host can show.** Two attach routes cover the rest, and only
+one needs anything installed. The zero-dependency route runs against
+the kernel's own client: WSL2 carries `vhci-hcd`, and under mirrored
+networking the Windows listener is reachable at `localhost`, so `usbip
+list` and `usbip attach` exercise devlist, import, and full enumeration
+against the reference implementation. For the USBTMC profile that route
+ends at enumeration — the Microsoft WSL kernel ships no `usbtmc`
+module — while the CDC-ACM profile goes all the way, because `cdc_acm`
+is in that kernel and a `/dev/ttyACM*` appears.
+
+The Windows-side attach is the release-gating check, run on a real host
+before a release per the ADR 0047 policy: attach through usbip-win2;
+confirm the device binds to the USBTMC class driver the vendor VISA
+installs; confirm the vendor VISA and `ivicli visa scan` both enumerate
+it; run a query round-trip against a scenario; run the IEEE 488.2 SRQ
+sequence (`*ESE 1; *SRE 32; *OPC` against a rule carrying `srq`) and see
+the service request arrive as a VISA event; attach the CDC-ACM profile
+and talk SCPI through the COM port; attach several devices at once and
+see their answers and service requests stay apart; and read one attach
+cycle back through Wireshark's `usbip` dissector without a malformed
+frame. Each run is recorded, with its date and method, on the issue that
+tracks this feature.
+
+**Residual risk — what this case does not assure.** The VISA-API-layer
+observation (§5's first layer) is reasoned, not observed: the vendors'
+call monitors are GUI tools, and their view of NI-VISA calls is
+device-agnostic. Only one host configuration has been observed; other
+VISA runtimes and Linux hosts beyond WSL2 have not. On a Linux kernel
+that carries `usbtmc`, the class driver's binding to the export is
+expected but not observed. Under the notify-wedge quirk the mock's
+`READ_STATUS_BYTE` reports the last byte the notification path saw,
+whereas the instrument that motivated the quirk kept reporting MSS in
+`*STB?`; a scenario wanting that answer writes the `*STB?` rule. The
+VID/PID pair is pid.codes' test allocation, chosen for a mock and frozen
+by the first release that ships it, since resource strings and driver
+bindings key on it.
