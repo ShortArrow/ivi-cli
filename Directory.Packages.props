@@ -7,9 +7,9 @@
   <ItemGroup Label="Runtime — production">
     <PackageVersion
       Include="Microsoft.Extensions.DependencyInjection.Abstractions"
-      Version="10.0.10"
+      Version="10.0.11"
     />
-    <PackageVersion Include="Microsoft.Extensions.DependencyInjection" Version="10.0.9" />
+    <PackageVersion Include="Microsoft.Extensions.DependencyInjection" Version="10.0.11" />
     <!--
       The IVI Foundation's own VISA.NET shared components (the Ivi.Visa
       abstraction), published by the foundation's verified nuget.org
@@ -19,8 +19,8 @@
     -->
     <PackageVersion Include="IviFoundation.Visa" Version="8.0.2" />
     <PackageVersion Include="Tomlyn" Version="2.10.1" />
-    <PackageVersion Include="Microsoft.Extensions.Hosting" Version="10.0.9" />
-    <PackageVersion Include="Microsoft.Extensions.Logging" Version="10.0.9" />
+    <PackageVersion Include="Microsoft.Extensions.Hosting" Version="10.0.11" />
+    <PackageVersion Include="Microsoft.Extensions.Logging" Version="10.0.11" />
     <PackageVersion Include="System.CommandLine" Version="2.0.0-beta5.25306.1" />
     <PackageVersion Include="Serilog" Version="4.3.0" />
     <PackageVersion Include="Serilog.Extensions.Hosting" Version="10.0.0" />
@@ -28,15 +28,8 @@
     <PackageVersion Include="Serilog.Sinks.File" Version="6.0.0" />
     <PackageVersion Include="Serilog.Formatting.Compact" Version="3.0.0" />
     <PackageVersion Include="Spectre.Console" Version="0.57.1" />
-    <PackageVersion Include="Microsoft.AspNetCore.OpenApi" Version="10.0.10" />
-    <PackageVersion Include="Microsoft.AspNetCore.TestHost" Version="10.0.10" />
-    <!--
-      Transitive pin: Microsoft.AspNetCore.OpenApi 10.0.10 pulls Microsoft.OpenApi
-      2.0.0, flagged high-severity by NU1903 (GHSA-v5pm-xwqc-g5wc). 2.7.5 is the
-      first patched 2.x release; same major, so API-compatible. Remove once the
-      AspNetCore.OpenApi bump carries a patched transitive on its own.
-    -->
-    <PackageVersion Include="Microsoft.OpenApi" Version="2.7.5" />
+    <PackageVersion Include="Microsoft.AspNetCore.OpenApi" Version="10.0.11" />
+    <PackageVersion Include="Microsoft.AspNetCore.TestHost" Version="10.0.11" />
   </ItemGroup>
 
   <ItemGroup Label="LXI discovery (ADR 0008, Batch W)">
@@ -47,9 +40,9 @@
   </ItemGroup>
 
   <ItemGroup Label="OpenTelemetry (ADR 0040)">
-    <PackageVersion Include="OpenTelemetry.Extensions.Hosting" Version="1.16.0" />
-    <PackageVersion Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.16.0" />
-    <PackageVersion Include="OpenTelemetry.Instrumentation.AspNetCore" Version="1.16.0" />
+    <PackageVersion Include="OpenTelemetry.Extensions.Hosting" Version="1.17.0" />
+    <PackageVersion Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.17.0" />
+    <PackageVersion Include="OpenTelemetry.Instrumentation.AspNetCore" Version="1.17.0" />
   </ItemGroup>
 
   <ItemGroup Label="Test stack — xUnit + assertions">
@@ -74,7 +67,7 @@
   </ItemGroup>
 
   <ItemGroup Label="Logging abstractions for tests">
-    <PackageVersion Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.10" />
+    <PackageVersion Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.11" />
   </ItemGroup>
 
   <ItemGroup Label="Time abstractions for tests">
