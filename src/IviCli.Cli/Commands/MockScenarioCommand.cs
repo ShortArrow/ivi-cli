@@ -684,7 +684,8 @@ public static class MockScenarioCommand
                     _ => "?",
                 };
                 var transition = r.Action.Transition is { } t ? $" -> [{t.Value}]" : string.Empty;
-                Console.WriteLine($"    {i + 1}. {r.Match} -> {action}{transition}");
+                var srq = r.Srq is { } stb ? $" (srq 0x{stb:X2})" : string.Empty;
+                Console.WriteLine($"    {i + 1}. {r.Match} -> {action}{transition}{srq}");
             }
         }
         return ExitCodeMapper.Success;

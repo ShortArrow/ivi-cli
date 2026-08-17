@@ -53,6 +53,7 @@ public static class TomlScenarioParser
     private const string FailField = "fail";
     private const string FailDetailField = "fail_detail";
     private const string TransitionToField = "transition_to";
+    private const string SrqField = "srq";
     private const string QuirksTable = "quirks";
     private const string SrqNotifyWedgeAfterField = "srq_notify_wedge_after";
 
@@ -282,6 +283,10 @@ public static class TomlScenarioParser
         {
             builder.AppendLine(inv, $"transition_to = \"{Escape(target.Value)}\"");
         }
+        if (rule.Srq is { } srq)
+        {
+            builder.AppendLine(inv, $"{SrqField} = 0x{srq:X2}");
+        }
     }
 
     private static Result<MockScenario, ScenarioStoreError> ParseFlatRules(
@@ -429,6 +434,16 @@ public static class TomlScenarioParser
             transition = t;
         }
 
+        byte? srq = null;
+        if (table.TryGetValue(SrqField, out var srqValue))
+        {
+            if (srqValue is not long srqRaw || srqRaw is < 0 or > 255)
+            {
+                return FailRule($"rule for `{match}`: `srq` must be an integer 0..255");
+            }
+            srq = (byte)srqRaw;
+        }
+
         RuleAction action;
         if (hasRespond)
         {
@@ -463,7 +478,7 @@ public static class TomlScenarioParser
             action = new RuleAction.Fail(failVariant, detail, transition);
         }
 
-        return Result.Success<MockRule, ScenarioStoreError>(new MockRule(match, action));
+        return Result.Success<MockRule, ScenarioStoreError>(new MockRule(match, action, srq));
     }
 
     private static Result<MockScenario, ScenarioStoreError> Fail(string reason) =>

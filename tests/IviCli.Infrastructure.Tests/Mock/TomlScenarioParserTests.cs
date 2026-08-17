@@ -106,6 +106,7 @@ public sealed class TomlScenarioParserTests
         serialized.ShouldNotContain("name =");
         serialized.ShouldContain("[[scenes]]");
         serialized.ShouldContain("respond = \"ACME,X,1,1.0\"");
+        serialized.ShouldNotContain("srq");
     }
 
     [Fact]
@@ -251,6 +252,64 @@ public sealed class TomlScenarioParserTests
 
                 """.ReplaceLineEndings()
             );
+    }
+
+    [Fact]
+    public void Srq_accepts_0x60_and_96()
+    {
+        const string toml = """
+            [[scenes]]
+            match = "*OPC"
+            ack = true
+            srq = 0x60
+
+            [[scenes]]
+            match = "INIT"
+            ack = true
+            srq = 96
+            """;
+        var scenario = TomlScenarioParser
+            .Parse(ScenarioName.From("srq").ShouldBeOk(), toml)
+            .ShouldBeOk();
+
+        scenario.Scenes[0].Rules[0].Srq.ShouldBe<byte?>(0x60);
+        scenario.Scenes[0].Rules[1].Srq.ShouldBe<byte?>(96);
+    }
+
+    [Theory]
+    [InlineData("srq = 256")]
+    [InlineData("srq = -1")]
+    [InlineData("srq = \"0x60\"")]
+    public void Srq_out_of_range_or_non_integer_is_a_parse_failure(string srqLine)
+    {
+        var toml = $"""
+            [[scenes]]
+            match = "*OPC"
+            ack = true
+            {srqLine}
+            """;
+        var err = TomlScenarioParser
+            .Parse(ScenarioName.From("srq").ShouldBeOk(), toml)
+            .ShouldBeError();
+        err.ShouldBeOfType<IviCli.Application.Mock.ScenarioStoreParseFailure>();
+    }
+
+    [Fact]
+    public void A_rule_with_srq_round_trips()
+    {
+        var scenario = MockScenario.SingleScene(
+            ScenarioName.From("srq").ShouldBeOk(),
+            idnDefault: null,
+            rules: ImmutableArray.Create(new MockRule("*OPC", new RuleAction.Ack(), Srq: 0x60))
+        );
+
+        var serialized = TomlScenarioParser.Serialize(scenario);
+        serialized.ShouldContain("srq = 0x60");
+
+        var loaded = TomlScenarioParser
+            .Parse(ScenarioName.From("srq").ShouldBeOk(), serialized)
+            .ShouldBeOk();
+        loaded.Scenes[0].Rules[0].ShouldBe(scenario.Scenes[0].Rules[0]);
     }
 
     [Fact]

@@ -24,6 +24,10 @@ namespace IviCli.Application.Mock;
 /// Optional scene name to make current after the rule fires. The target
 /// scene must exist in the scenario at <c>activate</c> time.
 /// </param>
+/// <param name="Srq">
+/// Optional status byte the mock raises a service request with after the
+/// rule fires. <see langword="null"/> means the rule raises none.
+/// </param>
 public sealed record AddRuleCommand(
     string ScenarioName,
     string? Scene,
@@ -32,7 +36,8 @@ public sealed record AddRuleCommand(
     bool Ack,
     string? Fail,
     string? FailDetail,
-    string? TransitionTo
+    string? TransitionTo,
+    byte? Srq = null
 );
 
 /// <summary>Outcomes the add-rule command can fail with.</summary>

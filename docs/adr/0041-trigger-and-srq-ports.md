@@ -65,7 +65,7 @@ default to zero.
 
 | Backend | TriggerAsync | ServiceRequestStream |
 | --- | --- | --- |
-| Fake | Counter (`TriggerCountFor`) | `Channel<ServiceRequest>` populated by `RaiseServiceRequest` test affordance |
+| Fake | Counter (`TriggerCountFor`) | `Channel<ServiceRequest>` fed by scenario rules carrying `srq` and by the `RaiseServiceRequest` affordance in tests |
 | Replay | `BackendOperationNotSupported` | empty |
 | Socket | `BackendOperationNotSupported` | empty |
 | Local | `Write("*TRG")` via existing IVisaSessionHandle | `IMessageBasedSession.ServiceRequest` event via `IVisaSessionHandle.EnableServiceRequests` |

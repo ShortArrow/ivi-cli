@@ -18,4 +18,12 @@ namespace IviCli.Domain.Mock;
 /// state-transition variant lands in a follow-up batch (see issue
 /// #26 §"Implementation plan").
 /// </param>
-public sealed record MockRule(string Match, RuleAction Action);
+/// <param name="Srq">
+/// The status byte the mock reports when it raises a service request
+/// after this rule fires; <see langword="null"/> means the rule raises
+/// none. The value is reported verbatim — the mock keeps no status
+/// register model, so no RQS bit is added — and one request is raised
+/// per firing, delivered through the same path as
+/// <c>FakeBackend.RaiseServiceRequest</c> so scenario quirks apply.
+/// </param>
+public sealed record MockRule(string Match, RuleAction Action, byte? Srq = null);
