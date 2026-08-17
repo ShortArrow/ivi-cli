@@ -61,11 +61,11 @@ ivicli mock scenario rule add "$SCENARIO" --in on --match 'OUTP ON'    --ack    
 ivicli mock scenario rule add "$SCENARIO" --in on --match 'MEAS:VOLT?' --respond '4.998'              || true
 ivicli mock scenario rule add "$SCENARIO" --in on --match 'MEAS:CURR?' --respond '0.823'              || true
 
-# 2) Activate so backend FakeBackend serves these responses.
-ivicli mock scenario activate "$SCENARIO"
-
-# 3) Logical device alias the gateway will route to.
+# 2) Logical device alias the gateway will route to.
 ivicli visa add "$DEVICE" 'TCPIP0::127.0.0.1::INSTR' || true
+
+# 3) Bind the scenario to the device; the alias answers from the scenario from here on.
+ivicli mock scenario activate "$SCENARIO" --for "$DEVICE"
 
 # 4) Gateway server.
 ivicli server add "$SERVER" --type "$PROTO" --port "$PORT" || true
