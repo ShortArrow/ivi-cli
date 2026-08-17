@@ -107,6 +107,30 @@ respond = "3.271"
 | `ack` / `--ack` | Accept a write with no response body. |
 | `fail` / `--fail` (+ `fail_detail` / `--fail-detail`) | Return a SCPI error instead of a normal response. |
 | `transition_to` / `--transition-to` | Switch the active scene after this rule fires. |
+| `srq` / `--srq` | Status byte (0..255) to raise a service request with after the rule fires; reported verbatim. |
+
+An instrument that answers `*OPC` with a service request is the usual
+reason to reach for `srq`:
+
+```toml
+[[scenes.rules]]
+match = "*ESE 1"
+ack = true
+
+[[scenes.rules]]
+match = "*SRE 32"
+ack = true
+
+[[scenes.rules]]
+match = "*OPC"
+ack = true
+srq = 0x60   # RQS | ESB — the SRQ a real instrument raises when the operation completes
+```
+
+The mock keeps no status registers, so `srq` is the whole model: the rule
+that stands for the completing operation carries the status byte a real
+instrument would report. Put 0x40 in it if you want the RQS bit a serial
+poll expects.
 
 > **v0.2.x limitations.** Rules match a full SCPI line literally (no
 > parameter capture — `VOLT 7.5` then `VOLT?` still returns the canned

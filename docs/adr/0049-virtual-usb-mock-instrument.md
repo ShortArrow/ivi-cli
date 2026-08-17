@@ -71,11 +71,11 @@ implements:
 ### 3. SCPI semantics come from the existing mock engine
 
 The device's behavior is the scenario stack that already drives the LAN
-gateways: scenes answer queries, the status model raises SRQs, and quirk
-profiles — including the notify-wedge shape observed on the bench —
-apply unchanged. One scenario TOML therefore describes the same mock
-instrument whether it is reached over HiSLIP, VXI-11, raw socket, or
-USB.
+gateways: scenes answer queries, rules declare the status byte they
+raise a service request with, and quirk profiles — including the
+notify-wedge shape observed on the bench — apply unchanged. One scenario
+TOML therefore describes the same mock instrument whether it is reached
+over HiSLIP, VXI-11, raw socket, or USB.
 
 ### 4. Client attach is the operator's, documented, never automated
 
