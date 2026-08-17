@@ -59,6 +59,11 @@ public static class MockRuleCommand
             Description =
                 "After the rule fires, make this scene current. Target scene must exist in the scenario.",
         };
+        var srqOpt = new Option<string?>("--srq")
+        {
+            Description =
+                "Status byte to raise a service request with when the rule fires (0..255, decimal or 0x hex).",
+        };
 
         var cmd = new Command("add", "Append a rule to a scene inside a scenario.");
         cmd.Arguments.Add(scenarioArg);
@@ -69,6 +74,7 @@ public static class MockRuleCommand
         cmd.Options.Add(failOpt);
         cmd.Options.Add(failDetailOpt);
         cmd.Options.Add(transitionOpt);
+        cmd.Options.Add(srqOpt);
 
         cmd.SetAction(
             async (parseResult, ct) =>
@@ -81,6 +87,19 @@ public static class MockRuleCommand
                 var fail = parseResult.GetValue(failOpt);
                 var failDetail = parseResult.GetValue(failDetailOpt);
                 var transition = parseResult.GetValue(transitionOpt);
+                var srqRaw = parseResult.GetValue(srqOpt);
+                byte? srq = null;
+                if (srqRaw is { Length: > 0 })
+                {
+                    if (ParseStatusByte(srqRaw) is not { } parsedSrq)
+                    {
+                        Console.Error.WriteLine(
+                            "error: --srq must be an integer 0..255 (decimal or 0x hex)."
+                        );
+                        return ExitCodeMapper.UsageError;
+                    }
+                    srq = parsedSrq;
+                }
 
                 var handler = services.GetRequiredService<AddRuleCommandHandler>();
                 var logger = services.GetRequiredService<ILogger<AddRuleCommandHandler>>();
@@ -94,7 +113,8 @@ public static class MockRuleCommand
                         ack,
                         fail,
                         failDetail,
-                        transition
+                        transition,
+                        srq
                     ),
                     ct
                 );
@@ -235,6 +255,28 @@ public static class MockRuleCommand
             }
         );
         return cmd;
+    }
+
+    /// <summary>
+    /// Reads a status byte written the way an instrument manual writes
+    /// one — <c>96</c> or <c>0x60</c> — returning <see langword="null"/>
+    /// for anything that is not a byte.
+    /// </summary>
+    private static byte? ParseStatusByte(string raw)
+    {
+        var isHex = raw.StartsWith("0x", StringComparison.OrdinalIgnoreCase);
+        var digits = isHex ? raw[2..] : raw;
+        var style = isHex
+            ? System.Globalization.NumberStyles.HexNumber
+            : System.Globalization.NumberStyles.None;
+        return byte.TryParse(
+            digits,
+            style,
+            System.Globalization.CultureInfo.InvariantCulture,
+            out var value
+        )
+            ? value
+            : null;
     }
 
     private static int Success(string message)
