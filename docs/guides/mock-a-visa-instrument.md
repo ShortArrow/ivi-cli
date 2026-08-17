@@ -59,6 +59,14 @@ scenario activate --for` decides that the device is answered by a scenario,
 and `server add` / `server route add` / `server start` decide how clients
 reach it.
 
+One server per process, and the mock lives in the process. `server start`
+runs a single server; its routes may point at as many devices as you like,
+and each device keeps its own scene, quirk state, and service requests. Two
+servers started separately are two processes and therefore two mocks: they
+read the same scenario files and the same activation, but a scene change or
+a service request on one is invisible to the other. Route every endpoint
+that must see one instrument's state through the same server.
+
 ---
 
 ## Run a ready-made mock
