@@ -73,7 +73,7 @@ public sealed class ServerRouteCommandProfileTests
             .BuildServiceProvider();
 
         var command = ServerRouteCommand.Build(services);
-        return await command.Parse(args).InvokeAsync(CancellationToken.None);
+        return await command.Parse(args).InvokeAsync(cancellationToken: CancellationToken.None);
     }
 
     private static async Task<Route> RouteOfAsync(FakeConfigStore store)

@@ -100,7 +100,7 @@ public sealed class MockRuleCommandSrqTests
             var exitCode = await MockScenarioCommand
                 .Build(services)
                 .Parse(["show", "demo"])
-                .InvokeAsync(CancellationToken.None);
+                .InvokeAsync(cancellationToken: CancellationToken.None);
             exitCode.ShouldBe(0);
         }
         finally
@@ -123,7 +123,7 @@ public sealed class MockRuleCommandSrqTests
         return await MockRuleCommand
             .Build(services)
             .Parse(args)
-            .InvokeAsync(CancellationToken.None);
+            .InvokeAsync(cancellationToken: CancellationToken.None);
     }
 
     private static async Task<MockRule> RuleOfAsync(FakeScenarioStore store)

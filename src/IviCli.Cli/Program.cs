@@ -368,7 +368,7 @@ internal static class Program
             await ActivateScenarioIfRequested(provider, cts.Token);
 
             var root = BuildRoot(provider);
-            return await root.Parse(args).InvokeAsync(cts.Token);
+            return await root.Parse(args).InvokeAsync(cancellationToken: cts.Token);
         }
         catch (OperationCanceledException)
         {
