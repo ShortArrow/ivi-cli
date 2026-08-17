@@ -105,9 +105,43 @@ public sealed class UsbControlPipe
             UsbStandardRequest.GetConfiguration => GetConfiguration(setup),
             UsbStandardRequest.GetStatus => GetStatus(setup),
             UsbStandardRequest.SetAddress => UsbControlResult.HandledEmpty(),
+            UsbStandardRequest.ClearFeature => ClearFeature(setup),
             _ => UsbControlResult.Stall(),
         };
     }
+
+    /// <summary>
+    /// <c>wValue</c> of CLEAR_FEATURE / SET_FEATURE naming the endpoint
+    /// halt feature (USB 2.0 §9.4, Table 9-6).
+    /// </summary>
+    public const ushort FeatureEndpointHalt = 0;
+
+    /// <summary>
+    /// CLEAR_FEATURE. The mock never halts an endpoint, so clearing the
+    /// halt of an endpoint the device has is accepted with nothing to do
+    /// — hosts send it while recovering a pipe and at close, and USB 2.0
+    /// §9.4.1 requires the device to take it. Every other feature, and an
+    /// endpoint the device does not have, stalls.
+    /// </summary>
+    private UsbControlResult ClearFeature(UsbSetupPacket setup)
+    {
+        if (
+            setup.Recipient != UsbRecipient.Endpoint
+            || setup.WValue != FeatureEndpointHalt
+            || !HasEndpoint((byte)(setup.WIndex & 0xFF))
+        )
+        {
+            return UsbControlResult.Stall();
+        }
+
+        return UsbControlResult.HandledEmpty();
+    }
+
+    private bool HasEndpoint(byte address) =>
+        address == 0
+        || _definition.Configuration.Interfaces.Any(i =>
+            i.Endpoints.Any(e => e.Address == address)
+        );
 
     /// <summary>
     /// Answers a USBIP_CMD_SUBMIT addressed to endpoint 0 — the seam

@@ -11,6 +11,7 @@ public sealed class UsbControlPipeTests
 {
     private const byte DeviceToHostStandardDevice = 0x80;
     private const byte HostToDeviceStandardDevice = 0x00;
+    private const byte HostToDeviceStandardEndpoint = 0x02;
     private const byte DeviceToHostClassInterface = 0xA1;
     private const byte HostToDeviceClassInterface = 0x21;
 
@@ -192,6 +193,62 @@ public sealed class UsbControlPipeTests
         );
 
         result.Data.ShouldBe([0x00, 0x00]);
+    }
+
+    [Theory]
+    [InlineData(0x81)]
+    [InlineData(0x01)]
+    [InlineData(0x82)]
+    [InlineData(0x00)]
+    public void ClearFeature_endpoint_halt_on_an_endpoint_the_device_has_is_accepted(int endpoint)
+    {
+        var result = Pipe()
+            .Handle(
+                new UsbSetupPacket(
+                    HostToDeviceStandardEndpoint,
+                    UsbStandardRequest.ClearFeature,
+                    UsbControlPipe.FeatureEndpointHalt,
+                    (ushort)endpoint,
+                    0
+                )
+            );
+
+        result.Outcome.ShouldBe(UsbControlOutcome.Handled);
+        result.Data.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void ClearFeature_endpoint_halt_on_an_endpoint_the_device_lacks_stalls()
+    {
+        var result = Pipe()
+            .Handle(
+                new UsbSetupPacket(
+                    HostToDeviceStandardEndpoint,
+                    UsbStandardRequest.ClearFeature,
+                    UsbControlPipe.FeatureEndpointHalt,
+                    0x85,
+                    0
+                )
+            );
+
+        result.Outcome.ShouldBe(UsbControlOutcome.Stall);
+    }
+
+    [Fact]
+    public void ClearFeature_of_any_other_feature_stalls()
+    {
+        var result = Pipe()
+            .Handle(
+                new UsbSetupPacket(
+                    HostToDeviceStandardDevice,
+                    UsbStandardRequest.ClearFeature,
+                    1,
+                    0,
+                    0
+                )
+            );
+
+        result.Outcome.ShouldBe(UsbControlOutcome.Stall);
     }
 
     [Fact]
