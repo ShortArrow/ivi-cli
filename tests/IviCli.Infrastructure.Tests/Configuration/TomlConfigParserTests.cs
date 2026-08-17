@@ -168,6 +168,27 @@ public class TomlConfigParserTests
         roundtripped.ShouldBe(original);
     }
 
+    [Theory]
+    [InlineData("TCPIP0::192.168.0.10::hislip0,5000::INSTR")]
+    [InlineData("TCPIP0::192.168.0.10::inst0,1234::INSTR")]
+    public void Serialize_KeepsTheExplicitPortOfALanDevice(string resource)
+    {
+        var original = ConfigDocument
+            .Empty.AddDevice(
+                new Device(
+                    DeviceName.From("dut").ShouldBeOk(),
+                    VisaResource.Parse(resource).ShouldBeOk(),
+                    Timeout.FromMilliseconds(3000).ShouldBeOk()
+                )
+            )
+            .ShouldBeOk();
+
+        var serialized = TomlConfigParser.Serialize(original);
+
+        serialized.ShouldContain($"resource = \"{resource}\"");
+        TomlConfigParser.Parse(serialized).ShouldBeOk().ShouldBe(original);
+    }
+
     [Fact]
     public void Parse_UsbIpServerType_IsRecognised()
     {
