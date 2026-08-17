@@ -81,7 +81,7 @@ public static class ServerCommand
         var nameArg = new Argument<string>("name") { Description = "Server alias." };
         var typeOpt = new Option<string>("--type")
         {
-            Description = "Server type: local, socket, hislip, vxi11.",
+            Description = "Server type: local, socket, hislip, vxi11, usbip.",
             Required = true,
         };
         var bindOpt = new Option<string>("--bind")
@@ -91,7 +91,7 @@ public static class ServerCommand
         };
         var portOpt = new Option<int>("--port")
         {
-            Description = "TCP port to listen on (defaults: socket=5025, hislip=4880).",
+            Description = "TCP port to listen on (defaults: socket=5025, hislip=4880, usbip=3240).",
             DefaultValueFactory = _ => 0,
         };
 
