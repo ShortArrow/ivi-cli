@@ -100,11 +100,11 @@ foreach ($r in $onRules) {
     Invoke-IvicliStep ("rule [on] " + $r.Match) $a
 }
 
-# 2) Activate
-Invoke-IvicliStep 'activate scenario' @('mock', 'scenario', 'activate', $Scenario)
-
-# 3) Logical device alias (DeviceName regex = ^[a-z][a-z0-9_]*$ — no hyphens)
+# 2) Logical device alias (DeviceName regex = ^[a-z][a-z0-9_]*$ — no hyphens)
 Invoke-IvicliStep "device alias '$Device'" @('visa', 'add', $Device, 'TCPIP0::127.0.0.1::INSTR')
+
+# 3) Bind the scenario to the device; the alias answers from the scenario from here on.
+Invoke-IvicliStep 'activate scenario' @('mock', 'scenario', 'activate', $Scenario, '--for', $Device)
 
 # 4) Gateway server
 Invoke-IvicliStep "server '$Server'" @('server', 'add', $Server, '--type', $Proto, '--port', "$Port")

@@ -8,12 +8,56 @@ SCPI, so your test suite talks to `ivicli` instead of a physical device.
 The flow is always three steps:
 
 1. **Author** a *scenario* — the SCPI request/response map for your instrument.
-2. **Serve** it over a gateway (HiSLIP `4880` and/or raw SOCKET `5025`).
+2. **Serve** it over a gateway (HiSLIP `4880`, raw SOCKET `5025`, or a
+   USB/IP export the host attaches as a USB instrument).
 3. **Point your app** at the gateway's VISA resource string.
 
 If you just want *a* mock to smoke-test against, jump to
 [Run a ready-made mock](#run-a-ready-made-mock). To model *your* instrument,
-start at [Author a scenario](#author-a-scenario).
+start at [Author a scenario](#author-a-scenario). If the split between
+`ivicli mock` and `ivicli server` is unclear, read
+[How mock and server fit together](#how-mock-and-server-fit-together) first.
+
+---
+
+## How mock and server fit together
+
+Three nouns carry the whole design, and each has its own command group.
+
+A **device** is an alias for a VISA resource; `ivicli visa add dut
+'TCPIP0::127.0.0.1::INSTR'` registers one. Every operation in `ivicli`
+targets a device, never a resource string directly.
+
+A **scenario** is behaviour: scenes, rules, and the `*IDN?` string. `ivicli
+mock` authors scenarios and *activates* one against a device (`mock scenario
+activate my-dmm --for dut`). Activation is a binding, device → scenario, and
+it changes how that device is reached: while a device has an active scenario,
+`ivicli` answers its SCPI from the in-process mock instead of opening its
+resource. The resource string is then a placeholder that is never dialled,
+which is why the recipes below register the mock as `TCPIP0::127.0.0.1::INSTR`.
+`mock scenario deactivate --for dut` clears the binding, and the same alias
+reaches its real resource again.
+
+A **server** is a listener (HiSLIP, raw SOCKET, VXI-11, or USB/IP), and
+its **routes** map a public endpoint (a HiSLIP sub-address, a port, a USB
+bus id) to a device. `ivicli server` manages servers and routes; a server
+does not know whether the device behind a route is a scenario or a bench
+instrument. Exposing a real instrument to a remote client and serving a mock
+to your test suite are the same three commands with a different device
+behind the route.
+
+```mermaid
+flowchart LR
+    client["your app<br/>(VISA / socket / USB host)"] -->|"endpoint"| server["ivicli server<br/>route: endpoint → device"]
+    server --> device["device alias"]
+    device -->|"active scenario"| mock["in-process mock<br/>(scenes + rules)"]
+    device -->|"no scenario"| real["the device's VISA resource"]
+```
+
+Reading a mock recipe with this in mind: `visa add` names the device, `mock
+scenario activate --for` decides that the device is answered by a scenario,
+and `server add` / `server route add` / `server start` decide how clients
+reach it.
 
 ---
 
@@ -55,9 +99,10 @@ ivicli mock scenario rule add my-dmm --in idle --match '*RST'      --ack
 ivicli mock scenario rule add my-dmm --in idle --match 'MEAS:VOLT?' --respond '3.271'
 ivicli mock scenario rule add my-dmm --in idle --match 'SYST:ERR?' --respond '0,"No error"'
 
-# 3. Activate it so the mock gateway serves it.
-ivicli mock scenario activate my-dmm
 ```
+
+Activating the scenario, that is, binding it to a device, is part of serving
+it, below.
 
 Add a second scene and a transition to model state:
 
@@ -157,15 +202,19 @@ docker run --rm \
 
 ### Option B — the bare CLI
 
-Register a scenario-backed device and expose it through a gateway server:
+Register a device, bind the scenario to it, and expose it through a gateway
+server:
 
 ```sh
-ivicli mock scenario activate my-dmm
-ivicli visa add dut 'TCPIP0::127.0.0.1::INSTR'      # the scenario-backed device
+ivicli visa add dut 'TCPIP0::127.0.0.1::INSTR'      # placeholder resource; never dialled while a scenario is active
+ivicli mock scenario activate my-dmm --for dut       # dut now answers from the scenario
 ivicli server add dmm-srv --type hislip --port 4880 # or --type socket --port 5025
 ivicli server route add dmm-srv hislip0 dut         # SOCKET: route the port itself
 ivicli server start dmm-srv
 ```
+
+`activate` needs a device: pass `--for`, or select one once with `ivicli visa
+use dut` and omit it afterwards.
 
 Either way the mock now listens on:
 
@@ -174,6 +223,50 @@ Either way the mock now listens on:
 | HiSLIP | `TCPIP::localhost::hislip0::INSTR` |
 | Raw SOCKET | `TCPIP::localhost::5025::SOCKET` |
 
+### Option C — as a USB device
+
+A `usbip` server exports the device over the USB/IP protocol, and a USB/IP
+client on the host attaches it as if it were plugged in: the operating
+system enumerates it, the class driver binds, and vendor VISA runtimes list
+it like any USB instrument. On the ivicli side only the server type and the
+shape of the endpoint change: the endpoint is a USB bus id such as `1-1`.
+
+```sh
+ivicli visa add dut 'TCPIP0::127.0.0.1::INSTR'
+ivicli mock scenario activate my-dmm --for dut
+ivicli server add usb-srv --type usbip               # listens on 3240
+ivicli server route add usb-srv 1-1 dut              # USBTMC (default profile)
+ivicli server route add usb-srv 1-2 dut --profile cdc-acm   # the same device as a serial port
+ivicli server start usb-srv
+```
+
+The client is the operating system's own USB/IP tooling; ivicli installs no
+driver.
+
+| Host | Client | Attach |
+| --- | --- | --- |
+| Windows 11 | [usbip-win2](https://github.com/vadimgrn/usbip-win2) (WHLK-certified drivers) | `usbip.exe attach -r 127.0.0.1 -b 1-1` |
+| Linux | in-kernel `vhci-hcd` + `usbip` from `linux-tools` | `sudo usbip attach -r <host> -b 1-1` |
+
+`usbip list -r <host>` shows the exports before you attach; `usbip detach -p
+<port>` unplugs. A non-default server port goes to the client as `-t <port>`
+(usbip-win2 takes it before the subcommand).
+
+What the host then sees depends on the route's profile:
+
+| Profile | Enumerates as | Reach it with |
+| --- | --- | --- |
+| `usbtmc` (default) | USB Test & Measurement device, VID `0x1209` PID `0x0001`, serial = the device alias | `USB0::0x1209::0x0001::dut::INSTR` in NI-VISA, Keysight VISA, PyVISA, `ivicli visa scan` |
+| `cdc-acm` | USB serial device, VID `0x1209` PID `0x0002` | a COM port on Windows, `/dev/ttyACM*` on Linux; 115200 8-N-1, one SCPI line per newline |
+
+Use the USBTMC profile when the code under test goes through a vendor VISA
+stack and you want that stack in the loop: its resource enumeration, its USB
+class driver, its I/O trace tools. Use the CDC-ACM profile for tools
+that only speak COM ports.
+
+A device is attached through one route at a time; the client refuses a
+second attach while the first is up. Detach, then attach the other profile.
+
 ### Swap behaviour on a running mock
 
 You can `activate` a different scenario against a gateway that is already
@@ -181,13 +274,13 @@ serving — no restart, no reconnect. The change is picked up on the client's
 next query:
 
 ```sh
-ivicli mock scenario activate my-dmm-faulted   # while the app stays connected
+ivicli mock scenario activate my-dmm-faulted --for dut   # while the app stays connected
 ```
 
 The next SCPI operation on the open connection sees the new scenario. An
 unchanged binding keeps its in-flight scene, so re-running `activate` with the
 same scenario does not reset a state machine the client already advanced. This
-works identically over HiSLIP, raw SOCKET, and VXI-11.
+works identically over HiSLIP, raw SOCKET, VXI-11, and a USB/IP export.
 
 ---
 
