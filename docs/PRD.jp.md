@@ -370,8 +370,6 @@ route を削除する。
 ivicli doctor
 ```
 
-後方互換のため `diagnose` を非推奨エイリアスとして残します（0.3.0 で削除予定）。
-
 以下を診断：
 
 * IVI Shared Components

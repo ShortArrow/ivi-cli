@@ -6,7 +6,7 @@
 
 `ivi-cli` は、VISA/IVI 経由で計測器を管理・診断・操作する統合 CLI です。
 
-> ステータス: **v0.2.8 (pre-1.0.0)。** Phase 1〜3 が landed: CLI core、HiSLIP / VXI-11 / SOCKET gateway、シナリオ駆動 mock-VISA コンテナ (ghcr.io/shortarrow/ivi-cli-mock)、Management HTTP / WebSocket API (PAT + TLS + audit)、OpenTelemetry、LAN discovery (LXI mDNS + VXI-11 broadcast、および opt-in の `--port` socket sweep)。1.0.0 までは 破壊的変更の可能性が残ります。[CHANGELOG.md](CHANGELOG.md) も参照。
+> ステータス: **v0.3.0-beta.1 (pre-1.0.0)。** 実装済み: CLI core、HiSLIP / VXI-11 / SOCKET gateway、シナリオ駆動 mock-VISA コンテナ (ghcr.io/shortarrow/ivi-cli-mock)、mock を USB 計測器または COM ポートとして見せる USB/IP gateway、Management HTTP / WebSocket API (PAT + TLS + audit)、OpenTelemetry、LAN と USB の discovery (LXI mDNS + VXI-11 broadcast、USB はインストール済み VISA ランタイム経由、opt-in の `--port` socket sweep)。1.0.0 までは破壊的変更の可能性が残ります。[CHANGELOG.md](CHANGELOG.md) も参照。
 
 ## ハイライト
 
@@ -21,7 +21,8 @@
   - **複数バックエンド.** Local NI-VISA / HiSLIP / VXI-11 / raw TCP SOCKET / Fake (プログラム可能 + scenario 再生) / Replay (厳密な決定論的再生) を単一の `IIviBackend` port 越しに提供します。
   - **ゲートウェイサーバ.** ローカル計測器を HiSLIP (`TCPIP::host::hislip0::INSTR`) または raw socket で公開し、リモートの PyVISA / NI-VISA クライアントから駆動できます。
 - **ハードウェアなしでテスト**
-  - **モック計測器を動かす.** `Fake` backend は *scenario*（`query → response` ルールの集合）に従って SCPI に応答するので、`ivicli`（または自作の VISA アプリ）を実機なしのスタンドインと対話させられます。
+  - **モック計測器を動かす.** `Fake` backend は *scenario*（`query → response` ルールの集合。ルールにはサービスリクエストで返すステータスバイトも書ける）に従って SCPI に応答するので、`ivicli`（または自作の VISA アプリ）を実機なしのスタンドインと対話させられます。
+  - **モックを USB で挿す.** `usbip` gateway が scenario 付きの device を USB/IP で公開し、usbip-win2（Windows）や `vhci-hcd`（Linux）で attach すると、ホストの USB スタックとベンダ VISA からは USBTMC 計測器（`USB0::0x1209::0x0001::<device>::INSTR`）に見えます。CDC-ACM プロファイルなら普通の COM ポートです。
   - **録って再生.** 実機セッション（`IVICLI_CAPTURE=<path>`）または SCPI スクリプト実行（`mock scenario record --from-script foo.scpi`）を scenario に録り、`IVICLI_REPLAY=<scenario>` で決定論的に再実行できます — 回帰チェックに実機を消費しません。
   - **SCPI スクリプトの実行と Lint.** `visa script foo.scpi` は `.scpi` ファイル（[SCPI](https://www.ivifoundation.org/downloads/SCPI/scpi-99.pdf) コマンド + ivi-cli 独自のインラインアサーション）を現在の機器に対して実行、`visa lint foo.scpi` は実行前に未知の SCPI ルート（IEEE 488.2 + SCPI core）を検出します。
   - **監査向け.** `IVICLI_CAPTURE=<path>` を設定するとすべての backend 操作が NDJSON ログにストリームされ、`tail -f path | jq` で後追い確認できるほか、`ivicli mock received <device> --match ':VOLT'` でモックへ実際に届いた SCPI 書き込みをアウトオブバンドで確認できます（テストが自身の VISA スタック経由でモックを駆動する場合に有効）。
