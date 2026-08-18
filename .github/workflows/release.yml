@@ -262,11 +262,17 @@ jobs:
           version_no_v="${version#v}"
           minor="$(echo "$version_no_v" | awk -F. '{print "v"$1"."$2}')"
           sha7="$(git rev-parse --short=7 HEAD)"
+          # A pre-release tag (v0.3.0-beta.1) publishes only its own tag
+          # and the commit tag; the floating `latest` and `vX.Y` tags keep
+          # pointing at the last final release.
+          tags="${image}:${version},${image}:sha-${sha7}"
+          case "$version_no_v" in
+            *-*) ;;
+            *) tags="${tags},${image}:${minor},${image}:latest" ;;
+          esac
           {
             echo "image=$image"
-            echo "version=$version"
-            echo "minor=$minor"
-            echo "sha7=sha-$sha7"
+            echo "tags=$tags"
           } >> "$GITHUB_OUTPUT"
 
       - name: Set up QEMU
@@ -306,11 +312,7 @@ jobs:
           # and selects the publish directory under ./artifacts/.
           # Both per-RID artifacts are staged earlier so each platform
           # build picks its own.
-          tags: |
-            ${{ steps.tags.outputs.image }}:${{ steps.tags.outputs.version }}
-            ${{ steps.tags.outputs.image }}:${{ steps.tags.outputs.minor }}
-            ${{ steps.tags.outputs.image }}:${{ steps.tags.outputs.sha7 }}
-            ${{ steps.tags.outputs.image }}:latest
+          tags: ${{ steps.tags.outputs.tags }}
           # OCI annotations on the multi-arch index — the manifest GHCR reads
           # for the package description and repo link. A Dockerfile LABEL does
           # not reach the index for a multi-arch image, so they are set here.
@@ -371,7 +373,12 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          case "${{ github.ref_name }}" in
+            *-*) prerelease="--prerelease" ;;
+            *) prerelease="" ;;
+          esac
           gh release create "${{ github.ref_name }}" \
             --title "${{ github.ref_name }}" \
             --generate-notes \
+            $prerelease \
             ./release-assets/*
