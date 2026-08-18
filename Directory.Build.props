@@ -37,6 +37,6 @@
       `-p:Version=<X.Y.Z>` derived from the pushed `v*` tag, so the
       published nupkg / binary metadata matches the GitHub Release.
     -->
-    <Version>0.3.0</Version>
+    <Version>0.3.0-beta.1</Version>
   </PropertyGroup>
 </Project>

@@ -4,7 +4,10 @@ All notable changes to ivi-cli are documented here. Format roughly follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning follows
 [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.html).
 
-## [0.3.0] — 2026-08-18
+## [0.3.0-beta.1] — 2026-08-18
+
+> Pre-release. Install with `dotnet tool install -g ivi-cli --prerelease`;
+> the container is published under its own tag only, `latest` stays on 0.2.10.
 
 ### Added
 
