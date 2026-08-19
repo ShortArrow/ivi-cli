@@ -12,11 +12,11 @@ public enum ServerType
     /// <summary>HiSLIP-compatible gateway (PRD §7.2).</summary>
     HiSlip,
 
-    /// <summary>VXI-11-compatible gateway (PRD §7.3, future).</summary>
+    /// <summary>VXI-11-compatible gateway (PRD §7.3).</summary>
     Vxi11,
 
     /// <summary>
-    /// USB/IP device-server gateway (ADR 0049 §1): every route of the
+    /// USB/IP device-server gateway (PRD §7.7 / ADR 0049 §1): every route of the
     /// server is one emulated USBTMC-USB488 device a client attaches by
     /// its busid, rather than one LAN endpoint a client connects to.
     /// </summary>

@@ -427,6 +427,8 @@ Priority order:
 
 `ivicli server` aims to be more than a proprietary gRPC gateway — it aims to be a remote instrument gateway that existing VISA clients can connect to as a TCPIP VISA resource.
 
+A fifth server type, the USB/IP device server (§7.7), sits outside this ordering. The four above all serve a VISA client that opens a TCPIP resource; a USB/IP export serves the operating system's USB stack instead, so the instrument appears plugged in rather than reachable over the LAN.
+
 ---
 
 ## 7.2 HiSLIP-compatible Server
@@ -462,7 +464,7 @@ port = 4880
 
 [[routes]]
 server = "lab"
-hislip_name = "hislip0"
+endpoint = "hislip0"
 device = "psu1"
 ```
 
@@ -539,6 +541,59 @@ Data Plane:
 Control Plane:
 - IVI-CLI management API
 ```
+
+---
+
+## 7.7 USB/IP Device Server
+
+The LAN gateways stop at the client's socket. Code that reaches an instrument through a vendor VISA runtime's USB enumeration, or through a COM port, never touches them — and that code is exactly what a bench without hardware cannot test. A `usbip` server closes that gap: it exports a registered device over the USB/IP protocol, and the host's own USB/IP client attaches it as if it were plugged in. The operating system enumerates it, the class driver binds, and the VISA runtime lists it beside real instruments.
+
+The client is the host's own tooling — usbip-win2 on Windows, the in-kernel `vhci-hcd` on Linux. IVI-CLI ships and installs no driver.
+
+### Start
+
+```bash
+ivicli server add usb-srv --type usbip     # listens on 3240
+ivicli server route add usb-srv 1-1 dut
+ivicli server start usb-srv
+```
+
+A route's endpoint is a USB bus id rather than a LAN address, and each route is one emulated device.
+
+### Attach from the host
+
+```bash
+usbip attach -r <host> -b 1-1
+```
+
+### Expected VISA resource
+
+```text
+USB0::0x1209::0x0001::dut::INSTR
+```
+
+The serial number is the device alias, which is how a host tells several exported instruments apart. A route's `profile` selects what the host enumerates:
+
+| Profile | Enumerates as | Reached through |
+| --- | --- | --- |
+| `usbtmc` (default) | USBTMC-USB488 instrument, VID `0x1209` PID `0x0001` | the vendor VISA runtime's USB class driver; SCPI, status byte, and service requests |
+| `cdc-acm` | USB serial device, PID `0x0002` | a COM port or `/dev/ttyACM*`, 115200 8-N-1, one SCPI line per newline |
+
+```toml
+[[servers]]
+name = "usb-srv"
+type = "usbip"
+bind = "127.0.0.1"
+port = 3240
+
+[[routes]]
+server = "usb-srv"
+endpoint = "1-1"
+device = "dut"
+profile = "usbtmc"
+```
+
+One attach per device at a time; a second import while one is up is refused. USB/IP across a network is out of scope — the export is meant for the machine under test, and the default bind is loopback. See [ADR 0049](adr/0049-virtual-usb-mock-instrument.md).
 
 ---
 

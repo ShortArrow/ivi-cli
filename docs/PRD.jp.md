@@ -432,6 +432,8 @@ Remote Server は、独自RPCを第一候補にせず、既存 VISA client か�
 
 `ivicli server` は、単なる独自 gRPC gateway ではなく、既存 VISA client から TCPIP VISA resource として接続できる remote instrument gateway を目指す。
 
+5 つめの server type である USB/IP device server（§7.7）は、この優先順位の外にある。上の 4 つはいずれも TCPIP resource を開く VISA client を相手にするが、USB/IP export の相手は OS の USB stack であり、LAN の先に見えるのではなく「挿さっている」状態になる。
+
 ---
 
 ## 7.2 HiSLIP-compatible Server
@@ -467,7 +469,7 @@ port = 4880
 
 [[routes]]
 server = "lab"
-hislip_name = "hislip0"
+endpoint = "hislip0"
 device = "psu1"
 ```
 
@@ -544,6 +546,59 @@ Data Plane:
 Control Plane:
 - IVI-CLI management API
 ```
+
+---
+
+## 7.7 USB/IP Device Server
+
+LAN gateway は client の socket までしか届かない。vendor VISA runtime の USB 列挙を経由して計測器に到達するコードや、COM port を開くコードは、そのどれにも触れない。そして実機のないベンチで検証できないのは、まさにそのコードである。`usbip` server はこの隙間を埋める。登録済み device を USB/IP protocol で export し、host 側の USB/IP client が「挿さっている」状態として attach する。OS が列挙し、class driver が bind し、VISA runtime は実機と並べて一覧に出す。
+
+client は host 自身のツール — Windows なら usbip-win2、Linux ならカーネル内蔵の `vhci-hcd` — であり、IVI-CLI は driver を同梱もインストールもしない。
+
+### 起動
+
+```bash
+ivicli server add usb-srv --type usbip     # 3240 で listen
+ivicli server route add usb-srv 1-1 dut
+ivicli server start usb-srv
+```
+
+route の endpoint は LAN address ではなく USB bus id であり、1 route が 1 台のエミュレート device に対応する。
+
+### host からの attach
+
+```bash
+usbip attach -r <host> -b 1-1
+```
+
+### 想定される VISA resource
+
+```text
+USB0::0x1209::0x0001::dut::INSTR
+```
+
+serial number は device alias である。host が複数の export を識別する手掛かりがこれになる。host が何として列挙するかは route の `profile` で決まる。
+
+| Profile | 列挙のされ方 | 到達経路 |
+| --- | --- | --- |
+| `usbtmc`（既定） | USBTMC-USB488 instrument、VID `0x1209` PID `0x0001` | vendor VISA runtime の USB class driver 経由。SCPI・status byte・service request が通る |
+| `cdc-acm` | USB serial device、PID `0x0002` | COM port もしくは `/dev/ttyACM*`。115200 8-N-1、改行区切りで 1 行 1 SCPI |
+
+```toml
+[[servers]]
+name = "usb-srv"
+type = "usbip"
+bind = "127.0.0.1"
+port = 3240
+
+[[routes]]
+server = "usb-srv"
+endpoint = "1-1"
+device = "dut"
+profile = "usbtmc"
+```
+
+同時に attach できるのは 1 device につき 1 つで、attach 中の 2 本目の import は拒否する。ネットワーク越しの USB/IP は対象外とする。export の想定先は被試験マシン自身であり、既定の bind も loopback である。[ADR 0049](adr/0049-virtual-usb-mock-instrument.md) を参照。
 
 ---
 
