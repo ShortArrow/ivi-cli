@@ -4,6 +4,21 @@ All notable changes to ivi-cli are documented here. Format roughly follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning follows
 [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- **Third-party attribution ships with the binaries** (#152). A
+  `THIRD-PARTY-NOTICES.md` lists every package in the CLI's dependency
+  closure with the copyright line its license asks a redistributor to carry,
+  and travels — with `LICENSE-MIT` and `LICENSE-APACHE` — inside the per-RID
+  archives, the container image, and the tool package. `Ivi.Visa.dll` is the
+  reason it matters most: the IVI Foundation grants redistribution "provided
+  that the above copyright notice(s) appear in all copies". Six of the
+  packages declare no usable license metadata, so the entries were read from
+  the projects themselves; a pull-request check keeps the list complete
+  against `src/IviCli.Cli/packages.lock.json`.
+
 ## [0.3.0-beta.1] — 2026-08-18
 
 > Pre-release. Install with `dotnet tool install -g ivi-cli --prerelease`;

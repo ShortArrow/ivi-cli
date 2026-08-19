@@ -84,6 +84,41 @@ jobs:
           fi
           echo "sync ok: <Version> $props has a CHANGELOG entry"
 
+  notices-sync:
+    name: third-party notices sync
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Every shipped package has an attribution entry
+        shell: bash
+        run: |
+          set -euo pipefail
+          # The CLI's lock file is the closure that reaches a user's machine:
+          # its packages become the assemblies published beside `ivicli` in
+          # the release archives, the container image, and the tool package.
+          jq -r '.dependencies[] | to_entries[]
+                 | select(.value.type != "Project") | .key' \
+            src/IviCli.Cli/packages.lock.json | tr -d '\r' | sort -u > /tmp/shipped.txt
+          sed -n 's/^- `\([A-Za-z0-9_.]*\)`.*/\1/p' THIRD-PARTY-NOTICES.md \
+            | tr -d '\r' | sort -u > /tmp/attributed.txt
+          missing="$(comm -23 /tmp/shipped.txt /tmp/attributed.txt)"
+          stale="$(comm -13 /tmp/shipped.txt /tmp/attributed.txt)"
+          status=0
+          if [ -n "$missing" ]; then
+            echo "::error::THIRD-PARTY-NOTICES.md has no entry for: $(echo "$missing" | tr '\n' ' ')"
+            echo "::error::Read each package's license from the project itself — several declare none in their NuGet metadata."
+            status=1
+          fi
+          if [ -n "$stale" ]; then
+            echo "::error::THIRD-PARTY-NOTICES.md attributes packages that are no longer shipped: $(echo "$stale" | tr '\n' ' ')"
+            status=1
+          fi
+          if [ "$status" -eq 0 ]; then
+            echo "notices ok: $(wc -l < /tmp/shipped.txt) shipped packages, all attributed"
+          fi
+          exit "$status"
+
   changes:
     name: detect code changes
     runs-on: ubuntu-latest
