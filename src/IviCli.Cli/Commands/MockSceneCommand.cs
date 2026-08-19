@@ -1,4 +1,5 @@
 using System.CommandLine;
+using IviCli.Application.Logging;
 using IviCli.Application.Mock;
 using IviCli.Domain;
 using IviCli.Domain.Mock;
@@ -172,12 +173,7 @@ public static class MockSceneCommand
         int exitCode
     )
     {
-        logger.Log(
-            Logging.SerilogConfiguration.ToLogLevel(error.Severity),
-            error.Cause,
-            error.Message,
-            error.LogArgs.ToArray()
-        );
+        logger.LogIviError(error);
         Console.Error.WriteLine(userMessage);
         return exitCode;
     }

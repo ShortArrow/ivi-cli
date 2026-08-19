@@ -1,6 +1,7 @@
 using System.CommandLine;
 using System.Globalization;
 using IviCli.Application.Diagnostics;
+using IviCli.Application.Logging;
 using IviCli.Domain;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -82,12 +83,7 @@ public static class DoctorCommand
 
     private static int Fail(DoctorError error, ILogger logger)
     {
-        logger.Log(
-            Logging.SerilogConfiguration.ToLogLevel(error.Severity),
-            error.Cause,
-            error.Message,
-            error.LogArgs.ToArray()
-        );
+        logger.LogIviError(error);
         Console.Error.WriteLine("error: doctor failed.");
         return ExitCodeMapper.GenericFailure;
     }

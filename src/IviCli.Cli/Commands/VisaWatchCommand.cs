@@ -1,5 +1,6 @@
 using System.Collections.Immutable;
 using System.CommandLine;
+using IviCli.Application.Logging;
 using IviCli.Application.Watch;
 using IviCli.Cli.Watch;
 using IviCli.Domain;
@@ -124,13 +125,7 @@ public static class VisaWatchCommand
 
     private static int Fail(WatchDevicesError error, ILogger logger)
     {
-        logger.Log(
-            Logging.SerilogConfiguration.ToLogLevel(error.Severity),
-            default,
-            error.Cause,
-            error.Message,
-            error.LogArgs.ToArray()
-        );
+        logger.LogIviError(error);
         Console.Error.WriteLine(UserFacingMessage(error));
         return error switch
         {

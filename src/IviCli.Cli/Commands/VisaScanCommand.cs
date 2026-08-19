@@ -296,12 +296,7 @@ public static class VisaScanCommand
 
     private static int Fail(ScanDevicesError error, ILogger logger)
     {
-        logger.Log(
-            Logging.SerilogConfiguration.ToLogLevel(error.Severity),
-            error.Cause,
-            error.Message,
-            error.LogArgs.ToArray()
-        );
+        logger.LogIviError(error);
         Console.Error.WriteLine("error: scan failed.");
         return ExitCodeMapper.TransportError;
     }

@@ -1,4 +1,5 @@
 using System.CommandLine;
+using IviCli.Application.Logging;
 using IviCli.Application.Servers;
 using IviCli.Domain;
 using IviCli.Domain.Protocols;
@@ -231,12 +232,7 @@ public static class ServerCommand
 
     internal static int Log(IviError error, ILogger logger, string userMessage, int exitCode)
     {
-        logger.Log(
-            Logging.SerilogConfiguration.ToLogLevel(error.Severity),
-            error.Cause,
-            error.Message,
-            error.LogArgs.ToArray()
-        );
+        logger.LogIviError(error);
         Console.Error.WriteLine(userMessage);
         return exitCode;
     }

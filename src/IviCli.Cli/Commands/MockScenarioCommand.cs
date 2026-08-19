@@ -1,4 +1,5 @@
 using System.CommandLine;
+using IviCli.Application.Logging;
 using IviCli.Application.Mock;
 using IviCli.Application.Session;
 using IviCli.Domain;
@@ -117,12 +118,7 @@ public static class MockScenarioCommand
 
     private static int ImportFail(ImportTrafficError error, ILogger logger)
     {
-        logger.Log(
-            Logging.SerilogConfiguration.ToLogLevel(error.Severity),
-            error.Cause,
-            error.Message,
-            error.LogArgs.ToArray()
-        );
+        logger.LogIviError(error);
         Console.Error.WriteLine(
             error switch
             {
@@ -217,12 +213,7 @@ public static class MockScenarioCommand
 
     private static int RecordFail(RecordScenarioError error, ILogger logger)
     {
-        logger.Log(
-            Logging.SerilogConfiguration.ToLogLevel(error.Severity),
-            error.Cause,
-            error.Message,
-            error.LogArgs.ToArray()
-        );
+        logger.LogIviError(error);
         Console.Error.WriteLine(
             error switch
             {
@@ -713,12 +704,7 @@ public static class MockScenarioCommand
 
     private static int LogAndFail(IviError error, ILogger logger, string userMessage)
     {
-        logger.Log(
-            Logging.SerilogConfiguration.ToLogLevel(error.Severity),
-            error.Cause,
-            error.Message,
-            error.LogArgs.ToArray()
-        );
+        logger.LogIviError(error);
         Console.Error.WriteLine(userMessage);
         return ExitCodeMapper.ConfigurationError;
     }
@@ -730,12 +716,7 @@ public static class MockScenarioCommand
         int exitCode
     )
     {
-        logger.Log(
-            Logging.SerilogConfiguration.ToLogLevel(error.Severity),
-            error.Cause,
-            error.Message,
-            error.LogArgs.ToArray()
-        );
+        logger.LogIviError(error);
         Console.Error.WriteLine(userMessage);
         return exitCode;
     }

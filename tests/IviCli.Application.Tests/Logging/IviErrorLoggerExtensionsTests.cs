@@ -13,6 +13,21 @@ namespace IviCli.Application.Tests.Logging;
 /// </summary>
 public sealed class IviErrorLoggerExtensionsTests
 {
+    [Theory]
+    [InlineData(LogSeverity.Trace, LogLevel.Trace)]
+    [InlineData(LogSeverity.Debug, LogLevel.Debug)]
+    [InlineData(LogSeverity.Information, LogLevel.Information)]
+    [InlineData(LogSeverity.Warning, LogLevel.Warning)]
+    [InlineData(LogSeverity.Error, LogLevel.Error)]
+    [InlineData(LogSeverity.Critical, LogLevel.Critical)]
+    public void Maps_every_severity_to_the_level_of_the_same_name(
+        LogSeverity severity,
+        LogLevel expected
+    )
+    {
+        IviErrorLoggerExtensions.ToLogLevel(severity).ShouldBe(expected);
+    }
+
     [Fact]
     public void Logs_at_the_severity_the_error_declares()
     {

@@ -1,6 +1,7 @@
 using System.CommandLine;
 using System.Text.Json;
 using IviCli.Application.Capture;
+using IviCli.Application.Logging;
 using IviCli.Application.Mock;
 using IviCli.Cli.Paths;
 using IviCli.Domain;
@@ -176,12 +177,7 @@ public static class MockReceivedWritesCommand
 
     private static int Fail(MockReceivedWritesError error, ILogger logger)
     {
-        logger.Log(
-            Logging.SerilogConfiguration.ToLogLevel(error.Severity),
-            error.Cause,
-            error.Message,
-            error.LogArgs.ToArray()
-        );
+        logger.LogIviError(error);
         Console.Error.WriteLine("error: could not read received writes.");
         return error switch
         {

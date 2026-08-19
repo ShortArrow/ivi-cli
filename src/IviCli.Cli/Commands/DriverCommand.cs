@@ -2,6 +2,7 @@ using System.CommandLine;
 using System.Globalization;
 using System.Text.Json;
 using IviCli.Application.Drivers;
+using IviCli.Application.Logging;
 using IviCli.Domain;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -119,12 +120,7 @@ public static class DriverCommand
             Console.WriteLine($"(no IVI Configuration Store at {notFound.Path})");
             return ExitCodeMapper.Success;
         }
-        logger.Log(
-            Logging.SerilogConfiguration.ToLogLevel(error.Severity),
-            error.Cause,
-            error.Message,
-            error.LogArgs.ToArray()
-        );
+        logger.LogIviError(error);
         Console.Error.WriteLine(
             $"error: {error.Message.Replace("{Path}", "...", StringComparison.Ordinal)}"
         );

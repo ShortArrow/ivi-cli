@@ -1,5 +1,6 @@
 using System.CommandLine;
 using IviCli.Application.Devices;
+using IviCli.Application.Logging;
 using IviCli.Domain;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -63,12 +64,7 @@ public static class VisaQueryCommand
 
     private static int Fail(QueryDeviceError error, ILogger logger)
     {
-        logger.Log(
-            Logging.SerilogConfiguration.ToLogLevel(error.Severity),
-            error.Cause,
-            error.Message,
-            error.LogArgs.ToArray()
-        );
+        logger.LogIviError(error);
         Console.Error.WriteLine(UserFacingMessage(error));
         return error switch
         {
