@@ -21,6 +21,14 @@ All notable changes to ivi-cli are documented here. Format roughly follows
 
 ### Changed
 
+- **`mock scene` and `mock rule` are siblings of `mock scenario`** (#22).
+  Both were two levels down, under `scenario`, which hid them from
+  `ivicli mock --help` — and the `scenario` segment bound nothing, since
+  every one of their verbs names its scenario as an argument anyway. So
+  `ivicli mock scene add my-dmm idle` and `ivicli mock rule add my-dmm --in
+  idle …` are the spellings now, and `ivicli mock --help` shows all three
+  nouns. The old `mock scenario scene …` / `mock scenario rule …` paths
+  keep working, hidden from help, and **are removed at 0.4.0**.
 - **Device names may contain hyphens** (#23). `ivicli visa add psu-mock ...`
   works. `DeviceName` was the only name in the domain that banned them —
   scenario, scene, server, and endpoint names all allowed them — and nothing

@@ -112,20 +112,30 @@ replacement.
 
 ### 5. CLI surface
 
-The new top-level `mock` namespace owns the management commands:
+The top-level `mock` namespace owns the management commands, one group
+per noun a mock is made of:
 
 ```
 ivicli mock scenario list
 ivicli mock scenario create <name>
 ivicli mock scenario remove <name>
 ivicli mock scenario show <name>
-ivicli mock scenario activate <name>
+ivicli mock scenario activate <name> [--for <device>]
 ivicli mock scenario deactivate
 
-ivicli mock scenario <name> scene add  [--match <scpi>] [--respond <text> | --ack | --fail <variant>] [--fail-detail <value>]
-ivicli mock scenario <name> scene list
-ivicli mock scenario <name> scene remove <index>
+ivicli mock scene add <scenario> <scene>
+ivicli mock scene remove <scenario> <scene>
+
+ivicli mock rule add <scenario> --in <scene> --match <scpi> [--respond <text> | --ack | --fail <variant>] [--fail-detail <value>] [--transition-to <scene>] [--srq <status-byte>]
+ivicli mock rule remove <scenario> <index>
 ```
+
+`scene` and `rule` are siblings of `scenario` rather than children of it:
+each verb names the scenario it operates on as an argument, so a
+`scenario` path segment ahead of it would bind nothing while hiding two
+of the three nouns from `ivicli mock --help`. The original
+`mock scenario scene ...` / `mock scenario rule ...` paths keep working,
+hidden from help, and are removed at 0.4.0.
 
 The scene `<index>` is 1-based and stable across `list` invocations
 within the same scenario revision.
@@ -333,9 +343,10 @@ Backwards compatibility:
   to the scenario's initial scene.
 - `mock scenario show` still flattens to a single ordered list
   for v0.1.x parity until B0.2-4 lands the multi-scene view.
-- The `mock scenario scene add ...` CLI verb continues to
-  function with the same arguments (it appends a rule to the
-  initial scene, same observable behaviour as v0.1.x).
+- The scene-adding CLI verb continues to function with the same
+  arguments (it appends a rule to the initial scene, same observable
+  behaviour as v0.1.x). It was spelled `mock scenario scene add ...`
+  at the time; §5 records where it lives now.
 
 Tracked in [issue #26](https://github.com/ShortArrow/ivi-cli/issues/26).
 

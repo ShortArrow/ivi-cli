@@ -25,10 +25,24 @@ public static class MockScenarioCommand
         command.Subcommands.Add(BuildActivate(services));
         command.Subcommands.Add(BuildDeactivate(services));
         command.Subcommands.Add(BuildListActive(services));
-        command.Subcommands.Add(MockSceneCommand.Build(services));
-        command.Subcommands.Add(MockRuleCommand.Build(services));
+        command.Subcommands.Add(Deprecated(MockSceneCommand.Build(services)));
+        command.Subcommands.Add(Deprecated(MockRuleCommand.Build(services)));
         command.Subcommands.Add(BuildRecord(services));
         command.Subcommands.Add(BuildImport(services));
+        return command;
+    }
+
+    /// <summary>
+    /// Hides a spelling that still works but is no longer the documented one.
+    /// <c>mock scenario scene ...</c> and <c>mock scenario rule ...</c> were
+    /// the original paths; both nouns are now siblings of <c>scenario</c>
+    /// under <c>mock</c>, since the <c>scenario</c> segment bound nothing —
+    /// every verb names its scenario as an argument anyway. The old paths are
+    /// kept for one minor version and removed at 0.4.0.
+    /// </summary>
+    private static Command Deprecated(Command command)
+    {
+        command.Hidden = true;
         return command;
     }
 

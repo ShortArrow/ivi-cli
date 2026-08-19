@@ -8,7 +8,7 @@ using Microsoft.Extensions.Logging;
 namespace IviCli.Cli.Commands;
 
 /// <summary>
-/// Builds the <c>ivicli mock scenario rule ...</c> subcommand tree
+/// Builds the <c>ivicli mock rule ...</c> subcommand tree
 /// (ADR 0026 §5 + §15, B0.2-4). In v0.2.0 the <c>rule</c> verb manages
 /// (match → action) pairs inside a named scene; <c>--in &lt;scene&gt;</c>
 /// targets a specific scene and <c>--transition-to &lt;scene&gt;</c>

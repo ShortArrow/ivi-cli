@@ -32,34 +32,34 @@ echo "==> using scenario=$SCENARIO  proto=$PROTO  port=$PORT  device=$DEVICE  se
 # `--initial off` makes the FSM start in the `off` scene, so the
 # synthetic `default` scene v0.2.0 used to auto-create is skipped.
 ivicli mock scenario create "$SCENARIO" --initial off || true
-ivicli mock scenario scene add "$SCENARIO" on        || true
+ivicli mock scene add "$SCENARIO" on        || true
 
 # Static metadata duplicated across both scenes (v0.2.0 limitation —
 # scenes do not share rules; key-value variable state is a follow-up).
 for SCENE in off on; do
-  ivicli mock scenario rule add "$SCENARIO" --in "$SCENE" --match '*IDN?'      --respond 'IVICLI-MOCK,PSU,SN0001,1.0.0' || true
-  ivicli mock scenario rule add "$SCENARIO" --in "$SCENE" --match '*RST'       --ack --transition-to off               || true
-  ivicli mock scenario rule add "$SCENARIO" --in "$SCENE" --match '*OPC?'      --respond '1'                           || true
-  ivicli mock scenario rule add "$SCENARIO" --in "$SCENE" --match 'VOLT 5.0'   --ack                                   || true
-  ivicli mock scenario rule add "$SCENARIO" --in "$SCENE" --match 'VOLT?'      --respond '5.000'                       || true
-  ivicli mock scenario rule add "$SCENARIO" --in "$SCENE" --match 'CURR 1.0'   --ack                                   || true
-  ivicli mock scenario rule add "$SCENARIO" --in "$SCENE" --match 'CURR?'      --respond '1.000'                       || true
-  ivicli mock scenario rule add "$SCENARIO" --in "$SCENE" --match 'SYST:ERR?'  --respond '0,"No error"'                || true
+  ivicli mock rule add "$SCENARIO" --in "$SCENE" --match '*IDN?'      --respond 'IVICLI-MOCK,PSU,SN0001,1.0.0' || true
+  ivicli mock rule add "$SCENARIO" --in "$SCENE" --match '*RST'       --ack --transition-to off               || true
+  ivicli mock rule add "$SCENARIO" --in "$SCENE" --match '*OPC?'      --respond '1'                           || true
+  ivicli mock rule add "$SCENARIO" --in "$SCENE" --match 'VOLT 5.0'   --ack                                   || true
+  ivicli mock rule add "$SCENARIO" --in "$SCENE" --match 'VOLT?'      --respond '5.000'                       || true
+  ivicli mock rule add "$SCENARIO" --in "$SCENE" --match 'CURR 1.0'   --ack                                   || true
+  ivicli mock rule add "$SCENARIO" --in "$SCENE" --match 'CURR?'      --respond '1.000'                       || true
+  ivicli mock rule add "$SCENARIO" --in "$SCENE" --match 'SYST:ERR?'  --respond '0,"No error"'                || true
 done
 
 # off-specific: OUTP? is 0; OUTP ON moves to `on`.
-ivicli mock scenario rule add "$SCENARIO" --in off --match 'OUTP?'      --respond '0'                 || true
-ivicli mock scenario rule add "$SCENARIO" --in off --match 'OUTP ON'    --ack --transition-to on      || true
-ivicli mock scenario rule add "$SCENARIO" --in off --match 'OUTP OFF'   --ack                          || true
-ivicli mock scenario rule add "$SCENARIO" --in off --match 'MEAS:VOLT?' --respond '0.001'              || true
-ivicli mock scenario rule add "$SCENARIO" --in off --match 'MEAS:CURR?' --respond '0.000'              || true
+ivicli mock rule add "$SCENARIO" --in off --match 'OUTP?'      --respond '0'                 || true
+ivicli mock rule add "$SCENARIO" --in off --match 'OUTP ON'    --ack --transition-to on      || true
+ivicli mock rule add "$SCENARIO" --in off --match 'OUTP OFF'   --ack                          || true
+ivicli mock rule add "$SCENARIO" --in off --match 'MEAS:VOLT?' --respond '0.001'              || true
+ivicli mock rule add "$SCENARIO" --in off --match 'MEAS:CURR?' --respond '0.000'              || true
 
 # on-specific: OUTP? is 1; OUTP OFF moves back to `off`.
-ivicli mock scenario rule add "$SCENARIO" --in on --match 'OUTP?'      --respond '1'                 || true
-ivicli mock scenario rule add "$SCENARIO" --in on --match 'OUTP OFF'   --ack --transition-to off     || true
-ivicli mock scenario rule add "$SCENARIO" --in on --match 'OUTP ON'    --ack                          || true
-ivicli mock scenario rule add "$SCENARIO" --in on --match 'MEAS:VOLT?' --respond '4.998'              || true
-ivicli mock scenario rule add "$SCENARIO" --in on --match 'MEAS:CURR?' --respond '0.823'              || true
+ivicli mock rule add "$SCENARIO" --in on --match 'OUTP?'      --respond '1'                 || true
+ivicli mock rule add "$SCENARIO" --in on --match 'OUTP OFF'   --ack --transition-to off     || true
+ivicli mock rule add "$SCENARIO" --in on --match 'OUTP ON'    --ack                          || true
+ivicli mock rule add "$SCENARIO" --in on --match 'MEAS:VOLT?' --respond '4.998'              || true
+ivicli mock rule add "$SCENARIO" --in on --match 'MEAS:CURR?' --respond '0.823'              || true
 
 # 2) Logical device alias the gateway will route to.
 ivicli visa add "$DEVICE" 'TCPIP0::127.0.0.1::INSTR' || true
