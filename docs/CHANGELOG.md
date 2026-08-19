@@ -21,6 +21,13 @@ All notable changes to ivi-cli are documented here. Format roughly follows
 
 ### Changed
 
+- **Device names may contain hyphens** (#23). `ivicli visa add psu-mock ...`
+  works. `DeviceName` was the only name in the domain that banned them —
+  scenario, scene, server, and endpoint names all allowed them — and nothing
+  depended on the ban. A rejected name is now told why and what to type
+  instead: `invalid device name 'PSU.1': use lowercase letters, digits,
+  underscores and hyphens, starting with a letter, at most 64 characters.
+  Try 'psu_1'.`
 - **Serilog.Sinks.File 7.0.0** (#35). The major bump held back since #29;
   it fixes a force-reopen of the log file every 30 minutes. What the sink
   puts on disk is unchanged — one dated file per day of Compact JSON, one

@@ -12,6 +12,8 @@ public class DeviceNameTests
     [InlineData("a")]
     [InlineData("a_b_c")]
     [InlineData("psu_001")]
+    [InlineData("psu-mock")]
+    [InlineData("a-b_c-1")]
     public void From_WithValidName_ReturnsOk(string raw)
     {
         // Given / When
@@ -25,7 +27,6 @@ public class DeviceNameTests
     [InlineData("")] // empty
     [InlineData("1psu")] // starts with digit
     [InlineData("Psu1")] // uppercase
-    [InlineData("psu-1")] // hyphen
     [InlineData("psu 1")] // whitespace
     [InlineData("psu.1")] // dot
     [InlineData("_psu")] // starts with underscore
@@ -60,6 +61,33 @@ public class DeviceNameTests
 
         // When / Then
         DeviceName.From(raw).ShouldBeOk().Value.ShouldBe(raw);
+    }
+
+    [Theory]
+    [InlineData("Psu1", "psu1")] // uppercase folded
+    [InlineData("psu.1", "psu_1")] // disallowed character replaced
+    [InlineData("psu 1", "psu_1")]
+    [InlineData("PSU-MOCK", "psu-mock")]
+    [InlineData("psu..1", "psu_1")] // a run of them collapses to one
+    public void Suggest_ReturnsAConformingNeighbour(string raw, string expected)
+    {
+        // Given / When
+        var suggestion = DeviceName.Suggest(raw);
+
+        // Then
+        suggestion.ShouldBe(expected);
+        DeviceName.From(suggestion!).ShouldBeOk();
+    }
+
+    [Theory]
+    [InlineData("")] // nothing to work from
+    [InlineData("1psu")] // no letter to start with
+    [InlineData("_psu")]
+    [InlineData("psu1")] // already valid; there is nothing to suggest
+    public void Suggest_ReturnsNullWhenItCannotHelp(string raw)
+    {
+        // Given / When / Then
+        DeviceName.Suggest(raw).ShouldBeNull();
     }
 
     [Fact]

@@ -143,7 +143,7 @@ public static class ServerRouteCommand
                         AddRouteInvalidDevice i => ServerCommand.Log(
                             err.Err,
                             logger,
-                            $"error: invalid device name '{i.Raw}'.",
+                            DeviceNameMessage.Invalid(i.Raw),
                             ExitCodeMapper.UsageError
                         ),
                         AddRouteInvalidProfile i => ServerCommand.Log(

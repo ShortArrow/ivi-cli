@@ -161,8 +161,9 @@ resource shape so repeated invocations are idempotent:
 | GPIB | `gpib_<primary-address>` |
 
 Every derived alias satisfies the `DeviceName` grammar
-(`[a-z][a-z0-9_]*`) — an alias the grammar rejects could be discovered
-but never registered.
+(`[a-z][a-z0-9_-]*`) — an alias the grammar rejects could be discovered
+but never registered. Derivation keeps to underscores even though the
+grammar admits hyphens, so a derived alias reads the same as it always did.
 
 Existing alias collisions are surfaced as "skipped (alias taken)"
 rather than errors.

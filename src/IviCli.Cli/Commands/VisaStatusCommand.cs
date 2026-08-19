@@ -115,7 +115,7 @@ public static class VisaStatusCommand
     private static string UserFacingMessage(StatusDeviceError error) =>
         error switch
         {
-            StatusDeviceInvalidName n => $"error: invalid device name '{n.Raw}'.",
+            StatusDeviceInvalidName n => DeviceNameMessage.Invalid(n.Raw),
             StatusDeviceNoTarget => "error: no current device.",
             StatusDeviceUnknown u => $"error: no device named '{u.Name.Value}'.",
             StatusDeviceConfigFailure => "error: configuration storage failed.",

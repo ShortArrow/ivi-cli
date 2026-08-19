@@ -74,7 +74,7 @@ public static class VisaWriteCommand
     private static string UserFacingMessage(WriteDeviceError error) =>
         error switch
         {
-            WriteDeviceInvalidName n => $"error: invalid device name '{n.Raw}'.",
+            WriteDeviceInvalidName n => DeviceNameMessage.Invalid(n.Raw),
             WriteDeviceInvalidScpi s => $"error: invalid SCPI command ({s.Reason}).",
             WriteDeviceNoTarget => "error: no current device.",
             WriteDeviceUnknown u => $"error: no device named '{u.Name.Value}'.",

@@ -86,7 +86,7 @@ public static class VisaAddCommand
     private static string UserFacingMessage(AddDeviceError error) =>
         error switch
         {
-            AddDeviceInvalidName n => $"error: invalid device name '{n.Raw}'.",
+            AddDeviceInvalidName n => DeviceNameMessage.Invalid(n.Raw),
             AddDeviceInvalidResource r => $"error: invalid VISA resource '{r.Raw}'.",
             AddDeviceInvalidTimeout t => $"error: invalid timeout {t.RawMilliseconds}ms.",
             AddDeviceNameTaken nt => $"error: device '{nt.Name.Value}' already exists.",

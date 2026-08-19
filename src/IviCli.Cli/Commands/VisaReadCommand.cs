@@ -73,7 +73,7 @@ public static class VisaReadCommand
     private static string UserFacingMessage(ReadDeviceError error) =>
         error switch
         {
-            ReadDeviceInvalidName n => $"error: invalid device name '{n.Raw}'.",
+            ReadDeviceInvalidName n => DeviceNameMessage.Invalid(n.Raw),
             ReadDeviceNoTarget => "error: no current device.",
             ReadDeviceUnknown u => $"error: no device named '{u.Name.Value}'.",
             ReadDeviceTransportFailure => "error: transport failure during read.",

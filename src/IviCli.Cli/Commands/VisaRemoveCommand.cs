@@ -70,7 +70,7 @@ public static class VisaRemoveCommand
     private static string UserFacingMessage(RemoveDeviceError error) =>
         error switch
         {
-            RemoveDeviceInvalidName n => $"error: invalid device name '{n.Raw}'.",
+            RemoveDeviceInvalidName n => DeviceNameMessage.Invalid(n.Raw),
             RemoveDeviceNotFound nf => $"error: no device named '{nf.Name.Value}'.",
             RemoveDeviceStorageFailure => "error: configuration storage failed.",
             _ => "error: failed to remove device.",

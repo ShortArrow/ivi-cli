@@ -94,7 +94,7 @@ public static class VisaScriptCommand
         error switch
         {
             ScriptDeviceParseFailure p => $"error: script parse failed ({p.Inner.Message}).",
-            ScriptDeviceInvalidName n => $"error: invalid device name '{n.Raw}'.",
+            ScriptDeviceInvalidName n => DeviceNameMessage.Invalid(n.Raw),
             ScriptDeviceNoTarget =>
                 "error: no current device. Use `visa use <name>` first or pass --device.",
             ScriptDeviceUnknown u => $"error: no device named '{u.Name.Value}'.",
