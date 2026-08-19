@@ -19,6 +19,16 @@ All notable changes to ivi-cli are documented here. Format roughly follows
   the projects themselves; a pull-request check keeps the list complete
   against `src/IviCli.Cli/packages.lock.json`.
 
+### Fixed
+
+- **`session.json` is locked to its owner on Windows too** (#19). ADR 0017
+  §4 has always required an NTFS ACL granting only the current account;
+  only the Unix half (`chmod 0600`) was implemented, and the Windows file
+  simply inherited whatever its directory granted. Measured on a
+  domain-joined workstation, that inheritance handed a workstation group
+  modify rights. The file's DACL is now protected and carries one entry:
+  full control for the account that wrote it.
+
 ### Changed
 
 - **CLI errors are logged through the contract they carry** (#109). The 24
