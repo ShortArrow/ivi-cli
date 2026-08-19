@@ -19,6 +19,13 @@ All notable changes to ivi-cli are documented here. Format roughly follows
   the projects themselves; a pull-request check keeps the list complete
   against `src/IviCli.Cli/packages.lock.json`.
 
+### Changed
+
+- **Serilog.Sinks.File 7.0.0** (#35). The major bump held back since #29;
+  it fixes a force-reopen of the log file every 30 minutes. What the sink
+  puts on disk is unchanged — one dated file per day of Compact JSON, one
+  event per line — and a test now pins that.
+
 ## [0.3.0-beta.1] — 2026-08-18
 
 > Pre-release. Install with `dotnet tool install -g ivi-cli --prerelease`;
