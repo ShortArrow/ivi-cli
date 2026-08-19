@@ -85,7 +85,7 @@ public static class VisaQueryCommand
     private static string UserFacingMessage(QueryDeviceError error) =>
         error switch
         {
-            QueryDeviceInvalidName n => $"error: invalid device name '{n.Raw}'.",
+            QueryDeviceInvalidName n => DeviceNameMessage.Invalid(n.Raw),
             QueryDeviceInvalidScpi s => $"error: invalid SCPI query ({s.Reason}).",
             QueryDeviceNoTarget =>
                 "error: no current device. Use `visa use <name>` first or pass an alias.",

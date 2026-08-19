@@ -84,7 +84,7 @@ public static class VisaUseCommand
     private static string UserFacingMessage(SetCurrentDeviceError error) =>
         error switch
         {
-            SetCurrentDeviceInvalidName n => $"error: invalid device name '{n.Raw}'.",
+            SetCurrentDeviceInvalidName n => DeviceNameMessage.Invalid(n.Raw),
             SetCurrentDeviceUnknown u => $"error: no device named '{u.Name.Value}'.",
             SetCurrentDeviceConfigFailure => "error: configuration storage failed.",
             SetCurrentDeviceSessionFailure => "error: session storage failed.",

@@ -130,7 +130,7 @@ public static class VisaMonitorCommand
         {
             MonitorDeviceInvalidQuery q => $"error: invalid SCPI query '{q.Raw}'.",
             MonitorDeviceInvalidInterval => "error: --interval must be positive.",
-            MonitorDeviceInvalidName n => $"error: invalid device name '{n.Raw}'.",
+            MonitorDeviceInvalidName n => DeviceNameMessage.Invalid(n.Raw),
             MonitorDeviceNoTarget =>
                 "error: no current device. Use `visa use <name>` first or pass --device.",
             MonitorDeviceUnknown u => $"error: no device named '{u.Name.Value}'.",

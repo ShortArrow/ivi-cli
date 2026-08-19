@@ -214,7 +214,7 @@ public static class MockScenarioCommand
             {
                 RecordScenarioInvalidName n => $"error: invalid scenario name '{n.Raw}'.",
                 RecordScenarioParseFailure p => $"error: script parse failed ({p.Inner.Message}).",
-                RecordScenarioInvalidDeviceName d => $"error: invalid device name '{d.Raw}'.",
+                RecordScenarioInvalidDeviceName d => DeviceNameMessage.Invalid(d.Raw),
                 RecordScenarioNoTarget =>
                     "error: no current device. Use `visa use <name>` first or pass --device.",
                 RecordScenarioUnknownDevice u => $"error: no device named '{u.Name.Value}'.",
@@ -472,7 +472,7 @@ public static class MockScenarioCommand
                         ActivateScenarioInvalidDevice d => LogAndUserError(
                             err.Err,
                             logger,
-                            $"error: invalid device name '{d.Raw}'.",
+                            DeviceNameMessage.Invalid(d.Raw),
                             ExitCodeMapper.UsageError
                         ),
                         ActivateScenarioNoDeviceSelected => LogAndUserError(
@@ -529,7 +529,7 @@ public static class MockScenarioCommand
                         ActivateScenarioInvalidDevice d => LogAndUserError(
                             err.Err,
                             logger,
-                            $"error: invalid device name '{d.Raw}'.",
+                            DeviceNameMessage.Invalid(d.Raw),
                             ExitCodeMapper.UsageError
                         ),
                         ActivateScenarioNoDeviceSelected => LogAndUserError(

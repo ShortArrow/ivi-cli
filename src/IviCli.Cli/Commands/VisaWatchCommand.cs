@@ -144,7 +144,7 @@ public static class VisaWatchCommand
     private static string UserFacingMessage(WatchDevicesError error) =>
         error switch
         {
-            WatchInvalidName n => $"error: invalid device name '{n.Raw}'.",
+            WatchInvalidName n => DeviceNameMessage.Invalid(n.Raw),
             WatchInvalidInterval i => $"error: interval must be positive (got {i.Given}).",
             WatchUnknownDevice u => $"error: no device named '{u.Name.Value}'.",
             WatchNoDevices => "error: no devices registered to watch.",

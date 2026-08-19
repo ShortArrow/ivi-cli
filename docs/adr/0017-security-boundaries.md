@@ -41,7 +41,7 @@ Required validations:
 
 | VO | Validation |
 | --- | --- |
-| `DeviceName.From(string)` | non-empty; recommended pattern `[a-z][a-z0-9_]*`; length cap |
+| `DeviceName.From(string)` | non-empty; recommended pattern `[a-z][a-z0-9_-]*`; length cap |
 | `ServerName.From(string)` | same as `DeviceName` |
 | `HislipName.From(string)` | conforms to HiSLIP naming convention |
 | `VisaResource.Parse(string)` | known transport prefix, structurally valid components |

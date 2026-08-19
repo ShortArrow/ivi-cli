@@ -52,7 +52,7 @@ Equality is determined by the value itself; only replacement is permitted.
 
 | VO | Example | Constraints |
 | --- | --- | --- |
-| `DeviceName` | `psu1` | non-empty; recommended pattern is roughly `[a-z][a-z0-9_]*` (see 0021 for naming conventions) |
+| `DeviceName` | `psu1` | non-empty; recommended pattern is roughly `[a-z][a-z0-9_-]*` (see 0021 for naming conventions) |
 | `ServerName` | `local`, `lab` | same as above |
 | `HislipName` | `hislip0`, `hislip1` | per the HiSLIP convention |
 

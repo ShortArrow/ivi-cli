@@ -16,8 +16,19 @@ public sealed partial record DeviceName
     /// <summary>The maximum permitted length, in characters.</summary>
     public const int MaxLength = 64;
 
-    [GeneratedRegex("^[a-z][a-z0-9_]*$")]
+    /// <summary>
+    /// The naming rule in words, for messages shown to whoever typed the name.
+    /// Kept beside the pattern it describes so the two cannot drift.
+    /// </summary>
+    public const string Requirement =
+        "lowercase letters, digits, underscores and hyphens, starting with a letter, "
+        + "at most 64 characters";
+
+    [GeneratedRegex("^[a-z][a-z0-9_-]*$")]
     private static partial Regex AllowedPattern();
+
+    [GeneratedRegex("[^a-z0-9_-]+")]
+    private static partial Regex Disallowed();
 
     /// <summary>The underlying canonical string value.</summary>
     public string Value { get; }
@@ -40,6 +51,27 @@ public sealed partial record DeviceName
             return Result.Failure<DeviceName, DeviceError>(new InvalidDeviceNameFormat(raw));
         }
         return Result.Success<DeviceName, DeviceError>(new DeviceName(raw));
+    }
+
+    /// <summary>
+    /// Proposes a conforming name close to one that was rejected, by folding
+    /// case and replacing each run of disallowed characters with an
+    /// underscore.
+    /// </summary>
+    /// <param name="raw">The rejected candidate.</param>
+    /// <returns>
+    /// The proposal, or <see langword="null"/> when folding cannot reach a
+    /// valid name (nothing to work from, no letter to start with, still too
+    /// long) or when <paramref name="raw"/> already is one.
+    /// </returns>
+    public static string? Suggest(string raw)
+    {
+        if (string.IsNullOrEmpty(raw))
+        {
+            return null;
+        }
+        var folded = Disallowed().Replace(raw.ToLowerInvariant(), "_");
+        return folded != raw && From(folded) is Result<DeviceName, DeviceError>.Ok ? folded : null;
     }
 
     /// <inheritdoc/>
