@@ -75,7 +75,11 @@ A future Roslyn analyzer rule may enforce that `ILogger` placeholder arguments o
 
 - **`session.json`** (state directory): **user-only** permissions are set explicitly on every write.
   - Unix-like: `chmod 0600` after atomic write-and-rename.
-  - Windows: NTFS ACL granting only the current user identity (read/write).
+  - Windows: the file's DACL is protected (inheritance switched off), its
+    inherited entries dropped, and one explicit full-control entry granted to
+    the writing account. Inheritance is a property of the directory, not of
+    the file: a managed workstation's profile tree can carry group grants,
+    and `IVICLI_CONFIG` can place the session outside the profile entirely.
 - **`config.toml`**: default umask / inherited ACL. The file is intended to be human-editable (`vim`, `nano`, GUI editors) and contains no secrets in Phase 1. Restricting it would create friction without benefit.
 - The atomic write pattern (temp file → set permissions → rename) is used for both files to avoid partial writes; permission setting is part of the rename-into-place step.
 - Editor workflow is unaffected: the owner of the file can read and write `session.json` normally; swap and backup files inherit the directory's umask, not the source file's stricter mode.

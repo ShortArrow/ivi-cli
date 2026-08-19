@@ -1,5 +1,8 @@
 using System.Collections.Immutable;
 using System.IO.Abstractions;
+using System.Runtime.Versioning;
+using System.Security.AccessControl;
+using System.Security.Principal;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using IviCli.Application.Session;
@@ -14,7 +17,7 @@ namespace IviCli.Infrastructure.Session;
 /// File-system-backed <see cref="ISessionStore"/> that persists the
 /// <see cref="SessionState"/> as JSON. Writes are atomic (temp + rename)
 /// and the resulting file is locked down to the current user per
-/// ADR 0017 §4 (Unix: <c>chmod 0600</c>; Windows fallback documented below).
+/// ADR 0017 §4 (Unix: <c>chmod 0600</c>; Windows: a protected DACL).
 /// </summary>
 public sealed class JsonSessionStore : ISessionStore
 {
@@ -235,19 +238,18 @@ public sealed class JsonSessionStore : ISessionStore
         }
     }
 
+    /// <summary>
+    /// Restricts the freshly written file to the account that wrote it, per
+    /// ADR 0017 §4 — mode <c>0600</c> on Unix, a protected DACL granting only
+    /// the current user on Windows. Applied to the temp file, before the
+    /// rename that publishes it, so the session is never briefly readable.
+    /// Best-effort: the write itself has already succeeded, and a session
+    /// that cannot be locked down is better than a session that is lost.
+    /// </summary>
     private void ApplyUserOnlyPermissions(string path)
     {
-        // ADR 0017 §4: session.json must be user-only on Unix (chmod 0600).
-        // Windows ACL tightening is deferred — the default user-profile path
-        // already restricts cross-user access in practice on consumer
-        // Windows; a follow-up cycle adds explicit FileSecurity ACL editing.
-        if (OperatingSystem.IsWindows())
-        {
-            return;
-        }
-
         // Only act when the adapter is backed by the real file system; the
-        // MockFileSystem used by tests does not implement Unix permissions.
+        // MockFileSystem used by tests implements neither Unix modes nor ACLs.
         if (!ReferenceEquals(_fs.GetType(), typeof(FileSystem)))
         {
             return;
@@ -255,16 +257,63 @@ public sealed class JsonSessionStore : ISessionStore
 
         try
         {
-            File.SetUnixFileMode(path, UnixFileMode.UserRead | UnixFileMode.UserWrite);
+            if (OperatingSystem.IsWindows())
+            {
+                ApplyWindowsUserOnlyAcl(path);
+            }
+            else
+            {
+                File.SetUnixFileMode(path, UnixFileMode.UserRead | UnixFileMode.UserWrite);
+            }
         }
         catch (PlatformNotSupportedException)
         {
-            // No-op on platforms that do not support Unix file modes.
+            // No-op where the platform has no such concept.
+        }
+        catch (UnauthorizedAccessException)
+        {
+            // The file system refused the change; the content is still written.
         }
         catch (IOException)
         {
             // Best-effort; the write itself already succeeded.
         }
+    }
+
+    /// <summary>
+    /// Replaces the file's inherited grants with a single explicit
+    /// full-control entry for the current account. What a file inherits is a
+    /// property of the directory rather than of the file: a managed
+    /// workstation's profile tree can carry group grants, and
+    /// <c>IVICLI_CONFIG</c> can place the session outside the profile
+    /// altogether.
+    /// </summary>
+    [SupportedOSPlatform("windows")]
+    private static void ApplyWindowsUserOnlyAcl(string path)
+    {
+        var user = WindowsIdentity.GetCurrent().User;
+        if (user is null)
+        {
+            return;
+        }
+
+        var file = new FileInfo(path);
+        var security = file.GetAccessControl();
+        security.SetAccessRuleProtection(isProtected: true, preserveInheritance: false);
+        foreach (
+            FileSystemAccessRule rule in security.GetAccessRules(
+                includeExplicit: true,
+                includeInherited: false,
+                typeof(SecurityIdentifier)
+            )
+        )
+        {
+            security.RemoveAccessRuleSpecific(rule);
+        }
+        security.AddAccessRule(
+            new FileSystemAccessRule(user, FileSystemRights.FullControl, AccessControlType.Allow)
+        );
+        file.SetAccessControl(security);
     }
 
     private sealed class SessionStateDto
