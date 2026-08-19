@@ -405,15 +405,11 @@ internal static class Program
         visa.Subcommands.Add(VisaWatchCommand.Build(services));
         visa.Subcommands.Add(VisaLintCommand.Build(services));
 
-        var mock = new Command("mock", "Manage mock-device behaviour for the Fake Backend.");
-        mock.Subcommands.Add(MockScenarioCommand.Build(services));
-        mock.Subcommands.Add(MockReceivedWritesCommand.Build(services));
-
         var root = new RootCommand(
             "ivi-cli: integrated CLI for managing, diagnosing, and operating VISA/IVI instruments."
         );
         root.Subcommands.Add(visa);
-        root.Subcommands.Add(mock);
+        root.Subcommands.Add(MockCommand.Build(services));
         root.Subcommands.Add(ServerCommand.Build(services));
         root.Subcommands.Add(ApiCommand.Build(services));
         root.Subcommands.Add(DoctorCommand.Build(services));
@@ -489,6 +485,19 @@ internal static class Program
             {
                 var sub = scenarioCmd.Subcommands.FirstOrDefault(c => c.Name == name);
                 if (sub is not null && sub.Arguments.Count > 0)
+                {
+                    registry.Bind(sub, sub.Arguments[0].Name, scenario);
+                }
+            }
+        }
+
+        // mock scene / rule add|remove: the owning scenario is their first positional
+        foreach (var noun in new[] { "scene", "rule" })
+        {
+            var nounCmd = mock.Subcommands.FirstOrDefault(c => c.Name == noun);
+            foreach (var sub in nounCmd?.Subcommands ?? [])
+            {
+                if (sub.Arguments.Count > 0)
                 {
                     registry.Bind(sub, sub.Arguments[0].Name, scenario);
                 }

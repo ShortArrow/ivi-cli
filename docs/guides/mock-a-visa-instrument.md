@@ -102,10 +102,10 @@ You can author it two ways — from the CLI, or by hand-writing a TOML file.
 ivicli mock scenario create my-dmm --idn 'ACME,DMM-1000,SN42,2.1' --initial idle
 
 # 2. Add rules to a scene. Queries respond; writes acknowledge.
-ivicli mock scenario rule add my-dmm --in idle --match '*IDN?'     --respond 'ACME,DMM-1000,SN42,2.1'
-ivicli mock scenario rule add my-dmm --in idle --match '*RST'      --ack
-ivicli mock scenario rule add my-dmm --in idle --match 'MEAS:VOLT?' --respond '3.271'
-ivicli mock scenario rule add my-dmm --in idle --match 'SYST:ERR?' --respond '0,"No error"'
+ivicli mock rule add my-dmm --in idle --match '*IDN?'     --respond 'ACME,DMM-1000,SN42,2.1'
+ivicli mock rule add my-dmm --in idle --match '*RST'      --ack
+ivicli mock rule add my-dmm --in idle --match 'MEAS:VOLT?' --respond '3.271'
+ivicli mock rule add my-dmm --in idle --match 'SYST:ERR?' --respond '0,"No error"'
 
 ```
 
@@ -115,10 +115,10 @@ it, below.
 Add a second scene and a transition to model state:
 
 ```sh
-ivicli mock scenario scene add my-dmm measuring
-ivicli mock scenario rule add my-dmm --in idle      --match 'INIT'  --ack --transition-to measuring
-ivicli mock scenario rule add my-dmm --in measuring --match 'FETC?' --respond '3.271'
-ivicli mock scenario rule add my-dmm --in measuring --match 'ABOR'  --ack --transition-to idle
+ivicli mock scene add my-dmm measuring
+ivicli mock rule add my-dmm --in idle      --match 'INIT'  --ack --transition-to measuring
+ivicli mock rule add my-dmm --in measuring --match 'FETC?' --respond '3.271'
+ivicli mock rule add my-dmm --in measuring --match 'ABOR'  --ack --transition-to idle
 ```
 
 ### By hand-writing TOML

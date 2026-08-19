@@ -8,7 +8,7 @@ using Microsoft.Extensions.Logging;
 namespace IviCli.Cli.Commands;
 
 /// <summary>
-/// Builds the <c>ivicli mock scenario scene ...</c> subcommand tree
+/// Builds the <c>ivicli mock scene ...</c> subcommand tree
 /// (ADR 0026 §5 + §15). In v0.2.0 the <c>scene</c> verb operates on
 /// <em>state nodes</em> — adding or removing a named scene inside a
 /// scenario. Rules (match → action) are managed by the sibling

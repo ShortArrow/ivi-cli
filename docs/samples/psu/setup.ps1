@@ -44,7 +44,7 @@ Write-Host "==> scenario=$Scenario  proto=$Proto  port=$Port  device=$Device  se
 # --initial off makes the FSM start in the `off` scene, so the
 # synthetic `default` scene v0.2.0 used to auto-create is skipped.
 Invoke-IvicliStep 'create scenario'  @('mock', 'scenario', 'create', $Scenario, '--initial', 'off')
-Invoke-IvicliStep 'add scene on'     @('mock', 'scenario', 'scene', 'add', $Scenario, 'on')
+Invoke-IvicliStep 'add scene on'     @('mock', 'scene', 'add', $Scenario, 'on')
 
 # Static metadata, duplicated across both scenes (v0.2.0 limitation —
 # scenes do not share rules; key-value variable state is a follow-up).
@@ -60,7 +60,7 @@ $staticRules = @(
 )
 foreach ($scene in @('off', 'on')) {
     foreach ($r in $staticRules) {
-        $a = @('mock', 'scenario', 'rule', 'add', $Scenario, '--in', $scene, '--match', $r.Match)
+        $a = @('mock', 'rule', 'add', $Scenario, '--in', $scene, '--match', $r.Match)
         if ($r.ContainsKey('Respond')) { $a += @('--respond', $r.Respond) }
         if ($r.ContainsKey('Ack'))     { $a += '--ack' }
         if ($r.ContainsKey('Transition')) { $a += @('--transition-to', $r.Transition) }
@@ -77,7 +77,7 @@ $offRules = @(
     @{ Match = 'MEAS:CURR?'; Respond = '0.000' }
 )
 foreach ($r in $offRules) {
-    $a = @('mock', 'scenario', 'rule', 'add', $Scenario, '--in', 'off', '--match', $r.Match)
+    $a = @('mock', 'rule', 'add', $Scenario, '--in', 'off', '--match', $r.Match)
     if ($r.ContainsKey('Respond')) { $a += @('--respond', $r.Respond) }
     if ($r.ContainsKey('Ack'))     { $a += '--ack' }
     if ($r.ContainsKey('Transition')) { $a += @('--transition-to', $r.Transition) }
@@ -93,7 +93,7 @@ $onRules = @(
     @{ Match = 'MEAS:CURR?'; Respond = '0.823' }
 )
 foreach ($r in $onRules) {
-    $a = @('mock', 'scenario', 'rule', 'add', $Scenario, '--in', 'on', '--match', $r.Match)
+    $a = @('mock', 'rule', 'add', $Scenario, '--in', 'on', '--match', $r.Match)
     if ($r.ContainsKey('Respond')) { $a += @('--respond', $r.Respond) }
     if ($r.ContainsKey('Ack'))     { $a += '--ack' }
     if ($r.ContainsKey('Transition')) { $a += @('--transition-to', $r.Transition) }

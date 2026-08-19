@@ -10,7 +10,7 @@ using Shouldly;
 namespace IviCli.Cli.Tests.Commands;
 
 /// <summary>
-/// <c>mock scenario rule add --srq</c> is where an operator says which
+/// <c>mock rule add --srq</c> is where an operator says which
 /// status byte the mock reports when the rule fires, so the option is
 /// exercised the way an operator uses it: parse a command line, run it,
 /// and read the rule back out of the scenario it wrote.
