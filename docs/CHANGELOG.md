@@ -21,6 +21,11 @@ All notable changes to ivi-cli are documented here. Format roughly follows
 
 ### Changed
 
+- **CLI errors are logged through the contract they carry** (#109). The 24
+  command sites that hand-assembled a log call from an error's severity,
+  template, arguments, and cause now call `LogIviError`, the way the SOCKET
+  gateway has since #102. Log output is unchanged; what is gone is the
+  chance of a site quietly dropping the cause or the structured arguments.
 - **`mock scene` and `mock rule` are siblings of `mock scenario`** (#22).
   Both were two levels down, under `scenario`, which hid them from
   `ivicli mock --help` — and the `scenario` segment bound nothing, since

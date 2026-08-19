@@ -83,11 +83,4 @@ public static class SerilogConfiguration
             Domain.LogSeverity.Critical => LogEventLevel.Fatal,
             _ => LogEventLevel.Information,
         };
-
-    /// <summary>
-    /// Maps the project's <see cref="Domain.LogSeverity"/> to
-    /// <see cref="Microsoft.Extensions.Logging.LogLevel"/>.
-    /// </summary>
-    public static Microsoft.Extensions.Logging.LogLevel ToLogLevel(Domain.LogSeverity severity) =>
-        Application.Logging.IviErrorLoggerExtensions.ToLogLevel(severity);
 }

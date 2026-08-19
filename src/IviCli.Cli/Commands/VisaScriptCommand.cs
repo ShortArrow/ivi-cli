@@ -1,4 +1,5 @@
 using System.CommandLine;
+using IviCli.Application.Logging;
 using IviCli.Application.Scripting;
 using IviCli.Domain;
 using Microsoft.Extensions.DependencyInjection;
@@ -71,12 +72,7 @@ public static class VisaScriptCommand
 
     private static int Fail(ScriptDeviceError error, ILogger logger)
     {
-        logger.Log(
-            Logging.SerilogConfiguration.ToLogLevel(error.Severity),
-            error.Cause,
-            error.Message,
-            error.LogArgs.ToArray()
-        );
+        logger.LogIviError(error);
         Console.Error.WriteLine(UserFacingMessage(error));
         return error switch
         {

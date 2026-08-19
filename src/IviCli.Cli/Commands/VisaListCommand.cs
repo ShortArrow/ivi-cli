@@ -1,5 +1,6 @@
 using System.CommandLine;
 using IviCli.Application.Devices;
+using IviCli.Application.Logging;
 using IviCli.Domain;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -62,12 +63,7 @@ public static class VisaListCommand
 
     private static int ReportFailure(ListDevicesError error, ILogger logger)
     {
-        logger.Log(
-            Logging.SerilogConfiguration.ToLogLevel(error.Severity),
-            error.Cause,
-            error.Message,
-            error.LogArgs.ToArray()
-        );
+        logger.LogIviError(error);
         Console.Error.WriteLine("error: failed to list devices.");
         return ExitCodeMapper.Map(error);
     }

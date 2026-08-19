@@ -1,4 +1,5 @@
 using System.CommandLine;
+using IviCli.Application.Logging;
 using IviCli.Application.Session;
 using IviCli.Domain;
 using IviCli.Domain.Devices;
@@ -64,12 +65,7 @@ public static class VisaUseCommand
 
     private static int Fail(SetCurrentDeviceError error, ILogger logger)
     {
-        logger.Log(
-            Logging.SerilogConfiguration.ToLogLevel(error.Severity),
-            error.Cause,
-            error.Message,
-            error.LogArgs.ToArray()
-        );
+        logger.LogIviError(error);
         Console.Error.WriteLine(UserFacingMessage(error));
         return error switch
         {

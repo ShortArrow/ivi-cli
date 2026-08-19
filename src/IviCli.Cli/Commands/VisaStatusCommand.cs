@@ -1,6 +1,7 @@
 using System.CommandLine;
 using System.Globalization;
 using IviCli.Application.Devices;
+using IviCli.Application.Logging;
 using IviCli.Domain;
 using IviCli.Domain.Visa;
 using Microsoft.Extensions.DependencyInjection;
@@ -95,12 +96,7 @@ public static class VisaStatusCommand
 
     private static int Fail(StatusDeviceError error, ILogger logger)
     {
-        logger.Log(
-            Logging.SerilogConfiguration.ToLogLevel(error.Severity),
-            error.Cause,
-            error.Message,
-            error.LogArgs.ToArray()
-        );
+        logger.LogIviError(error);
         Console.Error.WriteLine(UserFacingMessage(error));
         return error switch
         {
