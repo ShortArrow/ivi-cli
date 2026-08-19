@@ -27,10 +27,33 @@
     <PackageReadmeFile>README.md</PackageReadmeFile>
   </PropertyGroup>
 
+  <!--
+    CopyToOutputDirectory puts the licence texts and the third-party
+    attribution into the publish layout, which is what the per-RID release
+    archives are zipped from and what the container image copies in. The
+    bundled assemblies' licences require that attribution to travel with
+    every copy of the binaries, not only with the repository.
+  -->
   <ItemGroup>
     <None Include="..\..\README.md" Pack="true" PackagePath="\" />
-    <None Include="..\..\LICENSE-MIT" Pack="true" PackagePath="\" />
-    <None Include="..\..\LICENSE-APACHE" Pack="true" PackagePath="\" />
+    <None
+      Include="..\..\LICENSE-MIT"
+      Pack="true"
+      PackagePath="\"
+      CopyToOutputDirectory="PreserveNewest"
+    />
+    <None
+      Include="..\..\LICENSE-APACHE"
+      Pack="true"
+      PackagePath="\"
+      CopyToOutputDirectory="PreserveNewest"
+    />
+    <None
+      Include="..\..\THIRD-PARTY-NOTICES.md"
+      Pack="true"
+      PackagePath="\"
+      CopyToOutputDirectory="PreserveNewest"
+    />
   </ItemGroup>
 
   <ItemGroup>
