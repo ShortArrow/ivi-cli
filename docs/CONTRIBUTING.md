@@ -29,6 +29,10 @@ Husky.Net pre-commit runs CSharpier. Build and tests are not run on push — tha
 
 `pr.yml` (PR), `nightly.yml` (scheduled, includes Integration), `release.yml` (tagged) — see [ADR 0020](adr/0020-ci-cd-strategy.md). The `docs-sync-check` job enforces that bilingual doc pairs stay in lock-step.
 
+## Adding a dependency
+
+A new package reference is also a redistribution obligation: its assembly ships beside `ivicli` in the release archives, the container image, and the tool package. Add an entry for it to `THIRD-PARTY-NOTICES.md` in the same PR — the `notices-sync` job compares that file against `src/IviCli.Cli/packages.lock.json` and fails on a package with no entry as well as on an entry with no package. Read the terms from the project itself rather than from the package: several dependencies declare no license at all in their NuGet metadata. See [ADR 0046](adr/0046-licensing.md).
+
 ## Documentation
 
 All repository documentation is English-primary. Japanese mirrors (`*.jp.md`) are required for the PRD, README, and this file via an `**English** | [日本語](...)` switcher header — see [ADR 0024](adr/0024-documentation-policy.md).

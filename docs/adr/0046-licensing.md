@@ -11,10 +11,13 @@ downstream reuse, packaging, or contribution and is incompatible with the
 project's OSS positioning (ADR 0024).
 
 ivi-cli is distributed both as a `dotnet tool` NuGet package (`ivi-cli`) and as
-self-contained per-RID binaries. It links a stack of permissively licensed
-dependencies (Serilog, Spectre.Console, System.CommandLine, OpenTelemetry,
-Tomlyn, Makaretu.Dns — all MIT / Apache-2.0). Any license we adopt must be
-compatible with distributing those dependencies bundled inside the package.
+self-contained per-RID binaries, and later as a container image. Every one of
+those bundles its dependencies as assemblies beside the executable: Serilog,
+Spectre.Console, System.CommandLine, OpenTelemetry and Makaretu.Dns under
+MIT / Apache-2.0, Tomlyn and IPNetwork2 under BSD, and `Ivi.Visa.dll` under the
+IVI Foundation's own license agreement. Any license we adopt must be compatible
+with distributing those bundled — and the obligations running the other way,
+what each of them asks a redistributor to carry, must be met by what we ship.
 
 A choice was needed between:
 
@@ -56,6 +59,39 @@ Rationale for the dual grant over a single license:
   freely embeddable in commercial and closed test benches — the primary
   deployment context for a VISA/IVI instrument CLI.
 
+## Third-party attribution
+
+The grant above says what others may do with ivi-cli. The dependencies it
+bundles say what ivi-cli must do when it hands them on, and every one of them
+asks for the same thing: their copyright and permission notices reach whoever
+receives the binaries. A repository file does not satisfy that — the person who
+downloads a release archive or pulls the image never sees the repository.
+
+- `THIRD-PARTY-NOTICES.md` at the repository root lists every package in the
+  CLI's dependency closure, grouped by license, with the copyright line each
+  license asks to be carried, and reproduces the license texts that are not
+  already at the root.
+- It is copied into the publish layout, so it travels inside the per-RID
+  archives, inside the container image (built from that layout), and in the
+  tool package — both at the package root and beside the tool binary.
+  `LICENSE-MIT` and `LICENSE-APACHE` travel the same way, which is also how
+  Apache-2.0 §4(a) is satisfied for the Apache-licensed dependencies.
+- The `IviFoundation.Visa` entry is the one whose grant is *conditioned* on
+  this: it permits redistribution "provided that the above copyright notice(s)
+  appear in all copies". ivi-cli redistributes `Ivi.Visa.dll` unmodified and,
+  as a non-member of the Foundation, is licensed for its object code.
+- The list is not generated. Four of the packages declare no license in their
+  NuGet metadata and two declare only a URL, so a nuspec-scraping generator
+  would be silently wrong about six shipped assemblies; those entries record
+  the project repository the terms were read from. What is automated is the
+  *completeness* check: a pull-request job compares the entries against
+  `src/IviCli.Cli/packages.lock.json` and fails on a package with no entry or
+  an entry with no package.
+
+Versions are deliberately absent from the notices file. An entry attributes a
+work rather than a release, so a dependency bump cannot make the file quietly
+untrue, and the check stays quiet for the bumps that change nothing.
+
 ## Consequences
 
 **Pros**
@@ -63,8 +99,9 @@ Rationale for the dual grant over a single license:
 - Downstream users get a well-understood permissive grant and can pick the
   license that fits their compliance posture.
 - Explicit patent grant available via the Apache-2.0 option.
-- Compatible with the bundled MIT/Apache-2.0 dependency set; distributing the
-  self-contained binaries and the tool nupkg is unambiguously permitted.
+- Compatible with the bundled dependency set; with the notices file travelling
+  inside them, distributing the self-contained binaries, the container image
+  and the tool nupkg is unambiguously permitted.
 - Aligns the repository with the OSS documentation policy (ADR 0024), which
   requires the README to state a license.
 
@@ -72,6 +109,9 @@ Rationale for the dual grant over a single license:
 
 - Two license files and a dual-license contribution clause are marginally more
   to maintain than a single license.
+- A new dependency now costs an attribution entry, and for a package with no
+  license metadata that means reading the terms from the project itself. The
+  check makes that cost visible rather than optional.
 - GitHub's license detector shows "View license" rather than a single SPDX
   badge for dual-licensed repositories.
 

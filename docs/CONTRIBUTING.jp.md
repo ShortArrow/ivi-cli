@@ -29,6 +29,10 @@ Husky.Net の pre-commit が CSharpier を実行します。build とテスト�
 
 `pr.yml`（PR）、`nightly.yml`（スケジュール、Integration を含む）、`release.yml`（tag 起動）— [ADR 0020](adr/0020-ci-cd-strategy.md) を参照。`docs-sync-check` ジョブが bilingual ペアの整合性を強制します。
 
+## 依存パッケージの追加
+
+PackageReference を 1 つ増やすことは、再配布義務を 1 つ増やすことでもあります。そのアセンブリは release アーカイブ・コンテナイメージ・tool パッケージのいずれでも `ivicli` と並んで配布されます。同じ PR で `THIRD-PARTY-NOTICES.md` にエントリを追加してください。`notices-sync` ジョブが `src/IviCli.Cli/packages.lock.json` と突き合わせ、記載漏れも、パッケージが消えた後に残ったエントリも失敗させます。ライセンスは NuGet のメタデータではなくプロジェクト本体から読むこと — メタデータにライセンスを一切宣言していない依存が複数あります。[ADR 0046](adr/0046-licensing.md) を参照。
+
 ## ドキュメント
 
 リポジトリの文書は英語を primary とし、PRD・README・本ファイルは `**English** | [日本語](...)` スイッチャヘッダ付きで `*.jp.md` の日本語ミラーを必須とします — [ADR 0024](adr/0024-documentation-policy.md) を参照。
