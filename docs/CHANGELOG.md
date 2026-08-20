@@ -19,6 +19,14 @@ All notable changes to ivi-cli are documented here. Format roughly follows
   the projects themselves; a pull-request check keeps the list complete
   against `src/IviCli.Cli/packages.lock.json`.
 
+- **Local NI-VISA backend SRQ and trigger delivery is now observed, not
+  assumed** (#18). A pair of bench-gated integration tests points
+  `LocalBackend.ServiceRequestStream` and `TriggerAsync` at the virtual USB
+  mock attached through usbip-win2: the IEEE 488.2 sequence delivers the
+  rule's status byte, and `*TRG` raises a distinct one. The tests skip
+  wherever the mock is not attached, so CI is unaffected; the scenario and
+  attach steps ship next to the tests.
+
 ### Fixed
 
 - **`session.json` is locked to its owner on Windows too** (#19). ADR 0017

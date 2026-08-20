@@ -124,8 +124,9 @@ ivicli mock rule add my-dmm --in measuring --match 'ABOR'  --ack --transition-to
 ### By hand-writing TOML
 
 The same scenario is a plain TOML file. Drop it in the scenarios directory
-(see [Where scenarios live](#where-scenarios-live)) and `ivicli mock scenario
-activate my-dmm`, or `ivicli mock scenario import ./my-dmm.toml`.
+(see [Where scenarios live](#where-scenarios-live)) as `my-dmm.toml` and
+`ivicli mock scenario activate my-dmm`. (`mock scenario import` is for
+NDJSON captures, not TOML files.)
 
 ```toml
 idn = "ACME,DMM-1000,SN42,2.1"
