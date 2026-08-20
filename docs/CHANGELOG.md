@@ -6,6 +6,8 @@ All notable changes to ivi-cli are documented here. Format roughly follows
 
 ## [Unreleased]
 
+## [0.3.0-beta.2] — 2026-08-20
+
 ### Added
 
 - **Third-party attribution ships with the binaries** (#152). A
