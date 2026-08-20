@@ -53,6 +53,26 @@ public sealed class TelemetryConfigTests
     }
 
     [Fact]
+    public void Default_does_not_propagate_hislip_trace_context()
+    {
+        TelemetryConfig.Default.HiSlipPropagationEnabled.ShouldBeFalse();
+    }
+
+    [Fact]
+    public void From_can_opt_in_to_hislip_trace_context_propagation()
+    {
+        var result = TelemetryConfig.From(
+            enabled: true,
+            otlpEndpoint: null,
+            serviceName: "ivi-cli",
+            tracesEnabled: true,
+            metricsEnabled: true,
+            hislipPropagationEnabled: true
+        );
+        result.ShouldBeOk().HiSlipPropagationEnabled.ShouldBeTrue();
+    }
+
+    [Fact]
     public void From_disabled_can_keep_signals_off()
     {
         // Enabled=false means we don't enforce the "at least one signal" rule.

@@ -52,6 +52,7 @@ public static class TomlConfigParser
     private const string TelemetryServiceNameField = "service_name";
     private const string TelemetryTracesEnabledField = "traces_enabled";
     private const string TelemetryMetricsEnabledField = "metrics_enabled";
+    private const string TelemetryHiSlipPropagationField = "hislip_propagation";
     private const string AuditTable = "audit";
     private const string AuditEnabledField = "enabled";
     private const string AuditPathField = "path";
@@ -361,6 +362,10 @@ public static class TomlConfigParser
             builder.AppendLine(
                 inv,
                 $"{TelemetryMetricsEnabledField} = {(t.MetricsEnabled ? "true" : "false")}"
+            );
+            builder.AppendLine(
+                inv,
+                $"{TelemetryHiSlipPropagationField} = {(t.HiSlipPropagationEnabled ? "true" : "false")}"
             );
             builder.AppendLine();
         }
@@ -814,13 +819,15 @@ public static class TomlConfigParser
         var serviceName = ReadString(table, TelemetryServiceNameField) ?? "ivi-cli";
         var tracesEnabled = ReadBool(table, TelemetryTracesEnabledField, true);
         var metricsEnabled = ReadBool(table, TelemetryMetricsEnabledField, true);
+        var hislipPropagation = ReadBool(table, TelemetryHiSlipPropagationField, false);
 
         var built = TelemetryConfig.From(
             enabled,
             otlpEndpoint,
             serviceName,
             tracesEnabled,
-            metricsEnabled
+            metricsEnabled,
+            hislipPropagation
         );
         if (built is not Result<TelemetryConfig, TelemetryConfigError>.Ok ok)
         {
