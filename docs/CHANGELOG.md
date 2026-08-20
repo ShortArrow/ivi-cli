@@ -47,6 +47,16 @@ All notable changes to ivi-cli are documented here. Format roughly follows
   `cert-reloaded`. Operators rotating via ACME or corporate PKI cron jobs
   no longer schedule daemon restarts.
 
+- **The mock-VISA container serves VXI-11, and the gateway answers UDP
+  portmapper probes** (#14). The VXI-11 gateway already multiplexed
+  portmap and Device Core on one TCP port; what was missing was a UDP
+  responder on 111 — the transport `visa scan`'s broadcast probe and
+  unicast portmap clients actually use — and a container that exposes it.
+  `docker run -p 111:111 -p 111:111/udp` now serves VXI-11 end-to-end
+  (the CI smoke drives ivicli's own VXI-11 client through it); broadcast
+  discovery of a bridge-networked container is not possible (broadcasts
+  are not DNATed) and still needs `--network host`.
+
 ### Fixed
 
 - **`session.json` is locked to its owner on Windows too** (#19). ADR 0017

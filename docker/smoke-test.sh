@@ -32,10 +32,29 @@ response="$(docker exec "$name" bash -c 'echo "*IDN?" | nc -w 2 127.0.0.1 5025')
 echo "got: $response"
 case "$response" in
   *IVICLI-MOCK*)
-    echo "smoke passed"
+    echo "socket smoke passed"
     ;;
   *)
-    echo "smoke FAILED — unexpected response"
+    echo "socket smoke FAILED — unexpected response"
+    docker logs "$name"
+    exit 1
+    ;;
+esac
+
+# SCPI round-trip over the VXI-11 gateway, driven by ivicli's own
+# VXI-11 client backend: UDP GETPORT to 127.0.0.1:111 resolves the
+# core port, then create_link + device_write/read. IVICLI_MOCK_ONLY
+# must be off in the exec'd process or the client would answer from
+# its own in-process fake instead of crossing the wire.
+docker exec -e IVICLI_MOCK_ONLY=0 "$name" ivicli visa add vxi-probe 'TCPIP0::127.0.0.1::inst0::INSTR'
+vxi_response="$(docker exec -e IVICLI_MOCK_ONLY=0 "$name" ivicli visa query vxi-probe '*IDN?')"
+echo "got (vxi11): $vxi_response"
+case "$vxi_response" in
+  *IVICLI-MOCK*)
+    echo "vxi11 smoke passed"
+    ;;
+  *)
+    echo "vxi11 smoke FAILED — unexpected response"
     docker logs "$name"
     exit 1
     ;;

@@ -92,19 +92,31 @@ endpoints for mock CRUD over the Management API is **deferred** —
 
 ### 3. Protocols exposed
 
-The container starts two gateway servers in parallel:
+The container starts three gateway servers in parallel:
 
 | Protocol | Port | TCP shape | Audience |
 | --- | --- | --- | --- |
 | HiSlip | 4880 | Single TCP | NI-VISA, IVI.NET, Keysight VISA — modern VISA standard |
 | SOCKET | 5025 | Single TCP | lxi-tools, raw socket clients, simple shell pipelines |
+| VXI-11 | 111 (+ 111/udp) | Single TCP + UDP portmap | legacy VISA clients, pyvisa-py, ivicli's own VXI-11 backend |
 
-Both are single-TCP-port protocols that map cleanly to Docker
-port forwarding. VXI-11 is **out of scope for v1**: its RPC
-portmapper allocates dynamic ports per session, which forces
-`--network host` and defeats Docker's network isolation. VXI-11
-operators can layer on top of the base image with `--network
-host` themselves.
+All three map cleanly to Docker port forwarding. VXI-11 was
+deferred in v1 on the assumption that its portmapper hands out
+dynamic ports; the gateway never worked that way — it multiplexes
+portmap, Core, and abort RPCs on its single TCP port and answers
+GETPORT with that same port (issue #14, resolution (b)). Binding
+the gateway to 111 inside the container makes the answered port
+identical on both sides of the mapping, so
+`-p 111:111 -p 111:111/udp` is the whole setup. The UDP mapping
+serves clients that resolve the Core port over UDP — the only
+transport some embedded portmappers answer, and the one ivicli's
+client and broadcast scanner use.
+
+One limit stays: subnet-broadcast discovery (`visa scan`) cannot
+reach a bridge-networked container, because broadcasts are not
+DNATed. Operators who want the mock discoverable by broadcast run
+it with `--network host` (Linux); everything else works
+port-mapped.
 
 ### 4. Image construction
 
@@ -265,9 +277,10 @@ need the bypass).
 
 ## Out of scope (v1)
 
-- **VXI-11 in container** — RPC dynamic ports break Docker port
-  mapping; needs `--network host`. Operators who need it can
-  layer the base image themselves.
+- ~~**VXI-11 in container**~~ — shipped (§3): the gateway's
+  single-port portmap+Core design maps with `-p 111:111
+  -p 111:111/udp`; only broadcast discovery still needs
+  `--network host`.
 - **NativeAOT image** — ivi-cli's dependency stack (Serilog,
   OpenTelemetry, ASP.NET Core, Tomlyn, plugin reflection)
   requires AOT-compat audit. Future batch.

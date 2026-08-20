@@ -41,7 +41,12 @@ Core program to the gateway's TCP port without a system rpcbind. The
 portmapper and Core channel share one process and one bind address —
 the portmapper listens on the same port the user configures for the
 server, advertises that same port for the Core program, and dispatches
-RPC calls to the Core handler when the program number matches.
+RPC calls to the Core handler when the program number matches. A
+best-effort **UDP responder** (issue #14) additionally answers GETPORT
+datagrams on UDP 111 — the transport the broadcast scanner probes and
+unicast portmap clients (ivicli's own backend included) use. When the
+bind fails (elevation on Unix, a resident rpcbind) the gateway logs it
+and runs on; the TCP portmap path is unaffected.
 
 ### 2. Out of scope (deferred)
 
@@ -54,8 +59,9 @@ RPC calls to the Core handler when the program number matches.
   / `device_readstb` / `device_docmd` (procedures 13, 18-20, 22).
   `device_trigger` (proc 17) shipped in
   [ADR 0041](0041-trigger-and-srq-ports.md).
-- Vendor extensions, TLS, UDP transport, broadcast portmapper queries
-  on UDP 111.
+- Vendor extensions, TLS, UDP transport for the Core channel.
+  ~~Broadcast portmapper queries on UDP 111~~ — shipped (issue #14):
+  the gateway's UDP responder answers them (§1).
 - ~~Real **portmapper-at-111** client conversation — Batch D's client
   backend connects directly to the configured Core port instead, since
   the gateway co-locates portmapper + Core on one bind address. v2.~~
