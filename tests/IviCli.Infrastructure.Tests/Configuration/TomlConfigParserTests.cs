@@ -478,6 +478,7 @@ public class TomlConfigParserTests
             service_name = "ivi-cli-lab"
             traces_enabled = true
             metrics_enabled = false
+            hislip_propagation = true
             """;
         var cfg = TomlConfigParser.Parse(toml).ShouldBeOk();
         cfg.Telemetry.Enabled.ShouldBeTrue();
@@ -485,6 +486,7 @@ public class TomlConfigParserTests
         cfg.Telemetry.ServiceName.ShouldBe("ivi-cli-lab");
         cfg.Telemetry.TracesEnabled.ShouldBeTrue();
         cfg.Telemetry.MetricsEnabled.ShouldBeFalse();
+        cfg.Telemetry.HiSlipPropagationEnabled.ShouldBeTrue();
     }
 
     [Fact]
@@ -509,7 +511,7 @@ public class TomlConfigParserTests
     public void Serialize_RoundTrips_NonDefaultTelemetry()
     {
         var t = TelemetryConfig
-            .From(true, "http://otel:4317", "ivi-cli-lab", true, true)
+            .From(true, "http://otel:4317", "ivi-cli-lab", true, true, true)
             .ShouldBeOk();
         var original = ConfigDocument.Empty.WithTelemetry(t);
 

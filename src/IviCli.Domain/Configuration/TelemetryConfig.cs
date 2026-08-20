@@ -15,7 +15,8 @@ public sealed record TelemetryConfig
             otlpEndpoint: null,
             serviceName: "ivi-cli",
             tracesEnabled: true,
-            metricsEnabled: true
+            metricsEnabled: true,
+            hislipPropagationEnabled: false
         );
 
     /// <summary>When <see langword="false"/> the composition root skips OTel setup entirely.</summary>
@@ -33,12 +34,24 @@ public sealed record TelemetryConfig
     /// <summary>When false, the metrics pipeline is not built (traces may still flow).</summary>
     public bool MetricsEnabled { get; }
 
+    /// <summary>
+    /// When <see langword="true"/>, the HiSLIP client backend precedes each
+    /// operation with a VendorTraceContext message (vendor-specific type 128)
+    /// carrying the current W3C trace context, so an ivi-cli gateway joins
+    /// the caller's trace. Off by default: a conforming foreign server
+    /// answers an unrecognized vendor message with a non-fatal Error
+    /// (IVI-6.1 Table 16, code 3), so enable it only when the HiSLIP peer
+    /// is an ivi-cli gateway.
+    /// </summary>
+    public bool HiSlipPropagationEnabled { get; }
+
     private TelemetryConfig(
         bool enabled,
         string? otlpEndpoint,
         string serviceName,
         bool tracesEnabled,
-        bool metricsEnabled
+        bool metricsEnabled,
+        bool hislipPropagationEnabled
     )
     {
         Enabled = enabled;
@@ -46,6 +59,7 @@ public sealed record TelemetryConfig
         ServiceName = serviceName;
         TracesEnabled = tracesEnabled;
         MetricsEnabled = metricsEnabled;
+        HiSlipPropagationEnabled = hislipPropagationEnabled;
     }
 
     /// <summary>Validates and constructs a <see cref="TelemetryConfig"/>.</summary>
@@ -54,7 +68,8 @@ public sealed record TelemetryConfig
         string? otlpEndpoint,
         string serviceName,
         bool tracesEnabled,
-        bool metricsEnabled
+        bool metricsEnabled,
+        bool hislipPropagationEnabled = false
     )
     {
         if (string.IsNullOrWhiteSpace(serviceName))
@@ -84,7 +99,8 @@ public sealed record TelemetryConfig
                 NullIfEmpty(otlpEndpoint),
                 serviceName,
                 tracesEnabled,
-                metricsEnabled
+                metricsEnabled,
+                hislipPropagationEnabled
             )
         );
     }
