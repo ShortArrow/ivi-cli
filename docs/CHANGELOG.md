@@ -38,6 +38,15 @@ All notable changes to ivi-cli are documented here. Format roughly follows
   server answer an unrecognized vendor message with a non-fatal error, so
   the flag is for peers known to be ivi-cli gateways.
 
+- **The Management API picks up rotated TLS certificates without a
+  restart** (#16). The listener re-reads the files under `[api.tls]` when
+  their timestamps move (5 s poll) and serves the new certificate from the
+  next handshake; a rotation that fails to load or is already expired is
+  rejected with a warning while the old certificate stays active, and each
+  successful reload lands in the audit log as `server.lifecycle` /
+  `cert-reloaded`. Operators rotating via ACME or corporate PKI cron jobs
+  no longer schedule daemon restarts.
+
 ### Fixed
 
 - **`session.json` is locked to its owner on Windows too** (#19). ADR 0017

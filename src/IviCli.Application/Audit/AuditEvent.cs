@@ -80,7 +80,7 @@ public sealed record ApiRequest(
 /// <summary>A gateway server lifecycle transition (start / stop / crashed).</summary>
 /// <param name="Timestamp">UTC instant the transition was observed.</param>
 /// <param name="Server">Server name (matches <c>[[server]] name</c> in config.toml).</param>
-/// <param name="Action">One of <c>start</c> / <c>stop</c> / <c>crashed</c>. <c>crashed</c> ⇔ the gateway's RunAsync returned an error; cancellation maps to <c>stop</c>.</param>
+/// <param name="Action">One of <c>start</c> / <c>stop</c> / <c>crashed</c> / <c>cert-reloaded</c>. <c>crashed</c> ⇔ the gateway's RunAsync returned an error; cancellation maps to <c>stop</c>; <c>cert-reloaded</c> ⇔ the Management API swapped its TLS certificate (ADR 0039 §8).</param>
 /// <param name="Subject">Actor that started the process (e.g. <c>cli/alice</c>); null in legacy callers (ADR 0043 follow-up, Batch U).</param>
 public sealed record ServerLifecycle(
     DateTimeOffset Timestamp,

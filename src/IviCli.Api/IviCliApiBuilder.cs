@@ -33,7 +33,8 @@ public static class IviCliApiBuilder
         IServiceProvider hostingServices,
         IPAddress bind,
         int port,
-        TlsCertificateBundle? tls = null
+        TlsCertificateBundle? tls = null,
+        Func<TlsCertificateBundle>? tlsSource = null
     )
     {
         var builder = WebApplication.CreateSlimBuilder();
@@ -58,15 +59,22 @@ public static class IviCliApiBuilder
                     lo.Protocols = HttpProtocols.Http1;
                     if (tls is not null)
                     {
+                        // Read through the source per handshake so a hot
+                        // reload (RotatingTlsCertificate, ADR 0039) applies
+                        // to the next connection without a restart.
+                        var source = tlsSource ?? (() => tls);
                         lo.UseHttps(httpsOptions =>
                         {
-                            httpsOptions.ServerCertificate = tls.ServerCertificate;
-                            if (tls.ClientCaBundle is { } caBundle)
+                            httpsOptions.ServerCertificateSelector = (_, _) =>
+                                source().ServerCertificate;
+                            if (tls.ClientCaBundle is not null)
                             {
                                 httpsOptions.ClientCertificateMode =
                                     ClientCertificateMode.RequireCertificate;
                                 httpsOptions.ClientCertificateValidation = (cert, chain, _) =>
-                                    chain is not null && ValidateClientChain(cert, chain, caBundle);
+                                    chain is not null
+                                    && source().ClientCaBundle is { } caBundle
+                                    && ValidateClientChain(cert, chain, caBundle);
                             }
                         });
                     }
