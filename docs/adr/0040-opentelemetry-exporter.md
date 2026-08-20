@@ -45,6 +45,7 @@ otlp_endpoint = "http://otel-collector:4317"   # optional; falls
 service_name = "ivi-cli-lab"                    # required, default "ivi-cli"
 traces_enabled = true
 metrics_enabled = true
+hislip_propagation = false   # §7: send W3C context to ivi-cli HiSLIP gateways
 ```
 
 Validation surfaces three `TelemetryConfigError` variants:
@@ -67,9 +68,9 @@ Central registry: `IviCli.Application.Telemetry.IviCliTelemetry`.
 - `IviCli.Backend` — one Activity per backend op
   (`backend.open` / `.close` / `.write` / `.query` / `.read`),
   tagged with `ivi.device`, `scpi.text`, `outcome`.
-- `IviCli.Gateway` — one Activity per gateway server connection
-  (HiSlip / VXI-11 / Socket). v1 reserves the source; concrete
-  Activity creation lands incrementally as gateway code is touched.
+- `IviCli.Gateway` — gateway-side spans (see §6): one
+  `gateway.session` per connection / link and one `gateway.message`
+  per handled operation, on all three gateway servers.
 
 **Meter `IviCli`**:
 
@@ -124,7 +125,48 @@ know about Infrastructure (ADR 0010 §8).
 - Metrics: adds the IviCli Meter + AspNetCore instrumentation +
   OTLP exporter.
 
-### 6. Logs stay with Serilog
+### 6. Gateway spans (issue #17)
+
+Every gateway server emits on `IviCli.Gateway`:
+
+- **`gateway.session`** — one per accepted HiSLIP sync channel, per
+  VXI-11 link, and per SOCKET connection carrying at least one SCPI
+  line (a TCP probe that sends nothing emits no span). Tags:
+  `ivi.transport` (`hislip` / `vxi11` / `socket`), `ivi.server`,
+  `ivi.device`.
+- **`gateway.message`** — one per handled operation (`ivi.operation`
+  = `scpi` or `trigger`), child of its session span, tagged with the
+  same identity tags plus `outcome` (`ok` / `error`). The backend's
+  `backend.*` spans start while the message span is current, so a
+  trace shows gateway → backend → device.
+
+### 7. HiSLIP trace-context propagation (opt-in)
+
+The binary gateway protocols carry no headers, so cross-process
+traces need a carrier. HiSLIP has one designed for it: IVI-6.1
+reserves message types 128–255 for vendors, and Table 16 requires a
+peer that does not recognize a vendor message to answer with the
+**non-fatal** Error code 3 ("Unrecognized Vendor Defined Message")
+and return to normal processing — the session survives.
+
+- `HiSlipMessageType.VendorTraceContext = 128`, sync channel,
+  client → server, no response. Payload: UTF-8 W3C `traceparent`,
+  optionally `'\n'` + `tracestate`.
+- The **gateway always understands it**: the parsed context parents
+  the next `gateway.message` span (consumed once), and the session
+  span is attached as a link so the local view stays connected. An
+  unparseable payload falls back to session parenting.
+- The **client sends it only when `[telemetry] hislip_propagation =
+  true`** (default `false`) and an Activity is current. The default
+  stays off because a spec-conforming foreign server would answer
+  with error chatter on every operation, and a non-conforming one
+  might do worse; enable it when the HiSLIP peer is an ivi-cli
+  gateway.
+
+VXI-11 (fixed ONC RPC procedures) and raw SOCKET (SCPI bytes only)
+have no extension point; their gateways emit local root traces.
+
+### 8. Logs stay with Serilog
 
 ADR 0011 §1 makes Serilog the canonical logger. v1 does **not**
 emit log records via OTel. Operators who want log export can add
@@ -132,7 +174,7 @@ the Serilog OTel sink in a follow-up batch — it's an additive
 change that doesn't touch the trace / metric pipelines this ADR
 sets up.
 
-### 7. Test strategy
+### 9. Test strategy
 
 - Unit tests subscribe directly to `ActivitySource` /
   `MeterListener` via the `System.Diagnostics` APIs. The OTel
@@ -163,11 +205,10 @@ sets up.
 
 - **Serilog → OTel logs sink.** v1 keeps logs on Serilog file +
   console sinks; OTel exporter is traces + metrics only.
-- **Gateway-server Activity emission.** The `IviCli.Gateway`
-  ActivitySource is reserved; individual gateway implementations
-  (HiSlip / VXI-11 / Socket) gain Activity calls when next
-  touched. v1 ships the source + the OTel wiring; concrete spans
-  accrete.
+- ~~**Gateway-server Activity emission.**~~ Shipped (§6–§7): all
+  three gateways emit `gateway.session` / `gateway.message`, and
+  HiSLIP can join the caller's trace through the opt-in
+  VendorTraceContext message.
 - **Custom samplers.** Default OTel sampler (parent-based) is
   fine for v1. Operators tune sampling via the OTel SDK env vars
   (`OTEL_TRACES_SAMPLER`).
@@ -195,3 +236,8 @@ sets up.
 - `dotnet test --filter "Category!=Integration"` proves the
   ActivitySource + Meter emit at the expected points with the
   expected tags.
+- `GatewayActivityTests` runs each gateway against its real client
+  over loopback and asserts the session / message span shapes, the
+  propagated-parent case (message joins the caller's trace, session
+  linked), and that the client sends no VendorTraceContext by
+  default.

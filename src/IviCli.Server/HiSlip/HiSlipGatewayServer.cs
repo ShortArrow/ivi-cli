@@ -269,6 +269,13 @@ public sealed class HiSlipGatewayServer : IGatewayServer
         // session id can subscribe to ServiceRequestStream (ADR 0041).
         _sessionBindings[sessionId] = new SessionBinding(backend, device);
 
+        using var sessionActivity = GatewayTelemetry.StartSession(
+            "hislip",
+            server.Name,
+            device.Name
+        );
+        var pendingRemote = default(System.Diagnostics.ActivityContext);
+
         try
         {
             var assembled = new StringBuilder();
@@ -293,10 +300,19 @@ public sealed class HiSlipGatewayServer : IGatewayServer
                     {
                         var scpi = assembled.ToString();
                         assembled.Clear();
+                        using var message = GatewayTelemetry.StartMessage(
+                            "hislip",
+                            "scpi",
+                            server.Name,
+                            device.Name,
+                            sessionActivity,
+                            pendingRemote
+                        );
+                        pendingRemote = default;
                         // Echo the client's MessageId on the response per
                         // IVI-6.1 §10.6.2 (server-to-client Data carries the
                         // same MessageId as the client's initiating request).
-                        await DispatchScpiAsync(
+                        var ok = await DispatchScpiAsync(
                             stream,
                             backend,
                             device,
@@ -304,6 +320,7 @@ public sealed class HiSlipGatewayServer : IGatewayServer
                             header.MessageParameter,
                             ct
                         );
+                        GatewayTelemetry.Complete(message, ok);
                     }
                 }
                 else if (header.Type == HiSlipMessageType.Trigger)
@@ -313,7 +330,20 @@ public sealed class HiSlipGatewayServer : IGatewayServer
                         var drain = new byte[header.PayloadLength];
                         await ReadExactlyAsync(stream, drain, ct);
                     }
+                    using var message = GatewayTelemetry.StartMessage(
+                        "hislip",
+                        "trigger",
+                        server.Name,
+                        device.Name,
+                        sessionActivity,
+                        pendingRemote
+                    );
+                    pendingRemote = default;
                     var triggerResult = await backend.TriggerAsync(device, ct);
+                    GatewayTelemetry.Complete(
+                        message,
+                        triggerResult is Result<Unit, BackendError>.Ok
+                    );
                     if (triggerResult is Result<Unit, BackendError>.Error triggerErr)
                     {
                         _logger.LogInformation(
@@ -321,6 +351,15 @@ public sealed class HiSlipGatewayServer : IGatewayServer
                             triggerErr.Err.Message
                         );
                     }
+                }
+                else if (header.Type == HiSlipMessageType.VendorTraceContext)
+                {
+                    var payload = new byte[header.PayloadLength];
+                    if (payload.Length > 0)
+                    {
+                        await ReadExactlyAsync(stream, payload, ct);
+                    }
+                    pendingRemote = GatewayTelemetry.ParseRemoteContext(payload);
                 }
                 else if (header.Type == HiSlipMessageType.FatalError)
                 {
@@ -606,7 +645,8 @@ public sealed class HiSlipGatewayServer : IGatewayServer
         await stream.WriteAsync(resp, ct);
     }
 
-    private async Task DispatchScpiAsync(
+    /// <returns><c>true</c> when the operation completed normally.</returns>
+    private async Task<bool> DispatchScpiAsync(
         NetworkStream stream,
         IIviBackend backend,
         Domain.Devices.Device device,
@@ -641,29 +681,26 @@ public sealed class HiSlipGatewayServer : IGatewayServer
             if (queryResult is not Result<ScpiQuery, ScpiError>.Ok { Value: var q })
             {
                 await SendFatalAsync(stream, "invalid SCPI query", ct);
-                return;
+                return false;
             }
             var resp = await backend.QueryAsync(device, q, ct);
             if (resp is Result<string, BackendError>.Ok { Value: var responseText })
             {
                 await SendDataEndAsync(stream, responseText, clientMessageId, ct);
+                return true;
             }
-            else
-            {
-                await SendFatalAsync(stream, "backend query failed", ct);
-            }
+            await SendFatalAsync(stream, "backend query failed", ct);
+            return false;
         }
-        else
+
+        var cmdResult = ScpiCommand.From(normalized);
+        if (cmdResult is not Result<ScpiCommand, ScpiError>.Ok { Value: var c })
         {
-            var cmdResult = ScpiCommand.From(normalized);
-            if (cmdResult is not Result<ScpiCommand, ScpiError>.Ok { Value: var c })
-            {
-                await SendFatalAsync(stream, "invalid SCPI command", ct);
-                return;
-            }
-            _ = await backend.WriteAsync(device, c, ct);
-            // No response for a write in SCPI; HiSLIP clients don't expect one either.
+            await SendFatalAsync(stream, "invalid SCPI command", ct);
+            return false;
         }
+        // No response for a write in SCPI; HiSLIP clients don't expect one either.
+        return (await backend.WriteAsync(device, c, ct)) is Result<Unit, BackendError>.Ok;
     }
 
     private static async Task SendDataEndAsync(

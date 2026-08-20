@@ -405,7 +405,12 @@ public sealed class Vxi11GatewayServer : IGatewayServer
         }
 
         var lid = System.Threading.Interlocked.Increment(ref _linkCounter);
-        _links[lid] = new LinkState(backend, device);
+        var linkState = new LinkState(backend, device)
+        {
+            ServerName = server.Name,
+            SessionActivity = GatewayTelemetry.StartSession("vxi11", server.Name, device.Name),
+        };
+        _links[lid] = linkState;
         ownedLinks.Add(lid);
         await WriteCreateLinkReplyAsync(
             stream,
@@ -464,11 +469,20 @@ public sealed class Vxi11GatewayServer : IGatewayServer
 
         using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(ct, state.Cts.Token);
         var opCt = linkedCts.Token;
+        using var message = GatewayTelemetry.StartMessage(
+            "vxi11",
+            "scpi",
+            state.ServerName,
+            state.Device.Name,
+            state.SessionActivity,
+            remoteParent: default
+        );
         if (scpi.EndsWith('?'))
         {
             var queryResult = ScpiQuery.From(scpi);
             if (queryResult is not Result<ScpiQuery, ScpiError>.Ok { Value: var q })
             {
+                GatewayTelemetry.Complete(message, ok: false);
                 await WriteWriteReplyAsync(stream, xid, Vxi11SyntaxError, size: 0, ct);
                 return;
             }
@@ -476,10 +490,12 @@ public sealed class Vxi11GatewayServer : IGatewayServer
             if (resp is Result<string, BackendError>.Ok { Value: var responseText })
             {
                 state.PendingRead = Encoding.ASCII.GetBytes(responseText);
+                GatewayTelemetry.Complete(message, ok: true);
                 await WriteWriteReplyAsync(stream, xid, Vxi11NoError, (uint)parms.Data.Length, ct);
             }
             else
             {
+                GatewayTelemetry.Complete(message, ok: false);
                 await WriteWriteReplyAsync(stream, xid, Vxi11IoError, size: 0, ct);
             }
         }
@@ -488,10 +504,12 @@ public sealed class Vxi11GatewayServer : IGatewayServer
             var cmdResult = ScpiCommand.From(scpi);
             if (cmdResult is not Result<ScpiCommand, ScpiError>.Ok { Value: var c })
             {
+                GatewayTelemetry.Complete(message, ok: false);
                 await WriteWriteReplyAsync(stream, xid, Vxi11SyntaxError, size: 0, ct);
                 return;
             }
             var wrote = await state.Backend.WriteAsync(state.Device, c, opCt);
+            GatewayTelemetry.Complete(message, wrote is Result<Unit, BackendError>.Ok);
             if (wrote is Result<Unit, BackendError>.Ok)
             {
                 await WriteWriteReplyAsync(stream, xid, Vxi11NoError, (uint)parms.Data.Length, ct);
@@ -574,7 +592,16 @@ public sealed class Vxi11GatewayServer : IGatewayServer
         // result (typical for Socket / Replay) is mapped to Vxi11NotSupported
         // so the client gets the standard VXI-11 status code rather than a
         // soft success — operators see why the trigger didn't fire.
+        using var message = GatewayTelemetry.StartMessage(
+            "vxi11",
+            "trigger",
+            state.ServerName,
+            state.Device.Name,
+            state.SessionActivity,
+            remoteParent: default
+        );
         var triggerResult = await state.Backend.TriggerAsync(state.Device, ct);
+        GatewayTelemetry.Complete(message, triggerResult is Result<Unit, BackendError>.Ok);
         var error =
             triggerResult is Result<Unit, BackendError>.Ok ? Vxi11NoError
             : ((Result<Unit, BackendError>.Error)triggerResult).Err is BackendOperationNotSupported
@@ -888,6 +915,12 @@ public sealed class Vxi11GatewayServer : IGatewayServer
         public Device Device { get; }
         public byte[]? PendingRead { get; set; }
 
+        /// <summary>Name of the server this link was created through; tags its spans.</summary>
+        public ServerName ServerName { get; init; } = default!;
+
+        /// <summary>Per-link <c>gateway.session</c> span (ADR 0040); disposed with the link.</summary>
+        public System.Diagnostics.Activity? SessionActivity { get; init; }
+
         /// <summary>Cancellation source signalled by VXI-11 device_abort.</summary>
         public CancellationTokenSource Cts { get; }
 
@@ -937,6 +970,7 @@ public sealed class Vxi11GatewayServer : IGatewayServer
 
         public void Dispose()
         {
+            SessionActivity?.Dispose();
             StopSrqForwarder();
             Cts.Dispose();
         }

@@ -177,6 +177,11 @@ public sealed class SocketGatewayServer : IGatewayServer
                 return;
             }
 
+            // Started on the first SCPI line, not at accept: TCP probes
+            // (Docker HEALTHCHECK, port scanners) connect and send nothing,
+            // and a span per probe would be telemetry noise.
+            System.Diagnostics.Activity? sessionActivity = null;
+
             try
             {
                 while (!ct.IsCancellationRequested)
@@ -216,33 +221,53 @@ public sealed class SocketGatewayServer : IGatewayServer
                         _logger.LogWarning(ex, "scenario binding refresh failed; continuing");
                     }
 
+                    sessionActivity ??= GatewayTelemetry.StartSession(
+                        "socket",
+                        route.ServerName,
+                        device.Name
+                    );
+                    using var message = GatewayTelemetry.StartMessage(
+                        "socket",
+                        "scpi",
+                        route.ServerName,
+                        device.Name,
+                        sessionActivity,
+                        remoteParent: default
+                    );
                     if (trimmed.EndsWith('?'))
                     {
                         if (Failed(ScpiQuery.From(trimmed), out var q))
                         {
+                            GatewayTelemetry.Complete(message, ok: false);
                             continue;
                         }
                         if (Failed(await backend.QueryAsync(device, q, ct), out var responseText))
                         {
+                            GatewayTelemetry.Complete(message, ok: false);
                             break;
                         }
+                        GatewayTelemetry.Complete(message, ok: true);
                         await writer.WriteLineAsync(responseText.AsMemory(), ct);
                     }
                     else
                     {
                         if (Failed(ScpiCommand.From(trimmed), out var c))
                         {
+                            GatewayTelemetry.Complete(message, ok: false);
                             continue;
                         }
                         if (Failed(await backend.WriteAsync(device, c, ct), out _))
                         {
+                            GatewayTelemetry.Complete(message, ok: false);
                             break;
                         }
+                        GatewayTelemetry.Complete(message, ok: true);
                     }
                 }
             }
             finally
             {
+                sessionActivity?.Dispose();
                 _ = await backend.CloseAsync(device, ct);
             }
 

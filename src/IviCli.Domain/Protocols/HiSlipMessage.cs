@@ -148,4 +148,15 @@ public enum HiSlipMessageType : byte
 
     /// <summary>Trigger (IVI-6.1 §10.4 — v3). Sync-channel only. Spec value 24.</summary>
     Trigger = 24,
+
+    /// <summary>
+    /// ivi-cli's W3C trace-context carrier, in the vendor-specific range
+    /// (128–255) IVI-6.1 reserves for vendors. Payload: UTF-8
+    /// <c>traceparent</c>, optionally followed by a newline and
+    /// <c>tracestate</c>. Sync-channel, client → server, no response. A
+    /// peer that does not recognize it answers with the non-fatal Error
+    /// code 3 ("Unrecognized Vendor Defined Message", IVI-6.1 Table 16)
+    /// and continues, so sending it is safe against conforming servers.
+    /// </summary>
+    VendorTraceContext = 128,
 }

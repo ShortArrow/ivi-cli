@@ -27,6 +27,17 @@ All notable changes to ivi-cli are documented here. Format roughly follows
   wherever the mock is not attached, so CI is unaffected; the scenario and
   attach steps ship next to the tests.
 
+- **Gateway servers emit OpenTelemetry spans** (#17). Each HiSLIP /
+  VXI-11 / SOCKET connection carries a `gateway.session` span and every
+  handled operation a `gateway.message` child, with the backend's spans
+  nested inside — so a trace shows gateway → backend → device. A HiSLIP
+  client can additionally join the caller's trace across processes: with
+  `[telemetry] hislip_propagation = true` it precedes each operation with a
+  vendor-specific message (type 128) carrying the W3C trace context, which
+  the gateway consumes. Off by default — IVI-6.1 lets a conforming foreign
+  server answer an unrecognized vendor message with a non-fatal error, so
+  the flag is for peers known to be ivi-cli gateways.
+
 ### Fixed
 
 - **`session.json` is locked to its owner on Windows too** (#19). ADR 0017

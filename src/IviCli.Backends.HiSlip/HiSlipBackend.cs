@@ -26,6 +26,17 @@ public sealed class HiSlipBackend : IIviBackend
     public const int DefaultHiSlipPort = 4880;
 
     private readonly Dictionary<DeviceName, HiSlipSession> _sessions = new();
+
+    /// <summary>
+    /// When <see langword="true"/>, each Write / Query / Trigger is preceded
+    /// by a <see cref="HiSlipMessageType.VendorTraceContext"/> message
+    /// carrying the current W3C trace context, so an ivi-cli gateway joins
+    /// the caller's trace (ADR 0040). Off by default: enable only when the
+    /// peer is an ivi-cli gateway — a conforming foreign server answers the
+    /// unrecognized vendor message with a non-fatal Error (IVI-6.1 Table 16,
+    /// code 3). Wired from <c>[telemetry] hislip_propagation</c>.
+    /// </summary>
+    public bool PropagateTraceContext { get; set; }
     private readonly object _gate = new();
     private readonly int _port;
 
@@ -234,6 +245,7 @@ public sealed class HiSlipBackend : IIviBackend
         }
         try
         {
+            await SendTraceContextAsync(session, ct);
             await SendDataEndAsync(session, command.Value, ct);
         }
         catch (Exception ex) when (ex is SocketException or IOException)
@@ -262,6 +274,7 @@ public sealed class HiSlipBackend : IIviBackend
         }
         try
         {
+            await SendTraceContextAsync(session, ct);
             await SendDataEndAsync(session, query.Value, ct);
             return await ReceiveDataEndAsync(session, ct);
         }
@@ -316,6 +329,7 @@ public sealed class HiSlipBackend : IIviBackend
         );
         try
         {
+            await SendTraceContextAsync(session, ct);
             await session.Stream.WriteAsync(header, ct);
         }
         catch (Exception ex) when (ex is SocketException or IOException)
@@ -354,6 +368,38 @@ public sealed class HiSlipBackend : IIviBackend
         {
             return _sessions.TryGetValue(device.Name, out var s) ? s : null;
         }
+    }
+
+    /// <summary>
+    /// Sends the current W3C trace context as a VendorTraceContext message
+    /// when propagation is enabled and an Activity is current. No response
+    /// is expected; the ivi-cli gateway applies the context to the next
+    /// operation's span.
+    /// </summary>
+    private async Task SendTraceContextAsync(HiSlipSession session, CancellationToken ct)
+    {
+        if (
+            !PropagateTraceContext
+            || System.Diagnostics.Activity.Current
+                is not { IdFormat: System.Diagnostics.ActivityIdFormat.W3C } current
+        )
+        {
+            return;
+        }
+        var text = current.TraceStateString is { Length: > 0 } state
+            ? current.Id + "\n" + state
+            : current.Id;
+        var payload = Encoding.UTF8.GetBytes(text!);
+        var header = new byte[HiSlipMessage.HeaderSize];
+        HiSlipMessage.WriteHeader(
+            header,
+            HiSlipMessageType.VendorTraceContext,
+            controlCode: 0,
+            messageParameter: 0,
+            payloadLength: (ulong)payload.Length
+        );
+        await session.Stream.WriteAsync(header, ct);
+        await session.Stream.WriteAsync(payload, ct);
     }
 
     private static async Task SendDataEndAsync(

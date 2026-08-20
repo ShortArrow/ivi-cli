@@ -244,15 +244,26 @@ internal static class Program
                         "true",
                         StringComparison.OrdinalIgnoreCase
                     );
+                var hislipBackend = mockOnly
+                    ? null
+                    : sp.GetRequiredService<IviCli.Backends.HiSlip.HiSlipBackend>();
+                if (hislipBackend is not null)
+                {
+                    // [telemetry] hislip_propagation: precede each op with the
+                    // caller's W3C trace context so an ivi-cli gateway joins
+                    // the trace (ADR 0040). Off by default — foreign HiSLIP
+                    // servers answer the vendor message with a non-fatal Error.
+                    hislipBackend.PropagateTraceContext =
+                        bootstrapConfig.Telemetry.Enabled
+                        && bootstrapConfig.Telemetry.HiSlipPropagationEnabled;
+                }
                 IviCli.Application.Backends.IBackendFactory factory =
                     new IviCli.Infrastructure.Backends.DefaultBackendFactory(
                         fallbackBackend: fallback,
                         localBackend: mockOnly
                             ? null
                             : sp.GetRequiredService<IviCli.Backends.Local.LocalBackend>(),
-                        hislipBackend: mockOnly
-                            ? null
-                            : sp.GetRequiredService<IviCli.Backends.HiSlip.HiSlipBackend>(),
+                        hislipBackend: hislipBackend,
                         socketBackend: mockOnly
                             ? null
                             : sp.GetRequiredService<IviCli.Backends.Socket.SocketBackend>(),
