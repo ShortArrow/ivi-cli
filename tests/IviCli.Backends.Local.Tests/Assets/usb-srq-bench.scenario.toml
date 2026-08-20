@@ -1,0 +1,50 @@
+# Bench scenario for LocalBackendUsbMockBenchTests (issue #18 / ADR 0041).
+#
+# Serve it through the USB/IP device server and attach on the same host:
+#
+#   cp tests/IviCli.Backends.Local.Tests/Assets/usb-srq-bench.scenario.toml #      <config dir>/scenarios/usb-srq-bench.toml     # sibling of config.toml
+#   ivicli visa add dut 'TCPIP0::127.0.0.1::INSTR'
+#   ivicli mock scenario activate usb-srq-bench --for dut
+#   ivicli server add usb-srv --type usbip
+#   ivicli server route add usb-srv 1-1 dut
+#   ivicli server start usb-srv
+#   usbip attach -r 127.0.0.1 -b 1-1        # usbip-win2 on Windows (elevated)
+#
+# The tests then find USB0::0x1209::0x0001::dut::INSTR through the VISA
+# runtime and assert the status bytes below.
+
+idn = "IVICLI,SRQ-BENCH,0,1.0"
+initial_scene = "idle"
+
+[[scenes]]
+name = "idle"
+
+[[scenes.rules]]
+match = "*IDN?"
+respond = "IVICLI,SRQ-BENCH,0,1.0"
+
+[[scenes.rules]]
+match = "*CLS"
+ack = true
+
+[[scenes.rules]]
+match = "*ESE 1"
+ack = true
+
+[[scenes.rules]]
+match = "*SRE 32"
+ack = true
+
+# The completing operation: RQS | ESB, what a real 488.2 instrument
+# raises when *OPC finds the operation already done.
+[[scenes.rules]]
+match = "*OPC"
+ack = true
+srq = 0x60
+
+# A distinct status byte proves TriggerAsync's *TRG reached the device
+# rather than replaying the *OPC rule.
+[[scenes.rules]]
+match = "*TRG"
+ack = true
+srq = 0x41

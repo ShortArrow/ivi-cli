@@ -182,3 +182,11 @@ Decorator chain pass-through:
 - Manual: HiSLIP client (NI-VISA's `viAssertTrigger` /
   `viInstallHandler(VI_EVENT_SERVICE_REQ, ...)`) against
   `ivicli server start` lands at the Fake / Local backend.
+- Local backend, observed end-to-end (2026-08-20): the
+  `LocalBackendUsbMockBenchTests` pair (gated on
+  `[Requires("ni-visa", "usb-mock")]`) runs against the virtual USB
+  mock (ADR 0049) attached through usbip-win2 and NI-VISA. The
+  IEEE 488.2 sequence delivers the scenario rule's status byte 0x60
+  through `ServiceRequestStream`, and `TriggerAsync`'s `*TRG` raises
+  the distinct 0x41 — so the trigger leg is told apart from the
+  completing operation. Runs are recorded on issue #18.

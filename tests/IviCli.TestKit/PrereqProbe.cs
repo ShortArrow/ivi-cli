@@ -32,6 +32,14 @@ public static class PrereqProbe
     public static bool HasNiVisa => _niVisa.Value;
 
     /// <summary>
+    /// True when the virtual USB mock instrument (ADR 0049; pid.codes
+    /// VID 0x1209, PID 0x0001) is currently attached and visible to the
+    /// installed VISA runtime. Implies <see cref="HasNiVisa"/>. Probed
+    /// by reflection so the TestKit carries no VISA dependency.
+    /// </summary>
+    public static bool HasUsbMock => _usbMock.Value;
+
+    /// <summary>
     /// Returns the names of every prerequisite in <paramref name="names"/>
     /// that is currently missing. Returns an empty array when all are
     /// satisfied. The order of the returned names matches the input.
@@ -56,6 +64,7 @@ public static class PrereqProbe
             "python" => HasPython,
             "pyvisa" => HasPyVisa,
             "ni-visa" => HasNiVisa,
+            "usb-mock" => HasUsbMock,
             _ => false,
         };
 
@@ -74,6 +83,31 @@ public static class PrereqProbe
         }
         catch
         {
+            return false;
+        }
+    });
+
+    private static readonly Lazy<bool> _usbMock = new(() =>
+    {
+        if (!_niVisa.Value)
+        {
+            return false;
+        }
+        try
+        {
+            var manager = System
+                .Reflection.Assembly.Load("Ivi.Visa")
+                .GetType("Ivi.Visa.GlobalResourceManager");
+            var find = manager?.GetMethod("Find", new[] { typeof(string) });
+            var matches =
+                find?.Invoke(null, new object[] { "USB?*::0x1209::0x0001::?*::INSTR" })
+                as System.Collections.IEnumerable;
+            return matches is not null && matches.GetEnumerator().MoveNext();
+        }
+        catch
+        {
+            // No runtime, no USB support, or zero matches (VISA's Find
+            // throws on an empty result) — the mock is not attached.
             return false;
         }
     });
