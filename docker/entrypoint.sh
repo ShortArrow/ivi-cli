@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
 # Mock-VISA container entrypoint (ADR 0018 §6).
 #
-# Starts two `ivicli server start` processes — one HiSlip gateway on
-# 4880 and one SOCKET gateway on 5025, per the pre-baked config.toml.
+# Starts three `ivicli server start` processes — a HiSlip gateway on
+# 4880, a SOCKET gateway on 5025, and a VXI-11 gateway on 111 (TCP core
+# + portmap on one port, plus the UDP portmapper responder), per the
+# pre-baked config.toml.
 # A SIGTERM / SIGINT trap forwards the signal to both child PIDs so
 # `docker stop` shuts down cleanly inside the 10-second grace period.
 set -euo pipefail
@@ -24,6 +26,9 @@ ivicli server start hislip-mock &
 PIDS+=($!)
 
 ivicli server start socket-mock &
+PIDS+=($!)
+
+ivicli server start vxi11-mock &
 PIDS+=($!)
 
 # Block until any child exits (success or failure), then propagate to

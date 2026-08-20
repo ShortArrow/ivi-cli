@@ -11,7 +11,7 @@
 #   docker build -f docker/Dockerfile --build-arg RID=linux-x64 -t ivi-cli-mock:dev .
 #
 # Run:
-#   docker run --rm -p 4880:4880 -p 5025:5025 ivi-cli-mock:dev
+#   docker run --rm -p 4880:4880 -p 5025:5025 -p 111:111 -p 111:111/udp ivi-cli-mock:dev
 
 # RID selects the self-contained publish directory under
 # ./artifacts/<RID>-selfcontained/. For multi-arch buildx invocations
@@ -100,11 +100,13 @@ ENV IVICLI_CONFIG=/etc/ivi-cli/config.toml \
     IVICLI_SCENARIO_FOR=mock1 \
     PATH=/opt/ivi-cli:${PATH}
 
-# HiSlip gateway (per ADR 0018 §3) on 4880, SOCKET gateway on 5025.
-EXPOSE 4880 5025
+# HiSlip gateway (per ADR 0018 §3) on 4880, SOCKET gateway on 5025,
+# VXI-11 gateway on 111 (TCP portmap + core on one port; UDP portmap
+# answers GETPORT for unicast clients — map both: -p 111:111 -p 111:111/udp).
+EXPOSE 4880 5025 111 111/udp
 
-# Health: both gateway TCP listeners must accept a TCP probe.
+# Health: every gateway TCP listener must accept a TCP probe.
 HEALTHCHECK --interval=15s --timeout=3s --start-period=5s --retries=3 \
-    CMD nc -z 127.0.0.1 4880 && nc -z 127.0.0.1 5025 || exit 1
+    CMD nc -z 127.0.0.1 4880 && nc -z 127.0.0.1 5025 && nc -z 127.0.0.1 111 || exit 1
 
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]

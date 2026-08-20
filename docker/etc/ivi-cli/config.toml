@@ -22,9 +22,20 @@ type = "socket"
 bind = "0.0.0.0"
 port = 5025
 
+[[servers]]
+name = "vxi11-mock"
+type = "vxi11"
+bind = "0.0.0.0"
+port = 111
+
 [[routes]]
 server = "hislip-mock"
 endpoint = "hislip0"
+device = "mock1"
+
+[[routes]]
+server = "vxi11-mock"
+endpoint = "inst0"
 device = "mock1"
 
 [[routes]]

@@ -47,6 +47,16 @@ public sealed class Vxi11GatewayServer : IGatewayServer
     /// <inheritdoc/>
     public ServerType SupportedType => ServerType.Vxi11;
 
+    /// <summary>
+    /// UDP port the best-effort portmapper responder binds. 111 is where
+    /// VISA clients unicast GETPORT and where the broadcast scanner
+    /// probes; tests override it with a free port so parallel gateways
+    /// do not contend. Binding can fail (elevation on Unix, another
+    /// portmapper already resident) — the gateway logs and runs on,
+    /// because the TCP path answers GETPORT regardless.
+    /// </summary>
+    public int PortmapUdpPort { get; init; } = PortmapperPort;
+
     /// <inheritdoc/>
     public async Task<Result<Unit, GatewayServerError>> RunAsync(
         Domain.Servers.Server server,
@@ -78,6 +88,9 @@ public sealed class Vxi11GatewayServer : IGatewayServer
             server.Name.Value
         );
 
+        using var portmapCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        var portmapTask = RunUdpPortmapAsync(bindAddr, actualPort, server, portmapCts.Token);
+
         try
         {
             while (!ct.IsCancellationRequested)
@@ -97,10 +110,143 @@ public sealed class Vxi11GatewayServer : IGatewayServer
         finally
         {
             listener.Stop();
+            await portmapCts.CancelAsync();
+            await portmapTask;
         }
 
         _logger.LogInformation("VXI-11 gateway stopped (server {Name})", server.Name.Value);
         return Result.Success<Unit, GatewayServerError>(Unit.Value);
+    }
+
+    /// <summary>
+    /// Answers unicast and broadcast <c>PMAPPROC_GETPORT</c> datagrams with
+    /// the gateway's TCP port, so `visa scan`'s broadcast probe and VISA
+    /// clients that resolve the Core port over UDP (the only transport
+    /// some embedded portmappers answer on) both find this gateway.
+    /// Datagrams for other programs or procedures are dropped — replying
+    /// with errors to a subnet broadcast is noise.
+    /// </summary>
+    private async Task RunUdpPortmapAsync(
+        IPAddress bindAddr,
+        int corePort,
+        Domain.Servers.Server server,
+        CancellationToken ct
+    )
+    {
+        UdpClient udp;
+        try
+        {
+            udp = new UdpClient(new IPEndPoint(bindAddr, PortmapUdpPort));
+        }
+        catch (SocketException ex)
+        {
+            _logger.LogInformation(
+                "UDP portmapper on {Bind}:{Port} unavailable ({Reason}); broadcast discovery disabled, TCP portmap still answers (server {Name})",
+                bindAddr,
+                PortmapUdpPort,
+                ex.SocketErrorCode,
+                server.Name.Value
+            );
+            return;
+        }
+
+        using (udp)
+        {
+            _logger.LogInformation(
+                "UDP portmapper answering GETPORT on {Bind}:{Port} with core port {CorePort} (server {Name})",
+                bindAddr,
+                PortmapUdpPort,
+                corePort,
+                server.Name.Value
+            );
+            while (!ct.IsCancellationRequested)
+            {
+                System.Net.Sockets.UdpReceiveResult datagram;
+                try
+                {
+                    datagram = await udp.ReceiveAsync(ct);
+                }
+                catch (OperationCanceledException)
+                {
+                    break;
+                }
+                catch (SocketException)
+                {
+                    // A prior send to a closed peer port surfaces here on
+                    // Windows (ICMP port-unreachable); keep listening.
+                    continue;
+                }
+                if (!TryBuildGetportReply(datagram.Buffer, corePort, out var reply))
+                {
+                    continue;
+                }
+                try
+                {
+                    await udp.SendAsync(reply, datagram.RemoteEndPoint, ct);
+                }
+                catch (SocketException)
+                {
+                    // Reply target vanished; nothing to do.
+                }
+            }
+        }
+    }
+
+    /// <summary>
+    /// Parses a UDP RPC datagram (no record marking) and, when it is a
+    /// GETPORT for the VXI-11 Core program over TCP, builds the accepted
+    /// reply carrying <paramref name="corePort"/>.
+    /// </summary>
+    private static bool TryBuildGetportReply(byte[] datagram, int corePort, out byte[] reply)
+    {
+        reply = Array.Empty<byte>();
+        RpcCallHeader rpc;
+        Vxi11XdrCodec.XdrReader reader;
+        try
+        {
+            reader = new Vxi11XdrCodec.XdrReader(datagram);
+            rpc = DecodeRpcCall(ref reader);
+        }
+        catch (InvalidDataException)
+        {
+            return false; // UDP noise
+        }
+        if (
+            rpc.Program != PortmapProgram
+            || rpc.Version != PortmapVersion
+            || rpc.Procedure != PortmapGetPort
+        )
+        {
+            return false;
+        }
+        uint program;
+        uint protocol;
+        try
+        {
+            program = reader.ReadUInt32();
+            _ = reader.ReadUInt32(); // vers
+            protocol = reader.ReadUInt32();
+            _ = reader.ReadUInt32(); // port (ignored on GETPORT)
+        }
+        catch (InvalidDataException)
+        {
+            return false;
+        }
+        if (program != CoreProgram || protocol != IpProtoTcp)
+        {
+            return false;
+        }
+
+        var w = new Vxi11XdrCodec.XdrWriter();
+        w.WriteUInt32(rpc.Xid);
+        w.WriteUInt32(1); // mtype = REPLY
+        w.WriteUInt32(MsgAccepted);
+        w.WriteUInt32(0); // verf flavor (AUTH_NONE)
+        w.WriteUInt32(0); // verf length
+        w.WriteUInt32(AcceptSuccess);
+        w.WriteUInt32((uint)corePort);
+        reply = w.ToArray();
+        return true;
     }
 
     private async Task HandleConnectionAsync(
