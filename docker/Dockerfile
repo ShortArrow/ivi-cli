@@ -107,6 +107,6 @@ EXPOSE 4880 5025 111 111/udp
 
 # Health: every gateway TCP listener must accept a TCP probe.
 HEALTHCHECK --interval=15s --timeout=3s --start-period=5s --retries=3 \
-    CMD nc -z 127.0.0.1 4880 && nc -z 127.0.0.1 5025 && nc -z 127.0.0.1 111 || exit 1
+    CMD ["/bin/sh", "-c", "nc -z 127.0.0.1 4880 && nc -z 127.0.0.1 5025 && nc -z 127.0.0.1 111"]
 
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
