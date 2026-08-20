@@ -102,7 +102,28 @@ non-loopback gate is "don't expose write operations to a network
 without proving the operator wanted to." TLS encrypts but does
 not authorize; the two concerns are orthogonal.
 
-### 8. Errors
+### 8. Certificate hot-reload
+
+Long-running listeners pick up rotated certificate files without a
+restart (issue #16). `RotatingTlsCertificate` polls the file
+timestamps under `[api.tls]` every 5 seconds — polling rather than a
+`FileSystemWatcher`, because ACME clients replace files by rename,
+which watchers miss on some mounts, and a 5 s stat of up to three
+paths costs nothing. Kestrel reads the current bundle through
+`ServerCertificateSelector` on every TLS handshake, so a swap applies
+from the next connection.
+
+A rotation is rejected — the old material stays active and a warning
+is logged — when the new files fail to load or the new certificate is
+already expired. The timestamps are still recorded, so a half-written
+cert+key pair self-heals on the tick after the writer finishes.
+Chain validation is deliberately not part of the gate: internal-CA
+and self-signed deployments would never pass it. A successful reload
+appends a `server.lifecycle` audit event with action `cert-reloaded`
+(ADR 0043). The in-memory `--tls-self-signed` certificate has nothing
+on disk to watch and never rotates.
+
+### 9. Errors
 
 Validation surfaces three `TlsConfigError` variants:
 
@@ -142,9 +163,8 @@ Startup failures print one error line and exit with the
 
 ## Out of scope (v1)
 
-- **Cert hot-reload.** Kestrel does not auto-reload cert material;
-  rotating a cert requires `ivicli api stop && ivicli api start`.
-  v2 candidate (file watcher + `IConnectionListener` reconfigure).
+- ~~**Cert hot-reload.**~~ Shipped (§8): rotated cert files are
+  served from the next handshake, no restart.
 - **ACME / Let's Encrypt.** `--tls-self-signed` covers dev,
   cert files cover prod. ACME automation is one more dependency
   (Certes / `LettuceEncrypt`) and outside the v1 audience.

@@ -186,6 +186,7 @@ public static class ApiCommand
                 var logger = loggerFactory.CreateLogger("IviCli.Cli.Commands.ApiCommand");
 
                 TlsCertificateBundle? bundle = null;
+                RotatingTlsCertificate? rotation = null;
                 if (tlsCfg.Enabled)
                 {
                     var loaded = TlsCertificateLoader.Load(tlsCfg);
@@ -202,6 +203,12 @@ public static class ApiCommand
                         return ExitCodeMapper.DeviceError;
                     }
                     bundle = b;
+                    rotation = new RotatingTlsCertificate(
+                        b,
+                        tlsCfg,
+                        logger,
+                        services.GetRequiredService<IviCli.Application.Audit.IAuditLog>()
+                    );
                     if (b.SelfSigned)
                     {
                         logger.LogWarning(
@@ -223,7 +230,19 @@ public static class ApiCommand
 
                 try
                 {
-                    var app = IviCliApiBuilder.Build(services, bindAddr, port, bundle);
+                    var app = IviCliApiBuilder.Build(
+                        services,
+                        bindAddr,
+                        port,
+                        bundle,
+                        rotation is null ? null : () => rotation.Current
+                    );
+                    if (rotation is { CanRotate: true })
+                    {
+                        // Cert hot-reload (ADR 0039): rotated files are
+                        // picked up on the next handshake, no restart.
+                        _ = Task.Run(() => rotation.RunAsync(ct), ct);
+                    }
                     await ((IHost)app).RunAsync(ct);
                     return ExitCodeMapper.Success;
                 }
