@@ -71,8 +71,9 @@ VISA runtime, at the cost of still requiring one.
 
 A new backend assembly speaks USBTMC (with the USB488 subclass for
 `*STB?`-style control) directly over the OS USB stack — WinUSB on
-Windows, libusb on Linux/macOS — through a managed binding library. No
-VISA runtime is involved.
+Windows, the kernel's `usbtmc` class driver on Linux
+([ADR 0050](0050-managed-usbtmc-host-backend.md)). No VISA runtime is
+involved.
 
 - Routing follows the LAN precedent: `Usb → UsbBackend ?? LocalBackend
   ?? fallback`, so the native path wins when present and the abstraction
@@ -85,10 +86,9 @@ VISA runtime is involved.
   backend cannot claim it. The backend detects this and returns an
   actionable error naming the bound driver. Rebinding (Zadig, `udev`
   rules) is the operator's decision, documented, not automated.
-- The concrete binding library, the USBTMC framing details, and the
-  per-OS setup guidance are decided in a follow-up ADR when stage 2
-  starts; this ADR fixes only the strategy and the routing/precedence
-  contract.
+- The access layer, the USBTMC framing reuse, and the per-OS setup
+  guidance are decided in [ADR 0050](0050-managed-usbtmc-host-backend.md);
+  this ADR fixes only the strategy and the routing/precedence contract.
 
 ### 3. Out of scope
 
