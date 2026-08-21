@@ -120,7 +120,14 @@ public static class IviCliApiBuilder
         );
         app.UseApiTokenAuthentication();
         app.MapOpenApi("/openapi/v1.json");
-        app.MapGet("/healthz", () => Microsoft.AspNetCore.Http.Results.Json(new { status = "ok" }));
+        app.MapGet(
+            "/healthz",
+            () =>
+                Microsoft.AspNetCore.Http.Results.Json(
+                    new HealthzDto("ok"),
+                    ApiJsonContext.Default.HealthzDto
+                )
+        );
         app.MapDevices();
         app.MapServers();
         app.MapScenarios();

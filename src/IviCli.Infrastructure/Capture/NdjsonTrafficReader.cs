@@ -15,11 +15,6 @@ namespace IviCli.Infrastructure.Capture;
 /// </summary>
 public sealed class NdjsonTrafficReader : INdjsonTrafficReader
 {
-    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
-    {
-        Converters = { new JsonStringEnumConverter() },
-    };
-
     private readonly IFileSystem _fs;
 
     /// <summary>Creates a reader rooted on <paramref name="fs"/>.</summary>
@@ -62,7 +57,7 @@ public sealed class NdjsonTrafficReader : INdjsonTrafficReader
             TrafficEvent? ev;
             try
             {
-                ev = JsonSerializer.Deserialize<TrafficEvent>(line, JsonOptions);
+                ev = JsonSerializer.Deserialize(line, TrafficJsonContext.Default.TrafficEvent);
             }
             catch (JsonException ex)
             {

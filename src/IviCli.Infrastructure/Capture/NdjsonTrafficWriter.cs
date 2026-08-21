@@ -15,13 +15,6 @@ namespace IviCli.Infrastructure.Capture;
 /// </summary>
 public sealed class NdjsonTrafficWriter : ITrafficWriter, IDisposable
 {
-    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
-    {
-        WriteIndented = false,
-        DefaultIgnoreCondition = JsonIgnoreCondition.Never,
-        Converters = { new JsonStringEnumConverter() },
-    };
-
     private readonly IFileSystem _fs;
     private readonly string _path;
     private readonly SemaphoreSlim _gate = new(1, 1);
@@ -36,7 +29,7 @@ public sealed class NdjsonTrafficWriter : ITrafficWriter, IDisposable
     /// <inheritdoc/>
     public async Task AppendAsync(TrafficEvent ev, CancellationToken ct)
     {
-        var json = JsonSerializer.Serialize(ev, JsonOptions);
+        var json = JsonSerializer.Serialize(ev, TrafficJsonContext.Default.TrafficEvent);
         var line = json + "\n";
         var bytes = Encoding.UTF8.GetBytes(line);
 

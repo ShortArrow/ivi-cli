@@ -1,5 +1,6 @@
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace IviCli.Api.WebSockets;
 
@@ -11,8 +12,6 @@ namespace IviCli.Api.WebSockets;
 /// </summary>
 public static class VisaWebSocketCodec
 {
-    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
-
     /// <summary>
     /// Decodes a client→server frame. Returns <see langword="null"/>
     /// on malformed JSON, unknown <c>op</c>, or a missing /
@@ -76,30 +75,36 @@ public static class VisaWebSocketCodec
         var json = ev switch
         {
             VisaWebSocketEvent.Response r => JsonSerializer.Serialize(
-                new
-                {
-                    @event = "response",
-                    scpi = r.Scpi,
-                    response = r.Body,
-                    latencyMs = r.LatencyMs,
-                },
-                JsonOptions
+                new ResponseWire("response", r.Scpi, r.Body, r.LatencyMs),
+                WebSocketJsonContext.Default.ResponseWire
             ),
             VisaWebSocketEvent.Ack a => JsonSerializer.Serialize(
-                new { @event = "ack", scpi = a.Scpi },
-                JsonOptions
+                new AckWire("ack", a.Scpi),
+                WebSocketJsonContext.Default.AckWire
             ),
             VisaWebSocketEvent.Error e => JsonSerializer.Serialize(
-                new
-                {
-                    @event = "error",
-                    code = e.Code,
-                    message = e.Message,
-                },
-                JsonOptions
+                new ErrorWire("error", e.Code, e.Message),
+                WebSocketJsonContext.Default.ErrorWire
             ),
             _ => throw new ArgumentOutOfRangeException(nameof(ev)),
         };
         return Encoding.UTF8.GetBytes(json);
     }
 }
+
+// Server→client frame shapes (ADR 0035). Named records instead of the
+// earlier anonymous objects so the source-generated serializer keeps the
+// codec off the reflection path (trim/AOT, issue #15); the frames on the
+// wire are unchanged.
+internal sealed record ResponseWire(string Event, string Scpi, string Response, int LatencyMs);
+
+internal sealed record AckWire(string Event, string Scpi);
+
+internal sealed record ErrorWire(string Event, string Code, string Message);
+
+/// <summary>Source-generated serializer for the WebSocket frames (issue #15).</summary>
+[JsonSourceGenerationOptions(JsonSerializerDefaults.Web)]
+[JsonSerializable(typeof(ResponseWire))]
+[JsonSerializable(typeof(AckWire))]
+[JsonSerializable(typeof(ErrorWire))]
+internal sealed partial class WebSocketJsonContext : JsonSerializerContext;
