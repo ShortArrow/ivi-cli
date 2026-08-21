@@ -24,12 +24,6 @@ public sealed class JsonSessionStore : ISessionStore
     private readonly IFileSystem _fs;
     private readonly string _path;
 
-    private static readonly JsonSerializerOptions JsonOptions = new()
-    {
-        WriteIndented = false,
-        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
-    };
-
     /// <summary>Creates a new JsonSessionStore at the supplied file-system path.</summary>
     public JsonSessionStore(IFileSystem fs, string path)
     {
@@ -67,7 +61,7 @@ public sealed class JsonSessionStore : ISessionStore
         SessionStateDto? dto;
         try
         {
-            dto = JsonSerializer.Deserialize<SessionStateDto>(text, JsonOptions);
+            dto = JsonSerializer.Deserialize(text, SessionJsonContext.Default.SessionStateDto);
         }
         catch (JsonException ex)
         {
@@ -166,7 +160,7 @@ public sealed class JsonSessionStore : ISessionStore
                 ? null
                 : state.DeviceScenarios.ToDictionary(kv => kv.Key.Value, kv => kv.Value.Value),
         };
-        var serialized = JsonSerializer.Serialize(dto, JsonOptions);
+        var serialized = JsonSerializer.Serialize(dto, SessionJsonContext.Default.SessionStateDto);
 
         var directory = _fs.Path.GetDirectoryName(_path);
         if (!string.IsNullOrEmpty(directory) && !_fs.Directory.Exists(directory))
@@ -316,7 +310,7 @@ public sealed class JsonSessionStore : ISessionStore
         file.SetAccessControl(security);
     }
 
-    private sealed class SessionStateDto
+    internal sealed class SessionStateDto
     {
         [JsonPropertyName("current_device")]
         public string? CurrentDevice { get; set; }
@@ -331,3 +325,8 @@ public sealed class JsonSessionStore : ISessionStore
         public Dictionary<string, string>? DeviceScenarios { get; set; }
     }
 }
+
+/// <summary>Source-generated serializer for the session file (issue #15).</summary>
+[JsonSourceGenerationOptions(DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull)]
+[JsonSerializable(typeof(JsonSessionStore.SessionStateDto))]
+internal sealed partial class SessionJsonContext : JsonSerializerContext;

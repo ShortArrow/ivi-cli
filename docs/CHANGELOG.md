@@ -6,6 +6,16 @@ All notable changes to ivi-cli are documented here. Format roughly follows
 
 ## [Unreleased]
 
+### Changed
+
+- **JSON serialization is source-generated** (#15, first step toward the
+  NativeAOT image). The audit NDJSON, session file, capture NDJSON,
+  WebSocket frames, and API error/health bodies now serialize through
+  `JsonSerializerContext` types instead of reflection; the bytes on disk
+  and on the wire are unchanged, and the existing shape-pinning tests
+  prove it. Trim diagnostics drop from 25 to 9 (the Tomlyn and
+  plugin-loader buckets remain).
+
 ## [0.3.0] — 2026-08-21
 
 ### Added

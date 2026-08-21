@@ -56,7 +56,7 @@ public static class ApiMapping
 
     /// <summary>Builds a JSON error response at the supplied status code.</summary>
     public static IResult ProblemJson(int status, string code, string message) =>
-        Results.Json(Error(code, message), statusCode: status);
+        Results.Json(Error(code, message), ApiJsonContext.Default.ErrorDto, statusCode: status);
 
     private static string FormatResource(VisaResource resource) => resource.ToCanonical();
 }

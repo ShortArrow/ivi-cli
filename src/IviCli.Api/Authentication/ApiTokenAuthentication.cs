@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using IviCli.Api.Mapping;
 using IviCli.Application.Audit;
 using IviCli.Application.Auth;
 using IviCli.Domain;
@@ -38,8 +39,6 @@ public sealed class ApiAuthenticationOptions
 /// </summary>
 public static class ApiTokenAuthentication
 {
-    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
-
     /// <summary>WebSocket sub-protocol prefix carrying the API token.</summary>
     public const string WebSocketProtocolPrefix = "ivi-cli-pat.";
 
@@ -270,7 +269,10 @@ public static class ApiTokenAuthentication
     {
         context.Response.StatusCode = StatusCodes.Status401Unauthorized;
         context.Response.ContentType = "application/json";
-        var body = JsonSerializer.Serialize(new { error = new { code, message } }, JsonOptions);
+        var body = JsonSerializer.Serialize(
+            ApiMapping.Error(code, message),
+            ApiJsonContext.Default.ErrorDto
+        );
         await context.Response.WriteAsync(body);
     }
 
@@ -278,7 +280,10 @@ public static class ApiTokenAuthentication
     {
         context.Response.StatusCode = StatusCodes.Status403Forbidden;
         context.Response.ContentType = "application/json";
-        var body = JsonSerializer.Serialize(new { error = new { code, message } }, JsonOptions);
+        var body = JsonSerializer.Serialize(
+            ApiMapping.Error(code, message),
+            ApiJsonContext.Default.ErrorDto
+        );
         await context.Response.WriteAsync(body);
     }
 }

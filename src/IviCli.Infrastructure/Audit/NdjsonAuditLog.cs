@@ -1,6 +1,7 @@
 using System.IO.Abstractions;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using IviCli.Application.Audit;
 
 namespace IviCli.Infrastructure.Audit;
@@ -18,11 +19,6 @@ namespace IviCli.Infrastructure.Audit;
 /// </summary>
 public sealed class NdjsonAuditLog : IAuditLog, IDisposable
 {
-    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
-    {
-        WriteIndented = false,
-    };
-
     private readonly IFileSystem _fs;
     private readonly string _path;
     private readonly SemaphoreSlim _gate = new(1, 1);
@@ -75,64 +71,90 @@ public sealed class NdjsonAuditLog : IAuditLog, IDisposable
         ev switch
         {
             AuthSucceeded a => JsonSerializer.Serialize(
-                new
-                {
-                    kind = a.Kind,
-                    timestamp = a.Timestamp,
-                    mechanism = a.Mechanism,
-                    subject = a.Subject,
-                    transport = a.Transport,
-                },
-                JsonOptions
+                new AuthSucceededWire(a.Kind, a.Timestamp, a.Mechanism, a.Subject, a.Transport),
+                AuditJsonContext.Default.AuthSucceededWire
             ),
             AuthFailed a => JsonSerializer.Serialize(
-                new
-                {
-                    kind = a.Kind,
-                    timestamp = a.Timestamp,
-                    mechanism = a.Mechanism,
-                    reason = a.Reason,
-                    transport = a.Transport,
-                },
-                JsonOptions
+                new AuthFailedWire(a.Kind, a.Timestamp, a.Mechanism, a.Reason, a.Transport),
+                AuditJsonContext.Default.AuthFailedWire
             ),
             ConfigMutated c => JsonSerializer.Serialize(
-                new
-                {
-                    kind = c.Kind,
-                    timestamp = c.Timestamp,
-                    operation = c.Operation,
-                    target = c.Target,
-                    subject = c.Subject,
-                },
-                JsonOptions
+                new ConfigMutatedWire(c.Kind, c.Timestamp, c.Operation, c.Target, c.Subject),
+                AuditJsonContext.Default.ConfigMutatedWire
             ),
             ApiRequest r => JsonSerializer.Serialize(
-                new
-                {
-                    kind = r.Kind,
-                    timestamp = r.Timestamp,
-                    method = r.Method,
-                    path = r.Path,
-                    status = r.Status,
-                    subject = r.Subject,
-                    latency_ms = r.LatencyMs,
-                },
-                JsonOptions
+                new ApiRequestWire(
+                    r.Kind,
+                    r.Timestamp,
+                    r.Method,
+                    r.Path,
+                    r.Status,
+                    r.Subject,
+                    r.LatencyMs
+                ),
+                AuditJsonContext.Default.ApiRequestWire
             ),
             ServerLifecycle s => JsonSerializer.Serialize(
-                new
-                {
-                    kind = s.Kind,
-                    timestamp = s.Timestamp,
-                    server = s.Server,
-                    action = s.Action,
-                    subject = s.Subject,
-                },
-                JsonOptions
+                new ServerLifecycleWire(s.Kind, s.Timestamp, s.Server, s.Action, s.Subject),
+                AuditJsonContext.Default.ServerLifecycleWire
             ),
             _ => throw new InvalidOperationException(
                 $"unsupported audit event variant: {ev.GetType().Name}"
             ),
         };
 }
+
+// Flattened wire shapes for the NDJSON lines. Named records instead of the
+// earlier anonymous objects because the source-generated serializer below
+// keeps this file off the reflection path (trim/AOT, issue #15); the keys
+// on disk are unchanged.
+internal sealed record AuthSucceededWire(
+    string Kind,
+    DateTimeOffset Timestamp,
+    string Mechanism,
+    string Subject,
+    string Transport
+);
+
+internal sealed record AuthFailedWire(
+    string Kind,
+    DateTimeOffset Timestamp,
+    string Mechanism,
+    string Reason,
+    string Transport
+);
+
+internal sealed record ConfigMutatedWire(
+    string Kind,
+    DateTimeOffset Timestamp,
+    string Operation,
+    string Target,
+    string? Subject
+);
+
+internal sealed record ApiRequestWire(
+    string Kind,
+    DateTimeOffset Timestamp,
+    string Method,
+    string Path,
+    int Status,
+    string? Subject,
+    [property: JsonPropertyName("latency_ms")] int LatencyMs
+);
+
+internal sealed record ServerLifecycleWire(
+    string Kind,
+    DateTimeOffset Timestamp,
+    string Server,
+    string Action,
+    string? Subject
+);
+
+/// <summary>Source-generated serializer for the audit wire shapes (ADR 0040 / issue #15).</summary>
+[JsonSourceGenerationOptions(JsonSerializerDefaults.Web)]
+[JsonSerializable(typeof(AuthSucceededWire))]
+[JsonSerializable(typeof(AuthFailedWire))]
+[JsonSerializable(typeof(ConfigMutatedWire))]
+[JsonSerializable(typeof(ApiRequestWire))]
+[JsonSerializable(typeof(ServerLifecycleWire))]
+internal sealed partial class AuditJsonContext : JsonSerializerContext;
