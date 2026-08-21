@@ -63,7 +63,27 @@ jobs:
       - name: Smoke test (HEALTHCHECK + SCPI roundtrip)
         run: sh docker/smoke-test.sh ivi-cli-mock:pr-smoke
 
-  # Native-arm64 twin of the job above. Before this job existed, the
+  # NativeAOT flavor (issue #15). The image compiles inside its build
+  # stage, so the job needs Docker only. amd64 only: Dockerfile.aot
+  # publishes for linux-x64, and an arm64 AOT build belongs on a native
+  # arm runner if the flavor is ever published from release.yml.
+  docker-smoke-aot:
+    name: docker / mock-VISA smoke (NativeAOT)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Build NativeAOT image (publishes inside the build stage)
+        run: docker build -f docker/Dockerfile.aot --tag ivi-cli-mock:pr-smoke-aot .
+
+      - name: Smoke test (HEALTHCHECK + SCPI + VXI-11 roundtrip)
+        run: sh docker/smoke-test.sh ivi-cli-mock:pr-smoke-aot
+
+      - name: Report compressed image size
+        run: docker save ivi-cli-mock:pr-smoke-aot | gzip | wc -c
+
+  # Native-arm64 twin of the amd64 JIT job. Before this job existed, the
   # only arm64 execution of the container was the release-tag gate in
   # release.yml, so an arm64-timing bug could hide until a release run.
   docker-smoke-arm64:

@@ -275,15 +275,61 @@ need the bypass).
   work can revisit with NativeAOT once dependency-stack AOT
   warnings are audited.
 
+### NativeAOT flavor (issue #15)
+
+The audit happened (buckets on the issue: JSON and TOML moved to
+source-generated contexts, the plugin loader sits behind the
+`IviCli.Plugins.IsSupported` feature switch, and the trim/AOT
+analyzers run on every build). On top of it, `docker/Dockerfile.aot`
+builds a NativeAOT variant of this image: a multi-stage build whose
+SDK stage runs `dotnet publish -r linux-x64 -p:MockContainerAot=true`
+— the flavor property on `IviCli.Cli.csproj` that turns on
+`PublishAot`, `InvariantGlobalization`, `StripSymbols`, pins the
+plugin switch off so the trimmer deletes the loader, and demotes
+exactly four third-party ILC warning codes (`Ivi.Visa`,
+`Common.Logging`, one ASP.NET `ModelMetadata` member) while every
+other ILC finding still fails the publish. NativeAOT cannot
+cross-compile between OSes, so the publish lives inside the image
+build rather than in the host-side artifacts flow the JIT image uses.
+
+Measured on 2026-08-21 (amd64, `docker save | gzip | wc -c` for the
+compressed figures, both images built from the same commit):
+
+| | JIT image | AOT image |
+| --- | --- | --- |
+| compressed | 142.7 MB | **58.1 MB** |
+| uncompressed (`docker images`) | 493 MB | 217 MB |
+| app binary | 106.4 MB single-file bundle | 25.0 MB native |
+| in-container `ivicli --version`, 20 runs | 234 ms/run | **13.3 ms/run** |
+
+The issue's `< 30 MB compressed` target is not reachable on this
+base image: the debian rootfs plus the runtime-deps ICU/OpenSSL
+layer cost 47.1 MB compressed before any ivi-cli bytes, and the app
+itself is only 11.4 MB of the 58.1. Getting under 30 MB means a
+chiseled or alpine base, and both break the bash entrypoint and the
+`nc` healthcheck — a rewrite this ADR does not take on. Two smaller
+follow-ups are recorded here instead: `InvariantGlobalization` makes
+the 18.7 MB ICU layer dead weight (a plain `debian:bookworm-slim`
+base would drop it), and `Ivi.Visa` + `Common.Logging` survive
+trimming because `IviCli.Backends.Local` is registered in DI
+unconditionally — `IVICLI_MOCK_ONLY` stops the calls, not the
+static reachability.
+
+The flavor is CI-gated (pr-docker-smoke builds it and runs the same
+smoke as the JIT image, hadolint lints it) but not published:
+ghcr.io keeps shipping the JIT image until an arm64 AOT build
+exists (needs a native arm runner in release.yml) and the
+invariant-globalization behaviour difference has been weighed.
+
 ## Out of scope (v1)
 
 - ~~**VXI-11 in container**~~ — shipped (§3): the gateway's
   single-port portmap+Core design maps with `-p 111:111
   -p 111:111/udp`; only broadcast discovery still needs
   `--network host`.
-- **NativeAOT image** — ivi-cli's dependency stack (Serilog,
-  OpenTelemetry, ASP.NET Core, Tomlyn, plugin reflection)
-  requires AOT-compat audit. Future batch.
+- ~~**NativeAOT image**~~ — built and CI-gated (§4 NativeAOT
+  flavor); publication to ghcr.io stays open pending an arm64
+  build and the globalization decision.
 - **Docker Hub mirror** — ghcr.io only for v1. Mirror when an
   external operator reports the lack of Docker Hub presence.
 - **Windows container base** — image > 1 GB, no e2e mock value
