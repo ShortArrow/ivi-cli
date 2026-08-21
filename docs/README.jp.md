@@ -6,7 +6,7 @@
 
 `ivi-cli` は、VISA/IVI 経由で計測器を管理・診断・操作する統合 CLI です。
 
-> ステータス: **v0.3.0-beta.1 (pre-1.0.0)。** 実装済み: CLI core、HiSLIP / VXI-11 / SOCKET gateway、シナリオ駆動 mock-VISA コンテナ (ghcr.io/shortarrow/ivi-cli-mock)、mock を USB 計測器または COM ポートとして見せる USB/IP gateway、Management HTTP / WebSocket API (PAT + TLS + audit)、OpenTelemetry、LAN と USB の discovery (LXI mDNS + VXI-11 broadcast、USB はインストール済み VISA ランタイム経由、opt-in の `--port` socket sweep)。1.0.0 までは破壊的変更の可能性が残ります。[CHANGELOG.md](CHANGELOG.md) も参照。
+> ステータス: **v0.3.0 (pre-1.0.0)。** 実装済み: CLI core、HiSLIP / VXI-11 / SOCKET gateway、シナリオ駆動 mock-VISA コンテナ (ghcr.io/shortarrow/ivi-cli-mock)、mock を USB 計測器または COM ポートとして見せる USB/IP gateway、Management HTTP / WebSocket API (PAT + TLS + audit)、OpenTelemetry、LAN と USB の discovery (LXI mDNS + VXI-11 broadcast、USB はインストール済み VISA ランタイム経由、opt-in の `--port` socket sweep)。1.0.0 までは破壊的変更の可能性が残ります。[CHANGELOG.md](CHANGELOG.md) も参照。
 
 ## ハイライト
 
