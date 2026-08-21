@@ -1,0 +1,34 @@
+# Build context for docker/Dockerfile.aot. BuildKit prefers a
+# `<dockerfile>.dockerignore` over the context-root `.dockerignore`, so
+# the AOT image gets its own list without disturbing the JIT one.
+#
+# The AOT image compiles from source inside the build stage, so it needs
+# the opposite of what the JIT image needs: the sources and the MSBuild
+# scaffolding in, and the host-side ./artifacts/ publish output out.
+**/bin/
+**/obj/
+.git/
+.github/
+.vs/
+.idea/
+.vscode/
+.claude/
+artifacts/
+tests/
+docs/
+plans/
+*.user
+*.suo
+*.DotSettings
+TestResults/
+coverage/
+.dotnet/
+.husky/
+
+# Markdown is excluded wholesale by the JIT context; here two files are
+# build inputs — IviCli.Cli.csproj packs README.md and copies
+# THIRD-PARTY-NOTICES.md into the publish layout so the bundled
+# assemblies' attribution travels with the binary.
+*.md
+!README.md
+!THIRD-PARTY-NOTICES.md

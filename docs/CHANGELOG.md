@@ -6,6 +6,19 @@ All notable changes to ivi-cli are documented here. Format roughly follows
 
 ## [Unreleased]
 
+### Added
+
+- **A NativeAOT flavor of the mock-VISA container** (#15).
+  `docker build -f docker/Dockerfile.aot .` produces the same mock
+  surface (HiSLIP + SOCKET + VXI-11, same config, same smoke) at
+  58 MB compressed instead of 143 MB, with SCPI-facing startup 17×
+  faster; the publish flavor behind it is
+  `dotnet publish -p:MockContainerAot=true`. CI builds and smokes it
+  on every container-touching PR. The image is not yet published to
+  ghcr.io — that needs an arm64 build and a decision on invariant
+  globalization — and the issue's <30 MB target is documented as
+  unreachable on the debian base (47 MB of it is base layers).
+
 ### Changed
 
 - **JSON serialization is source-generated** (#15, first step toward the

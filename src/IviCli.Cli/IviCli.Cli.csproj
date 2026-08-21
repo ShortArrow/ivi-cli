@@ -56,6 +56,55 @@
     />
   </ItemGroup>
 
+  <!--
+    Mock-only container publish flavor (issue #15; the NativeAOT item ADR
+    0018 records as out of scope for the JIT image). Opt in with
+    `dotnet publish src/IviCli.Cli -c Release -r linux-x64 -p:MockContainerAot=true`.
+    The default publish path is untouched — nothing below applies unless
+    the property is set.
+
+    The container runs `ivicli server start` with IVICLI_MOCK_ONLY=1, so
+    every transport collapses to FakeBackend and the reflection-heavy
+    corners (vendor VISA discovery, plugin assembly loading) are never
+    reached. That is what makes AOT viable here and nowhere else.
+  -->
+  <PropertyGroup Condition="'$(MockContainerAot)' == 'true'">
+    <PublishAot>true</PublishAot>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <StripSymbols>true</StripSymbols>
+  </PropertyGroup>
+
+  <ItemGroup Condition="'$(MockContainerAot)' == 'true'">
+    <!--
+      The four warning codes ILC still raises all come from third-party
+      IL that this image never executes:
+
+        IL2104  Ivi.Visa, Common.Logging — per-assembly trim rollups
+        IL3000  Ivi.Visa.Internal.VisaAssemblyLocator reads
+                Assembly.Location to find vendor VISA assemblies
+        IL2026  Mvc ModelMetadata.InitializeDynamicTypeInformation
+        IL3053  Microsoft.AspNetCore.Mvc.Abstractions AOT rollup
+
+      The nowarnaserr argument below demotes exactly these and leaves
+      IlcTreatWarningsAsErrors on, so any other ILC finding still fails
+      the publish. Going through IlcArg rather than the MSBuild
+      WarningsNotAsErrors property keeps the demotion inside the ILC
+      step: WarningsNotAsErrors is also read by Roslyn, and the
+      compile-time trim/AOT analyzers must stay strict.
+    -->
+    <IlcArg Include="--nowarnaserr:&quot;IL2104%3BIL3000%3BIL2026%3BIL3053&quot;" />
+    <!--
+      Trim="true" bakes the switch into the trimmer as a constant, so the
+      guarded PluginLoader branch and the reflection it carries are
+      removed from the image rather than merely disabled at runtime.
+    -->
+    <RuntimeHostConfigurationOption
+      Include="IviCli.Plugins.IsSupported"
+      Value="false"
+      Trim="true"
+    />
+  </ItemGroup>
+
   <ItemGroup>
     <ProjectReference Include="..\IviCli.Application\IviCli.Application.csproj" />
     <ProjectReference Include="..\IviCli.Infrastructure\IviCli.Infrastructure.csproj" />

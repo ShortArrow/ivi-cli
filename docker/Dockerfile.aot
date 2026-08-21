@@ -1,0 +1,95 @@
+# syntax=docker/dockerfile:1.7
+#
+# NativeAOT mock-VISA container image for ivi-cli (issue #15; the
+# NativeAOT item ADR 0018 recorded as out of scope for the JIT image).
+#
+# Unlike docker/Dockerfile, which consumes a host-side self-contained
+# publish handed in through ./artifacts/, this one compiles inside the
+# image: NativeAOT cannot cross-compile from a Windows or macOS host to
+# linux-x64, so the linux toolchain has to be where the build happens.
+#
+# Local build:
+#   docker build -f docker/Dockerfile.aot -t ivi-cli-mock:aot .
+#
+# Run (identical surface to the JIT image):
+#   docker run --rm -p 4880:4880 -p 5025:5025 -p 111:111 -p 111:111/udp ivi-cli-mock:aot
+
+ARG SDK_TAG=10.0
+ARG RUNTIME_DEPS_TAG=9.0-bookworm-slim
+
+# ---------------------------------------------------------------------
+# Build stage — NativeAOT publish
+# ---------------------------------------------------------------------
+FROM mcr.microsoft.com/dotnet/sdk:${SDK_TAG} AS build
+
+# ILC emits object files and hands them to a native linker; on Linux the
+# SDK drives `clang`, and the runtime links against zlib. Neither ships
+# in the SDK image.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends clang zlib1g-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /src
+COPY . .
+
+# RestoreLockedMode=false applies inside the image only: the committed
+# lock files are written for the host SDK's patch band, and the SDK in
+# this image moves independently of it. Forcing locked mode here would
+# make the image build fail on lock files that are correct for CI and
+# for every developer machine.
+#
+# MockContainerAot is the publish flavor defined in IviCli.Cli.csproj —
+# PublishAot, InvariantGlobalization, StripSymbols, and the plugin
+# feature switch pinned off so the trimmer drops the reflection-based
+# loader outright.
+RUN dotnet publish src/IviCli.Cli/IviCli.Cli.csproj \
+        -c Release \
+        -r linux-x64 \
+        -p:MockContainerAot=true \
+        -p:RestoreLockedMode=false \
+        -o /app/publish
+
+# StripSymbols moves the native debug info into a sidecar `ivicli.dbg`
+# that is larger than the executable itself, and the publish layout also
+# carries the managed .pdb / XML doc files of every referenced project —
+# none of which a native binary reads. Dropping them is most of the
+# difference between this image and the JIT one.
+RUN rm -f /app/publish/*.dbg /app/publish/*.pdb /app/publish/*.xml
+
+# ---------------------------------------------------------------------
+# Final stage — same runtime surface as docker/Dockerfile
+# ---------------------------------------------------------------------
+FROM mcr.microsoft.com/dotnet/runtime-deps:${RUNTIME_DEPS_TAG}
+
+# `netcat-openbsd` provides the `nc` HEALTHCHECK probe; `bash` is the
+# entrypoint shell. `--no-install-recommends` keeps the layer minimal.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends bash netcat-openbsd \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /opt/ivi-cli
+
+COPY --from=build /app/publish/ /opt/ivi-cli/
+RUN chmod +x /opt/ivi-cli/ivicli
+
+# Pre-baked configuration + sample scenario. Operators override at
+# runtime via `-v ./my-config.toml:/etc/ivi-cli/config.toml` or
+# `-v ./my-scenarios:/etc/ivi-cli/scenarios`.
+COPY docker/etc/ivi-cli/ /etc/ivi-cli/
+COPY docker/entrypoint.sh /usr/local/bin/entrypoint.sh
+RUN chmod +x /usr/local/bin/entrypoint.sh
+
+# Container-facing env wires the CLI to the pre-baked layout, matching
+# docker/Dockerfile exactly (ADR 0018 §2, ADR 0026 §16).
+ENV IVICLI_CONFIG=/etc/ivi-cli/config.toml \
+    IVICLI_MOCK_ONLY=1 \
+    IVICLI_SCENARIO=default \
+    IVICLI_SCENARIO_FOR=mock1 \
+    PATH=/opt/ivi-cli:${PATH}
+
+EXPOSE 4880 5025 111 111/udp
+
+HEALTHCHECK --interval=15s --timeout=3s --start-period=5s --retries=3 \
+    CMD ["/bin/sh", "-c", "nc -z 127.0.0.1 4880 && nc -z 127.0.0.1 5025 && nc -z 127.0.0.1 111"]
+
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
