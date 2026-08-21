@@ -6,7 +6,7 @@
 
 `ivi-cli` is an integrated CLI for managing, diagnosing, and operating instruments addressed via VISA/IVI.
 
-> Status: **v0.3.0-beta.1 (pre-1.0.0).** Landed: CLI core, HiSLIP / VXI-11 / SOCKET gateways, scenario-driven mock-VISA container (ghcr.io/shortarrow/ivi-cli-mock), a USB/IP gateway that exports a mock as a USB instrument or a COM port, Management HTTP / WebSocket API with PAT + TLS + audit, OpenTelemetry, and LAN + USB discovery (LXI mDNS + VXI-11 broadcast, the installed VISA runtime for USB, plus opt-in `--port` socket sweep). Breaking changes are still possible. See [CHANGELOG.md](docs/CHANGELOG.md).
+> Status: **v0.3.0 (pre-1.0.0).** Landed: CLI core, HiSLIP / VXI-11 / SOCKET gateways, scenario-driven mock-VISA container (ghcr.io/shortarrow/ivi-cli-mock), a USB/IP gateway that exports a mock as a USB instrument or a COM port, Management HTTP / WebSocket API with PAT + TLS + audit, OpenTelemetry, and LAN + USB discovery (LXI mDNS + VXI-11 broadcast, the installed VISA runtime for USB, plus opt-in `--port` socket sweep). Breaking changes are still possible. See [CHANGELOG.md](docs/CHANGELOG.md).
 
 ## Highlights
 

@@ -49,7 +49,7 @@
       "ivicli.application": {
         "type": "Project",
         "dependencies": {
-          "IviCli.Domain": "[0.3.0-beta.2, )",
+          "IviCli.Domain": "[0.3.0, )",
           "Microsoft.Extensions.DependencyInjection.Abstractions": "[10.0.11, )",
           "Microsoft.Extensions.Logging.Abstractions": "[10.0.11, )",
           "TestableIO.System.IO.Abstractions": "[22.2.0, )"
@@ -61,7 +61,7 @@
       "ivicli.plugin": {
         "type": "Project",
         "dependencies": {
-          "IviCli.Application": "[0.3.0-beta.2, )"
+          "IviCli.Application": "[0.3.0, )"
         }
       }
     }

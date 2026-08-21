@@ -6,7 +6,7 @@ All notable changes to ivi-cli are documented here. Format roughly follows
 
 ## [Unreleased]
 
-## [0.3.0-beta.2] — 2026-08-20
+## [0.3.0] — 2026-08-21
 
 ### Added
 
@@ -59,50 +59,6 @@ All notable changes to ivi-cli are documented here. Format roughly follows
   discovery of a bridge-networked container is not possible (broadcasts
   are not DNATed) and still needs `--network host`.
 
-### Fixed
-
-- **`session.json` is locked to its owner on Windows too** (#19). ADR 0017
-  §4 has always required an NTFS ACL granting only the current account;
-  only the Unix half (`chmod 0600`) was implemented, and the Windows file
-  simply inherited whatever its directory granted. Measured on a
-  domain-joined workstation, that inheritance handed a workstation group
-  modify rights. The file's DACL is now protected and carries one entry:
-  full control for the account that wrote it.
-
-### Changed
-
-- **CLI errors are logged through the contract they carry** (#109). The 24
-  command sites that hand-assembled a log call from an error's severity,
-  template, arguments, and cause now call `LogIviError`, the way the SOCKET
-  gateway has since #102. Log output is unchanged; what is gone is the
-  chance of a site quietly dropping the cause or the structured arguments.
-- **`mock scene` and `mock rule` are siblings of `mock scenario`** (#22).
-  Both were two levels down, under `scenario`, which hid them from
-  `ivicli mock --help` — and the `scenario` segment bound nothing, since
-  every one of their verbs names its scenario as an argument anyway. So
-  `ivicli mock scene add my-dmm idle` and `ivicli mock rule add my-dmm --in
-  idle …` are the spellings now, and `ivicli mock --help` shows all three
-  nouns. The old `mock scenario scene …` / `mock scenario rule …` paths
-  keep working, hidden from help, and **are removed at 0.4.0**.
-- **Device names may contain hyphens** (#23). `ivicli visa add psu-mock ...`
-  works. `DeviceName` was the only name in the domain that banned them —
-  scenario, scene, server, and endpoint names all allowed them — and nothing
-  depended on the ban. A rejected name is now told why and what to type
-  instead: `invalid device name 'PSU.1': use lowercase letters, digits,
-  underscores and hyphens, starting with a letter, at most 64 characters.
-  Try 'psu_1'.`
-- **Serilog.Sinks.File 7.0.0** (#35). The major bump held back since #29;
-  it fixes a force-reopen of the log file every 30 minutes. What the sink
-  puts on disk is unchanged — one dated file per day of Compact JSON, one
-  event per line — and a test now pins that.
-
-## [0.3.0-beta.1] — 2026-08-18
-
-> Pre-release. Install with `dotnet tool install -g ivi-cli --prerelease`;
-> the container is published under its own tag only, `latest` stays on 0.2.10.
-
-### Added
-
 - **A mock instrument can be a USB device** (#118, #119, #121, #122, #124,
   #126, #128, #138). A new gateway type, `server add --type usbip`, exports
   each routed device over the USB/IP protocol; a USB/IP client on the host
@@ -150,6 +106,31 @@ All notable changes to ivi-cli are documented here. Format roughly follows
 
 ### Changed
 
+- **CLI errors are logged through the contract they carry** (#109). The 24
+  command sites that hand-assembled a log call from an error's severity,
+  template, arguments, and cause now call `LogIviError`, the way the SOCKET
+  gateway has since #102. Log output is unchanged; what is gone is the
+  chance of a site quietly dropping the cause or the structured arguments.
+- **`mock scene` and `mock rule` are siblings of `mock scenario`** (#22).
+  Both were two levels down, under `scenario`, which hid them from
+  `ivicli mock --help` — and the `scenario` segment bound nothing, since
+  every one of their verbs names its scenario as an argument anyway. So
+  `ivicli mock scene add my-dmm idle` and `ivicli mock rule add my-dmm --in
+  idle …` are the spellings now, and `ivicli mock --help` shows all three
+  nouns. The old `mock scenario scene …` / `mock scenario rule …` paths
+  keep working, hidden from help, and **are removed at 0.4.0**.
+- **Device names may contain hyphens** (#23). `ivicli visa add psu-mock ...`
+  works. `DeviceName` was the only name in the domain that banned them —
+  scenario, scene, server, and endpoint names all allowed them — and nothing
+  depended on the ban. A rejected name is now told why and what to type
+  instead: `invalid device name 'PSU.1': use lowercase letters, digits,
+  underscores and hyphens, starting with a letter, at most 64 characters.
+  Try 'psu_1'.`
+- **Serilog.Sinks.File 7.0.0** (#35). The major bump held back since #29;
+  it fixes a force-reopen of the log file every 30 minutes. What the sink
+  puts on disk is unchanged — one dated file per day of Compact JSON, one
+  event per line — and a test now pins that.
+
 - **System.CommandLine 2.0.11** (#146). The CLI moves from the 2.0
   beta to the stable release; help, completion, and exit codes are
   unchanged.
@@ -161,6 +142,14 @@ All notable changes to ivi-cli are documented here. Format roughly follows
   <busid> detached (device <name>)`.
 
 ### Fixed
+
+- **`session.json` is locked to its owner on Windows too** (#19). ADR 0017
+  §4 has always required an NTFS ACL granting only the current account;
+  only the Unix half (`chmod 0600`) was implemented, and the Windows file
+  simply inherited whatever its directory granted. Measured on a
+  domain-joined workstation, that inheritance handed a workstation group
+  modify rights. The file's DACL is now protected and carries one entry:
+  full control for the account that wrote it.
 
 - **A LAN device's port suffix survived nowhere it was written out**
   (#144). `visa add dut 'TCPIP0::…::hislip0,5000::INSTR'` was saved as
