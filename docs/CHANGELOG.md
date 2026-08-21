@@ -6,6 +6,8 @@ All notable changes to ivi-cli are documented here. Format roughly follows
 
 ## [Unreleased]
 
+## [0.3.1] — 2026-08-21
+
 ### Added
 
 - **A NativeAOT flavor of the mock-VISA container** (#15).
