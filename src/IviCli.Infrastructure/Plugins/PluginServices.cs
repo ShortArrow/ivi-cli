@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using IviCli.Application.Backends;
 using IviCli.Plugin;
 using Microsoft.Extensions.DependencyInjection;
@@ -27,7 +28,9 @@ public sealed class PluginServices : IPluginServices
     public IReadOnlyList<PluginBackendRegistration> Registrations => _registrations;
 
     /// <inheritdoc/>
-    public void AddBackend<TBackend>(VisaResourceMatcher matcher)
+    public void AddBackend<
+        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] TBackend
+    >(VisaResourceMatcher matcher)
         where TBackend : class, IIviBackend
     {
         _services.AddSingleton<TBackend>();

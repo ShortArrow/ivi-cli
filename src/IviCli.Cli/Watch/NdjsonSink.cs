@@ -10,11 +10,6 @@ namespace IviCli.Cli.Watch;
 /// </summary>
 public sealed class NdjsonSink : IWatchDevicesSink
 {
-    private static readonly JsonSerializerOptions Options = new(JsonSerializerDefaults.Web)
-    {
-        WriteIndented = false,
-    };
-
     private readonly TextWriter _writer;
 
     /// <summary>Creates a sink writing to <paramref name="writer"/> (default <see cref="Console.Out"/>).</summary>
@@ -38,18 +33,18 @@ public sealed class NdjsonSink : IWatchDevicesSink
                 s.FailureMessage
             ))
         );
-        _writer.WriteLine(JsonSerializer.Serialize(dto, Options));
+        _writer.WriteLine(JsonSerializer.Serialize(dto, CliJsonContext.Default.WatchTickDto));
         _writer.Flush();
         return Task.CompletedTask;
     }
 
-    private sealed record WatchTickDto(
+    internal sealed record WatchTickDto(
         DateTimeOffset Timestamp,
         int Sequence,
         IEnumerable<SnapshotDto> Snapshots
     );
 
-    private sealed record SnapshotDto(
+    internal sealed record SnapshotDto(
         string Device,
         string Resource,
         bool Online,

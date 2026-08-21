@@ -11,6 +11,9 @@
     <EnableDefaultContentItems>false</EnableDefaultContentItems>
     <IsPackable>false</IsPackable>
     <OutputType>Library</OutputType>
+    <!-- Intercept Map* calls at compile time so the minimal-API pipeline
+         needs no runtime delegate reflection (trim/AOT, issue #15). -->
+    <EnableRequestDelegateGenerator>true</EnableRequestDelegateGenerator>
   </PropertyGroup>
 
   <ItemGroup>

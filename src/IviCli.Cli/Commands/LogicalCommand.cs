@@ -17,11 +17,6 @@ namespace IviCli.Cli.Commands;
 /// </summary>
 public static class LogicalCommand
 {
-    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
-    {
-        WriteIndented = false,
-    };
-
     /// <summary>Builds the configured <see cref="Command"/>.</summary>
     public static Command Build(IServiceProvider services)
     {
@@ -72,13 +67,14 @@ public static class LogicalCommand
         {
             Console.WriteLine(
                 JsonSerializer.Serialize(
-                    listing.LogicalNames.Select(n => new
-                    {
-                        name = n.Name,
-                        description = n.Description,
-                        session = n.DriverSessionName,
-                    }),
-                    JsonOptions
+                    listing
+                        .LogicalNames.Select(n => new LogicalNameView(
+                            n.Name,
+                            n.Description,
+                            n.DriverSessionName
+                        ))
+                        .ToArray(),
+                    CliJsonContext.Default.LogicalNameViewArray
                 )
             );
         }

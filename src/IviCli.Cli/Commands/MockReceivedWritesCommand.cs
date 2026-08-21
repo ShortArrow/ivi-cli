@@ -161,8 +161,12 @@ public static class MockReceivedWritesCommand
 
         if (json)
         {
-            var views = selected.Select(w => new WriteView(w.Device, w.Data ?? "", w.Timestamp));
-            output.WriteLine(JsonSerializer.Serialize(views, JsonOptions));
+            var views = selected
+                .Select(w => new WriteView(w.Device, w.Data ?? "", w.Timestamp))
+                .ToArray();
+            output.WriteLine(
+                JsonSerializer.Serialize(views, CliJsonContext.Default.WriteViewArray)
+            );
         }
         else
         {
@@ -187,7 +191,5 @@ public static class MockReceivedWritesCommand
         };
     }
 
-    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
-
-    private sealed record WriteView(string Device, string Scpi, DateTimeOffset Timestamp);
+    internal sealed record WriteView(string Device, string Scpi, DateTimeOffset Timestamp);
 }

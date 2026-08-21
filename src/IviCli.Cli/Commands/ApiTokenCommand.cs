@@ -20,11 +20,6 @@ namespace IviCli.Cli.Commands;
 /// </summary>
 public static class ApiTokenCommand
 {
-    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
-    {
-        WriteIndented = false,
-    };
-
     /// <summary>Builds the configured <see cref="Command"/>.</summary>
     public static Command Build(IServiceProvider services)
     {
@@ -267,17 +262,16 @@ public static class ApiTokenCommand
     public static string RenderJson(ImmutableArray<ApiToken> tokens) =>
         JsonSerializer.Serialize(
             tokens
-                .Select(t => new
-                {
-                    id = t.Id,
-                    label = t.Label,
-                    createdAt = t.CreatedAt,
-                    lastUsedAt = t.LastUsedAt,
-                    scopes = t.Scopes.IsDefaultOrEmpty ? Array.Empty<string>() : t.Scopes.ToArray(),
-                    expiresAt = t.ExpiresAt,
-                })
+                .Select(t => new ApiTokenView(
+                    t.Id,
+                    t.Label,
+                    t.CreatedAt,
+                    t.LastUsedAt,
+                    t.Scopes.IsDefaultOrEmpty ? Array.Empty<string>() : t.Scopes.ToArray(),
+                    t.ExpiresAt
+                ))
                 .ToArray(),
-            JsonOptions
+            CliJsonContext.Default.ApiTokenViewArray
         );
 
     private static int RevokeOk(ApiToken token)

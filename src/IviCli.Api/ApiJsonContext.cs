@@ -8,12 +8,21 @@ namespace IviCli.Api;
 public sealed record HealthzDto(string Status);
 
 /// <summary>
-/// Source-generated serializer for the hand-written API responses —
-/// the error envelope and the health probe (issue #15). Endpoint DTOs
-/// bound by the minimal-API pipeline are not here; they move when the
-/// AOT publish flavor lands.
+/// Source-generated serializer for every JSON body the Management API
+/// reads or writes (issue #15). The minimal-API pipeline resolves these
+/// through <c>ConfigureHttpJsonOptions</c> in the builder, so request
+/// binding and responses stay off the reflection path.
 /// </summary>
 [JsonSourceGenerationOptions(JsonSerializerDefaults.Web)]
 [JsonSerializable(typeof(ErrorDto))]
 [JsonSerializable(typeof(HealthzDto))]
+[JsonSerializable(typeof(DeviceDto))]
+[JsonSerializable(typeof(DeviceListingDto))]
+[JsonSerializable(typeof(DeviceStatusDto))]
+[JsonSerializable(typeof(ServerDto))]
+[JsonSerializable(typeof(ServerListingDto))]
+[JsonSerializable(typeof(ScenarioListingDto))]
+[JsonSerializable(typeof(ScpiRequestDto))]
+[JsonSerializable(typeof(ScpiQueryResponseDto))]
+[JsonSerializable(typeof(ScpiAckDto))]
 internal sealed partial class ApiJsonContext : JsonSerializerContext;

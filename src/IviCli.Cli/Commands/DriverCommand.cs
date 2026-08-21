@@ -17,11 +17,6 @@ namespace IviCli.Cli.Commands;
 /// </summary>
 public static class DriverCommand
 {
-    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
-    {
-        WriteIndented = false,
-    };
-
     /// <summary>Builds the configured <see cref="Command"/>.</summary>
     public static Command Build(IServiceProvider services)
     {
@@ -72,14 +67,15 @@ public static class DriverCommand
         {
             Console.WriteLine(
                 JsonSerializer.Serialize(
-                    listing.Drivers.Select(d => new
-                    {
-                        name = d.Name,
-                        description = d.Description,
-                        modulePath = d.ModulePath,
-                        prefix = d.Prefix,
-                    }),
-                    JsonOptions
+                    listing
+                        .Drivers.Select(d => new DriverView(
+                            d.Name,
+                            d.Description,
+                            d.ModulePath,
+                            d.Prefix
+                        ))
+                        .ToArray(),
+                    CliJsonContext.Default.DriverViewArray
                 )
             );
         }
