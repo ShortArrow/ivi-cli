@@ -115,9 +115,14 @@ from the next connection.
 
 A rotation is rejected — the old material stays active and a warning
 is logged — when the new files fail to load or the new certificate is
-already expired. The timestamps are still recorded, so a half-written
-cert+key pair self-heals on the tick after the writer finishes.
-Chain validation is deliberately not part of the gate: internal-CA
+already expired. A failed load leaves the timestamps unrecorded, so
+the next tick retries until it heals: a half-written cert+key pair
+recovers once the writer finishes, and a scanner briefly holding the
+fresh file (observed on the v0.3.0 win-arm64 release runner) costs one
+tick, not the rotation. An expired certificate records the timestamps
+instead — waiting cannot un-expire it, so one warning per file change
+is enough. Chain validation is deliberately not part of the gate:
+internal-CA
 and self-signed deployments would never pass it. A successful reload
 appends a `server.lifecycle` audit event with action `cert-reloaded`
 (ADR 0043). The in-memory `--tls-self-signed` certificate has nothing

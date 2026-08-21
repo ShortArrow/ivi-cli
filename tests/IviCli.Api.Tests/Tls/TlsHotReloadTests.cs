@@ -64,7 +64,10 @@ public sealed class TlsHotReloadTests
             (await ServedThumbprintAsync(port)).ShouldBe(cert1.Thumbprint);
 
             File.WriteAllBytes(certPath, cert2.Pfx);
-            await rotation.PollOnceAsync(CancellationToken.None);
+            await PollUntilAsync(
+                rotation,
+                () => rotation.Current.ServerCertificate.Thumbprint == cert2.Thumbprint
+            );
 
             (await ServedThumbprintAsync(port)).ShouldBe(cert2.Thumbprint);
         }
@@ -146,11 +149,53 @@ public sealed class TlsHotReloadTests
             var rotation = new RotatingTlsCertificate(initial, config, NullLogger.Instance, audit);
 
             File.WriteAllBytes(certPath, cert2.Pfx);
-            await rotation.PollOnceAsync(CancellationToken.None);
+            await PollUntilAsync(rotation, () => audit.Events.Count > 0);
 
             var lifecycle = audit.Events.ShouldHaveSingleItem().ShouldBeOfType<ServerLifecycle>();
             lifecycle.Action.ShouldBe("cert-reloaded");
             lifecycle.Server.ShouldBe("ivi-management-api");
+        }
+        finally
+        {
+            File.Delete(certPath);
+        }
+    }
+
+    [Fact]
+    public async Task A_transiently_unreadable_rotation_is_retried_on_the_next_tick()
+    {
+        if (!OperatingSystem.IsWindows())
+        {
+            // FileShare.None blocks readers only on Windows; the failure
+            // this pins (a scanner holding the fresh PFX, seen on the
+            // win-arm64 release runner for v0.3.0) is Windows-shaped too.
+            return;
+        }
+        var cert1 = NewPfx();
+        var cert2 = NewPfx();
+        var certPath = WritePfx(cert1.Pfx);
+        try
+        {
+            var config = FileTlsConfig(certPath);
+            var initial = TlsCertificateLoader.Load(config).ShouldBeOk();
+            var rotation = new RotatingTlsCertificate(
+                initial,
+                config,
+                NullLogger.Instance,
+                NullAuditLog.Instance
+            );
+
+            File.WriteAllBytes(certPath, cert2.Pfx);
+            using (File.Open(certPath, FileMode.Open, FileAccess.Read, FileShare.None))
+            {
+                await rotation.PollOnceAsync(CancellationToken.None);
+                rotation.Current.ServerCertificate.Thumbprint.ShouldBe(cert1.Thumbprint);
+            }
+
+            // No further write happens — the retry must come from the
+            // rotation itself remembering that the change is still pending.
+            await rotation.PollOnceAsync(CancellationToken.None);
+            rotation.Current.ServerCertificate.Thumbprint.ShouldBe(cert2.Thumbprint);
         }
         finally
         {
@@ -181,6 +226,26 @@ public sealed class TlsHotReloadTests
         );
 
         rotation.CanRotate.ShouldBeFalse();
+    }
+
+    /// <summary>
+    /// Polls until <paramref name="done"/> holds. A single tick is not
+    /// enough on CI runners whose virus scanner briefly holds the freshly
+    /// written PFX — the rotation retries a failed load on the next tick
+    /// by design, so the test drives ticks until it heals.
+    /// </summary>
+    private static async Task PollUntilAsync(RotatingTlsCertificate rotation, Func<bool> done)
+    {
+        for (var i = 0; i < 100 && !done(); i++)
+        {
+            await rotation.PollOnceAsync(CancellationToken.None);
+            if (done())
+            {
+                return;
+            }
+            await Task.Delay(50);
+        }
+        done().ShouldBeTrue("the rotation never applied within patience");
     }
 
     private static TlsConfig FileTlsConfig(string certPath) =>

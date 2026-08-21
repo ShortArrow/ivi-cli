@@ -11,10 +11,11 @@ namespace IviCli.Api.Tls;
 /// disk when the files named by <c>[api.tls]</c> change (ADR 0039).
 /// Kestrel's <c>ServerCertificateSelector</c> reads <see cref="Current"/>
 /// per TLS handshake, so a swap applies from the next connection without
-/// restarting the listener. A rotation that fails to load or is already
-/// expired is rejected: the old material stays active, a warning is
-/// logged, and the next file change is tried again — which also makes a
-/// half-written cert+key pair self-heal once the writer finishes.
+/// restarting the listener. A rotation that fails to load is retried on
+/// every tick until it heals (a half-written cert+key pair, or a scanner
+/// briefly holding the fresh file); one that loads but is already expired
+/// is rejected once per file change. Either way the old material stays
+/// active and a warning is logged.
 /// </summary>
 public sealed class RotatingTlsCertificate
 {
@@ -95,18 +96,23 @@ public sealed class RotatingTlsCertificate
         {
             return;
         }
-        _stamps = stamps;
 
         var loaded = TlsCertificateLoader.Load(_config);
         if (loaded is not Result<TlsCertificateBundle, TlsLoadError>.Ok { Value: var bundle })
         {
+            // Stamps deliberately NOT recorded: a load failure can be
+            // transient (half-written cert+key pair, a virus scanner
+            // holding the fresh file), and recording would mean never
+            // retrying unless the file changes again — a missed rotation.
+            // The next tick retries; the warning repeats until it heals.
             _logger.LogIviError(((Result<TlsCertificateBundle, TlsLoadError>.Error)loaded).Err);
             _logger.LogWarning(
-                "TLS certificate rotation rejected; keeping the previous certificate (thumbprint {Thumbprint})",
+                "TLS certificate rotation rejected; keeping the previous certificate (thumbprint {Thumbprint}) and retrying on the next poll",
                 _current.ServerCertificate.Thumbprint
             );
             return;
         }
+        _stamps = stamps;
 
         var now = _time.GetUtcNow();
         if (bundle.ServerCertificate.NotAfter.ToUniversalTime() <= now.UtcDateTime)
