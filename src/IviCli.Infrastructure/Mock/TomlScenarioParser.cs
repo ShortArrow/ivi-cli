@@ -67,7 +67,9 @@ public static class TomlScenarioParser
         TomlTable model;
         try
         {
-            model = TomlSerializer.Deserialize<TomlTable>(toml) ?? new TomlTable();
+            model =
+                TomlSerializer.Deserialize<TomlTable>(toml, TomlModelContext.Default)
+                ?? new TomlTable();
         }
         catch (TomlException ex)
         {
