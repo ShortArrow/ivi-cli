@@ -20,6 +20,22 @@
     <Using Include="IviCli.Domain.Timeout" Alias="Timeout" />
   </ItemGroup>
 
+  <!--
+    NuGet Package Explorer's health check reads the PDBs: without
+    ContinuousIntegrationBuild the compiler records the runner's absolute
+    source paths (/home/runner/work/...), the build is not reproducible
+    bit-for-bit, and the package shows "Non deterministic". The flag maps
+    every source path to /_/ via SourceLink. CI-only on purpose — locally
+    it would break stepping into sources under a debugger.
+  -->
+  <PropertyGroup Label="Reproducible CI builds" Condition="'$(GITHUB_ACTIONS)' == 'true'">
+    <ContinuousIntegrationBuild>true</ContinuousIntegrationBuild>
+  </PropertyGroup>
+
+  <PropertyGroup Label="SourceLink">
+    <EmbedUntrackedSources>true</EmbedUntrackedSources>
+  </PropertyGroup>
+
   <PropertyGroup Label="Assembly metadata">
     <Authors>ivi-cli contributors</Authors>
     <Product>IVI-CLI</Product>

@@ -19,6 +19,15 @@ All notable changes to ivi-cli are documented here. Format roughly follows
   globalization — and the issue's <30 MB target is documented as
   unreachable on the debian base (47 MB of it is base layers).
 
+### Fixed
+
+- **Release assemblies are built reproducibly** and NuGet Package
+  Explorer's health check stops reporting "Non deterministic".
+  `ContinuousIntegrationBuild` now turns on for GitHub Actions builds, so
+  the PDBs map every source path to `/_/` through SourceLink instead of
+  recording the runner's absolute paths; local builds are unchanged so
+  debugger stepping keeps working.
+
 ### Changed
 
 - **JSON serialization is source-generated** (#15, first step toward the
