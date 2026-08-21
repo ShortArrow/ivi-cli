@@ -93,14 +93,10 @@ public static class VisaMonitorCommand
 
     private static Task EmitJsonAsync(MonitorSample s)
     {
-        var payload = new
-        {
-            ts = s.Timestamp,
-            seq = s.Sequence,
-            query = s.Query,
-            response = s.Response,
-        };
-        Console.WriteLine(JsonSerializer.Serialize(payload));
+        var payload = new MonitorSampleView(s.Timestamp, s.Sequence, s.Query, s.Response);
+        Console.WriteLine(
+            JsonSerializer.Serialize(payload, CliJsonContext.Default.MonitorSampleView)
+        );
         return Task.CompletedTask;
     }
 

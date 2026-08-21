@@ -12,4 +12,26 @@
     <!-- CA1848 / CA2254 / CA1873: the IviError contract emits dynamic templates and args (ADR 0014 §9); source-gen LoggerMessage is reserved for hot paths per ADR 0011 §8. -->
     <NoWarn>$(NoWarn);CS1591;CA1716;CA1859;CA1715;CA1848;CA2254;CA1873</NoWarn>
   </PropertyGroup>
+
+  <!-- Trim / AOT analyzers run on every build so a new reflection call
+       fails CI instead of resurfacing at the next NativeAOT publish
+       (issue #15). The analyzer properties are set directly instead of
+       IsAotCompatible: that property also adds an implicit
+       Microsoft.NET.ILLink.Tasks reference whose version tracks the SDK
+       patch band, which fights the committed lock files across machines
+       (the same shape as the dependabot/CPM pinning incident), and its
+       IsTrimmable packaging metadata means nothing here (IsPackable is
+       false). Enabling the trim analyzer still injects an implicit
+       Microsoft.NET.ILLink.Tasks reference, so it is declared explicitly
+       below with a centrally pinned version — otherwise each machine's
+       SDK patch band writes a different version into the committed lock
+       files and locked restore fails everywhere else. -->
+  <PropertyGroup>
+    <EnableTrimAnalyzer>true</EnableTrimAnalyzer>
+    <EnableSingleFileAnalyzer>true</EnableSingleFileAnalyzer>
+    <EnableAotAnalyzer>true</EnableAotAnalyzer>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.ILLink.Tasks" PrivateAssets="all" />
+  </ItemGroup>
 </Project>

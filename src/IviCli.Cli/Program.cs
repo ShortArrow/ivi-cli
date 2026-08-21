@@ -117,7 +117,19 @@ internal static class Program
             // dispatches to them by VisaResource matcher.
             var pluginRegistrations =
                 new List<IviCli.Infrastructure.Plugins.PluginBackendRegistration>();
-            if (bootstrapConfig.Plugins.Enabled)
+            if (
+                bootstrapConfig.Plugins.Enabled
+                && !IviCli.Infrastructure.Plugins.PluginSupport.IsSupported
+            )
+            {
+                Log.Logger.Warning(
+                    "[plugins] enabled = true, but this build was published without plugin support (trimmed/AOT); skipping plugin discovery"
+                );
+            }
+            else if (
+                IviCli.Infrastructure.Plugins.PluginSupport.IsSupported
+                && bootstrapConfig.Plugins.Enabled
+            )
             {
                 var pluginLoader = new IviCli.Infrastructure.Plugins.PluginLoader(
                     new System.IO.Abstractions.FileSystem()

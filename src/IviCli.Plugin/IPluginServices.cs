@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using IviCli.Application.Backends;
 using IviCli.Domain.Visa;
 
@@ -20,7 +21,9 @@ public interface IPluginServices
     /// </summary>
     /// <typeparam name="TBackend">The plugin's backend concrete type.</typeparam>
     /// <param name="matcher">Predicate over the device's VISA resource.</param>
-    void AddBackend<TBackend>(VisaResourceMatcher matcher)
+    void AddBackend<
+        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] TBackend
+    >(VisaResourceMatcher matcher)
         where TBackend : class, IIviBackend;
 }
 

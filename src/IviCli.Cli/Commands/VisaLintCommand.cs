@@ -121,14 +121,13 @@ public static class VisaLintCommand
     )
     {
         var dto = findings
-            .Select(f => new
-            {
-                line = f.Line,
-                severity = f.Severity.ToString().ToLowerInvariant(),
-                message = f.Message,
-                snippet = f.Snippet,
-            })
+            .Select(f => new LintFindingView(
+                f.Line,
+                f.Severity.ToString().ToLowerInvariant(),
+                f.Message,
+                f.Snippet
+            ))
             .ToArray();
-        return JsonSerializer.Serialize(dto);
+        return JsonSerializer.Serialize(dto, CliJsonContext.Default.LintFindingViewArray);
     }
 }

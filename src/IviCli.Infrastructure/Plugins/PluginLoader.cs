@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using System.IO.Abstractions;
 using System.Reflection;
 using System.Runtime.Loader;
@@ -22,6 +23,9 @@ namespace IviCli.Infrastructure.Plugins;
 /// transitive dependency do not collide. v1 contexts are not
 /// collectible — plugin unload is a v2 follow-up.
 /// </remarks>
+[RequiresUnreferencedCode(
+    "Plugins are loaded by reflection from arbitrary assemblies; guard call sites with PluginSupport.IsSupported."
+)]
 public sealed class PluginLoader
 {
     private readonly IFileSystem _fs;

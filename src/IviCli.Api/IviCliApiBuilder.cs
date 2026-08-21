@@ -41,6 +41,11 @@ public static class IviCliApiBuilder
         // Replace the slim builder's default DI with the CLI's container so
         // every Application handler is resolvable from minimal-API handlers.
         builder.Services.AddRouting();
+        // Bind and serialize every endpoint body through the generated
+        // context so the pipeline stays off the reflection path (issue #15).
+        builder.Services.ConfigureHttpJsonOptions(options =>
+            options.SerializerOptions.TypeInfoResolverChain.Insert(0, ApiJsonContext.Default)
+        );
         builder.Services.AddOpenApi();
         // Forward singleton handler resolutions to the parent provider so the
         // CLI and the API share state (session store, scenario store, ...).

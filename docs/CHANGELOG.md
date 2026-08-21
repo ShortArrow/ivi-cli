@@ -16,7 +16,13 @@ All notable changes to ivi-cli are documented here. Format roughly follows
   prove it. TOML follows the same pattern: every Tomlyn surface maps
   `TomlTable` by hand, so one generated `TomlModelContext` covers config,
   scenarios, API tokens, and plugin manifests. Trim diagnostics drop from
-  25 to 4 (only the plugin loader remains).
+  25 to 4 (only the plugin loader remains). The loader itself is now
+  behind the `IviCli.Plugins.IsSupported` feature switch — a trimmed/AOT
+  publish pins it to false and drops the reflection loader, a JIT build
+  is unchanged — and the minimal-API endpoints compile through the
+  request-delegate generator with every body type in the JSON context.
+  Trim and AOT analyzers now run on every build, so a new reflection
+  call fails CI instead of resurfacing at the next NativeAOT publish.
 
 ## [0.3.0] — 2026-08-21
 

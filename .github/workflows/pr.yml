@@ -97,9 +97,13 @@ jobs:
           # The CLI's lock file is the closure that reaches a user's machine:
           # its packages become the assemblies published beside `ivicli` in
           # the release archives, the container image, and the tool package.
+          # Build-task packages (PrivateAssets=all) never reach the
+          # published output, so they need no attribution entry:
+          # Microsoft.NET.ILLink.Tasks backs the trim/AOT analyzers.
           jq -r '.dependencies[] | to_entries[]
                  | select(.value.type != "Project") | .key' \
-            src/IviCli.Cli/packages.lock.json | tr -d '\r' | sort -u > /tmp/shipped.txt
+            src/IviCli.Cli/packages.lock.json | tr -d '\r' \
+            | grep -vx 'Microsoft.NET.ILLink.Tasks' | sort -u > /tmp/shipped.txt
           sed -n 's/^- `\([A-Za-z0-9_.]*\)`.*/\1/p' THIRD-PARTY-NOTICES.md \
             | tr -d '\r' | sort -u > /tmp/attributed.txt
           missing="$(comm -23 /tmp/shipped.txt /tmp/attributed.txt)"
