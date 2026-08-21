@@ -7,6 +7,9 @@
 # publish handed in through ./artifacts/, this one compiles inside the
 # image: NativeAOT cannot cross-compile from a Windows or macOS host to
 # linux-x64, so the linux toolchain has to be where the build happens.
+# For the same reason each architecture is built on a runner of its own
+# arch rather than under QEMU, and the two results are stitched into one
+# index with `docker buildx imagetools create` (ADR 0018 §4).
 #
 # Local build:
 #   docker build -f docker/Dockerfile.aot -t ivi-cli-mock:aot .
@@ -32,6 +35,14 @@ RUN apt-get update \
 WORKDIR /src
 COPY . .
 
+# TARGETARCH is filled in by BuildKit from the platform being built.
+# SOURCE_REVISION carries the commit hash the caller is building: the
+# build context excludes .git, so nothing in here can derive it and the
+# informational version would otherwise drop the `+<sha>` suffix that
+# the host-side JIT publish gets from the working tree.
+ARG TARGETARCH
+ARG SOURCE_REVISION=""
+
 # RestoreLockedMode=false applies inside the image only: the committed
 # lock files are written for the host SDK's patch band, and the SDK in
 # this image moves independently of it. Forcing locked mode here would
@@ -42,11 +53,17 @@ COPY . .
 # PublishAot, InvariantGlobalization, StripSymbols, and the plugin
 # feature switch pinned off so the trimmer drops the reflection-based
 # loader outright.
-RUN dotnet publish src/IviCli.Cli/IviCli.Cli.csproj \
+RUN case "${TARGETARCH}" in \
+        amd64) rid=linux-x64 ;; \
+        arm64) rid=linux-arm64 ;; \
+        *) echo "unsupported TARGETARCH '${TARGETARCH}': this image builds linux/amd64 and linux/arm64 only" >&2; exit 1 ;; \
+    esac \
+    && dotnet publish src/IviCli.Cli/IviCli.Cli.csproj \
         -c Release \
-        -r linux-x64 \
+        -r "${rid}" \
         -p:MockContainerAot=true \
         -p:RestoreLockedMode=false \
+        ${SOURCE_REVISION:+-p:SourceRevisionId=${SOURCE_REVISION}} \
         -o /app/publish
 
 # StripSymbols moves the native debug info into a sidecar `ivicli.dbg`

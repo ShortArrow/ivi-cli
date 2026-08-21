@@ -14,10 +14,16 @@ All notable changes to ivi-cli are documented here. Format roughly follows
   58 MB compressed instead of 143 MB, with SCPI-facing startup 17×
   faster; the publish flavor behind it is
   `dotnet publish -p:MockContainerAot=true`. CI builds and smokes it
-  on every container-touching PR. The image is not yet published to
-  ghcr.io — that needs an arm64 build and a decision on invariant
-  globalization — and the issue's <30 MB target is documented as
-  unreachable on the debian base (47 MB of it is base layers).
+  on every container-touching PR. Releases publish it to ghcr.io next
+  to the JIT image under `-aot`-suffixed tags — `vX.Y.Z-aot` and
+  `sha-<sha7>-aot` on every tag, plus `vX.Y-aot` and the floating
+  `aot` on a final release — so the unsuffixed tags stay JIT and
+  nobody changes flavor by accident. ILC cannot cross-compile, so each
+  architecture is built on a runner of its own arch and the two are
+  stitched with `docker buildx imagetools create`; the arm64 half is
+  smoke-tested on arm64 hardware in the release run before anything is
+  stitched. The issue's <30 MB target is documented as unreachable on
+  the debian base (47 MB of it is base layers).
 
 ### Changed
 

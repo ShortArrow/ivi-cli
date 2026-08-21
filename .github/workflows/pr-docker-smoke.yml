@@ -64,9 +64,9 @@ jobs:
         run: sh docker/smoke-test.sh ivi-cli-mock:pr-smoke
 
   # NativeAOT flavor (issue #15). The image compiles inside its build
-  # stage, so the job needs Docker only. amd64 only: Dockerfile.aot
-  # publishes for linux-x64, and an arm64 AOT build belongs on a native
-  # arm runner if the flavor is ever published from release.yml.
+  # stage, so the job needs Docker only. amd64 only: ILC under QEMU is
+  # not viable, and the arm64 half is built and smoked on a native arm
+  # runner in release.yml before it reaches the published index.
   docker-smoke-aot:
     name: docker / mock-VISA smoke (NativeAOT)
     runs-on: ubuntu-latest
