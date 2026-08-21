@@ -13,8 +13,10 @@ All notable changes to ivi-cli are documented here. Format roughly follows
   WebSocket frames, and API error/health bodies now serialize through
   `JsonSerializerContext` types instead of reflection; the bytes on disk
   and on the wire are unchanged, and the existing shape-pinning tests
-  prove it. Trim diagnostics drop from 25 to 9 (the Tomlyn and
-  plugin-loader buckets remain).
+  prove it. TOML follows the same pattern: every Tomlyn surface maps
+  `TomlTable` by hand, so one generated `TomlModelContext` covers config,
+  scenarios, API tokens, and plugin manifests. Trim diagnostics drop from
+  25 to 4 (only the plugin loader remains).
 
 ## [0.3.0] — 2026-08-21
 
