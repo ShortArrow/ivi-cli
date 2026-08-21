@@ -282,8 +282,9 @@ source-generated contexts, the plugin loader sits behind the
 `IviCli.Plugins.IsSupported` feature switch, and the trim/AOT
 analyzers run on every build). On top of it, `docker/Dockerfile.aot`
 builds a NativeAOT variant of this image: a multi-stage build whose
-SDK stage runs `dotnet publish -r linux-x64 -p:MockContainerAot=true`
-— the flavor property on `IviCli.Cli.csproj` that turns on
+SDK stage runs `dotnet publish -p:MockContainerAot=true` for the
+RID it maps from BuildKit's `TARGETARCH` — the flavor property on
+`IviCli.Cli.csproj` that turns on
 `PublishAot`, `InvariantGlobalization`, `StripSymbols`, pins the
 plugin switch off so the trimmer deletes the loader, and demotes
 exactly four third-party ILC warning codes (`Ivi.Visa`,
@@ -315,11 +316,43 @@ trimming because `IviCli.Backends.Local` is registered in DI
 unconditionally — `IVICLI_MOCK_ONLY` stops the calls, not the
 static reachability.
 
-The flavor is CI-gated (pr-docker-smoke builds it and runs the same
-smoke as the JIT image, hadolint lints it) but not published:
-ghcr.io keeps shipping the JIT image until an arm64 AOT build
-exists (needs a native arm runner in release.yml) and the
-invariant-globalization behaviour difference has been weighed.
+The flavor is CI-gated on every container-touching PR
+(pr-docker-smoke builds it and runs the same smoke as the JIT image,
+hadolint lints it) and **published** alongside the JIT image.
+
+Tagging suffixes the JIT scheme rather than forking the package:
+`vX.Y.Z-aot` and `sha-<sha7>-aot` on every release tag, plus
+`vX.Y-aot` and the floating `aot` on a final release only — a
+pre-release moves neither floating tag, exactly as it moves neither
+`latest` nor `vX.Y`. The default (unsuffixed) tags stay JIT, so an
+operator opts into AOT explicitly and nobody's `docker pull` changes
+flavor under them.
+
+The build cannot use the JIT image's buildx-with-QEMU path: ILC
+neither cross-compiles nor runs at tolerable speed under emulation.
+So `release.yml` builds `docker/Dockerfile.aot` natively on
+`ubuntu-latest` and on `ubuntu-24.04-arm`, smoke-tests each
+single-arch image on its own architecture, pushes the two as
+`sha-<sha7>-aot-<arch>`, and stitches them with
+`docker buildx imagetools create`. imagetools writes an index over
+manifests already in the registry, so the bytes that pass the smoke
+are the bytes the index points at. The manifest job gates the GitHub
+Release, which makes a failed AOT publish a failed release rather
+than a half-shipped one.
+
+`InvariantGlobalization` is accepted for this image. The mock's
+surface is ASCII SCPI, and the codebase already compares ordinally
+and formats invariantly throughout, so there is no culture-sensitive
+behaviour for the switch to change — it removes a capability nothing
+here uses.
+
+The `runtime-deps` base is kept deliberately, and with it the
+18.7 MB ICU layer that `InvariantGlobalization` makes dead weight.
+This image is the same product as the JIT one, and an operator who
+mounts a config turning on TLS or the Management API has to find
+libssl and tzdata where the JIT image put them. Dropping to
+`debian:bookworm-slim` would trade that parity for ~19 MB and turn
+one runtime configuration into a flavor-dependent failure.
 
 ## Out of scope (v1)
 
@@ -327,9 +360,9 @@ invariant-globalization behaviour difference has been weighed.
   single-port portmap+Core design maps with `-p 111:111
   -p 111:111/udp`; only broadcast discovery still needs
   `--network host`.
-- ~~**NativeAOT image**~~ — built and CI-gated (§4 NativeAOT
-  flavor); publication to ghcr.io stays open pending an arm64
-  build and the globalization decision.
+- ~~**NativeAOT image**~~ — shipped (§4 NativeAOT flavor):
+  published to ghcr.io under `-aot`-suffixed tags, built
+  natively per architecture and stitched into one index.
 - **Docker Hub mirror** — ghcr.io only for v1. Mirror when an
   external operator reports the lack of Docker Hub presence.
 - **Windows container base** — image > 1 GB, no e2e mock value

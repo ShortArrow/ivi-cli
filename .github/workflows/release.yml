@@ -322,11 +322,151 @@ jobs:
             index:org.opencontainers.image.source=https://github.com/ShortArrow/ivi-cli
             index:org.opencontainers.image.licenses=MIT OR Apache-2.0
 
+  # NativeAOT flavor of the mock-VISA image (ADR 0018 §4). ILC cannot
+  # cross-compile and is too slow to run under QEMU, so each arch is
+  # built on a runner of its own architecture and the two single-arch
+  # tags are stitched into one index by docker-aot-manifest below.
+  # These jobs hang off `guard` rather than `publish`: the image
+  # compiles from source inside its own build stage and consumes none
+  # of the host-side artifacts.
+  docker-aot-amd64:
+    name: docker / NativeAOT image (amd64)
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    needs: guard
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Log in to ghcr.io
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Compute arch tag
+        id: tag
+        run: |
+          owner="${GITHUB_REPOSITORY_OWNER,,}"
+          sha7="$(git rev-parse --short=7 HEAD)"
+          echo "ref=ghcr.io/${owner}/ivi-cli-mock:sha-${sha7}-aot-amd64" >> "$GITHUB_OUTPUT"
+
+      # SOURCE_REVISION is handed in because the build context excludes
+      # .git — without it the in-image publish loses the commit hash
+      # that `ivicli --version` carries everywhere else.
+      - name: Build NativeAOT image (publishes inside the build stage)
+        run: |
+          docker build -f docker/Dockerfile.aot \
+            --build-arg SOURCE_REVISION=${{ github.sha }} \
+            --tag ${{ steps.tag.outputs.ref }} .
+
+      - name: Run smoke test
+        run: sh docker/smoke-test.sh ${{ steps.tag.outputs.ref }}
+
+      - name: Push arch tag
+        run: docker push ${{ steps.tag.outputs.ref }}
+
+  docker-aot-arm64:
+    name: docker / NativeAOT image (arm64)
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 40
+    needs: guard
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Log in to ghcr.io
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Compute arch tag
+        id: tag
+        run: |
+          owner="${GITHUB_REPOSITORY_OWNER,,}"
+          sha7="$(git rev-parse --short=7 HEAD)"
+          echo "ref=ghcr.io/${owner}/ivi-cli-mock:sha-${sha7}-aot-arm64" >> "$GITHUB_OUTPUT"
+
+      - name: Build NativeAOT image (publishes inside the build stage)
+        run: |
+          docker build -f docker/Dockerfile.aot \
+            --build-arg SOURCE_REVISION=${{ github.sha }} \
+            --tag ${{ steps.tag.outputs.ref }} .
+
+      # The only arm64 execution of the AOT flavor anywhere in CI: the
+      # PR job builds amd64 only, so this smoke is the gate that keeps
+      # a broken arm64 native binary out of the published index.
+      - name: Run smoke test
+        run: sh docker/smoke-test.sh ${{ steps.tag.outputs.ref }}
+
+      - name: Push arch tag
+        run: docker push ${{ steps.tag.outputs.ref }}
+
+  docker-aot-manifest:
+    name: docker / NativeAOT multi-arch manifest
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: [docker-aot-amd64, docker-aot-arm64]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Log in to ghcr.io
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Same tag scheme as the JIT image, every tag suffixed `-aot` so
+      # the two flavors share one package without ever colliding.
+      - name: Compute image tags
+        id: tags
+        run: |
+          owner="${GITHUB_REPOSITORY_OWNER,,}"
+          image="ghcr.io/${owner}/ivi-cli-mock"
+          version="${{ github.ref_name }}"
+          version_no_v="${version#v}"
+          minor="$(echo "$version_no_v" | awk -F. '{print "v"$1"."$2}')"
+          sha7="$(git rev-parse --short=7 HEAD)"
+          # A pre-release tag (v0.3.0-beta.1) publishes only its own tag
+          # and the commit tag; the floating `aot` and `vX.Y-aot` tags
+          # keep pointing at the last final release.
+          tags="${image}:${version}-aot ${image}:sha-${sha7}-aot"
+          case "$version_no_v" in
+            *-*) ;;
+            *) tags="${tags} ${image}:${minor}-aot ${image}:aot" ;;
+          esac
+          {
+            echo "image=$image"
+            echo "sha7=$sha7"
+            echo "tags=$tags"
+          } >> "$GITHUB_OUTPUT"
+
+      # imagetools reads the two arch manifests already in the registry
+      # and writes an index over them — no rebuild, so the bytes that
+      # were smoke-tested are the bytes that ship. Annotations mirror
+      # the JIT index; a Dockerfile LABEL does not reach the index.
+      - name: Create multi-arch manifest
+        run: |
+          set -euo pipefail
+          args=()
+          for tag in ${{ steps.tags.outputs.tags }}; do
+            args+=(-t "$tag")
+          done
+          docker buildx imagetools create "${args[@]}" \
+            --annotation "index:org.opencontainers.image.title=ivi-cli-mock" \
+            --annotation "index:org.opencontainers.image.description=NativeAOT build. Scenario-driven mock VISA instrument (HiSLIP on 4880 + raw SOCKET on 5025) for testing SCPI clients without hardware. Built from ivi-cli." \
+            --annotation "index:org.opencontainers.image.source=https://github.com/ShortArrow/ivi-cli" \
+            --annotation "index:org.opencontainers.image.licenses=MIT OR Apache-2.0" \
+            "${{ steps.tags.outputs.image }}:sha-${{ steps.tags.outputs.sha7 }}-aot-amd64" \
+            "${{ steps.tags.outputs.image }}:sha-${{ steps.tags.outputs.sha7 }}-aot-arm64"
+
   release:
     name: github release
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    needs: [publish, pack, docker]
+    needs: [publish, pack, docker, docker-aot-manifest]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
