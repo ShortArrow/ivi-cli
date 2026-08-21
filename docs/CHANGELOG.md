@@ -44,9 +44,10 @@ All notable changes to ivi-cli are documented here. Format roughly follows
   restart** (#16). The listener re-reads the files under `[api.tls]` when
   their timestamps move (5 s poll) and serves the new certificate from the
   next handshake; a rotation that fails to load or is already expired is
-  rejected with a warning while the old certificate stays active, and each
-  successful reload lands in the audit log as `server.lifecycle` /
-  `cert-reloaded`. Operators rotating via ACME or corporate PKI cron jobs
+  rejected with a warning while the old certificate stays active — a failed
+  load is retried on the next poll until it heals, so a half-written pair
+  or a briefly locked file cannot lose the rotation — and each successful
+  reload lands in the audit log as `server.lifecycle` / `cert-reloaded`. Operators rotating via ACME or corporate PKI cron jobs
   no longer schedule daemon restarts.
 
 - **The mock-VISA container serves VXI-11, and the gateway answers UDP
