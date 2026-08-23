@@ -3,6 +3,7 @@
 # ivi-cli
 
 [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/ShortArrow/ivi-cli)
+![NuGet Downloads](https://img.shields.io/nuget/dt/ivi-cli)
 
 `ivi-cli` is an integrated CLI for managing, diagnosing, and operating instruments addressed via VISA/IVI.
 
