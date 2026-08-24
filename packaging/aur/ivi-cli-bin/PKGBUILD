@@ -1,4 +1,4 @@
-# Maintainer: ShortArrow <bamboogeneral@gmail.com>
+# Maintainer: ShortArrow <bamboogeneral@shortarrow.jp>
 
 # Built from the published linux-x64 self-contained release asset rather than
 # from source or from the NuGet tool package. The `dotnet tool install` route
