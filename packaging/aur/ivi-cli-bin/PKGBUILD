@@ -17,13 +17,20 @@ license=('MIT' 'Apache-2.0')
 # ldd on the shipped binary resolves libc/libdl/libm/libpthread/librt from
 # glibc, libgcc_s.so.1 from libgcc and libstdc++.so.6 from libstdc++ — the two
 # split packages rather than the gcc-libs metapackage, which would drag in ten
-# more runtimes nothing here touches. ICU never appears in ldd because .NET
-# dlopen()s it, but it is mandatory: with `icu` removed the binary aborts at
-# startup with "Couldn't find a valid ICU package installed on the system".
-# OpenSSL is deliberately absent — the bundle carries dlopen candidates for
-# libssl.so.3, yet strace shows no ssl/crypto load on any command path, so it
-# is not a hard runtime requirement.
-depends=('glibc' 'libgcc' 'libstdc++' 'icu')
+# more runtimes nothing here touches.
+#
+# The rest of the list is invisible to ldd because .NET dlopen()s it, so each
+# entry was established by removing the package and running the CLI:
+#
+#   icu      — without it the binary aborts at startup with "Couldn't find a
+#              valid ICU package installed on the system".
+#   openssl  — `ivicli visa scan` and `ivicli api start --tls-self-signed`
+#              load libssl.so.3 / libcrypto.so.3; with openssl removed,
+#              `visa scan` dies on "No usable version of libssl was found".
+#
+# zlib is loaded too, but by libssl rather than by the CLI, so openssl
+# carries it and namcap reports an explicit entry as already satisfied.
+depends=('glibc' 'libgcc' 'libstdc++' 'icu' 'openssl')
 # The binary is executed during build() to emit its own completion scripts.
 makedepends=('icu')
 provides=('ivi-cli')

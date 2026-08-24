@@ -11,6 +11,7 @@ pkgbase = ivi-cli-bin
 	depends = libgcc
 	depends = libstdc++
 	depends = icu
+	depends = openssl
 	provides = ivi-cli
 	conflicts = ivi-cli
 	options = !strip
