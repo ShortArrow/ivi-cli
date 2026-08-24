@@ -9,7 +9,7 @@
 # linux-x64, so the linux toolchain has to be where the build happens.
 # For the same reason each architecture is built on a runner of its own
 # arch rather than under QEMU, and the two results are stitched into one
-# index with `docker buildx imagetools create` (ADR 0018 §4).
+# index with `docker buildx imagetools create` (ADR 0018 §11).
 #
 # Local build:
 #   docker build -f docker/Dockerfile.aot -t ivi-cli-mock:aot .

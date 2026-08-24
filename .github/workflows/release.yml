@@ -322,7 +322,7 @@ jobs:
             index:org.opencontainers.image.source=https://github.com/ShortArrow/ivi-cli
             index:org.opencontainers.image.licenses=MIT OR Apache-2.0
 
-  # NativeAOT flavor of the mock-VISA image (ADR 0018 §4). ILC cannot
+  # NativeAOT flavor of the mock-VISA image (ADR 0018 §11). ILC cannot
   # cross-compile and is too slow to run under QEMU, so each arch is
   # built on a runner of its own architecture and the two single-arch
   # tags are stitched into one index by docker-aot-manifest below.

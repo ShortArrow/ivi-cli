@@ -257,25 +257,7 @@ The container sets these envs in the Dockerfile so a bare
 contract; no CLI flag is exposed (containers set env, humans rarely
 need the bypass).
 
-## Consequences
-
-- **3rd-party VISA-app e2e tests become a `docker run` away.** A
-  single command spins up a scriptable mock instrument with no
-  hardware dependency, no .NET install, no manual config.
-- **The CLI is dog-fooded as both server and client.** The same
-  binary that runs in the container is the binary the test fleet
-  uses to probe it (`ivicli visa query`). Failures surface in
-  both personas simultaneously.
-- **Release pipeline grows by one job** (`docker`) between
-  `publish` and `release`. CI minutes per release rise by
-  ~3–5 min (multi-arch buildx + smoke). PR pipeline impact is
-  ~0 for 99 % of PRs thanks to the paths filter.
-- **Image size 334 MB** is larger than alpine + AOT theoretical
-  optimum (~50–80 MB). v1 trades size for compatibility; future
-  work can revisit with NativeAOT once dependency-stack AOT
-  warnings are audited.
-
-### NativeAOT flavor (issue #15)
+### 11. NativeAOT flavor (issue #15)
 
 The audit happened (buckets on the issue: JSON and TOML moved to
 source-generated contexts, the plugin loader sits behind the
@@ -387,13 +369,32 @@ talk to instruments.
 per-RID archives keep shipping the single-file JIT binary — the one
 that installs on a machine with no .NET on it.
 
+## Consequences
+
+- **3rd-party VISA-app e2e tests become a `docker run` away.** A
+  single command spins up a scriptable mock instrument with no
+  hardware dependency, no .NET install, no manual config.
+- **The CLI is dog-fooded as both server and client.** The same
+  binary that runs in the container is the binary the test fleet
+  uses to probe it (`ivicli visa query`). Failures surface in
+  both personas simultaneously.
+- **Release pipeline grows by one job** (`docker`) between
+  `publish` and `release`. CI minutes per release rise by
+  ~3–5 min (multi-arch buildx + smoke). PR pipeline impact is
+  ~0 for 99 % of PRs thanks to the paths filter.
+- **Image size** is larger than an alpine + AOT optimum. v1 traded
+  size for compatibility, and the audit that unblocked the trade
+  has since happened: the AOT flavor in §11 ships the same mock at
+  58.1 MB compressed against the JIT image's 142.7 MB, on the same
+  base and with the same capabilities.
+
 ## Out of scope (v1)
 
 - ~~**VXI-11 in container**~~ — shipped (§3): the gateway's
   single-port portmap+Core design maps with `-p 111:111
   -p 111:111/udp`; only broadcast discovery still needs
   `--network host`.
-- ~~**NativeAOT image**~~ — shipped (§4 NativeAOT flavor):
+- ~~**NativeAOT image**~~ — shipped (§11 NativeAOT flavor):
   published to ghcr.io under `-aot`-suffixed tags, built
   natively per architecture and stitched into one index.
 - **NativeAOT for the distributed CLI** — the Local backend needs
