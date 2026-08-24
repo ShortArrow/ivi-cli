@@ -34,14 +34,18 @@
 ## インストール
 
 ```sh
-# .NET tool（.NET 10 SDK / runtime 必須）
-dotnet tool install -g ivi-cli
-
-# self-contained single-file バイナリ（.NET インストール不要）
+# self-contained single-file バイナリ。.NET のインストールは要りません。
 # GitHub Releases から各 OS / arch のアーティファクトを取得してください。
+
+# .NET tool。必要なのは ASP.NET Core 10 ランタイムで、
+# base ランタイムだけでは起動しません（`ivicli api start` が
+# ASP.NET Core のリスナーを内包するため）。
+dotnet tool install -g ivi-cli
 ```
 
 リリースは `win-x64` / `win-arm64` / `linux-x64` / `linux-arm64` / `osx-x64` / `osx-arm64` を提供します。
+
+mise やコンテナからの導入、ランタイムを別パッケージに分けているディストリビューションで出る `No frameworks were found` の対処は[インストールガイド](guides/install.md)にまとめてあります。
 
 ## クイックスタート
 

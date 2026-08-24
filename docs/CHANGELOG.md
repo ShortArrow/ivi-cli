@@ -6,6 +6,22 @@ All notable changes to ivi-cli are documented here. Format roughly follows
 
 ## [Unreleased]
 
+### Added
+
+- **An install guide** (`docs/guides/install.md`) covering the
+  self-contained binary, the .NET tool, mise, and the container, with the
+  asset-selection options mise needs and a diagnosis path for
+  `No frameworks were found`.
+
+### Fixed
+
+- **The stated prerequisite for `dotnet tool install -g ivi-cli` was
+  wrong.** Both READMEs said "the .NET 10 SDK or runtime"; the tool needs
+  the **ASP.NET Core** 10 runtime, because the CLI's framework reference
+  reaches `Microsoft.AspNetCore.App` whether or not `api start` is used.
+  The gap only shows on distributions that package the runtimes
+  separately, where the tool installs and then refuses to run.
+
 ## [0.3.1] — 2026-08-21
 
 ### Added
