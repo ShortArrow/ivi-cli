@@ -12,7 +12,9 @@ All notable changes to ivi-cli are documented here. Format roughly follows
   wraps the self-contained binary, so it needs no .NET on the system and
   avoids the ASP.NET Core runtime requirement the `dotnet tool` route
   carries; bash and zsh completions install with it. Verified by building
-  and installing it in an Arch container with no .NET present.
+  and installing it in an Arch container with no .NET present, and each
+  `dlopen`-only dependency (`icu`, `openssl`) by removing the package and
+  watching the CLI fail.
 - **A `SHA256SUMS` asset on every release**, covering the per-RID archives
   and the nupkg, for package maintainers and for installers that verify
   what they download.

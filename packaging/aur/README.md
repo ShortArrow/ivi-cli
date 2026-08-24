@@ -37,10 +37,19 @@ means the packaging travels with the code it packages.
      namcap /home/build/*.pkg.tar.zst'
    ```
 
-   Three `namcap` warnings are expected and can be ignored: the unused
+   Five `namcap` warnings are expected and can be ignored. The unused
    `libdl` / `librt` / `libpthread` links are glibc compatibility stubs the .NET
-   host still records, and `icu` looks unneeded to `namcap` only because .NET
-   loads it through `dlopen`.
+   host still records. `icu` and `openssl` look unneeded to `namcap` because it
+   reads the ELF and .NET loads both through `dlopen`; both are in fact
+   mandatory, and the way to check that claim is to remove the package and run
+   the CLI rather than to trust either tool:
+
+   ```sh
+   pacman -Rdd icu     && ivicli --version    # Couldn't find a valid ICU package
+   pacman -Rdd openssl && ivicli visa scan    # No usable version of libssl was found
+   ```
+
+   Anything `namcap` reports beyond those five is new and worth reading.
 4. Regenerate `.SRCINFO` from the edited PKGBUILD and commit both:
 
    ```sh
