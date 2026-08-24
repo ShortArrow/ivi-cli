@@ -36,14 +36,17 @@
 ## Install
 
 ```sh
-# .NET tool (requires the .NET 10 SDK or runtime)
-dotnet tool install -g ivi-cli
-
-# Self-contained single-file binary (no .NET install required)
+# Self-contained single-file binary — no .NET install required.
 # Download the artifact for your OS / arch from the GitHub Releases page.
+
+# .NET tool — requires the ASP.NET Core 10 runtime, not just the base
+# runtime (`ivicli api start` embeds an ASP.NET Core listener).
+dotnet tool install -g ivi-cli
 ```
 
 Releases ship for `win-x64`, `win-arm64`, `linux-x64`, `linux-arm64`, `osx-x64`, and `osx-arm64`.
+
+The [install guide](docs/guides/install.md) covers mise, the container, and what to do about `No frameworks were found` on distributions that package the .NET runtimes separately.
 
 ## Quick start
 
