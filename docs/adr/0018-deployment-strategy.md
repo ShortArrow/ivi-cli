@@ -354,6 +354,39 @@ libssl and tzdata where the JIT image put them. Dropping to
 `debian:bookworm-slim` would trade that parity for ~19 MB and turn
 one runtime configuration into a flavor-dependent failure.
 
+#### What the AOT flavor deliberately does not cover
+
+AOT stops at the mock container. The CLI in the release archives
+stays a single-file self-contained JIT publish, which is a decision
+and not work left undone.
+
+The Local backend reaches an instrument through whatever VISA
+implementation the machine has installed, and VISA.NET locates that
+implementation at runtime. Our own builds name the members:
+`Ivi.Visa.Internal.VisaAssemblyLoadContext.Load` calls
+`AssemblyLoadContext.LoadFromAssemblyPath` (IL2026),
+`ResourceManagerFactory.TryCreateResourceManager` and
+`ConflictManager.GetConflictManagerApi` resolve the vendor type from
+a composed name through `Type.GetType` (IL2057), and
+`VisaAssemblyLocator.GetApplicationLocalVendorAssembliesDirectory`
+reads `Assembly.Location` (IL3000). NativeAOT has no runtime assembly
+loading, so an AOT build of the CLI has no vendor implementation to
+find and every Local-backend resource fails.
+
+The failure mode is why this is worth writing down rather than
+leaving to whoever reads the flavor property next. The publish
+succeeds: those diagnostics come from a third-party assembly, and the
+flavor demotes exactly them. Nothing breaks until a user points
+`visa scan` or a USB resource at real hardware and gets nothing back.
+Demoting the warnings is correct for an image that answers from
+`FakeBackend` on every transport (`IVICLI_MOCK_ONLY=1` collapses them
+before VISA is reached) and misleading for a CLI whose purpose is to
+talk to instruments.
+
+`PublishAot` therefore stays behind `MockContainerAot`, and the
+per-RID archives keep shipping the single-file JIT binary — the one
+that installs on a machine with no .NET on it.
+
 ## Out of scope (v1)
 
 - ~~**VXI-11 in container**~~ — shipped (§3): the gateway's
@@ -363,6 +396,10 @@ one runtime configuration into a flavor-dependent failure.
 - ~~**NativeAOT image**~~ — shipped (§4 NativeAOT flavor):
   published to ghcr.io under `-aot`-suffixed tags, built
   natively per architecture and stitched into one index.
+- **NativeAOT for the distributed CLI** — the Local backend needs
+  the runtime assembly loading NativeAOT does not have, and the
+  breakage would surface on a user's bench rather than in the build
+  (see "What the AOT flavor deliberately does not cover").
 - **Docker Hub mirror** — ghcr.io only for v1. Mirror when an
   external operator reports the lack of Docker Hub presence.
 - **Windows container base** — image > 1 GB, no e2e mock value
