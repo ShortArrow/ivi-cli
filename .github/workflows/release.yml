@@ -509,6 +509,23 @@ jobs:
           fi
           ls -la ./release-assets/
 
+      # Checksum manifest over everything the Release page carries. Package
+      # maintainers pin against it — the AUR PKGBUILD under packaging/aur/
+      # takes its sha256sums from the linux-x64 line — and installers such as
+      # mise verify their downloads with it.
+      - name: Generate SHA256SUMS
+        run: |
+          set -euo pipefail
+          cd ./release-assets
+          # Filenames only, no directory prefixes, in a locale-stable order.
+          # Written outside the directory first so the manifest cannot end up
+          # listing itself, then moved back in to ship with the assets.
+          find . -maxdepth 1 -type f -printf '%P\n' \
+            | LC_ALL=C sort \
+            | xargs -r sha256sum > ../SHA256SUMS
+          mv ../SHA256SUMS ./SHA256SUMS
+          cat SHA256SUMS
+
       - name: Create GitHub Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
