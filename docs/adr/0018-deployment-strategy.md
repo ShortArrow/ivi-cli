@@ -257,25 +257,7 @@ The container sets these envs in the Dockerfile so a bare
 contract; no CLI flag is exposed (containers set env, humans rarely
 need the bypass).
 
-## Consequences
-
-- **3rd-party VISA-app e2e tests become a `docker run` away.** A
-  single command spins up a scriptable mock instrument with no
-  hardware dependency, no .NET install, no manual config.
-- **The CLI is dog-fooded as both server and client.** The same
-  binary that runs in the container is the binary the test fleet
-  uses to probe it (`ivicli visa query`). Failures surface in
-  both personas simultaneously.
-- **Release pipeline grows by one job** (`docker`) between
-  `publish` and `release`. CI minutes per release rise by
-  ~3–5 min (multi-arch buildx + smoke). PR pipeline impact is
-  ~0 for 99 % of PRs thanks to the paths filter.
-- **Image size 334 MB** is larger than alpine + AOT theoretical
-  optimum (~50–80 MB). v1 trades size for compatibility; future
-  work can revisit with NativeAOT once dependency-stack AOT
-  warnings are audited.
-
-### NativeAOT flavor (issue #15)
+### 11. NativeAOT flavor (issue #15)
 
 The audit happened (buckets on the issue: JSON and TOML moved to
 source-generated contexts, the plugin loader sits behind the
@@ -354,15 +336,71 @@ libssl and tzdata where the JIT image put them. Dropping to
 `debian:bookworm-slim` would trade that parity for ~19 MB and turn
 one runtime configuration into a flavor-dependent failure.
 
+#### What the AOT flavor deliberately does not cover
+
+AOT stops at the mock container. The CLI in the release archives
+stays a single-file self-contained JIT publish, which is a decision
+and not work left undone.
+
+The Local backend reaches an instrument through whatever VISA
+implementation the machine has installed, and VISA.NET locates that
+implementation at runtime. Our own builds name the members:
+`Ivi.Visa.Internal.VisaAssemblyLoadContext.Load` calls
+`AssemblyLoadContext.LoadFromAssemblyPath` (IL2026),
+`ResourceManagerFactory.TryCreateResourceManager` and
+`ConflictManager.GetConflictManagerApi` resolve the vendor type from
+a composed name through `Type.GetType` (IL2057), and
+`VisaAssemblyLocator.GetApplicationLocalVendorAssembliesDirectory`
+reads `Assembly.Location` (IL3000). NativeAOT has no runtime assembly
+loading, so an AOT build of the CLI has no vendor implementation to
+find and every Local-backend resource fails.
+
+The failure mode is why this is worth writing down rather than
+leaving to whoever reads the flavor property next. The publish
+succeeds: those diagnostics come from a third-party assembly, and the
+flavor demotes exactly them. Nothing breaks until a user points
+`visa scan` or a USB resource at real hardware and gets nothing back.
+Demoting the warnings is correct for an image that answers from
+`FakeBackend` on every transport (`IVICLI_MOCK_ONLY=1` collapses them
+before VISA is reached) and misleading for a CLI whose purpose is to
+talk to instruments.
+
+`PublishAot` therefore stays behind `MockContainerAot`, and the
+per-RID archives keep shipping the single-file JIT binary — the one
+that installs on a machine with no .NET on it.
+
+## Consequences
+
+- **3rd-party VISA-app e2e tests become a `docker run` away.** A
+  single command spins up a scriptable mock instrument with no
+  hardware dependency, no .NET install, no manual config.
+- **The CLI is dog-fooded as both server and client.** The same
+  binary that runs in the container is the binary the test fleet
+  uses to probe it (`ivicli visa query`). Failures surface in
+  both personas simultaneously.
+- **Release pipeline grows by one job** (`docker`) between
+  `publish` and `release`. CI minutes per release rise by
+  ~3–5 min (multi-arch buildx + smoke). PR pipeline impact is
+  ~0 for 99 % of PRs thanks to the paths filter.
+- **Image size** is larger than an alpine + AOT optimum. v1 traded
+  size for compatibility, and the audit that unblocked the trade
+  has since happened: the AOT flavor in §11 ships the same mock at
+  58.1 MB compressed against the JIT image's 142.7 MB, on the same
+  base and with the same capabilities.
+
 ## Out of scope (v1)
 
 - ~~**VXI-11 in container**~~ — shipped (§3): the gateway's
   single-port portmap+Core design maps with `-p 111:111
   -p 111:111/udp`; only broadcast discovery still needs
   `--network host`.
-- ~~**NativeAOT image**~~ — shipped (§4 NativeAOT flavor):
+- ~~**NativeAOT image**~~ — shipped (§11 NativeAOT flavor):
   published to ghcr.io under `-aot`-suffixed tags, built
   natively per architecture and stitched into one index.
+- **NativeAOT for the distributed CLI** — the Local backend needs
+  the runtime assembly loading NativeAOT does not have, and the
+  breakage would surface on a user's bench rather than in the build
+  (see "What the AOT flavor deliberately does not cover").
 - **Docker Hub mirror** — ghcr.io only for v1. Mirror when an
   external operator reports the lack of Docker Hub presence.
 - **Windows container base** — image > 1 GB, no e2e mock value
