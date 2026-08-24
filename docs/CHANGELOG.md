@@ -8,6 +8,14 @@ All notable changes to ivi-cli are documented here. Format roughly follows
 
 ### Added
 
+- **An AUR package** (`ivi-cli-bin`, PKGBUILD under `packaging/aur/`). It
+  wraps the self-contained binary, so it needs no .NET on the system and
+  avoids the ASP.NET Core runtime requirement the `dotnet tool` route
+  carries; bash and zsh completions install with it. Verified by building
+  and installing it in an Arch container with no .NET present.
+- **A `SHA256SUMS` asset on every release**, covering the per-RID archives
+  and the nupkg, for package maintainers and for installers that verify
+  what they download.
 - **An install guide** (`docs/guides/install.md`) covering the
   self-contained binary, the .NET tool, mise, and the container, with the
   asset-selection options mise needs and a diagnosis path for

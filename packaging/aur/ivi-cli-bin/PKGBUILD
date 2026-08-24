@@ -1,0 +1,68 @@
+# Maintainer: ShortArrow <bamboogeneral@shortarrow.jp>
+
+# Built from the published linux-x64 self-contained release asset rather than
+# from source or from the NuGet tool package. The `dotnet tool install` route
+# needs the ASP.NET Core runtime (the CLI's runtimeconfig references
+# Microsoft.AspNetCore.App), so an Arch user carrying only `dotnet-runtime`
+# gets "No frameworks were found". A self-contained publish carries its own
+# runtime and needs no .NET on the system at all.
+
+pkgname=ivi-cli-bin
+pkgver=0.3.1
+pkgrel=1
+pkgdesc="Integrated CLI for managing, diagnosing, and operating VISA/IVI instruments (prebuilt binary)"
+arch=('x86_64')
+url="https://github.com/ShortArrow/ivi-cli"
+license=('MIT' 'Apache-2.0')
+# ldd on the shipped binary resolves libc/libdl/libm/libpthread/librt from
+# glibc, libgcc_s.so.1 from libgcc and libstdc++.so.6 from libstdc++ — the two
+# split packages rather than the gcc-libs metapackage, which would drag in ten
+# more runtimes nothing here touches. ICU never appears in ldd because .NET
+# dlopen()s it, but it is mandatory: with `icu` removed the binary aborts at
+# startup with "Couldn't find a valid ICU package installed on the system".
+# OpenSSL is deliberately absent — the bundle carries dlopen candidates for
+# libssl.so.3, yet strace shows no ssl/crypto load on any command path, so it
+# is not a hard runtime requirement.
+depends=('glibc' 'libgcc' 'libstdc++' 'icu')
+# The binary is executed during build() to emit its own completion scripts.
+makedepends=('icu')
+provides=('ivi-cli')
+conflicts=('ivi-cli')
+# The single-file bundle appends its payload after the ELF image; stripping
+# rewrites the file and destroys it. Without symbols to split out there is no
+# debug package either, and leaving it on ships an empty /usr/src/debug dir.
+options=('!strip' '!debug')
+source=("$pkgname-$pkgver.zip::$url/releases/download/v$pkgver/ivicli-$pkgver-linux-x64-selfcontained.zip")
+sha256sums=('741cd953c4fecc33788f93b1fe314dd9c32a02a4d24e374fab4b9e6e3035b2eb')
+
+build() {
+  chmod +x "$srcdir/ivicli"
+
+  # `ivicli completion` supports bash, zsh and powershell only — there is no
+  # fish emitter upstream, so no fish completion is shipped.
+  "$srcdir/ivicli" completion bash > "$srcdir/ivicli.bash"
+
+  # The zsh emitter produces an eval-style snippet (defines _ivicli, then
+  # compdef). Two lines of packaging glue turn it into an autoloadable
+  # site-function: the #compdef tag so compinit binds it to `ivicli`, and the
+  # trailing call so the first Tab completes instead of only registering.
+  {
+    echo '#compdef ivicli'
+    "$srcdir/ivicli" completion zsh
+    echo '_ivicli "$@"'
+  } > "$srcdir/_ivicli"
+}
+
+package() {
+  install -Dm755 "$srcdir/ivicli" "$pkgdir/usr/bin/ivicli"
+
+  install -Dm644 "$srcdir/LICENSE-MIT" "$pkgdir/usr/share/licenses/$pkgname/LICENSE-MIT"
+  install -Dm644 "$srcdir/LICENSE-APACHE" "$pkgdir/usr/share/licenses/$pkgname/LICENSE-APACHE"
+  install -Dm644 "$srcdir/THIRD-PARTY-NOTICES.md" "$pkgdir/usr/share/doc/$pkgname/THIRD-PARTY-NOTICES.md"
+
+  # The .pdb and .xml files in the release zip are debug symbols and XML doc
+  # comments for library consumers; neither belongs in a system package.
+
+  install -Dm644 "$srcdir/ivicli.bash" "$pkgdir/usr/share/bash-completion/completions/ivicli"
+  install -Dm644 "$srcdir/_ivicli" "$pkgdir/usr/share/zsh/site-functions/_ivicli"
+}

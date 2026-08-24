@@ -10,6 +10,9 @@ want ivi-cli to depend on a .NET installation, or not?
 | [mise](#mise) | no | pinning a version per project |
 | [Container](#container) | no | running the mock instrument, not the CLI |
 
+Arch Linux users have a fifth option, [the AUR package](#arch-linux-aur),
+which wraps the self-contained binary.
+
 ## Self-contained binary
 
 Every release carries a `*-selfcontained.zip` per platform. The `ivicli`
@@ -24,6 +27,9 @@ unzip -j ivicli.zip ivicli -d ~/.local/bin
 chmod +x ~/.local/bin/ivicli
 ```
 
+Releases from v0.3.2 onward also carry a `SHA256SUMS` asset if you want
+to verify the download.
+
 Swap `linux-x64` for `linux-arm64`, `osx-x64`, `osx-arm64`, `win-x64`,
 or `win-arm64`. The `-j` flag keeps the debug symbols and XML docs that
 travel in the archive out of your `bin` directory.
@@ -32,6 +38,21 @@ The other archive per platform, `*-fxdep.zip`, is the
 framework-dependent build. It is smaller and needs .NET installed, so
 reach for it only if you already meet the prerequisite below and want
 the smaller download.
+
+## Arch Linux (AUR)
+
+`ivi-cli-bin` packages the self-contained binary, so it carries no .NET
+dependency and none of the runtime-splitting trouble below.
+
+```sh
+paru -S ivi-cli-bin   # or: yay -S ivi-cli-bin
+```
+
+The package installs bash and zsh completions. There is no fish
+completion because the CLI emits bash, zsh and PowerShell only.
+
+The PKGBUILD lives in this repository under `packaging/aur/`, which is
+also where the version-bump procedure is written down.
 
 ## .NET tool
 
@@ -118,7 +139,8 @@ dotnet --list-runtimes
 
 **Only `Microsoft.NETCore.App` is listed.** The ASP.NET Core runtime is
 missing. Install it from the table above — on Arch,
-`sudo pacman -S aspnet-runtime`.
+`sudo pacman -S aspnet-runtime`, or sidestep the question entirely with
+[the AUR package](#arch-linux-aur).
 
 **Nothing is listed, or the paths differ from the ".NET location" in the
 error.** The launcher and the runtimes disagree about where .NET lives.
