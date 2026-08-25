@@ -6,6 +6,17 @@ All notable changes to ivi-cli are documented here. Format roughly follows
 
 ## [Unreleased]
 
+### Fixed
+
+- **`ivicli --version` and `--help` no longer emit scenario warnings.**
+  Scenario activation ran before the command line was parsed, so an
+  unloadable binding in `session.json` put a warning line ahead of the
+  version string and broke anything parsing that output. Parsing now
+  happens first, and activation is skipped for invocations that only print
+  help or a version, or that failed to parse — none of which opens a
+  session. Every command that can reach a backend still activates exactly
+  as before.
+
 ### Changed
 
 - **The self-contained archive is now the unsuffixed release asset.** From

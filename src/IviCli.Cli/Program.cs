@@ -385,13 +385,20 @@ internal static class Program
                 cts.Cancel();
             };
 
-            // Activate any scenario named by IVICLI_SCENARIO (env wins) or
-            // session.json (persisted) before parsing the command line, so
-            // visa subcommands see the scenario on this same invocation.
-            await ActivateScenarioIfRequested(provider, cts.Token);
-
             var root = BuildRoot(provider);
-            return await root.Parse(args).InvokeAsync(cancellationToken: cts.Token);
+            var parseResult = root.Parse(args);
+
+            // Activate any scenario named by IVICLI_SCENARIO (env wins) or
+            // session.json (persisted) before the command runs, so visa
+            // subcommands see the scenario on this same invocation. Parsing
+            // first costs nothing and tells us when the invocation prints
+            // help or a version and touches no backend at all.
+            if (ScenarioActivation.IsNeededFor(parseResult))
+            {
+                await ActivateScenarioIfRequested(provider, cts.Token);
+            }
+
+            return await parseResult.InvokeAsync(cancellationToken: cts.Token);
         }
         catch (OperationCanceledException)
         {
