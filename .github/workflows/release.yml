@@ -493,11 +493,19 @@ jobs:
           set -euo pipefail
           VERSION="${GITHUB_REF_NAME#v}"
           mkdir -p ./release-assets
+          # The self-contained build is the unsuffixed asset: it is what a
+          # download with no further thought should produce, and it is the
+          # one that runs on a machine with no .NET. Only the framework-
+          # dependent build carries a suffix. Installers that pick an asset
+          # by matching the platform — mise among them — otherwise had two
+          # candidates per platform and chose the one needing a runtime.
+          # The staging directory names below are internal and unchanged;
+          # docker/Dockerfile and pr-docker-smoke.yml consume them.
           for rid in linux-x64 linux-arm64 osx-x64 osx-arm64 win-x64 win-arm64; do
             sc="./artifacts/ivicli-${rid}/${rid}-selfcontained"
             fx="./artifacts/ivicli-${rid}/${rid}-fxdep"
             if [ -d "$sc" ]; then
-              (cd "$sc" && zip -qr "../../../release-assets/ivicli-${VERSION}-${rid}-selfcontained.zip" .)
+              (cd "$sc" && zip -qr "../../../release-assets/ivicli-${VERSION}-${rid}.zip" .)
             fi
             if [ -d "$fx" ]; then
               (cd "$fx" && zip -qr "../../../release-assets/ivicli-${VERSION}-${rid}-fxdep.zip" .)

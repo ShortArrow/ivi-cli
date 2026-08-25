@@ -6,6 +6,19 @@ All notable changes to ivi-cli are documented here. Format roughly follows
 
 ## [Unreleased]
 
+### Changed
+
+- **The self-contained archive is now the unsuffixed release asset.** From
+  the next release it is `ivicli-<version>-<rid>.zip` rather than
+  `ivicli-<version>-<rid>-selfcontained.zip`; the framework-dependent
+  archive keeps its `-fxdep` suffix. Tools that pick a release asset by
+  matching the platform saw two candidates per platform and took the one
+  that needs a .NET runtime installed — mise did exactly that — so the
+  build that runs anywhere is now the one with the plain name. A pinned
+  download URL for `-selfcontained.zip` needs updating; `-fxdep.zip` URLs
+  are unaffected, as is the container, which consumes the publish output
+  directly rather than these archives.
+
 ### Added
 
 - **An AUR package** (`ivi-cli-bin`, PKGBUILD under `packaging/aur/`). It
