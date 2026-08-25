@@ -504,11 +504,16 @@ jobs:
           for rid in linux-x64 linux-arm64 osx-x64 osx-arm64 win-x64 win-arm64; do
             sc="./artifacts/ivicli-${rid}/${rid}-selfcontained"
             fx="./artifacts/ivicli-${rid}/${rid}-fxdep"
+            # XML doc comments describe an API surface to a compiler and
+            # mean nothing to someone downloading a CLI; they stay in the
+            # NuGet package, which is where a consumer of the types would
+            # look for them. Symbols are embedded in the assemblies (see
+            # src/Directory.Build.props), so nothing else needs excluding.
             if [ -d "$sc" ]; then
-              (cd "$sc" && zip -qr "../../../release-assets/ivicli-${VERSION}-${rid}.zip" .)
+              (cd "$sc" && zip -qr "../../../release-assets/ivicli-${VERSION}-${rid}.zip" . -x '*.xml')
             fi
             if [ -d "$fx" ]; then
-              (cd "$fx" && zip -qr "../../../release-assets/ivicli-${VERSION}-${rid}-fxdep.zip" .)
+              (cd "$fx" && zip -qr "../../../release-assets/ivicli-${VERSION}-${rid}-fxdep.zip" . -x '*.xml')
             fi
           done
           # NuGet package: attach as-is (already a single file).
