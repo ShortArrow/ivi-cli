@@ -59,6 +59,46 @@ means the packaging travels with the code it packages.
    The two files must agree — the AUR rejects a push whose `.SRCINFO` does not
    match, and `namcap` on the PKGBUILD will not catch the mismatch for you.
 
+## ivi-cli (built from source)
+
+`ivi-cli/PKGBUILD` builds the framework-dependent publish from the release
+tag's source tarball and installs it to `/usr/lib/ivi-cli` with
+`/usr/bin/ivicli` pointing at the apphost. It depends on `aspnet-runtime`
+and takes `dotnet-sdk` as a makedepend.
+
+Two accommodations in it are for Arch's SDK packaging rather than for this
+project, and both fail the build loudly if removed:
+
+- `prepare()` deletes `global.json`. It pins the SDK to 10.0.204 with
+  `rollForward=latestFeature`, which cannot roll down to the 10.0.1xx band
+  Arch ships, so the build stops with "A compatible .NET SDK was not
+  found". The pin is there so upstream CI builds on one known SDK; a
+  distribution package builds on the distribution's SDK.
+- `-p:AllowMissingPrunePackageData=true`, because Arch's `dotnet-sdk` ships
+  without the `PrunePackageData` folder and the ASP.NET Core reference
+  otherwise fails with `NETSDK1226`. The SDK names this flag itself in the
+  error text.
+
+Bumping it needs the tag tarball's `sha256sum` rather than a line from the
+release `SHA256SUMS`, which covers the published archives and not the
+GitHub-generated source tarball:
+
+```sh
+curl -fsSL "https://github.com/ShortArrow/ivi-cli/archive/refs/tags/vX.Y.Z.tar.gz" | sha256sum
+```
+
+Expected `namcap` output is four warnings: `libm` unused (a glibc stub the
+apphost records), `glibc` / `libstdc++` / `libgcc` "implicitly satisfied"
+(they arrive through `aspnet-runtime`, so the package does not declare
+them), and `aspnet-runtime` "may not be needed", which is `namcap` reading
+the ELF while the requirement lives in `ivicli.runtimeconfig.json`.
+
+## The two packages conflict
+
+`ivi-cli-bin` declares `provides=('ivi-cli')` and `conflicts=('ivi-cli')`;
+`ivi-cli` declares `conflicts=('ivi-cli-bin')`. Both own `/usr/bin/ivicli`,
+so this is deliberate — a user picks one.
+
 ## Publishing to the AUR
 
 Pushing needs an AUR account with a registered SSH public key, so it is a
