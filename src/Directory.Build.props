@@ -11,6 +11,15 @@
     <!-- CA1715: type names like `IviError` already start with `I`; the lowercase `v` is from the project name `Ivi`. -->
     <!-- CA1848 / CA2254 / CA1873: the IviError contract emits dynamic templates and args (ADR 0014 §9); source-gen LoggerMessage is reserved for hot paths per ADR 0011 §8. -->
     <NoWarn>$(NoWarn);CS1591;CA1716;CA1859;CA1715;CA1848;CA2254;CA1873</NoWarn>
+    <!--
+      Symbols travel inside the assembly rather than as a sidecar .pdb. A
+      published CLI is a thing you download and run, and the fourteen .pdb
+      files beside it were both clutter and easy to leave behind, which
+      turns a user's stack trace into frames without line numbers. Embedding
+      costs ~0.4 MB on the single-file binary and removes ~0.7 MB of
+      sidecars, so the download gets slightly smaller as well as simpler.
+    -->
+    <DebugType>embedded</DebugType>
   </PropertyGroup>
 
   <!-- Trim / AOT analyzers run on every build so a new reflection call

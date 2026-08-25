@@ -6,6 +6,20 @@ All notable changes to ivi-cli are documented here. Format roughly follows
 
 ## [Unreleased]
 
+### Changed
+
+- **The release archives carry what you run, and nothing else.** They held
+  thirty-two files: the binary, two licences, the third-party notices, and
+  then fourteen `.pdb` and fourteen XML doc files. Symbols now travel
+  embedded in the assemblies instead of as sidecars, and the XML docs are
+  left out of the archives — they describe an API surface to a compiler,
+  and the NuGet package is where someone consuming the types would look for
+  them. A self-contained archive is four files. Embedding costs about
+  0.4 MB on the binary and removes about 0.7 MB of sidecars, so the
+  download is slightly smaller, and a stack trace from a downloaded build
+  keeps its line numbers instead of losing them the moment the `.pdb` beside
+  it goes missing.
+
 ## [0.3.2-beta.1] — 2026-08-25
 
 ### Added
