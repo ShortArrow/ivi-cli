@@ -30,7 +30,7 @@
       "ivicli.application": {
         "type": "Project",
         "dependencies": {
-          "IviCli.Domain": "[0.3.1, )",
+          "IviCli.Domain": "[0.3.2-beta.1, )",
           "TestableIO.System.IO.Abstractions": "[22.2.0, )"
         }
       },

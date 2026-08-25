@@ -6,29 +6,7 @@ All notable changes to ivi-cli are documented here. Format roughly follows
 
 ## [Unreleased]
 
-### Fixed
-
-- **`ivicli --version` and `--help` no longer emit scenario warnings.**
-  Scenario activation ran before the command line was parsed, so an
-  unloadable binding in `session.json` put a warning line ahead of the
-  version string and broke anything parsing that output. Parsing now
-  happens first, and activation is skipped for invocations that only print
-  help or a version, or that failed to parse — none of which opens a
-  session. Every command that can reach a backend still activates exactly
-  as before.
-
-### Changed
-
-- **The self-contained archive is now the unsuffixed release asset.** From
-  the next release it is `ivicli-<version>-<rid>.zip` rather than
-  `ivicli-<version>-<rid>-selfcontained.zip`; the framework-dependent
-  archive keeps its `-fxdep` suffix. Tools that pick a release asset by
-  matching the platform saw two candidates per platform and took the one
-  that needs a .NET runtime installed — mise did exactly that — so the
-  build that runs anywhere is now the one with the plain name. A pinned
-  download URL for `-selfcontained.zip` needs updating; `-fxdep.zip` URLs
-  are unaffected, as is the container, which consumes the publish output
-  directly rather than these archives.
+## [0.3.2-beta.1] — 2026-08-25
 
 ### Added
 
@@ -55,7 +33,30 @@ All notable changes to ivi-cli are documented here. Format roughly follows
   asset-selection options mise needs and a diagnosis path for
   `No frameworks were found`.
 
+### Changed
+
+- **The self-contained archive is now the unsuffixed release asset.** From
+  the next release it is `ivicli-<version>-<rid>.zip` rather than
+  `ivicli-<version>-<rid>-selfcontained.zip`; the framework-dependent
+  archive keeps its `-fxdep` suffix. Tools that pick a release asset by
+  matching the platform saw two candidates per platform and took the one
+  that needs a .NET runtime installed — mise did exactly that — so the
+  build that runs anywhere is now the one with the plain name. A pinned
+  download URL for `-selfcontained.zip` needs updating; `-fxdep.zip` URLs
+  are unaffected, as is the container, which consumes the publish output
+  directly rather than these archives.
+
 ### Fixed
+
+- **`ivicli --version` and `--help` no longer emit scenario warnings.**
+  Scenario activation ran before the command line was parsed, so an
+  unloadable binding in `session.json` put a warning line ahead of the
+  version string and broke anything parsing that output. Parsing now
+  happens first, and activation is skipped for invocations that only print
+  help or a version, or that failed to parse — none of which opens a
+  session. Every command that can reach a backend still activates exactly
+  as before.
+
 
 - **The stated prerequisite for `dotnet tool install -g ivi-cli` was
   wrong.** Both READMEs said "the .NET 10 SDK or runtime"; the tool needs
