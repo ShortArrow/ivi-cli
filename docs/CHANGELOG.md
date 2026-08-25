@@ -21,6 +21,14 @@ All notable changes to ivi-cli are documented here. Format roughly follows
 
 ### Added
 
+- **A second AUR package, `ivi-cli`**, built from source against the system
+  .NET. It depends on `aspnet-runtime`, installs 6.5 MB rather than 102 MiB,
+  and takes .NET security fixes through pacman; `ivi-cli-bin` remains the
+  choice for a machine with no .NET, and the two conflict. Verified by
+  building and installing it in an Arch container. Note that footprint is
+  not the reason to prefer it: from a standing start `aspnet-runtime` pulls
+  in ~97 MiB, so on a machine with no .NET the two come out within a couple
+  of MiB of each other.
 - **An AUR package** (`ivi-cli-bin`, PKGBUILD under `packaging/aur/`). It
   wraps the self-contained binary, so it needs no .NET on the system and
   avoids the ASP.NET Core runtime requirement the `dotnet tool` route
