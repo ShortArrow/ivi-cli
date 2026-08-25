@@ -8,6 +8,18 @@ All notable changes to ivi-cli are documented here. Format roughly follows
 
 ### Changed
 
+- **Pull requests now run the test suite on Windows as well as Linux.** It
+  ran on Linux for every PR and on every platform only at release time, so
+  a platform-specific failure surfaced as a dead release rather than as a
+  red PR — which is exactly how v0.3.0 went, with a TLS test racing a file
+  lock on win-arm64 and the tag needing a fix and a re-push. The Windows
+  ACL assertion on the session file also gets its first CI coverage; it
+  could never run on the Linux job. Formatting, analyzers and coverage
+  stay on the Linux job, being properties of the code rather than of the
+  operating system.
+
+### Changed
+
 - **The release archives carry what you run, and nothing else.** They held
   thirty-two files: the binary, two licences, the third-party notices, and
   then fourteen `.pdb` and fourteen XML doc files. Symbols now travel

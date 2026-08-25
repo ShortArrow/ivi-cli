@@ -227,3 +227,43 @@ jobs:
           token: ${{ secrets.CODECOV_TOKEN }}
           directory: ./TestResults
           fail_ci_if_error: false
+
+  # The suite has always run on Linux here and on every platform only at
+  # release time, which is a bad place to learn that a test is
+  # platform-specific: v0.3.0's tag run died on win-arm64 because a TLS
+  # test raced a file lock, and the release had to be fixed and re-tagged.
+  # This job is deliberately thinner than the Linux one — formatting,
+  # analyzers and coverage are properties of the code rather than of the
+  # operating system, so they stay where they are and are not paid for
+  # twice. It also gives the Windows ACL test on the session file its
+  # first CI coverage; that assertion could only ever run here.
+  test-windows:
+    name: test (windows)
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    runs-on: windows-latest
+    timeout-minutes: 20
+    env:
+      DOTNET_NOLOGO: true
+      DOTNET_CLI_TELEMETRY_OPTOUT: true
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          global-json-file: global.json
+          cache: true
+          cache-dependency-path: '**/packages.lock.json'
+
+      - name: Restore tools
+        run: dotnet tool restore
+
+      - name: Restore (locked)
+        run: dotnet restore --locked-mode
+
+      - name: Build
+        run: dotnet build --no-restore --configuration Release
+
+      - name: Test (unit + architecture)
+        run: dotnet test --no-build --configuration Release --filter "Category!=Integration"
