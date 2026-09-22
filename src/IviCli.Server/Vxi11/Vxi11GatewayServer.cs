@@ -324,6 +324,10 @@ public sealed class Vxi11GatewayServer : IGatewayServer
         {
             // graceful shutdown
         }
+        catch (IOException ex) when (PeerAbort.Is(ex, out var socketError))
+        {
+            _logger.LogInformation("client aborted the connection ({SocketError})", socketError);
+        }
         catch (Exception ex)
         {
             _logger.LogError(ex, "VXI-11 connection terminated with unexpected error");

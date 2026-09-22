@@ -176,6 +176,10 @@ public sealed class HiSlipGatewayServer : IGatewayServer
             // it at Debug so production logs stay clean.
             _logger.LogDebug("HiSLIP probe disconnected without handshake");
         }
+        catch (IOException ex) when (PeerAbort.Is(ex, out var socketError))
+        {
+            _logger.LogInformation("client aborted the connection ({SocketError})", socketError);
+        }
         catch (Exception ex)
         {
             _logger.LogError(ex, "HiSLIP connection terminated with unexpected error");
