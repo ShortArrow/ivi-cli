@@ -53,6 +53,10 @@ All notable changes to ivi-cli are documented here. Format roughly follows
   and `visa query` refused them. A request is now a query when the header
   of any of its `;`-separated units ends in `?`, with `;` and `?` inside
   quoted strings and block data ignored.
+- **A gateway no longer cuts bytes off the end of block data.** Stripping
+  the terminator also stripped a trailing CR or LF byte that belonged to a
+  `#<n><length>` block. The gateways now trim only after the block's
+  declared length, and remove whitespace before the terminator elsewhere.
 - **A SOCKET client that resets its connection is logged as a disconnect,
   not as an error.** A killed client, or one that gives up on a slow query
   and reconnects, ends its TCP connection with a reset rather than a close.

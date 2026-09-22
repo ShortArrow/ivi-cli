@@ -594,7 +594,7 @@ public sealed class Vxi11GatewayServer : IGatewayServer
             await WriteWriteReplyAsync(stream, xid, Vxi11NoError, (uint)parms.Data.Length, ct);
             return;
         }
-        var scpi = Encoding.ASCII.GetString(pendingWrite).TrimEnd();
+        var scpi = ScpiMessage.TrimEnd(Encoding.ASCII.GetString(pendingWrite));
         state.ClearPendingWrite();
 
         // Pick up an out-of-process scenario re-binding mid-link: a client

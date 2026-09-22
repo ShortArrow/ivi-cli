@@ -44,6 +44,22 @@ public sealed class ScpiMessageTests
         ScpiMessage.IsQuery(text).ShouldBeFalse();
 
     [Theory]
+    [InlineData("*IDN? ", "*IDN?")]
+    [InlineData("*IDN?\r\n", "*IDN?")]
+    [InlineData("SYST:ERR?\t\n", "SYST:ERR?")]
+    [InlineData("VOLT 1 ;*OPC? \r\n", "VOLT 1 ;*OPC?")]
+    [InlineData("DISP:TEXT \"a \" ", "DISP:TEXT \"a \"")]
+    [InlineData("DATA #13ab ", "DATA #13ab ")]
+    [InlineData("DATA #13ab \r\n", "DATA #13ab ")]
+    [InlineData("DATA #12a\n", "DATA #12a\n")]
+    [InlineData("DATA #12a\r", "DATA #12a\r")]
+    [InlineData("DATA #0ab \n", "DATA #0ab ")]
+    [InlineData("DATA #0ab ", "DATA #0ab ")]
+    [InlineData("", "")]
+    public void TrimEnd_drops_trailing_whitespace_outside_block_data(string text, string expected) =>
+        ScpiMessage.TrimEnd(text).ShouldBe(expected);
+
+    [Theory]
     [InlineData("MEAS:VOLT? (@1)")]
     [InlineData("*IDN? ")]
     public void From_accepts_a_query_with_parameters_or_trailing_whitespace(string text) =>

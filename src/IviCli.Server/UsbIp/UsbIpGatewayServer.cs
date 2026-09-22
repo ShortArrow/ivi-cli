@@ -893,7 +893,7 @@ public sealed class UsbIpGatewayServer : IGatewayServer
         CancellationToken ct
     )
     {
-        var text = Encoding.UTF8.GetString(message).TrimEnd();
+        var text = ScpiMessage.TrimEnd(Encoding.UTF8.GetString(message));
         if (text.Length == 0)
         {
             return;

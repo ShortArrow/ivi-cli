@@ -674,8 +674,8 @@ public sealed class HiSlipGatewayServer : IGatewayServer
         // Real VISA clients (NI-VISA, Keysight, R&S, PyVISA-py) terminate
         // SCPI lines with `\r\n` or `\n` per IEEE 488.2 §7.5, and may put
         // whitespace before the terminator. Backends and scenario matchers
-        // see canonical strings with neither.
-        var normalized = scpi.TrimEnd();
+        // see neither; block data keeps every byte it declares.
+        var normalized = ScpiMessage.TrimEnd(scpi);
         if (ScpiMessage.IsQuery(normalized))
         {
             var queryResult = ScpiQuery.From(normalized);

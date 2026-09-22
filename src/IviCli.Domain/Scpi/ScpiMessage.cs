@@ -8,6 +8,60 @@ namespace IviCli.Domain.Scpi;
 public static class ScpiMessage
 {
     /// <summary>
+    /// <paramref name="text"/> without the whitespace and terminator after its
+    /// last data. Whitespace before the terminator is not part of the message
+    /// (IEEE 488.2 §7), but the contents of quoted strings and block data are:
+    /// a definite-length block keeps its declared length even when it ends in
+    /// whitespace, and an indefinite block (<c>#0</c>) loses only the newline
+    /// that terminates it.
+    /// </summary>
+    public static string TrimEnd(string text)
+    {
+        var (dataEnd, indefinite) = LastData(text);
+        if (indefinite)
+        {
+            return text.EndsWith('\n') ? text[..^1] : text;
+        }
+        var end = text.Length;
+        while (end > dataEnd && char.IsWhiteSpace(text[end - 1]))
+        {
+            end--;
+        }
+        return text[..end];
+    }
+
+    private static (int End, bool Indefinite) LastData(string text)
+    {
+        var end = 0;
+        var indefinite = false;
+        var i = 0;
+        while (i < text.Length)
+        {
+            switch (text[i])
+            {
+                case '"' or '\'':
+                    i = AfterQuotedString(text, i);
+                    end = i;
+                    indefinite = false;
+                    break;
+                case '#':
+                    var after = AfterBlock(text, i);
+                    if (after > i + 1)
+                    {
+                        end = after;
+                        indefinite = text[i + 1] == '0';
+                    }
+                    i = after;
+                    break;
+                default:
+                    i++;
+                    break;
+            }
+        }
+        return (end, indefinite);
+    }
+
+    /// <summary>
     /// Whether <paramref name="text"/> expects a response: the header of at
     /// least one program message unit ends in <c>?</c> (IEEE 488.2). A header
     /// runs to the first whitespace, so parameters may follow it. Units are
