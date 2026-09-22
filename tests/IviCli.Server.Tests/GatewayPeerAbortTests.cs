@@ -53,9 +53,10 @@ public sealed class GatewayPeerAbortTests
             tcp.Client.Close(0);
         }
 
-        await SettleAsync(logger.Entries, cts.Token);
+        var ending = await EndingAsync(logger, cts.Token);
         await StopAsync(cts, serverTask);
-        logger.Entries.ShouldNotContain(e => e.Level >= LogLevel.Error);
+        ending.Level.ShouldBe(LogLevel.Information);
+        ending.Message.ShouldContain("client aborted the connection");
     }
 
     [Fact]
@@ -95,9 +96,10 @@ public sealed class GatewayPeerAbortTests
             tcp.Client.Close(0);
         }
 
-        await SettleAsync(logger.Entries, cts.Token);
+        var ending = await EndingAsync(logger, cts.Token);
         await StopAsync(cts, serverTask);
-        logger.Entries.ShouldNotContain(e => e.Level >= LogLevel.Error);
+        ending.Level.ShouldBe(LogLevel.Information);
+        ending.Message.ShouldContain("client aborted the connection");
     }
 
     [Fact]
@@ -113,21 +115,31 @@ public sealed class GatewayPeerAbortTests
             client.Abort();
         }
 
-        await SettleAsync(logger.Entries, bench.Token);
-        logger.Entries.ShouldNotContain(e => e.Level >= LogLevel.Error);
+        var ending = await EndingAsync(logger, bench.Token);
+        ending.Level.ShouldBe(LogLevel.Debug);
+        ending.Message.ShouldContain("I/O error");
     }
 
-    private static async Task SettleAsync(
-        IReadOnlyList<(LogLevel Level, string Message)> entries,
+    /// <summary>
+    /// The first entry the gateway logs about how the connection ended: an
+    /// error, or the line that names the abort.
+    /// </summary>
+    private static async Task<(LogLevel Level, string Message)> EndingAsync<T>(
+        RecordingLogger<T> logger,
         CancellationToken ct
     )
     {
-        var deadline = DateTime.UtcNow.AddSeconds(1);
-        while (
-            DateTime.UtcNow < deadline
-            && !entries.Any(e => e.Level >= LogLevel.Error || e.Message.Contains("aborted"))
-        )
+        while (true)
         {
+            var ending = logger.Entries.FirstOrDefault(e =>
+                e.Level >= LogLevel.Error
+                || e.Message.Contains("aborted")
+                || e.Message.Contains("I/O error")
+            );
+            if (ending.Message is not null)
+            {
+                return ending;
+            }
             await Task.Delay(20, ct);
         }
     }
