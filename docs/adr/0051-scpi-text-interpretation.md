@@ -19,9 +19,9 @@ The consequences are visible rather than theoretical. The mock treats
 sends lower case works against an instrument and gets nothing from the
 mock — which defeats the purpose of the mock. Nothing anywhere handles a
 compound query. Whether a request expects a response at all is decided
-by `EndsWith('?')` on the whole line, in `ScpiQuery.From`, the script
-parser and all four gateways. Responses are strings from the backend to the terminal
-and are never interpreted, so a script cannot assert that a reading sits
+by whether the line ends in `?` once its terminator is stripped, in
+`ScpiQuery.From`, the script parser and all four gateways. Responses are
+strings from the backend to the terminal and are never interpreted, so a script cannot assert that a reading sits
 in a range without writing a regular expression over digits.
 
 A request to assert numerically on a reading — `25.3,72.1` from a
@@ -33,7 +33,8 @@ decision, not four.
 
 ### What the standard actually requires
 
-Confirmed against the SCPI specification rather than from habit:
+Confirmed against SCPI-99 Volume 1 (Syntax and Style) and IEEE 488.2 §7
+rather than from habit:
 
 - Headers are case-insensitive.
 - Each mnemonic has exactly two accepted spellings, the short form and
@@ -46,7 +47,9 @@ Confirmed against the SCPI specification rather than from habit:
   was**: `MEAS:VOLT?;CURR?` asks for `MEAS:VOLT?` and `MEAS:CURR?`.
   Returning to the root needs `;:`.
 - Square brackets mark optional keywords, applied implicitly when
-  omitted (`:TRACe` ≡ `:TRACe1`).
+  omitted: under `[:SOURce]:VOLTage`, `VOLT 1` means `SOUR:VOLT 1`.
+- A numeric suffix left off a header takes its default, usually 1
+  (`:TRACe` ≡ `:TRACe1`).
 
 Two of these cannot be honoured by a generic implementation. Optional
 keywords and default numeric suffixes are properties of one instrument's
@@ -88,8 +91,8 @@ as. `MEAS:VOLT?;CURR?` does not activate a rule for `MEAS:VOLT?`.
 
 Expanding it correctly means tracking the path across units, which is
 mechanical but only worth building when something asks for it. Nothing
-does: no scenario in the repository, and no reported use. The limit is
-documented in the mock guide instead of being discovered.
+does: no scenario in the repository, and no reported use. The limit goes
+into the mock guide, so a user reads it rather than discovers it.
 
 ### 3. Responses: split on `;` then `,`, and stop at block data
 
@@ -171,9 +174,8 @@ which turns "should we add a directive" into a question about the
 instrument population rather than about the tool.
 
 `#` cannot mark a comment inside a SCPI line. It is not a free character:
-IEEE 488.2 gives it four meanings — `#8<len>` and `#0` introduce block
-data, and `#H`, `#Q`, `#B` introduce hexadecimal, octal and binary
-values. `SOUR:VOLT #HFF` sets 255. The parser strips from the first `#`
+in IEEE 488.2, `#<n><length>` and `#0` introduce block data, and `#H`,
+`#Q`, `#B` introduce hexadecimal, octal and binary values. `SOUR:VOLT #HFF` sets 255. The parser strips from the first `#`
 unconditionally, so that line and every block transfer are silently
 truncated. The code comment above the strip claims it honours `#` only
 after whitespace or at the start of a line; the implementation does not
@@ -185,7 +187,7 @@ or `:`, so no valid command can start with it. `:` was unavailable for
 exactly the opposite reason. Trailing comments are dropped rather than
 rescued: any rule that finds a comment inside a SCPI line has to
 enumerate the meanings of `#`, and the next edition of 488.2 is free to
-add a fifth.
+add another.
 
 The result is a rule that fits in one sentence and stays true as
 directives accumulate. Reserved words go to zero, `#` needs no special
@@ -210,21 +212,34 @@ message units ends in `?`. The header is the unit's text up to the first
 whitespace; parameters may follow it. Units are separated by `;` outside
 quoted strings and outside block data, where a definite-length block
 (`#<n><length>`) is skipped by its declared length and `#0` runs to the
-end of the message. Trailing whitespace is not part of the message.
+end of the message.
 
 IEEE 488.2 defines a query by its header, not by the last character of
 the line: `MEAS:VOLT? (@1)` is how a channel list is queried, and
-`<white space>` is allowed before the terminator. Deciding by
-`EndsWith('?')` sent `MEAS:VOLT? (@1)`, `MEAS:VOLT? CH1` and `*IDN? ` to
-the backend as writes. The mock accepted them, no response was written,
-and the client waited for its timeout while nothing was logged at any
-level.
+`<white space>` is allowed before the terminator. Deciding by the last
+character sends `MEAS:VOLT? (@1)`, `MEAS:VOLT? CH1` and `*IDN? ` to the
+backend as writes. The mock accepts them, no response is written, and
+the client waits for its timeout while nothing is logged at any level.
+The converse follows too: a `?` that ends a parameter, as in `VOLT MAX?`,
+does not make a query. That form is not valid SCPI — the query of the
+setting is `VOLT? MAX` — so a client relying on it moves the `?` onto
+the header.
 
-One pure function in the domain answers the question, and every surface
+The terminator and the whitespace before it are not part of the message,
+and a gateway strips them before anything reads the request. Quoted
+strings and block data are part of it, so stripping stops at the end of
+the last one: a definite-length block keeps every byte it declares even
+when the last of them is whitespace, CR or LF, and an indefinite block
+loses only the newline that ends it. Block lengths are counted in
+characters, because the gateways hand the backend decoded text; a block
+holding bytes outside ASCII is not carried faithfully by that interface,
+and this decision does not change it.
+
+One pure function in the domain answers each question, and every surface
 that asks it — `ScpiQuery.From`, the script parser and the four gateways
 — calls that function. §2 still holds: the units are found only to read
-their headers, and the request reaches the backend as the string it was
-sent as.
+their headers, and the request reaches the backend as it was sent, less
+its terminator.
 
 ## Consequences
 
@@ -235,17 +250,22 @@ sent as.
 - Scripts can assert on readings without a regular expression over
   digits, and the failure tells the reader which reading was wrong.
 - Two limits become explicit rather than emergent: compound requests are
-  matched whole, and block data is opaque. Both are documented where a
-  user meets them.
+  matched whole, and block data is opaque. Both go into the guides where
+  a user meets them.
 - The repository still holds three pattern languages, now with a written
   reason for each and a table saying where each applies. Adding a fourth
   needs an argument.
-- A script can send any SCPI command, including one spelled like a
-  directive, and can carry block data and `#H` values through unharmed.
-  Both were impossible before and neither was known to be.
+- From 0.4.0 a script can send any SCPI command, including one spelled
+  like a directive, and can carry block data and `#H` values through
+  unharmed. Both are impossible today and neither was known to be.
+  Through 0.3.x the unprefixed format is still read, so `#` still starts
+  a comment and `echo ` still names a directive.
 - A query with parameters or trailing whitespace gets its response from
-  every gateway and from `visa query`, where it used to get silence or a
-  validation error.
+  every gateway, where today it gets silence, and `visa query` accepts it,
+  where today it refuses it.
+- `VOLT MAX?` and every other request whose `?` ends a parameter become
+  writes. This is a breaking change for any client that relied on the old
+  reading, and it is recorded as one.
 - [ADR 0026](0026-mock-scenario-system.md)'s exact-string matching gives
   way to §1, and [ADR 0027](0027-phase3-operator-automation.md) §2's
   script format to §6; both now point here.
@@ -281,8 +301,14 @@ sent as.
   refuses `MEASure:VOLTage?`.
 - Query detection is pinned by cases on the pure function —
   `MEAS:VOLT? (@1)`, `*IDN? `, `VOLT 1;MEAS:VOLT? (@1)`, a `;` or `?`
-  inside a quoted string, a `?` inside definite-length block data — and
-  by a gateway test per protocol showing `MEAS:VOLT? CH1` gets a reply.
+  inside a quoted string, a `?` inside definite-length block data, and
+  `VOLT MAX?` as a write — and by a gateway test per protocol showing
+  `MEAS:VOLT? CH1` gets a reply.
+- Stripping the message end is pinned on the pure function: trailing
+  whitespace and CR/LF go, a definite-length block ending in a space, CR
+  or LF keeps it, and an indefinite block loses only its newline. A
+  gateway test shows a write whose block ends in a space reaching the
+  backend whole.
 - The script parser is pinned by cases the old format could not express:
   a line spelled `echo ON` reaching the instrument, `SOUR:VOLT #HFF`
   arriving with its parameter intact, and `DATA #800001000AB` surviving
