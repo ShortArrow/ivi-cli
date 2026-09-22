@@ -265,7 +265,7 @@ public sealed class SocketGatewayServer : IGatewayServer
                     }
                 }
             }
-            catch (IOException ex) when (IsPeerAbort(ex, out var socketError))
+            catch (IOException ex) when (PeerAbort.Is(ex, out var socketError))
             {
                 _logger.LogInformation(
                     "client aborted the connection ({SocketError})",
@@ -288,24 +288,6 @@ public sealed class SocketGatewayServer : IGatewayServer
         {
             _logger.LogError(ex, "connection terminated with unexpected error");
         }
-    }
-
-    /// <summary>
-    /// Whether <paramref name="ex"/> is the peer resetting the connection
-    /// (killed client, abortive close) rather than a gateway fault. A write
-    /// after the reset fails with <see cref="SocketError.Shutdown"/> (EPIPE)
-    /// on Linux; the gateway never shuts its own sockets down, so that too
-    /// means the peer is gone.
-    /// </summary>
-    private static bool IsPeerAbort(IOException ex, out SocketError socketError)
-    {
-        socketError = ex.InnerException is SocketException se
-            ? se.SocketErrorCode
-            : SocketError.Success;
-        return socketError
-            is SocketError.ConnectionReset
-                or SocketError.ConnectionAborted
-                or SocketError.Shutdown;
     }
 
     /// <summary>
