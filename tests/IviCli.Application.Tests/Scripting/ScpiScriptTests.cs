@@ -15,6 +15,16 @@ public class ScpiScriptTests
         script.Directives[0].ShouldBeOfType<ScpiScriptDirective.Query>().Text.ShouldBe("*IDN?");
     }
 
+    [Theory]
+    [InlineData("MEAS:VOLT? CH1")]
+    [InlineData("MEAS:VOLT? (@1)")]
+    [InlineData("VOLT 1;MEAS:VOLT? (@1)")]
+    public void Parse_classifies_query_when_a_header_ends_with_question_mark(string line)
+    {
+        var script = ScpiScript.Parse(line).ShouldBeOk();
+        script.Directives[0].ShouldBeOfType<ScpiScriptDirective.Query>().Text.ShouldBe(line);
+    }
+
     [Fact]
     public void Parse_classifies_write_when_line_lacks_question_mark()
     {

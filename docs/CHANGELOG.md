@@ -34,6 +34,15 @@ All notable changes to ivi-cli are documented here. Format roughly follows
 
 ### Fixed
 
+- **A query with parameters or trailing whitespace gets its response.**
+  Every gateway, `visa query` and the script runner decided whether a
+  request expects a response by whether the line's last character was
+  `?`. IEEE 488.2 decides it by the header, so `MEAS:VOLT? (@1)`,
+  `MEAS:VOLT? CH1` and `*IDN? ` went to the instrument as writes: through
+  a gateway the client waited for its timeout while nothing was logged,
+  and `visa query` refused them. A request is now a query when the header
+  of any of its `;`-separated units ends in `?`, with `;` and `?` inside
+  quoted strings and block data ignored.
 - **A SOCKET client that resets its connection is logged as a disconnect,
   not as an error.** A killed client, or one that gives up on a slow query
   and reconnects, ends its TCP connection with a reset rather than a close.

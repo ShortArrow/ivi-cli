@@ -893,7 +893,7 @@ public sealed class UsbIpGatewayServer : IGatewayServer
         CancellationToken ct
     )
     {
-        var text = Encoding.UTF8.GetString(message).TrimEnd('\n').TrimEnd('\r');
+        var text = Encoding.UTF8.GetString(message).TrimEnd();
         if (text.Length == 0)
         {
             return;
@@ -913,7 +913,7 @@ public sealed class UsbIpGatewayServer : IGatewayServer
             _logger.LogWarning(ex, "scenario binding refresh failed; continuing");
         }
 
-        if (text.EndsWith('?'))
+        if (ScpiQuery.IsQuery(text))
         {
             if (Failed(ScpiQuery.From(text), out var query))
             {

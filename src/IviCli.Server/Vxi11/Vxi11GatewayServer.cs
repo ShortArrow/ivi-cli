@@ -594,7 +594,7 @@ public sealed class Vxi11GatewayServer : IGatewayServer
             await WriteWriteReplyAsync(stream, xid, Vxi11NoError, (uint)parms.Data.Length, ct);
             return;
         }
-        var scpi = Encoding.ASCII.GetString(pendingWrite).TrimEnd('\r', '\n');
+        var scpi = Encoding.ASCII.GetString(pendingWrite).TrimEnd();
         state.ClearPendingWrite();
 
         // Pick up an out-of-process scenario re-binding mid-link: a client
@@ -623,7 +623,7 @@ public sealed class Vxi11GatewayServer : IGatewayServer
             state.SessionActivity,
             remoteParent: default
         );
-        if (scpi.EndsWith('?'))
+        if (ScpiQuery.IsQuery(scpi))
         {
             var queryResult = ScpiQuery.From(scpi);
             if (queryResult is not Result<ScpiQuery, ScpiError>.Ok { Value: var q })

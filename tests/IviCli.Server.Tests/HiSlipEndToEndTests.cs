@@ -25,8 +25,10 @@ namespace IviCli.Server.Tests;
 /// </summary>
 public sealed class HiSlipEndToEndTests
 {
-    [Fact]
-    public async Task Query_returns_fake_response_through_gateway()
+    [Theory]
+    [InlineData("*IDN?")]
+    [InlineData("MEAS:VOLT? CH1")]
+    public async Task Query_returns_fake_response_through_gateway(string request)
     {
         var port = GetFreePort();
         var deviceName = DeviceName.From("dut").ShouldBeOk();
@@ -58,7 +60,7 @@ public sealed class HiSlipEndToEndTests
 
         var fake = new FakeBackend()
             .ConfigureDevice(deviceName, "FAKE,HISLIP,0,1.0")
-            .RespondToQuery(deviceName, "*IDN?", "FAKE,HISLIP,0,1.0");
+            .RespondToQuery(deviceName, request, "FAKE,HISLIP,0,1.0");
 
         var gateway = new HiSlipGatewayServer(
             new FakeBackendFactory(fake),
@@ -72,7 +74,7 @@ public sealed class HiSlipEndToEndTests
         var client = new HiSlipBackend(port);
         (await client.OpenAsync(device, cts.Token)).ShouldBeOk();
 
-        var query = ScpiQuery.From("*IDN?").ShouldBeOk();
+        var query = ScpiQuery.From(request).ShouldBeOk();
         var response = await client.QueryAsync(device, query, cts.Token);
         response.ShouldBeOk().ShouldBe("FAKE,HISLIP,0,1.0");
 

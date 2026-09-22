@@ -199,7 +199,7 @@ public sealed class SocketGatewayServer : IGatewayServer
                     {
                         break;
                     }
-                    var trimmed = line.TrimEnd('\r');
+                    var trimmed = line.TrimEnd();
                     if (trimmed.Length == 0)
                     {
                         continue;
@@ -234,7 +234,7 @@ public sealed class SocketGatewayServer : IGatewayServer
                         sessionActivity,
                         remoteParent: default
                     );
-                    if (trimmed.EndsWith('?'))
+                    if (ScpiQuery.IsQuery(trimmed))
                     {
                         if (Failed(ScpiQuery.From(trimmed), out var q))
                         {

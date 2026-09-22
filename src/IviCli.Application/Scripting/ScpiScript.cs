@@ -1,6 +1,7 @@
 using System.Collections.Immutable;
 using System.Globalization;
 using IviCli.Domain;
+using IviCli.Domain.Scpi;
 
 namespace IviCli.Application.Scripting;
 
@@ -98,7 +99,7 @@ public sealed record ScpiScript(ImmutableArray<ScpiScriptDirective> Directives)
                 new ScpiScriptDirective.Echo(line, text)
             );
         }
-        if (raw.TrimEnd().EndsWith('?'))
+        if (ScpiQuery.IsQuery(raw))
         {
             return Result.Success<ScpiScriptDirective, ScpiScriptError>(
                 new ScpiScriptDirective.Query(line, raw)
