@@ -676,7 +676,7 @@ public sealed class HiSlipGatewayServer : IGatewayServer
         // whitespace before the terminator. Backends and scenario matchers
         // see canonical strings with neither.
         var normalized = scpi.TrimEnd();
-        if (ScpiQuery.IsQuery(normalized))
+        if (ScpiMessage.IsQuery(normalized))
         {
             var queryResult = ScpiQuery.From(normalized);
             if (queryResult is not Result<ScpiQuery, ScpiError>.Ok { Value: var q })

@@ -8,7 +8,7 @@ namespace IviCli.Domain.Tests.Scpi;
 /// A request is a query when the header of any of its program message units
 /// ends in <c>?</c> (IEEE 488.2), not when the line's last character does.
 /// </summary>
-public sealed class ScpiQueryRecognitionTests
+public sealed class ScpiMessageTests
 {
     [Theory]
     [InlineData("*IDN?")]
@@ -27,7 +27,7 @@ public sealed class ScpiQueryRecognitionTests
     [InlineData("DISP:TEXT 'it''s';*OPC?")]
     [InlineData("DATA #14ab?c;*OPC?")]
     public void A_header_ending_in_a_question_mark_makes_a_query(string text) =>
-        ScpiQuery.IsQuery(text).ShouldBeTrue();
+        ScpiMessage.IsQuery(text).ShouldBeTrue();
 
     [Theory]
     [InlineData("")]
@@ -41,7 +41,7 @@ public sealed class ScpiQueryRecognitionTests
     [InlineData("DATA #0ab?;*OPC?")]
     [InlineData("DATA #9123")]
     public void No_header_ending_in_a_question_mark_makes_a_write(string text) =>
-        ScpiQuery.IsQuery(text).ShouldBeFalse();
+        ScpiMessage.IsQuery(text).ShouldBeFalse();
 
     [Theory]
     [InlineData("MEAS:VOLT? (@1)")]

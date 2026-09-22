@@ -99,7 +99,7 @@ public sealed record ScpiScript(ImmutableArray<ScpiScriptDirective> Directives)
                 new ScpiScriptDirective.Echo(line, text)
             );
         }
-        if (ScpiQuery.IsQuery(raw))
+        if (ScpiMessage.IsQuery(raw))
         {
             return Result.Success<ScpiScriptDirective, ScpiScriptError>(
                 new ScpiScriptDirective.Query(line, raw)

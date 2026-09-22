@@ -234,7 +234,7 @@ public sealed class SocketGatewayServer : IGatewayServer
                         sessionActivity,
                         remoteParent: default
                     );
-                    if (ScpiQuery.IsQuery(trimmed))
+                    if (ScpiMessage.IsQuery(trimmed))
                     {
                         if (Failed(ScpiQuery.From(trimmed), out var q))
                         {

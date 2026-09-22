@@ -913,7 +913,7 @@ public sealed class UsbIpGatewayServer : IGatewayServer
             _logger.LogWarning(ex, "scenario binding refresh failed; continuing");
         }
 
-        if (ScpiQuery.IsQuery(text))
+        if (ScpiMessage.IsQuery(text))
         {
             if (Failed(ScpiQuery.From(text), out var query))
             {
