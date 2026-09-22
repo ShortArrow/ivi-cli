@@ -62,11 +62,13 @@ public sealed class Vxi11EndToEndTests
         catch (OperationCanceledException) { }
     }
 
-    [Fact]
-    public async Task CreateLink_then_Write_query_returns_fake_response()
+    [Theory]
+    [InlineData("*IDN?")]
+    [InlineData("MEAS:VOLT? CH1")]
+    public async Task CreateLink_then_Write_query_returns_fake_response(string request)
     {
         var (gateway, server, config, port, fake) = BuildHarness();
-        fake.RespondToQuery(DeviceName.From("dut").ShouldBeOk(), "*IDN?", "FAKE,VXI11,0,1.0");
+        fake.RespondToQuery(DeviceName.From("dut").ShouldBeOk(), request, "FAKE,VXI11,0,1.0");
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
         var serverTask = gateway.RunAsync(server, config, cts.Token);
         await WaitForListenerAsync(port, cts.Token);
@@ -98,8 +100,8 @@ public sealed class Vxi11EndToEndTests
         _ = createReply.ReadUInt32(); // abort port
         _ = createReply.ReadUInt32(); // maxRecvSize
 
-        // device_write *IDN?\n with END flag
-        var idn = "*IDN?\n"u8.ToArray();
+        // device_write <request>\n with END flag
+        var idn = System.Text.Encoding.ASCII.GetBytes(request + "\n");
         var writeCall = BuildRpcCall(
             xid: 101,
             program: CoreProgram,
@@ -387,6 +389,69 @@ public sealed class Vxi11EndToEndTests
         triggerReply.ReadInt32().ShouldBe(Vxi11NoError);
 
         fake.TriggerCountFor(DeviceName.From("dut").ShouldBeOk()).ShouldBe(1);
+
+        await cts.CancelAsync();
+        try
+        {
+            await serverTask;
+        }
+        catch (OperationCanceledException) { }
+    }
+
+    [Fact]
+    public async Task A_block_ending_in_whitespace_reaches_the_backend_whole()
+    {
+        var (gateway, server, config, port, fake) = BuildHarness();
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        var serverTask = gateway.RunAsync(server, config, cts.Token);
+        await WaitForListenerAsync(port, cts.Token);
+
+        using var tcp = new TcpClient();
+        await tcp.ConnectAsync(IPAddress.Loopback, port, cts.Token);
+        using var stream = tcp.GetStream();
+
+        var createCall = BuildRpcCall(
+            xid: 700,
+            program: CoreProgram,
+            version: CoreVersion,
+            procedure: ProcCreateLink,
+            body: writer =>
+            {
+                writer.WriteInt32(1);
+                writer.WriteUInt32(0);
+                writer.WriteUInt32(0);
+                writer.WriteString("inst0");
+            }
+        );
+        await Vxi11RecordFraming.WriteRecordAsync(stream, createCall, cts.Token);
+        var createReply = SkipReplyHeader(
+            await Vxi11RecordFraming.ReadRecordAsync(stream, cts.Token)
+        );
+        createReply.ReadInt32().ShouldBe(Vxi11NoError);
+        var lid = createReply.ReadInt32();
+
+        var writeCall = BuildRpcCall(
+            xid: 701,
+            program: CoreProgram,
+            version: CoreVersion,
+            procedure: ProcDeviceWrite,
+            body: writer =>
+            {
+                writer.WriteInt32(lid);
+                writer.WriteUInt32(1000);
+                writer.WriteUInt32(0);
+                writer.WriteInt32(WriteEndFlag);
+                writer.WriteOpaque("DATA #13ab \n"u8.ToArray());
+            }
+        );
+        await Vxi11RecordFraming.WriteRecordAsync(stream, writeCall, cts.Token);
+        var writeReply = SkipReplyHeader(
+            await Vxi11RecordFraming.ReadRecordAsync(stream, cts.Token)
+        );
+        writeReply.ReadInt32().ShouldBe(Vxi11NoError);
+
+        var device = config.FindDevice(DeviceName.From("dut").ShouldBeOk()).ShouldNotBeNull();
+        (await fake.ReadAsync(device, cts.Token)).ShouldBeOk().ShouldBe("DATA #13ab ");
 
         await cts.CancelAsync();
         try

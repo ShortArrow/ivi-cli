@@ -200,8 +200,14 @@ public sealed class UsbIpGatewayServerTests
             );
     }
 
-    [Fact]
-    public async Task A_query_travels_out_as_a_usbtmc_message_and_back_as_the_scenario_answer()
+    [Theory]
+    [InlineData("*IDN?", IdnResponse)]
+    [InlineData("*IDN? ", IdnResponse)]
+    [InlineData("MEAS:VOLT? CH1", "MEAS:VOLT? CH1")]
+    public async Task A_query_travels_out_as_a_usbtmc_message_and_back_as_the_scenario_answer(
+        string request,
+        string expected
+    )
     {
         await using var bench = await UsbIpBench.StartAsync();
         var client = await bench.ImportAsync();
@@ -211,7 +217,7 @@ public sealed class UsbIpGatewayServerTests
                 new UsbTmcDevDepMsgOut(
                     BTag: 1,
                     EndOfMessage: true,
-                    Encoding.ASCII.GetBytes("*IDN?\n")
+                    Encoding.ASCII.GetBytes(request + "\n")
                 )
             ),
             bench.Token
@@ -237,7 +243,7 @@ public sealed class UsbIpGatewayServerTests
         var message = UsbTmcCodec.ReadDevDepMsgIn(answer.Payload);
         message.BTag.ShouldBe((byte)2);
         message.EndOfMessage.ShouldBeTrue();
-        Encoding.ASCII.GetString(message.Payload).ShouldBe(IdnResponse + "\n");
+        Encoding.ASCII.GetString(message.Payload).ShouldBe(expected + "\n");
     }
 
     [Fact]

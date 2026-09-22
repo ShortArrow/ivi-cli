@@ -17,7 +17,7 @@ public static class VisaMonitorCommand
     {
         var queryArg = new Argument<string>("query")
         {
-            Description = "SCPI query to repeat (must end with `?`).",
+            Description = "SCPI query to repeat (a header must end with `?`).",
         };
         var deviceOpt = new Option<string?>("--device")
         {

@@ -32,8 +32,35 @@ All notable changes to ivi-cli are documented here. Format roughly follows
   keeps its line numbers instead of losing them the moment the `.pdb` beside
   it goes missing.
 
+### Changed (breaking)
+
+- **A `?` that ends a parameter no longer makes a query.** A request is a
+  query only when a header ends in `?`, so `VOLT MAX?` is now a write:
+  `visa query "VOLT MAX?"` refuses it, a gateway sends it to the backend
+  as a write and returns nothing, and a scenario rule matching it must
+  `ack` rather than `respond`. `VOLT MAX?` is not valid SCPI; the query
+  of that setting is `VOLT? MAX`. A script or client using the old form
+  moves the `?` onto the header.
+
 ### Fixed
 
+- **A query with parameters or trailing whitespace gets its response.**
+  Every gateway, `visa query` and the script runner treated a request as
+  a query when the last character of the line was `?`. IEEE 488.2 defines
+  a query by its header, so `MEAS:VOLT? (@1)`, `MEAS:VOLT? CH1` and
+  `*IDN? ` went to the instrument as writes. Through a gateway the client
+  waited for its timeout and nothing was logged; `visa query` refused
+  them. A request is now a query when the header of any unit ends in `?`,
+  where `;` separates units and a newline separates messages, and neither
+  counts inside a quoted string or block data. A gateway strips the
+  whitespace before the terminator. `visa query` sends the text as given,
+  so against the mock `*IDN? ` is accepted but matches no rule.
+- **The HiSLIP, VXI-11 and USB/IP gateways no longer cut bytes off the end
+  of block data.** Stripping the terminator also stripped a trailing CR or
+  LF byte that belonged to a `#<n><length>` block. These gateways now trim
+  only after the block's declared length, and remove whitespace before the
+  terminator elsewhere. The SOCKET gateway frames requests by line, so a
+  block holding CR or LF still cannot cross it.
 - **A SOCKET client that resets its connection is logged as a disconnect,
   not as an error.** A killed client, or one that gives up on a slow query
   and reconnects, ends its TCP connection with a reset rather than a close.

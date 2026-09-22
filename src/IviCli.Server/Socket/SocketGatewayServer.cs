@@ -17,8 +17,8 @@ namespace IviCli.Server.Socket;
 /// Raw TCP SOCKET gateway: line-based SCPI (PRD §7.4 / ADR 0007).
 /// Reads <c>\n</c>-terminated SCPI lines from the client, dispatches each
 /// to the bound device's <see cref="IIviBackend"/>, and writes responses
-/// back as <c>\n</c>-terminated lines. A trailing <c>?</c> in the line
-/// distinguishes query from write.
+/// back as <c>\n</c>-terminated lines. A line is a query when
+/// <see cref="ScpiMessage.IsQuery(string)"/> says so, and a write otherwise.
 /// </summary>
 public sealed class SocketGatewayServer : IGatewayServer
 {
@@ -199,7 +199,7 @@ public sealed class SocketGatewayServer : IGatewayServer
                     {
                         break;
                     }
-                    var trimmed = line.TrimEnd('\r');
+                    var trimmed = ScpiMessage.TrimEnd(line);
                     if (trimmed.Length == 0)
                     {
                         continue;
@@ -234,7 +234,7 @@ public sealed class SocketGatewayServer : IGatewayServer
                         sessionActivity,
                         remoteParent: default
                     );
-                    if (trimmed.EndsWith('?'))
+                    if (ScpiMessage.IsQuery(trimmed))
                     {
                         if (Failed(ScpiQuery.From(trimmed), out var q))
                         {
