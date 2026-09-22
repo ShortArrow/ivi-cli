@@ -181,6 +181,9 @@ internal sealed class UsbIpTestClient : IDisposable
         return UsbIpCodec.ReadRetUnlink(ref reader);
     }
 
+    /// <summary>Closes the connection with a reset instead of a FIN.</summary>
+    public void Abort() => _tcp.Client.Close(0);
+
     public void Dispose()
     {
         _stream?.Dispose();
