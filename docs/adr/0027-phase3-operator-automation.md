@@ -42,6 +42,11 @@ backlog.
 
 ### 2. Script File Format
 
+[ADR 0051](0051-scpi-text-interpretation.md) §6 decides to replace this
+format: directives and comments take a `!` prefix, and every other line
+goes to the instrument verbatim. The unprefixed form below is to be
+accepted with a warning through 0.3.x and removed at 0.4.0.
+
 A script file is UTF-8 text. Each non-blank, non-`#`-prefixed line is
 one directive. Supported directives:
 

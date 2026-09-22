@@ -48,8 +48,8 @@ Confirmed against the SCPI specification rather than from habit:
 
 Two of these cannot be honoured by a generic implementation. Optional
 keywords and default numeric suffixes are properties of one instrument's
-command tree, and ADR 0032 already decided this project does not carry
-vendor command dictionaries. A third is one-directional: a long-form
+command tree, and ADR 0032 leaves vendor command dictionaries to a
+pluggable loader that does not exist. A third is one-directional: a long-form
 rule yields its short form mechanically, while a short-form rule does
 not yield its long form — `VOLT` may be short for `VOLTage` or a
 complete four-letter mnemonic, and the string alone cannot say which.
@@ -187,13 +187,17 @@ The result is a rule that fits in one sentence and stays true as
 directives accumulate. Reserved words go to zero, `#` needs no special
 case, and adding a directive costs nothing but a name.
 
-**Migration.** The same shape this repository used for `diagnose` →
-`doctor` and for the nested `mock scenario scene` spelling: 0.3.x accepts
-both forms and warns on the unprefixed one, 0.4.0 removes it. 0.4.0
-already carries the removal of the nested mock spellings, so the script
-format break lands with the one users are told to expect. No `.scpi`
-file exists in this repository, so nothing here needs migrating; the
-warning exists for scripts written elsewhere.
+**Migration.** 0.3.x accepts both forms and warns on each unprefixed
+directive and each `#` comment; 0.4.0 removes them. The earlier renames —
+`diagnose` → `doctor`, the nested `mock scenario scene` spelling — kept
+the old form as a silent alias or a hidden command and announced the
+removal only in the changelog. A script runs unattended, so a silent
+alias would leave its author nothing to notice before 0.4.0 breaks it;
+the warning is what that shape was missing. 0.4.0 already carries the
+removal of the nested mock spellings, so the script format break lands
+with the one users are told to expect. No `.scpi` file exists in this
+repository, so nothing here needs migrating; the warning exists for
+scripts written elsewhere.
 
 ## Consequences
 
@@ -212,12 +216,15 @@ warning exists for scripts written elsewhere.
 - A script can send any SCPI command, including one spelled like a
   directive, and can carry block data and `#H` values through unharmed.
   Both were impossible before and neither was known to be.
+- [ADR 0026](0026-mock-scenario-system.md)'s exact-string matching gives
+  way to §1, and [ADR 0027](0027-phase3-operator-automation.md) §2's
+  script format to §6; both now point here.
 
 ## Out of scope
 
 - **Optional keywords and default numeric suffixes.** They need a
-  per-instrument command tree; ADR 0032 declined to carry vendor
-  dictionaries and that decision stands.
+  per-instrument command tree, which ADR 0032 defers to a pluggable
+  dictionary loader; they belong with that loader if it is built.
 - **Short/long form equivalence** (§1), until either a scenario needs it
   enough to write the long form or a command tree arrives.
 - **Compound request expansion** (§2).
@@ -236,7 +243,8 @@ warning exists for scripts written elsewhere.
 ## Verification
 
 - Existing scenarios pass unchanged after case folding, including the
-  three in the repository and the bench scenario under
+  `docker/etc/ivi-cli/scenarios/default.toml`,
+  `docs/samples/psu/psu-bench.toml` and the bench scenario under
   `tests/IviCli.Backends.Local.Tests/Assets`.
 - Case folding is pinned by a test asserting that a rule written
   `MEAS:VOLT?` answers `meas:volt?`, `:MEAS:VOLT?` and `MEAS:VOLT?`, and
