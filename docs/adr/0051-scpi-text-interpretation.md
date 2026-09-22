@@ -15,14 +15,14 @@ rule for reading it without reference to the others:
 | `visa lint`, completion | mnemonic vocabulary | `ScpiVocabulary`, standard roots only ([ADR 0032](0032-scpi-vocabulary-and-linter.md)) |
 
 The consequences are visible rather than theoretical. The mock treats
-`meas:volt?` and `MEAS:VOLT?` as different commands, so a client that
-sends lower case works against an instrument and gets nothing from the
-mock — which defeats the purpose of the mock. Nothing anywhere handles a
-compound query. Whether a request expects a response at all is decided
-by whether the line ends in `?` once its terminator is stripped, in
-`ScpiQuery.From`, the script parser and all four gateways. Responses are
-strings from the backend to the terminal and are never interpreted, so a script cannot assert that a reading sits
-in a range without writing a regular expression over digits.
+`meas:volt?` and `MEAS:VOLT?` as different commands, so a client that sends
+lower case works against an instrument and gets nothing from the mock —
+which defeats the purpose of the mock. Nothing anywhere handles a compound
+query. Whether a request expects a response at all is decided by whether the
+line ends in `?` once its terminator is stripped, in `ScpiQuery.From`, the
+script parser and all four gateways. Responses are strings from the backend
+to the terminal and are never interpreted, so a script cannot assert that a
+reading sits in a range without writing a regular expression over digits.
 
 A request to assert numerically on a reading — `25.3,72.1` from a
 temperature/humidity probe, `1.234,-0.567,3.000` from a positioner — is
@@ -53,11 +53,11 @@ rather than from habit:
 
 Two of these cannot be honoured by a generic implementation. Optional
 keywords and default numeric suffixes are properties of one instrument's
-command tree, and ADR 0032 leaves vendor command dictionaries to a
-pluggable loader that does not exist. A third is one-directional: a long-form
-rule yields its short form mechanically, while a short-form rule does
-not yield its long form — `VOLT` may be short for `VOLTage` or a
-complete four-letter mnemonic, and the string alone cannot say which.
+command tree, and ADR 0032 leaves vendor command dictionaries to a pluggable
+loader that does not exist. A third is one-directional: a long-form rule
+yields its short form mechanically, while a short-form rule does not yield
+its long form — `VOLT` may be short for `VOLTage` or a complete four-letter
+mnemonic, and the string alone cannot say which.
 
 ## Decision
 
@@ -173,14 +173,14 @@ from a script at all, and each directive added narrows the gap further —
 which turns "should we add a directive" into a question about the
 instrument population rather than about the tool.
 
-`#` cannot mark a comment inside a SCPI line. It is not a free character:
-in IEEE 488.2, `#<n><length>` and `#0` introduce block data, and `#H`,
-`#Q`, `#B` introduce hexadecimal, octal and binary values. `SOUR:VOLT #HFF` sets 255. The parser strips from the first `#`
-unconditionally, so that line and every block transfer are silently
-truncated. The code comment above the strip claims it honours `#` only
-after whitespace or at the start of a line; the implementation does not
-do that, and even the documented intent would still break
-`DATA #800001000AB`.
+`#` cannot mark a comment inside a SCPI line. It is not a free character: in
+IEEE 488.2, `#<n><length>` and `#0` introduce block data, and `#H`, `#Q`,
+`#B` introduce hexadecimal, octal and binary values. `SOUR:VOLT #HFF` sets
+255. The parser strips from the first `#` unconditionally, so that line and
+every block transfer are silently truncated. The code comment above the
+strip claims it honours `#` only after whitespace or at the start of a line;
+the implementation does not do that, and even the documented intent would
+still break `DATA #800001000AB`.
 
 `!` is chosen because a SCPI program message begins with a letter, `*`
 or `:`, so no valid command can start with it. `:` was unavailable for
@@ -195,15 +195,14 @@ case, and adding a directive costs nothing but a name.
 
 **Migration.** 0.3.x accepts both forms and warns on each unprefixed
 directive and each `#` comment; 0.4.0 removes them. The earlier renames —
-`diagnose` → `doctor`, the nested `mock scenario scene` spelling — kept
-the old form as a silent alias or a hidden command and announced the
-removal only in the changelog. A script runs unattended, so a silent
-alias would leave its author nothing to notice before 0.4.0 breaks it.
-0.4.0 already carries the
-removal of the nested mock spellings, so the script format break lands
-with the one users are told to expect. No `.scpi` file exists in this
-repository, so nothing here needs migrating; the warning exists for
-scripts written elsewhere.
+`diagnose` → `doctor`, the nested `mock scenario scene` spelling — kept the
+old form as a silent alias or a hidden command and announced the removal
+only in the changelog. A script runs unattended, so a silent alias would
+leave its author nothing to notice before 0.4.0 breaks it. 0.4.0 already
+carries the removal of the nested mock spellings, so the script format break
+lands with the one users are told to expect. No `.scpi` file exists in this
+repository, so nothing here needs migrating; the warning exists for scripts
+written elsewhere.
 
 ### 7. A request is a query when a header ends in `?`
 
