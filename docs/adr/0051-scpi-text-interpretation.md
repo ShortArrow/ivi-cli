@@ -92,7 +92,7 @@ as. `MEAS:VOLT?;CURR?` does not activate a rule for `MEAS:VOLT?`.
 Expanding it correctly means tracking the path across units, which is
 mechanical but only worth building when something asks for it. Nothing
 does: no scenario in the repository, and no reported use. The limit goes
-into the mock guide, so a user reads it rather than discovers it.
+into the mock guide.
 
 ### 3. Responses: split on `;` then `,`, and stop at block data
 
@@ -198,8 +198,8 @@ directive and each `#` comment; 0.4.0 removes them. The earlier renames —
 `diagnose` → `doctor`, the nested `mock scenario scene` spelling — kept
 the old form as a silent alias or a hidden command and announced the
 removal only in the changelog. A script runs unattended, so a silent
-alias would leave its author nothing to notice before 0.4.0 breaks it;
-the warning is what that shape was missing. 0.4.0 already carries the
+alias would leave its author nothing to notice before 0.4.0 breaks it.
+0.4.0 already carries the
 removal of the nested mock spellings, so the script format break lands
 with the one users are told to expect. No `.scpi` file exists in this
 repository, so nothing here needs migrating; the warning exists for
@@ -209,47 +209,42 @@ scripts written elsewhere.
 
 A request expects a response when the header of any of its program
 message units ends in `?`. The header is the unit's text up to the first
-whitespace; parameters may follow it. Units are separated by `;`, and
-messages by a newline, outside
-quoted strings and outside block data, where a definite-length block
-(`#<n><length>`) is skipped by its declared length and `#0` runs to the
-end of the message.
+whitespace; parameters may follow it. `;` separates units and a newline
+separates messages, except inside a quoted string or block data. A
+definite-length block (`#<n><length>`) is skipped by its declared length;
+`#0` runs to the end of the message.
 
-IEEE 488.2 defines a query by its header, not by the last character of
-the line: `MEAS:VOLT? (@1)` is how a channel list is queried, and
-`<white space>` is allowed before the terminator. Deciding by the last
-character sends `MEAS:VOLT? (@1)`, `MEAS:VOLT? CH1` and `*IDN? ` to the
-backend as writes. The mock accepts them, no response is written, and
-the client waits for its timeout while nothing is logged at any level.
-The converse follows too: a `?` that ends a parameter, as in `VOLT MAX?`,
-does not make a query. That form is not valid SCPI — the query of the
-setting is `VOLT? MAX` — so a client relying on it moves the `?` onto
-the header.
+This is the IEEE 488.2 definition of a query. `MEAS:VOLT? (@1)` is how a
+channel list is queried, and white space may precede the terminator. A
+rule that looks at the last character of the line sends `MEAS:VOLT? (@1)`,
+`MEAS:VOLT? CH1` and `*IDN? ` to the backend as writes; the mock accepts
+them, writes no response, and the client waits for its timeout with
+nothing in the log. Under the header rule a `?` at the end of a
+parameter, as in `VOLT MAX?`, does not make a query. `VOLT MAX?` is not
+valid SCPI; the query of that setting is `VOLT? MAX`, and a client that
+relied on the old reading moves the `?` onto the header.
 
-The terminator and the whitespace before it are not part of the message,
-and a gateway strips them before anything reads the request. Quoted
-strings and block data are part of it, so stripping stops at the end of
-the last one: a definite-length block keeps every byte it declares even
-when the last of them is whitespace, CR or LF, and an indefinite block
-loses only the newline that ends it. A block whose length field is not
-all digits is not a block, and one that declares more than the message
-holds runs to its end. Block lengths are counted in characters, because
-the gateways hand the backend decoded text; a block holding bytes outside
-ASCII is not carried faithfully by that interface, and this decision does
-not change it.
+A gateway strips the terminator and the whitespace before it before
+anything reads the request, because neither is part of the message.
+Quoted strings and block data are, so stripping stops at the end of the
+last one. A definite-length block keeps every byte it declares, including
+a final space, CR or LF; an indefinite block loses only the newline that
+ends it. A `#` whose length field is not all digits does not start a
+block, and a block that declares more than the message holds runs to its
+end. Lengths are counted in characters: the gateways hand the backend
+decoded text, so a block holding bytes outside ASCII is not carried
+faithfully today, and this decision does not change that.
 
-The SOCKET gateway frames requests by line before any of this runs, and a
-line ends at CR, LF or CR LF. A block holding either byte is split there,
-so block data with CR or LF cannot cross SOCKET. That limit belongs to
-the framing, which HiSLIP, VXI-11 and USB/IP do not share; lifting it
-needs a reader that frames by the block's declared length, and this
-decision does not build one.
+The SOCKET gateway frames by line before any of this runs, and a line
+ends at CR, LF or CR LF, so a block holding either byte is split there.
+HiSLIP, VXI-11 and USB/IP frame by message and have no such limit.
+Lifting it on SOCKET needs a reader that frames by the block's declared
+length, which is out of scope here.
 
-One pure function in the domain answers each question, and every surface
-that asks it — `ScpiQuery.From`, the script parser and the four gateways
-— calls that function. §2 still holds: the units are found only to read
-their headers, and the request reaches the backend as it was sent, less
-its terminator.
+`ScpiQuery.From`, the script parser and the four gateways call the same
+two domain functions for the header test and the strip. §2 still holds:
+units are found only to read their headers, and the request reaches the
+backend as it was sent, less its terminator.
 
 ## Consequences
 
@@ -273,9 +268,8 @@ its terminator.
 - A query with parameters or trailing whitespace gets its response from
   every gateway, where today it gets silence, and `visa query` accepts it,
   where today it refuses it.
-- `VOLT MAX?` and every other request whose `?` ends a parameter become
-  writes. This is a breaking change for any client that relied on the old
-  reading, and it is recorded as one.
+- `VOLT MAX?`, and every other request whose `?` ends a parameter,
+  becomes a write. The changelog lists this under breaking changes.
 - [ADR 0026](0026-mock-scenario-system.md)'s exact-string matching gives
   way to §1, and [ADR 0027](0027-phase3-operator-automation.md) §2's
   script format to §6; both now point here.
