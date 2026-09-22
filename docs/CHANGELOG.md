@@ -51,8 +51,10 @@ All notable changes to ivi-cli are documented here. Format roughly follows
   `MEAS:VOLT? CH1` and `*IDN? ` went to the instrument as writes: through
   a gateway the client waited for its timeout while nothing was logged,
   and `visa query` refused them. A request is now a query when the header
-  of any of its `;`-separated units ends in `?`, with `;` and `?` inside
-  quoted strings and block data ignored.
+  of any of its `;`- or newline-separated units ends in `?`, with `;` and
+  `?` inside quoted strings and block data ignored. A gateway strips the
+  whitespace before the terminator; `visa query` sends the text as given,
+  so against the mock `*IDN? ` is accepted but matches no rule.
 - **The HiSLIP, VXI-11 and USB/IP gateways no longer cut bytes off the end
   of block data.** Stripping the terminator also stripped a trailing CR or
   LF byte that belonged to a `#<n><length>` block. These gateways now trim

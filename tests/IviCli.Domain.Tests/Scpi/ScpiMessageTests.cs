@@ -23,6 +23,8 @@ public sealed class ScpiMessageTests
     [InlineData("MEAS:VOLT?;VOLT 1")]
     [InlineData("VOLT 1;MEAS:VOLT? (@1)")]
     [InlineData("VOLT 1; MEAS:VOLT?")]
+    [InlineData("VOLT 1\n*OPC?")]
+    [InlineData("VOLT 1\r\n*OPC?\r\n")]
     [InlineData("DISP:TEXT \"a;b\";*OPC?")]
     [InlineData("DISP:TEXT 'it''s';*OPC?")]
     [InlineData("DATA #14ab?c;*OPC?")]

@@ -65,9 +65,10 @@ public static class ScpiMessage
     /// Whether <paramref name="text"/> expects a response: the header of at
     /// least one program message unit ends in <c>?</c> (IEEE 488.2). A header
     /// runs to the first whitespace, so parameters may follow it. Units are
-    /// separated by <c>;</c> outside quoted strings and block data; a
-    /// definite-length block (<c>#&lt;n&gt;&lt;length&gt;</c>) is skipped by
-    /// its declared length and <c>#0</c> runs to the end of the text.
+    /// separated by <c>;</c>, and messages by a newline, outside quoted
+    /// strings and block data; a definite-length block
+    /// (<c>#&lt;n&gt;&lt;length&gt;</c>) is skipped by its declared length and
+    /// <c>#0</c> runs to the end of the text.
     /// </summary>
     public static bool IsQuery(string text)
     {
@@ -98,7 +99,7 @@ public static class ScpiMessage
         {
             switch (text[i])
             {
-                case ';':
+                case ';' or '\n' or '\r':
                     return i + 1;
                 case '"' or '\'':
                     i = AfterQuotedString(text, i);
