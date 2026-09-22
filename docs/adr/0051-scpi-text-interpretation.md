@@ -18,7 +18,9 @@ The consequences are visible rather than theoretical. The mock treats
 `meas:volt?` and `MEAS:VOLT?` as different commands, so a client that
 sends lower case works against an instrument and gets nothing from the
 mock — which defeats the purpose of the mock. Nothing anywhere handles a
-compound query. Responses are strings from the backend to the terminal
+compound query. Whether a request expects a response at all is decided
+by `EndsWith('?')` on the whole line, in `ScpiQuery.From`, the script
+parser and all four gateways. Responses are strings from the backend to the terminal
 and are never interpreted, so a script cannot assert that a reading sits
 in a range without writing a regular expression over digits.
 
@@ -59,7 +61,9 @@ complete four-letter mnemonic, and the string alone cannot say which.
 ### 1. Canonicalization: case and leading colon, nothing more
 
 `NormalizeForMatch` gains case folding. It keeps stripping the leading
-`:`. It does not resolve short and long forms.
+`:`. It does not resolve short and long forms. The universal `*IDN?`
+fallback compares through the same canonicalization, so `*idn?` gets the
+identity string rather than its own text back.
 
 Every `match` in every scenario in this repository is written in short
 form and upper case — `MEAS:VOLT?`, `SYST:ERR?`, `OUTP?`. Case folding
@@ -199,6 +203,29 @@ with the one users are told to expect. No `.scpi` file exists in this
 repository, so nothing here needs migrating; the warning exists for
 scripts written elsewhere.
 
+### 7. A request is a query when a header ends in `?`
+
+A request expects a response when the header of any of its program
+message units ends in `?`. The header is the unit's text up to the first
+whitespace; parameters may follow it. Units are separated by `;` outside
+quoted strings and outside block data, where a definite-length block
+(`#<n><length>`) is skipped by its declared length and `#0` runs to the
+end of the message. Trailing whitespace is not part of the message.
+
+IEEE 488.2 defines a query by its header, not by the last character of
+the line: `MEAS:VOLT? (@1)` is how a channel list is queried, and
+`<white space>` is allowed before the terminator. Deciding by
+`EndsWith('?')` sent `MEAS:VOLT? (@1)`, `MEAS:VOLT? CH1` and `*IDN? ` to
+the backend as writes. The mock accepted them, no response was written,
+and the client waited for its timeout while nothing was logged at any
+level.
+
+One pure function in the domain answers the question, and every surface
+that asks it — `ScpiQuery.From`, the script parser and the four gateways
+— calls that function. §2 still holds: the units are found only to read
+their headers, and the request reaches the backend as the string it was
+sent as.
+
 ## Consequences
 
 - The mock stops refusing requests an instrument would answer, which is
@@ -216,6 +243,9 @@ scripts written elsewhere.
 - A script can send any SCPI command, including one spelled like a
   directive, and can carry block data and `#H` values through unharmed.
   Both were impossible before and neither was known to be.
+- A query with parameters or trailing whitespace gets its response from
+  every gateway and from `visa query`, where it used to get silence or a
+  validation error.
 - [ADR 0026](0026-mock-scenario-system.md)'s exact-string matching gives
   way to §1, and [ADR 0027](0027-phase3-operator-automation.md) §2's
   script format to §6; both now point here.
@@ -249,6 +279,10 @@ scripts written elsewhere.
 - Case folding is pinned by a test asserting that a rule written
   `MEAS:VOLT?` answers `meas:volt?`, `:MEAS:VOLT?` and `MEAS:VOLT?`, and
   refuses `MEASure:VOLTage?`.
+- Query detection is pinned by cases on the pure function —
+  `MEAS:VOLT? (@1)`, `*IDN? `, `VOLT 1;MEAS:VOLT? (@1)`, a `;` or `?`
+  inside a quoted string, a `?` inside definite-length block data — and
+  by a gateway test per protocol showing `MEAS:VOLT? CH1` gets a reply.
 - The script parser is pinned by cases the old format could not express:
   a line spelled `echo ON` reaching the instrument, `SOUR:VOLT #HFF`
   arriving with its parameter intact, and `DATA #800001000AB` surviving
