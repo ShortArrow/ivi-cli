@@ -230,10 +230,19 @@ and a gateway strips them before anything reads the request. Quoted
 strings and block data are part of it, so stripping stops at the end of
 the last one: a definite-length block keeps every byte it declares even
 when the last of them is whitespace, CR or LF, and an indefinite block
-loses only the newline that ends it. Block lengths are counted in
-characters, because the gateways hand the backend decoded text; a block
-holding bytes outside ASCII is not carried faithfully by that interface,
-and this decision does not change it.
+loses only the newline that ends it. A block whose length field is not
+all digits is not a block, and one that declares more than the message
+holds runs to its end. Block lengths are counted in characters, because
+the gateways hand the backend decoded text; a block holding bytes outside
+ASCII is not carried faithfully by that interface, and this decision does
+not change it.
+
+The SOCKET gateway frames requests by line before any of this runs, and a
+line ends at CR, LF or CR LF. A block holding either byte is split there,
+so block data with CR or LF cannot cross SOCKET. That limit belongs to
+the framing, which HiSLIP, VXI-11 and USB/IP do not share; lifting it
+needs a reader that frames by the block's declared length, and this
+decision does not build one.
 
 One pure function in the domain answers each question, and every surface
 that asks it — `ScpiQuery.From`, the script parser and the four gateways
