@@ -60,6 +60,22 @@ public sealed class SocketPeerAbortTests
         harness.Logger.Entries.ShouldNotContain(entry => entry.Level >= LogLevel.Error);
     }
 
+    [Fact]
+    public async Task Client_leaving_with_responses_unread_is_logged_as_a_disconnect_not_an_error()
+    {
+        await using var harness = await Harness.StartAsync();
+
+        using (var tcp = new TcpClient())
+        {
+            await tcp.ConnectAsync(IPAddress.Loopback, harness.ListenPort, harness.Token);
+            var burst = string.Concat(Enumerable.Repeat("*IDN?\n", 20000));
+            await tcp.GetStream().WriteAsync(Encoding.UTF8.GetBytes(burst), harness.Token);
+        }
+
+        await harness.WaitForSecondAsync("client disconnected");
+        harness.Logger.Entries.ShouldNotContain(entry => entry.Level >= LogLevel.Error);
+    }
+
     private sealed class Harness : IAsyncDisposable
     {
         private readonly CancellationTokenSource _cts;
