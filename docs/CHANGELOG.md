@@ -38,22 +38,22 @@ All notable changes to ivi-cli are documented here. Format roughly follows
   query only when a header ends in `?`, so `VOLT MAX?` is now a write:
   `visa query "VOLT MAX?"` refuses it, a gateway sends it to the backend
   as a write and returns nothing, and a scenario rule matching it must
-  `ack` rather than `respond`. The form is not valid SCPI — the query of
-  that setting is `VOLT? MAX` — so a script or client using it needs the
-  `?` moved onto the header.
+  `ack` rather than `respond`. `VOLT MAX?` is not valid SCPI; the query
+  of that setting is `VOLT? MAX`. A script or client using the old form
+  moves the `?` onto the header.
 
 ### Fixed
 
 - **A query with parameters or trailing whitespace gets its response.**
-  Every gateway, `visa query` and the script runner decided whether a
-  request expects a response by whether the line's last character was
-  `?`. IEEE 488.2 decides it by the header, so `MEAS:VOLT? (@1)`,
-  `MEAS:VOLT? CH1` and `*IDN? ` went to the instrument as writes: through
-  a gateway the client waited for its timeout while nothing was logged,
-  and `visa query` refused them. A request is now a query when the header
-  of any of its `;`- or newline-separated units ends in `?`, with `;` and
-  `?` inside quoted strings and block data ignored. A gateway strips the
-  whitespace before the terminator; `visa query` sends the text as given,
+  Every gateway, `visa query` and the script runner treated a request as
+  a query when the last character of the line was `?`. IEEE 488.2 defines
+  a query by its header, so `MEAS:VOLT? (@1)`, `MEAS:VOLT? CH1` and
+  `*IDN? ` went to the instrument as writes. Through a gateway the client
+  waited for its timeout and nothing was logged; `visa query` refused
+  them. A request is now a query when the header of any unit ends in `?`,
+  where `;` separates units and a newline separates messages, and neither
+  counts inside a quoted string or block data. A gateway strips the
+  whitespace before the terminator. `visa query` sends the text as given,
   so against the mock `*IDN? ` is accepted but matches no rule.
 - **The HiSLIP, VXI-11 and USB/IP gateways no longer cut bytes off the end
   of block data.** Stripping the terminator also stripped a trailing CR or
