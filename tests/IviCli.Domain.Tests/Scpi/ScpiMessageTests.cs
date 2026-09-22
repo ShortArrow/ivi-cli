@@ -62,8 +62,10 @@ public sealed class ScpiMessageTests
     [InlineData("DATA #2+3a  ", "DATA #2+3a")]
     [InlineData("   ", "")]
     [InlineData("", "")]
-    public void TrimEnd_drops_trailing_whitespace_outside_block_data(string text, string expected) =>
-        ScpiMessage.TrimEnd(text).ShouldBe(expected);
+    public void TrimEnd_drops_trailing_whitespace_outside_block_data(
+        string text,
+        string expected
+    ) => ScpiMessage.TrimEnd(text).ShouldBe(expected);
 
     [Theory]
     [InlineData("MEAS:VOLT? (@1)")]
