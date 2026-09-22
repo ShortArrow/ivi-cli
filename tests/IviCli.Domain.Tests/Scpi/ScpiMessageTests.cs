@@ -55,6 +55,12 @@ public sealed class ScpiMessageTests
     [InlineData("DATA #12a\r", "DATA #12a\r")]
     [InlineData("DATA #0ab \n", "DATA #0ab ")]
     [InlineData("DATA #0ab ", "DATA #0ab ")]
+    [InlineData("DATA #0ab\r\n", "DATA #0ab\r")]
+    [InlineData("DATA #15ab\r\n", "DATA #15ab\r\n")]
+    [InlineData("DISP:TEXT \"ab \r\n", "DISP:TEXT \"ab \r\n")]
+    [InlineData("DATA #2 3a  ", "DATA #2 3a")]
+    [InlineData("DATA #2+3a  ", "DATA #2+3a")]
+    [InlineData("   ", "")]
     [InlineData("", "")]
     public void TrimEnd_drops_trailing_whitespace_outside_block_data(string text, string expected) =>
         ScpiMessage.TrimEnd(text).ShouldBe(expected);

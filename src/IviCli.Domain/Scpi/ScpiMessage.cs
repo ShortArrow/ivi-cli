@@ -136,7 +136,14 @@ public static class ScpiMessage
         {
             return text.Length;
         }
-        if (!int.TryParse(text.AsSpan(lengthStart, digits), out var length))
+        if (
+            !int.TryParse(
+                text.AsSpan(lengthStart, digits),
+                System.Globalization.NumberStyles.None,
+                System.Globalization.CultureInfo.InvariantCulture,
+                out var length
+            )
+        )
         {
             return hash + 1;
         }
