@@ -209,7 +209,8 @@ scripts written elsewhere.
 
 A request expects a response when the header of any of its program
 message units ends in `?`. The header is the unit's text up to the first
-whitespace; parameters may follow it. Units are separated by `;` outside
+whitespace; parameters may follow it. Units are separated by `;`, and
+messages by a newline, outside
 quoted strings and outside block data, where a definite-length block
 (`#<n><length>`) is skipped by its declared length and `#0` runs to the
 end of the message.
