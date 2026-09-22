@@ -32,6 +32,16 @@ All notable changes to ivi-cli are documented here. Format roughly follows
   keeps its line numbers instead of losing them the moment the `.pdb` beside
   it goes missing.
 
+### Changed (breaking)
+
+- **A `?` that ends a parameter no longer makes a query.** A request is a
+  query only when a header ends in `?`, so `VOLT MAX?` is now a write:
+  `visa query "VOLT MAX?"` refuses it, a gateway sends it to the backend
+  as a write and returns nothing, and a scenario rule matching it must
+  `ack` rather than `respond`. The form is not valid SCPI — the query of
+  that setting is `VOLT? MAX` — so a script or client using it needs the
+  `?` moved onto the header.
+
 ### Fixed
 
 - **A query with parameters or trailing whitespace gets its response.**
