@@ -83,8 +83,10 @@ fail_detail = "50"                       # variant-specific payload (e.g. ms)
 ```
 
 - Exactly one of `respond` / `ack` / `fail` must be set per scene.
-- `match` is matched **as exact strings** in v1. Regex / wildcard
-  matching is deferred to a future revision.
+- `match` is matched **as exact strings** in v1.
+  [ADR 0051](0051-scpi-text-interpretation.md) §1 decides to compare
+  after case folding and removal of a leading `:`, and nothing else.
+  Regex / wildcard matching is deferred to a future revision.
 - Scenes have no defined order. Lookup is O(scenes-in-scenario); a
   later revision can adopt a hash map if needed.
 - `idn` is a convenience that pre-populates the universal `*IDN?`
