@@ -4,6 +4,19 @@ All notable changes to ivi-cli are documented here. Format roughly follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning follows
 [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- **An empty message no longer ends a HiSLIP session or fails a VXI-11
+  write.** A message holding only whitespace and a terminator is an empty
+  program message, which an instrument accepts and ignores. Since
+  0.4.0-beta.1 the gateways strip that whitespace, so the message reached
+  the command check empty: HiSLIP answered with a fatal error and closed
+  the session, and VXI-11 returned a syntax error. A bare newline did the
+  same before. Both gateways now accept it without calling the backend, as
+  SOCKET and USB/IP already did.
+
 ## [0.4.0-beta.1] — 2026-09-23
 
 ### Changed (breaking)

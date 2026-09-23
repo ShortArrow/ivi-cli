@@ -680,6 +680,11 @@ public sealed class HiSlipGatewayServer : IGatewayServer
         // whitespace before the terminator. Backends and scenario matchers
         // see neither; block data keeps every byte it declares.
         var normalized = ScpiMessage.TrimEnd(scpi);
+        if (normalized.Length == 0)
+        {
+            // An empty program message (IEEE 488.2 §7): accepted, nothing to do.
+            return true;
+        }
         if (ScpiMessage.IsQuery(normalized))
         {
             var queryResult = ScpiQuery.From(normalized);
