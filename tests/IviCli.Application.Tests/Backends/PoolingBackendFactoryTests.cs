@@ -6,6 +6,7 @@ using IviCli.Domain.Devices;
 using IviCli.Domain.Scpi;
 using IviCli.Domain.Visa;
 using IviCli.TestKit;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Time.Testing;
 using Shouldly;
 
@@ -227,6 +228,48 @@ public sealed class PoolingBackendFactoryTests
         pool.CachedEntryCount.ShouldBe(2);
         fake.OpenCountFor(Dev("a").Name).ShouldBe(1);
         fake.OpenCountFor(Dev("b").Name).ShouldBe(1);
+    }
+
+    [Fact]
+    public async Task A_session_that_waits_for_a_held_lease_logs_the_wait_and_how_long_it_took()
+    {
+        var device = Dev("dut", timeoutMs: 5000);
+        var logger = new RecordingLogger<PoolingBackendFactory>();
+        await using var pool = new PoolingBackendFactory(
+            new FakeBackendFactory(new FakeBackend()),
+            DefaultPool(),
+            new FakeTimeProvider(),
+            logger
+        );
+        var holder = pool.CreateFor(device).ShouldBeOk();
+        (await holder.OpenAsync(device, default)).ShouldBeOk();
+
+        var waiter = pool.CreateFor(device).ShouldBeOk();
+        var waiting = waiter.OpenAsync(device, default);
+        await WaitForAsync(() => logger.Entries.Any(e => e.Message.Contains("waiting")));
+        (await holder.CloseAsync(device, default)).ShouldBeOk();
+        (await waiting).ShouldBeOk();
+
+        var lines = logger.Entries.Where(e => e.Level == LogLevel.Debug).Select(e => e.Message);
+        lines.ShouldContain(m => m.Contains("dut") && m.Contains("waiting"));
+        lines.ShouldContain(m => m.Contains("dut") && m.Contains("acquired after"));
+    }
+
+    [Fact]
+    public async Task A_session_that_finds_the_lease_free_logs_nothing_about_waiting()
+    {
+        var device = Dev("dut");
+        var logger = new RecordingLogger<PoolingBackendFactory>();
+        await using var pool = new PoolingBackendFactory(
+            new FakeBackendFactory(new FakeBackend()),
+            DefaultPool(),
+            new FakeTimeProvider(),
+            logger
+        );
+
+        await OpenCloseAsync(pool, device);
+
+        logger.Entries.ShouldNotContain(e => e.Message.Contains("waiting"));
     }
 
     private static async Task OpenCloseAsync(PoolingBackendFactory pool, Device device)

@@ -236,21 +236,29 @@ public sealed class SocketGatewayServer : IGatewayServer
                     );
                     if (ScpiMessage.IsQuery(trimmed))
                     {
+                        _logger.LogDebug("query {Request}", TraceText.Clip(trimmed));
                         if (Failed(ScpiQuery.From(trimmed), out var q))
                         {
                             GatewayTelemetry.Complete(message, ok: false);
                             continue;
                         }
+                        var started = System.Diagnostics.Stopwatch.GetTimestamp();
                         if (Failed(await backend.QueryAsync(device, q, ct), out var responseText))
                         {
                             GatewayTelemetry.Complete(message, ok: false);
                             break;
                         }
                         GatewayTelemetry.Complete(message, ok: true);
+                        _logger.LogDebug(
+                            "response {Response} after {Elapsed}",
+                            TraceText.Clip(responseText),
+                            System.Diagnostics.Stopwatch.GetElapsedTime(started)
+                        );
                         await writer.WriteLineAsync(responseText.AsMemory(), ct);
                     }
                     else
                     {
+                        _logger.LogDebug("write {Request}", TraceText.Clip(trimmed));
                         if (Failed(ScpiCommand.From(trimmed), out var c))
                         {
                             GatewayTelemetry.Complete(message, ok: false);
