@@ -4,7 +4,17 @@ All notable changes to ivi-cli are documented here. Format roughly follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning follows
 [Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.4.0-beta.1] — 2026-09-23
+
+### Changed (breaking)
+
+- **A gateway or script no longer treats a `?` that ends a parameter as a
+  query.** They read a request as a query only when a header ends in `?`,
+  so `VOLT MAX?` sent through a gateway, or written on a script line, is
+  now a write: the gateway returns nothing, and a scenario rule matching
+  it must `ack` rather than `respond`. `VOLT MAX?` is not valid SCPI; the
+  query of that setting is `VOLT? MAX`. `visa query`, `visa monitor` and
+  the API still send it as a query, because the caller asked for one.
 
 ### Changed
 
@@ -17,9 +27,6 @@ All notable changes to ivi-cli are documented here. Format roughly follows
   could never run on the Linux job. Formatting, analyzers and coverage
   stay on the Linux job, being properties of the code rather than of the
   operating system.
-
-### Changed
-
 - **The release archives carry what you run, and nothing else.** They held
   thirty-two files: the binary, two licences, the third-party notices, and
   then fourteen `.pdb` and fourteen XML doc files. Symbols now travel
@@ -31,16 +38,6 @@ All notable changes to ivi-cli are documented here. Format roughly follows
   download is slightly smaller, and a stack trace from a downloaded build
   keeps its line numbers instead of losing them the moment the `.pdb` beside
   it goes missing.
-
-### Changed (breaking)
-
-- **A gateway or script no longer treats a `?` that ends a parameter as a
-  query.** They read a request as a query only when a header ends in `?`,
-  so `VOLT MAX?` sent through a gateway, or written on a script line, is
-  now a write: the gateway returns nothing, and a scenario rule matching
-  it must `ack` rather than `respond`. `VOLT MAX?` is not valid SCPI; the
-  query of that setting is `VOLT? MAX`. `visa query`, `visa monitor` and
-  the API still send it as a query, because the caller asked for one.
 
 ### Fixed
 
