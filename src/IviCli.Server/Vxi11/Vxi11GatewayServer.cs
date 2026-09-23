@@ -600,6 +600,12 @@ public sealed class Vxi11GatewayServer : IGatewayServer
         }
         var scpi = ScpiMessage.TrimEnd(Encoding.ASCII.GetString(pendingWrite));
         state.ClearPendingWrite();
+        if (scpi.Length == 0)
+        {
+            // An empty program message (IEEE 488.2 §7): accepted, nothing to do.
+            await WriteWriteReplyAsync(stream, xid, Vxi11NoError, (uint)parms.Data.Length, ct);
+            return;
+        }
 
         // Pick up an out-of-process scenario re-binding mid-link: a client
         // may hold one long-lived link while a separate `mock scenario
