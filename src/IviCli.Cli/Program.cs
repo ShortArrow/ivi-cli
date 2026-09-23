@@ -438,6 +438,7 @@ internal static class Program
         var root = new RootCommand(
             "ivi-cli: integrated CLI for managing, diagnosing, and operating VISA/IVI instruments."
         );
+        GlobalLoggingOptions.AddTo(root);
         root.Subcommands.Add(visa);
         root.Subcommands.Add(MockCommand.Build(services));
         root.Subcommands.Add(ServerCommand.Build(services));
