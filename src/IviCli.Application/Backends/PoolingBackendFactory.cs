@@ -105,7 +105,11 @@ public sealed class PoolingBackendFactory : IBackendFactory, IAsyncDisposable
             bool acquired;
             try
             {
-                acquired = await entry.Semaphore.WaitAsync(device.Timeout.Value, ct);
+                acquired = entry.Semaphore.Wait(0, CancellationToken.None);
+                if (!acquired)
+                {
+                    acquired = await WaitForHeldLeaseAsync(entry, device, ct);
+                }
             }
             catch (ObjectDisposedException)
             {
@@ -139,6 +143,35 @@ public sealed class PoolingBackendFactory : IBackendFactory, IAsyncDisposable
 
             return Result.Success<Lease, BackendError>(new Lease(entry, this, device));
         }
+    }
+
+    /// <summary>
+    /// Waits for a lease another session holds, logging the wait and, once
+    /// the lease is taken, how long it took. Only called when the lease was
+    /// not free, so an uncontended open logs nothing.
+    /// </summary>
+    private async Task<bool> WaitForHeldLeaseAsync(
+        PoolEntry entry,
+        Device device,
+        CancellationToken ct
+    )
+    {
+        _logger?.LogDebug(
+            "pool: {Device} is leased by another session; waiting up to {Timeout}",
+            device.Name.Value,
+            device.Timeout.Value
+        );
+        var started = _time.GetTimestamp();
+        var acquired = await entry.Semaphore.WaitAsync(device.Timeout.Value, ct);
+        if (acquired)
+        {
+            _logger?.LogDebug(
+                "pool: lease for {Device} acquired after {Waited}",
+                device.Name.Value,
+                _time.GetElapsedTime(started)
+            );
+        }
+        return acquired;
     }
 
     internal void Release(Lease lease, bool broken)

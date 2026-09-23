@@ -16,6 +16,17 @@ All notable changes to ivi-cli are documented here. Format roughly follows
   query of that setting is `VOLT? MAX`. `visa query`, `visa monitor` and
   the API still send it as a query, because the caller asked for one.
 
+### Added
+
+- **`-v` shows what a SOCKET gateway received and answered.** At Debug the
+  gateway logs each request line, and for a query the response and how
+  long the backend took to give it. It also logs when a session has to
+  wait for a device another session holds, and how long the wait lasted:
+  a SOCKET connection keeps its device leased until it disconnects, so a
+  second client on the same gateway waits for the first to leave, up to
+  the device's `timeout_ms`. Text longer than 200 characters is cut, with
+  its full length noted.
+
 ### Changed
 
 - **Pull requests now run the test suite on Windows as well as Linux.** It
@@ -41,6 +52,10 @@ All notable changes to ivi-cli are documented here. Format roughly follows
 
 ### Fixed
 
+- **`-v`, `-vv`, `-q`, `--log-format` and `--log-file` are accepted.** The
+  README documents them and the logger read them, but the command-line
+  parser did not know them, so any command given one exited with
+  `Unrecognized command or argument`.
 - **A query with parameters or trailing whitespace gets its response.**
   Every gateway, `visa query` and the script runner treated a request as
   a query when the last character of the line was `?`. IEEE 488.2 defines
