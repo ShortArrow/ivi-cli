@@ -220,8 +220,17 @@ rule that looks at the last character of the line sends `MEAS:VOLT? (@1)`,
 them, writes no response, and the client waits for its timeout with
 nothing in the log. Under the header rule a `?` at the end of a
 parameter, as in `VOLT MAX?`, does not make a query. `VOLT MAX?` is not
-valid SCPI; the query of that setting is `VOLT? MAX`, and a client that
-relied on the old reading moves the `?` onto the header.
+valid SCPI; the query of that setting is `VOLT? MAX`, and a gateway
+client that relied on the old reading moves the `?` onto the header.
+
+The rule applies only where the request does not say what the caller
+expects. A SOCKET line and a HiSLIP message carry no such statement, and
+neither does a line in a script, so the gateways and the script parser
+use the header rule. `visa query`, `visa monitor`, the API and scenario
+recording are asked for a query by name, so `ScpiQuery.From` does not
+override the caller: it accepts text in which a header ends in `?` or
+the text itself does, and refuses only text with neither. A write asked
+for by name is sent as a write whatever its text says.
 
 A gateway strips the terminator and the whitespace before it before
 anything reads the request, because neither is part of the message.
@@ -240,8 +249,8 @@ HiSLIP, VXI-11 and USB/IP frame by message and have no such limit.
 Lifting it on SOCKET needs a reader that frames by the block's declared
 length, which is out of scope here.
 
-`ScpiQuery.From`, the script parser and the four gateways call the same
-two domain functions for the header test and the strip. §2 still holds:
+The script parser and the four gateways call the same two domain
+functions for the header test and the strip. §2 still holds:
 units are found only to read their headers, and the request reaches the
 backend as it was sent, less its terminator.
 
@@ -268,7 +277,9 @@ backend as it was sent, less its terminator.
   every gateway, where today it gets silence, and `visa query` accepts it,
   where today it refuses it.
 - `VOLT MAX?`, and every other request whose `?` ends a parameter,
-  becomes a write. The changelog lists this under breaking changes.
+  becomes a write when it reaches a gateway or a script. The changelog
+  lists this under breaking changes. `visa query "VOLT MAX?"` still reads
+  a response.
 - [ADR 0026](0026-mock-scenario-system.md)'s exact-string matching gives
   way to §1, and [ADR 0027](0027-phase3-operator-automation.md) §2's
   script format to §6; both now point here.

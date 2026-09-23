@@ -75,7 +75,18 @@ public sealed class ScpiMessageTests
     public void From_accepts_a_query_with_parameters_or_trailing_whitespace(string text) =>
         ScpiQuery.From(text).ShouldBeOk().Value.ShouldBe(text);
 
-    [Fact]
-    public void From_rejects_a_request_without_a_query_header() =>
-        ScpiQuery.From("VOLT MAX?").ShouldBeError();
+    [Theory]
+    [InlineData("VOLT MAX?")]
+    [InlineData("VOLT MAX?\r\n")]
+    public void From_accepts_a_text_ending_in_a_question_mark_even_without_a_query_header(
+        string text
+    ) => ScpiQuery.From(text).ShouldBeOk().Value.ShouldBe(text);
+
+    [Theory]
+    [InlineData("*RST")]
+    [InlineData("VOLT 1")]
+    [InlineData("DISP:TEXT \"ready?\"")]
+    public void From_rejects_a_text_with_neither_a_query_header_nor_a_final_question_mark(
+        string text
+    ) => ScpiQuery.From(text).ShouldBeError();
 }

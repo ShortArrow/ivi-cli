@@ -34,13 +34,13 @@ All notable changes to ivi-cli are documented here. Format roughly follows
 
 ### Changed (breaking)
 
-- **A `?` that ends a parameter no longer makes a query.** A request is a
-  query only when a header ends in `?`, so `VOLT MAX?` is now a write:
-  `visa query "VOLT MAX?"` refuses it, a gateway sends it to the backend
-  as a write and returns nothing, and a scenario rule matching it must
-  `ack` rather than `respond`. `VOLT MAX?` is not valid SCPI; the query
-  of that setting is `VOLT? MAX`. A script or client using the old form
-  moves the `?` onto the header.
+- **A gateway or script no longer treats a `?` that ends a parameter as a
+  query.** They read a request as a query only when a header ends in `?`,
+  so `VOLT MAX?` sent through a gateway, or written on a script line, is
+  now a write: the gateway returns nothing, and a scenario rule matching
+  it must `ack` rather than `respond`. `VOLT MAX?` is not valid SCPI; the
+  query of that setting is `VOLT? MAX`. `visa query`, `visa monitor` and
+  the API still send it as a query, because the caller asked for one.
 
 ### Fixed
 
