@@ -2,8 +2,10 @@ namespace IviCli.Domain.Scpi;
 
 /// <summary>
 /// A SCPI query intended to be sent to an instrument and produce a textual
-/// response. Construct via <see cref="From(string)"/>; the value must be a
-/// query as <see cref="ScpiMessage.IsQuery(string)"/> defines it.
+/// response. Construct via <see cref="From(string)"/>. The caller has already
+/// said it expects a response, so the value is accepted when either a header
+/// ends in <c>?</c> (<see cref="ScpiMessage.IsQuery(string)"/>) or the text
+/// itself does; only text with no <c>?</c> in either place is refused.
 /// </summary>
 public sealed record ScpiQuery
 {
@@ -28,10 +30,10 @@ public sealed record ScpiQuery
                 new InvalidScpiQuery(raw, $"exceeds {MaxLength} characters")
             );
         }
-        if (!ScpiMessage.IsQuery(raw))
+        if (!ScpiMessage.IsQuery(raw) && !raw.TrimEnd().EndsWith('?'))
         {
             return Result.Failure<ScpiQuery, ScpiError>(
-                new InvalidScpiQuery(raw, "no program header ends with '?'")
+                new InvalidScpiQuery(raw, "no '?' ends a header or the text")
             );
         }
         foreach (var c in raw)
