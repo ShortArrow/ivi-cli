@@ -6,6 +6,23 @@ All notable changes to ivi-cli are documented here. Format roughly follows
 
 ## [Unreleased]
 
+### Added
+
+- **Scripts accept the `!` prefix that 0.4.0 requires.** `!sleep`,
+  `!assert` and `!echo` are the directives, and `!#` starts a comment. A
+  `!` line is read whole, so `#` inside it stays part of the text, as it
+  will for every line from 0.4.0.
+
+### Deprecated
+
+- **Unprefixed script directives and `#` comments.** `sleep`, `assert` and
+  `echo` without `!`, and a `#` comment on its own line or after SCPI text,
+  still work in 0.3.x. `visa script` and `mock scenario record
+  --from-script` print a warning for each such line, and `visa lint`
+  reports it. 0.4.0 removes the unprefixed form: it sends every line
+  without `!` to the instrument as written, `#` included, since `#` also
+  starts block data and `#H`/`#Q`/`#B` numbers.
+
 ## [0.3.2-beta.1] — 2026-08-25
 
 ### Added

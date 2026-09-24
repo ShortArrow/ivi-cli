@@ -13,101 +13,201 @@ namespace IviCli.Application.Scripting;
 public sealed record ScpiScript(ImmutableArray<ScpiScriptDirective> Directives)
 {
     /// <summary>
+    /// Lines written in the form 0.4.0 removes: a directive without the
+    /// <c>!</c> prefix, or a <c>#</c> comment. They still parse as before;
+    /// each one is listed here so the caller can say where the script needs
+    /// changing.
+    /// </summary>
+    public ImmutableArray<ScpiScriptDeprecation> Deprecations { get; init; } = [];
+
+    /// <summary>
     /// Parses the supplied script source into a structured
-    /// <see cref="ScpiScript"/>. Blank lines and lines starting with
-    /// <c>#</c> are ignored. Trailing <c># ...</c> comments are stripped.
+    /// <see cref="ScpiScript"/>. A line starting with <c>!</c> is a directive
+    /// (<c>!sleep</c>, <c>!assert</c>, <c>!echo</c>) or, as <c>!#</c>, a
+    /// comment, and is read whole. Any other line is read as before: blank
+    /// lines and <c>#</c> comments are skipped, a trailing <c># ...</c> is
+    /// stripped, and an unprefixed <c>sleep</c>, <c>assert</c> or <c>echo</c>
+    /// is a directive; each such use is recorded in
+    /// <see cref="Deprecations"/>.
     /// </summary>
     public static Result<ScpiScript, ScpiScriptError> Parse(string source)
     {
         var directives = ImmutableArray.CreateBuilder<ScpiScriptDirective>();
+        var deprecations = ImmutableArray.CreateBuilder<ScpiScriptDeprecation>();
         var lines = source.Split('\n');
         for (var i = 0; i < lines.Length; i++)
         {
             var lineNumber = i + 1;
-            var raw = StripComment(lines[i]).Trim();
-            if (raw.Length == 0)
+            var written = lines[i].Trim();
+            var parsed = written.StartsWith('!')
+                ? ParsePrefixed(written, lineNumber)
+                : ParseUnprefixed(written, lineNumber, deprecations);
+            switch (parsed)
             {
-                continue;
-            }
-
-            var parseResult = ParseDirective(raw, lineNumber);
-            if (parseResult is Result<ScpiScriptDirective, ScpiScriptError>.Ok { Value: var d })
-            {
-                directives.Add(d);
-            }
-            else
-            {
-                return Result.Failure<ScpiScript, ScpiScriptError>(
-                    ((Result<ScpiScriptDirective, ScpiScriptError>.Error)parseResult).Err
-                );
+                case Result<ScpiScriptDirective?, ScpiScriptError>.Ok { Value: { } directive }:
+                    directives.Add(directive);
+                    break;
+                case Result<ScpiScriptDirective?, ScpiScriptError>.Error error:
+                    return Result.Failure<ScpiScript, ScpiScriptError>(error.Err);
+                default:
+                    break;
             }
         }
         return Result.Success<ScpiScript, ScpiScriptError>(
-            new ScpiScript(directives.ToImmutable())
+            new ScpiScript(directives.ToImmutable()) { Deprecations = deprecations.ToImmutable() }
         );
     }
 
-    private static string StripComment(string line)
+    private static Result<ScpiScriptDirective?, ScpiScriptError> ParsePrefixed(
+        string written,
+        int line
+    )
     {
-        // Honor `#` only when it follows whitespace OR is the first non-space
-        // character. SCPI text rarely contains `#` so a literal split is OK
-        // for the v1 contract.
-        var idx = line.IndexOf('#');
-        return idx < 0 ? line : line[..idx];
+        var body = written[1..];
+        if (body.StartsWith('#'))
+        {
+            return Result.Success<ScpiScriptDirective?, ScpiScriptError>(null);
+        }
+        if (TryParseKeyword(body, line) is { } keyword)
+        {
+            return keyword;
+        }
+        return Result.Failure<ScpiScriptDirective?, ScpiScriptError>(
+            new ScpiScriptInvalidDirective(
+                line,
+                written,
+                "unknown directive; expected !sleep, !assert, !echo or !#"
+            )
+        );
     }
 
-    private static Result<ScpiScriptDirective, ScpiScriptError> ParseDirective(string raw, int line)
+    private static Result<ScpiScriptDirective?, ScpiScriptError> ParseUnprefixed(
+        string written,
+        int line,
+        ImmutableArray<ScpiScriptDeprecation>.Builder deprecations
+    )
     {
-        if (raw.StartsWith("sleep ", StringComparison.OrdinalIgnoreCase))
+        var hash = written.IndexOf('#');
+        var raw = (hash < 0 ? written : written[..hash]).Trim();
+        if (hash >= 0)
         {
-            var arg = raw["sleep ".Length..].Trim();
+            deprecations.Add(ScpiScriptDeprecation.ForComment(line, written, raw, written[hash..]));
+        }
+        if (raw.Length == 0)
+        {
+            return Result.Success<ScpiScriptDirective?, ScpiScriptError>(null);
+        }
+        if (TryParseKeyword(raw, line) is { } keyword)
+        {
+            if (keyword is Result<ScpiScriptDirective?, ScpiScriptError>.Ok)
+            {
+                deprecations.Add(ScpiScriptDeprecation.ForDirective(line, raw));
+            }
+            return keyword;
+        }
+        return Result.Success<ScpiScriptDirective?, ScpiScriptError>(
+            raw.EndsWith('?')
+                ? new ScpiScriptDirective.Query(line, raw)
+                : new ScpiScriptDirective.Write(line, raw)
+        );
+    }
+
+    /// <summary>
+    /// Reads <paramref name="text"/> as <c>sleep</c>, <c>assert</c> or
+    /// <c>echo</c>, the directive names shared by both forms; <c>null</c>
+    /// when it is none of them.
+    /// </summary>
+    private static Result<ScpiScriptDirective?, ScpiScriptError>? TryParseKeyword(
+        string text,
+        int line
+    )
+    {
+        if (text.StartsWith("sleep ", StringComparison.OrdinalIgnoreCase))
+        {
+            var arg = text["sleep ".Length..].Trim();
             if (
                 !int.TryParse(arg, NumberStyles.Integer, CultureInfo.InvariantCulture, out var ms)
                 || ms < 0
             )
             {
-                return Result.Failure<ScpiScriptDirective, ScpiScriptError>(
+                return Result.Failure<ScpiScriptDirective?, ScpiScriptError>(
                     new ScpiScriptInvalidDirective(
                         line,
-                        raw,
+                        text,
                         "sleep argument must be a non-negative integer"
                     )
                 );
             }
-            return Result.Success<ScpiScriptDirective, ScpiScriptError>(
+            return Result.Success<ScpiScriptDirective?, ScpiScriptError>(
                 new ScpiScriptDirective.Sleep(line, TimeSpan.FromMilliseconds(ms))
             );
         }
-        if (raw.StartsWith("assert ", StringComparison.OrdinalIgnoreCase))
+        if (text.StartsWith("assert ", StringComparison.OrdinalIgnoreCase))
         {
-            var pattern = raw["assert ".Length..].Trim();
+            var pattern = text["assert ".Length..].Trim();
             if (pattern.Length == 0)
             {
-                return Result.Failure<ScpiScriptDirective, ScpiScriptError>(
-                    new ScpiScriptInvalidDirective(line, raw, "assert requires a regex pattern")
+                return Result.Failure<ScpiScriptDirective?, ScpiScriptError>(
+                    new ScpiScriptInvalidDirective(line, text, "assert requires a regex pattern")
                 );
             }
-            return Result.Success<ScpiScriptDirective, ScpiScriptError>(
+            return Result.Success<ScpiScriptDirective?, ScpiScriptError>(
                 new ScpiScriptDirective.Assert(line, pattern)
             );
         }
-        if (raw.StartsWith("echo ", StringComparison.OrdinalIgnoreCase))
+        if (text.StartsWith("echo ", StringComparison.OrdinalIgnoreCase))
         {
-            var text = raw["echo ".Length..];
-            return Result.Success<ScpiScriptDirective, ScpiScriptError>(
-                new ScpiScriptDirective.Echo(line, text)
+            return Result.Success<ScpiScriptDirective?, ScpiScriptError>(
+                new ScpiScriptDirective.Echo(line, text["echo ".Length..])
             );
         }
-        if (raw.TrimEnd().EndsWith('?'))
-        {
-            return Result.Success<ScpiScriptDirective, ScpiScriptError>(
-                new ScpiScriptDirective.Query(line, raw)
-            );
-        }
-        return Result.Success<ScpiScriptDirective, ScpiScriptError>(
-            new ScpiScriptDirective.Write(line, raw)
-        );
+        return null;
     }
+}
+
+/// <summary>
+/// One line of a script written in the form 0.4.0 removes, with what to
+/// write instead. <see cref="Message"/> is the sentence a user reads.
+/// </summary>
+/// <param name="Line">1-based source line.</param>
+/// <param name="Written">The line as written, trimmed.</param>
+/// <param name="Replacement">What to write instead in the 0.4.0 form.</param>
+/// <param name="Message">A one-line explanation; the caller adds the line number.</param>
+public sealed record ScpiScriptDeprecation(
+    int Line,
+    string Written,
+    string Replacement,
+    string Message
+)
+{
+    /// <summary>An unprefixed <c>sleep</c>, <c>assert</c> or <c>echo</c>.</summary>
+    public static ScpiScriptDeprecation ForDirective(int line, string written) =>
+        new(
+            line,
+            written,
+            "!" + written,
+            $"`{written}` is a directive only until 0.4.0, which sends it to the instrument as SCPI; write `!{written}`."
+        );
+
+    /// <summary>
+    /// A <c>#</c> comment, on its own line or after SCPI text. From 0.4.0 a
+    /// <c>#</c> belongs to the instrument: it starts block data and
+    /// <c>#H</c>/<c>#Q</c>/<c>#B</c> numbers.
+    /// </summary>
+    public static ScpiScriptDeprecation ForComment(
+        int line,
+        string written,
+        string beforeHash,
+        string comment
+    ) =>
+        beforeHash.Length == 0
+            ? new(line, written, "!" + comment, $"`#` comments end at 0.4.0; write `!{comment}`.")
+            : new(
+                line,
+                written,
+                "!" + comment,
+                $"everything from `#` on is dropped here, but 0.4.0 sends it to the instrument (`#` also starts block data and #H/#Q/#B numbers); if `{comment}` is a comment, move it to its own `!{comment}` line."
+            );
 }
 
 /// <summary>A single directive within a parsed script.</summary>
