@@ -107,8 +107,10 @@ backend:
 `bin = "ivicli"` is required: the backend looks for an executable named
 after the repository (`ivi-cli`), and the binary is `ivicli` without the
 hyphen. No `matching` option is needed. From v0.3.2 the self-contained
-archive carries no suffix, and the backend picks it over `-fxdep`; with
-mise 2026.8.5 on Windows x64 it installed `ivicli-0.4.0-beta.1-win-x64.zip`.
+archive carries no suffix, and the backend picks it over `-fxdep`: for
+v0.4.0-beta.1 it installed `ivicli-0.4.0-beta.1-win-x64.zip` on Windows x64
+(mise 2026.8.5) and `ivicli-0.4.0-beta.1-linux-x64.zip` on a Debian x64
+host with no .NET, and both ran.
 `matching = "selfcontained"`, which releases up to v0.3.1 needed, now
 matches nothing and the install fails with `No matching asset found`.
 
