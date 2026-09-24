@@ -8,6 +8,15 @@ All notable changes to ivi-cli are documented here. Format roughly follows
 
 ### Fixed
 
+- **The install guide names the archives releases actually carry.** It
+  still pointed at `*-selfcontained.zip`, which releases stopped
+  publishing at v0.3.2, so its `curl` line and its mise recipe
+  (`matching = "selfcontained"`, which now matches nothing) both failed.
+  The guide now uses `ivicli-<version>-<rid>.zip` and mise's `github`
+  backend with `bin = "ivicli"` alone, which picks the self-contained
+  archive; the `ubi` backend it used before picks `-fxdep` and installs a
+  binary that cannot start.
+
 - **An empty message no longer ends a HiSLIP session or fails a VXI-11
   write.** A message holding only whitespace and a terminator is an empty
   program message, which an instrument accepts and ignores. Since
@@ -122,7 +131,7 @@ All notable changes to ivi-cli are documented here. Format roughly follows
   asset-selection options mise needs and a diagnosis path for
   `No frameworks were found`.
 
-### Changed
+### Changed (breaking)
 
 - **The self-contained archive is now the unsuffixed release asset.** From
   the next release it is `ivicli-<version>-<rid>.zip` rather than

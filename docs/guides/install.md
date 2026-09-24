@@ -15,24 +15,27 @@ covering both answers to that question.
 
 ## Self-contained binary
 
-Every release carries a `*-selfcontained.zip` per platform. The `ivicli`
-inside it is one file with the runtime bundled, so it runs on a machine
-with no .NET at all.
+Every release carries a self-contained archive per platform, named
+`ivicli-<version>-<rid>.zip`. The `ivicli` inside it is one file with the
+runtime bundled, so it runs on a machine with no .NET at all.
 
 ```sh
-version=0.3.1
+version=0.4.0-beta.1
 curl -fsSL -o ivicli.zip \
-  "https://github.com/ShortArrow/ivi-cli/releases/download/v${version}/ivicli-${version}-linux-x64-selfcontained.zip"
+  "https://github.com/ShortArrow/ivi-cli/releases/download/v${version}/ivicli-${version}-linux-x64.zip"
 unzip -j ivicli.zip ivicli -d ~/.local/bin
 chmod +x ~/.local/bin/ivicli
 ```
+
+Releases up to v0.3.1 named the same archive
+`ivicli-<version>-<rid>-selfcontained.zip`; use that name for them.
 
 Releases from v0.3.2 onward also carry a `SHA256SUMS` asset if you want
 to verify the download.
 
 Swap `linux-x64` for `linux-arm64`, `osx-x64`, `osx-arm64`, `win-x64`,
-or `win-arm64`. The `-j` flag keeps the debug symbols and XML docs that
-travel in the archive out of your `bin` directory.
+or `win-arm64`. The `-j` flag extracts the binary alone; the licences and
+third-party notices stay in the archive.
 
 The other archive per platform, `*-fxdep.zip`, is the
 framework-dependent build. It is smaller and needs .NET installed, so
@@ -93,27 +96,29 @@ If the tool refuses to start, jump to
 
 ## mise
 
-mise installs from the GitHub release assets. Two tool options are
-required, and without them you get the wrong thing or nothing at all:
+mise installs from the GitHub release assets through its `github`
+backend:
 
 ```toml
 [tools]
-"ubi:ShortArrow/ivi-cli" = { version = "0.3.1", exe = "ivicli", matching = "selfcontained" }
+"github:ShortArrow/ivi-cli" = { version = "0.4.0-beta.1", bin = "ivicli" }
 ```
 
-- `exe = "ivicli"` — the backend looks for an executable named after the
-  repository (`ivi-cli`), and the binary is `ivicli` without the hyphen.
-  Omit this and the install fails with `could not find any files
-  matching [ivi-cli*.bat ivi-cli*.exe]`.
-- `matching = "selfcontained"` — two archives match every platform, and
-  the backend otherwise picks `-fxdep`, the build that needs .NET
-  installed. Omit this and you inherit the prerequisite above without
-  being told.
+`bin = "ivicli"` is required: the backend looks for an executable named
+after the repository (`ivi-cli`), and the binary is `ivicli` without the
+hyphen. No `matching` option is needed. From v0.3.2 the self-contained
+archive carries no suffix, and the backend picks it over `-fxdep`: for
+v0.4.0-beta.1 it installed `ivicli-0.4.0-beta.1-win-x64.zip` on Windows x64
+(mise 2026.8.5) and `ivicli-0.4.0-beta.1-linux-x64.zip` on a Debian x64
+host with no .NET, and both ran.
+`matching = "selfcontained"`, which releases up to v0.3.1 needed, now
+matches nothing and the install fails with `No matching asset found`.
 
-mise has deprecated its `ubi` backend in favour of `github`, with
-removal announced for 2027.1. The `github` backend takes the same
-options; verify the resolved asset with `MISE_VERBOSE=1 mise install`
-before trusting it, because asset selection is what goes wrong here.
+The deprecated `ubi` backend picks `-fxdep` for these releases and
+extracts only `ivicli.exe` from it, which then fails for want of
+`ivicli.dll`. It has no option that selects the unsuffixed archive, so use
+`github`. Either way, `MISE_VERBOSE=1 mise install` shows the asset it
+resolved.
 
 ## Container
 
