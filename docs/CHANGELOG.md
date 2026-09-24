@@ -6,8 +6,6 @@ All notable changes to ivi-cli are documented here. Format roughly follows
 
 ## [Unreleased]
 
-## [Unreleased]
-
 ### Added
 
 - **Scripts accept the `!` prefix that 0.4.0 requires.** `!sleep`,
