@@ -623,7 +623,7 @@ public sealed class Vxi11GatewayServer : IGatewayServer
             state.SessionActivity,
             remoteParent: default
         );
-        if (scpi.EndsWith('?'))
+        if (ScpiMessage.ExpectsResponse(scpi))
         {
             var queryResult = ScpiQuery.From(scpi);
             if (queryResult is not Result<ScpiQuery, ScpiError>.Ok { Value: var q })

@@ -62,11 +62,13 @@ public sealed class Vxi11EndToEndTests
         catch (OperationCanceledException) { }
     }
 
-    [Fact]
-    public async Task CreateLink_then_Write_query_returns_fake_response()
+    [Theory]
+    [InlineData("*IDN?")]
+    [InlineData("MEAS:VOLT? CH1")]
+    public async Task CreateLink_then_Write_query_returns_fake_response(string request)
     {
         var (gateway, server, config, port, fake) = BuildHarness();
-        fake.RespondToQuery(DeviceName.From("dut").ShouldBeOk(), "*IDN?", "FAKE,VXI11,0,1.0");
+        fake.RespondToQuery(DeviceName.From("dut").ShouldBeOk(), request, "FAKE,VXI11,0,1.0");
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
         var serverTask = gateway.RunAsync(server, config, cts.Token);
         await WaitForListenerAsync(port, cts.Token);
@@ -98,8 +100,8 @@ public sealed class Vxi11EndToEndTests
         _ = createReply.ReadUInt32(); // abort port
         _ = createReply.ReadUInt32(); // maxRecvSize
 
-        // device_write *IDN?\n with END flag
-        var idn = "*IDN?\n"u8.ToArray();
+        // device_write <request>\n with END flag
+        var idn = System.Text.Encoding.ASCII.GetBytes(request + "\n");
         var writeCall = BuildRpcCall(
             xid: 101,
             program: CoreProgram,

@@ -675,7 +675,7 @@ public sealed class HiSlipGatewayServer : IGatewayServer
         // SCPI lines with `\r\n` or `\n` per IEEE 488.2 §7.5. Backends and
         // scenario matchers see canonical, terminator-free strings.
         var normalized = scpi.TrimEnd('\r', '\n');
-        if (normalized.EndsWith('?'))
+        if (ScpiMessage.ExpectsResponse(normalized))
         {
             var queryResult = ScpiQuery.From(normalized);
             if (queryResult is not Result<ScpiQuery, ScpiError>.Ok { Value: var q })

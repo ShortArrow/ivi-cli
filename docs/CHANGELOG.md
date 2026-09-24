@@ -13,6 +13,17 @@ All notable changes to ivi-cli are documented here. Format roughly follows
   `!` line is read whole, so `#` inside it stays part of the text, as it
   will for every line from 0.4.0.
 
+### Fixed
+
+- **A query with parameters gets its response.** A gateway, `visa query`
+  and the script runner treated a request as a query only when its last
+  character was `?`, so `MEAS:VOLT? (@1)` and `MEAS:VOLT? CH1` went to
+  the instrument as writes: through a gateway the client waited for its
+  timeout with nothing logged, and `visa query` refused them. A request is
+  now also a query when a program header ends in `?` (IEEE 488.2), with
+  `;` and `?` inside quoted strings and block data ignored. A line that
+  ends in `?` is still a query, so nothing 0.3.1 answered goes unanswered.
+
 ### Deprecated
 
 - **Unprefixed script directives and `#` comments.** `sleep`, `assert` and
