@@ -13,6 +13,13 @@ All notable changes to ivi-cli are documented here. Format roughly follows
   `!` line is read whole, so `#` inside it stays part of the text, as it
   will for every line from 0.4.0.
 
+### Fixed
+
+- **`-v`, `-vv`, `-q`, `--log-format` and `--log-file` are accepted.** The
+  README documents them and the logger read them, but the command-line
+  parser did not know them, so any command given one exited with
+  `Unrecognized command or argument`.
+
 ### Deprecated
 
 - **Unprefixed script directives and `#` comments.** `sleep`, `assert` and
