@@ -19,6 +19,14 @@ All notable changes to ivi-cli are documented here. Format roughly follows
   README documents them and the logger read them, but the command-line
   parser did not know them, so any command given one exited with
   `Unrecognized command or argument`.
+- **A client that resets its connection is logged as a disconnect, not as
+  an error.** A killed client, or one that gives up on a slow query and
+  reconnects, ends its TCP connection with a reset rather than a close.
+  The SOCKET, HiSLIP and VXI-11 gateways logged that as `connection
+  terminated with unexpected error` with a sixty-line stack trace, and
+  SOCKET never logged `client disconnected`. Each now logs one line,
+  `client aborted the connection (ConnectionReset)`; SOCKET follows it
+  with the usual `client disconnected`.
 
 ### Deprecated
 

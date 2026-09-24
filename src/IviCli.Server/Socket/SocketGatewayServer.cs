@@ -265,6 +265,13 @@ public sealed class SocketGatewayServer : IGatewayServer
                     }
                 }
             }
+            catch (IOException ex) when (PeerAbort.Is(ex, out var socketError))
+            {
+                _logger.LogInformation(
+                    "client aborted the connection ({SocketError})",
+                    socketError
+                );
+            }
             finally
             {
                 sessionActivity?.Dispose();
