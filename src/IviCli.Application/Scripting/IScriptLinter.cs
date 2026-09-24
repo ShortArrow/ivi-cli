@@ -40,7 +40,9 @@ public enum LintSeverity
 /// Default linter: walks every <c>Write</c> / <c>Query</c> directive and
 /// flags those whose root mnemonic is not in <see cref="ScpiVocabulary"/>.
 /// Sleep / Assert / Echo directives are control flow, not SCPI, and never
-/// produce findings.
+/// produce findings of their own. Every line written in the form 0.4.0
+/// removes (<see cref="ScpiScript.Deprecations"/>) is a warning, in line
+/// order with the rest.
 /// </summary>
 public sealed class DefaultScriptLinter : IScriptLinter
 {
@@ -50,6 +52,17 @@ public sealed class DefaultScriptLinter : IScriptLinter
     public Task<ImmutableArray<LintFinding>> LintAsync(ScpiScript script, CancellationToken ct)
     {
         var findings = ImmutableArray.CreateBuilder<LintFinding>();
+        foreach (var deprecation in script.Deprecations)
+        {
+            findings.Add(
+                new LintFinding(
+                    deprecation.Line,
+                    LintSeverity.Warning,
+                    deprecation.Message,
+                    Snippet(deprecation.Written)
+                )
+            );
+        }
         foreach (var directive in script.Directives)
         {
             ct.ThrowIfCancellationRequested();
@@ -77,7 +90,7 @@ public sealed class DefaultScriptLinter : IScriptLinter
                 )
             );
         }
-        return Task.FromResult(findings.ToImmutable());
+        return Task.FromResult(findings.OrderBy(f => f.Line).ToImmutableArray());
     }
 
     private static string Snippet(string raw)

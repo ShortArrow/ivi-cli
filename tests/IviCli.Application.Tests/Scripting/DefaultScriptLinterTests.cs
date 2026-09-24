@@ -75,7 +75,7 @@ public sealed class DefaultScriptLinterTests
     public async Task LintAsync_never_flags_control_directives()
     {
         var linter = new DefaultScriptLinter();
-        var script = Parse(string.Join('\n', "sleep 100", "assert FAKE,.*", "echo hello world"));
+        var script = Parse(string.Join('\n', "!sleep 100", "!assert FAKE,.*", "!echo hello world"));
 
         var findings = await linter.LintAsync(script, default);
 
@@ -94,5 +94,19 @@ public sealed class DefaultScriptLinterTests
         var only = findings.ShouldHaveSingleItem();
         only.Snippet.Length.ShouldBe(80);
         only.Snippet.ShouldEndWith("…");
+    }
+
+    [Fact]
+    public async Task LintAsync_warns_on_each_line_in_the_form_0_4_0_removes()
+    {
+        var linter = new DefaultScriptLinter();
+        var script = Parse("# header\n*RST\nsleep 10\n!sleep 10\n*IDN?");
+
+        var findings = await linter.LintAsync(script, default);
+
+        findings.Select(f => f.Line).ShouldBe([1, 3]);
+        findings.ShouldAllBe(f => f.Severity == LintSeverity.Warning);
+        findings.ShouldAllBe(f => f.Message.Contains("0.4.0"));
+        findings[1].Snippet.ShouldBe("sleep 10");
     }
 }

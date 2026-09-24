@@ -182,6 +182,7 @@ public static class MockScenarioCommand
                     return ExitCodeMapper.UsageError;
                 }
                 var source = await File.ReadAllTextAsync(scriptPath, ct);
+                ScriptDeprecationWarnings.Write(source, Console.Error);
 
                 var handler = services.GetRequiredService<RecordScenarioCommandHandler>();
                 var logger = services.GetRequiredService<ILogger<RecordScenarioCommandHandler>>();

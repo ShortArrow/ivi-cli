@@ -42,6 +42,7 @@ public static class VisaScriptCommand
                 }
 
                 var source = await File.ReadAllTextAsync(file, ct);
+                ScriptDeprecationWarnings.Write(source, Console.Error);
                 var handler = services.GetRequiredService<ScriptDeviceCommandHandler>();
                 var logger = services.GetRequiredService<ILogger<ScriptDeviceCommandHandler>>();
 
