@@ -205,6 +205,9 @@ jobs:
       - name: Format check (CSharpier)
         run: dotnet csharpier check .
 
+      - name: Release channel rules
+        run: bash .github/scripts/release-channel.test.sh
+
       - name: Analyzer rule check
         run: dotnet format analyzers --verify-no-changes --no-restore
 
