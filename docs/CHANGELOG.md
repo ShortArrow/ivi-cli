@@ -6,6 +6,22 @@ All notable changes to ivi-cli are documented here. Format roughly follows
 
 ## [Unreleased]
 
+### Changed (breaking)
+
+- **A script line without `!` goes to the instrument as written.** Only
+  `!sleep`, `!assert`, `!echo` and `!#` comments are read by ivi-cli; the
+  unprefixed `sleep`, `assert` and `echo`, and `#` comments, are sent as
+  SCPI. A `#` inside a SCPI line now reaches the instrument, so block data
+  and `#H`/`#Q`/`#B` numbers survive, and a command spelled like a
+  directive (`ECHO ON`) can be sent. 0.3.2 warns on every line this
+  changes; `visa lint` on 0.3.2 lists them.
+
+### Removed
+
+- **The nested `mock scenario scene ...` and `mock scenario rule ...`
+  spellings.** They were hidden aliases of `mock scene ...` and
+  `mock rule ...` since 0.3.0; use the flat spellings.
+
 ### Fixed
 
 - **The install guide names the archives releases actually carry.** It

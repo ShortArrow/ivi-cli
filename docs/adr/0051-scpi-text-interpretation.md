@@ -193,7 +193,7 @@ The result is a rule that fits in one sentence and stays true as
 directives accumulate. Reserved words go to zero, `#` needs no special
 case, and adding a directive costs nothing but a name.
 
-**Migration.** 0.3.x accepts both forms and warns on each unprefixed
+**Migration.** 0.3.2 accepts both forms and warns on each unprefixed
 directive and each `#` comment; 0.4.0 removes them. The earlier renames —
 `diagnose` → `doctor`, the nested `mock scenario scene` spelling — kept the
 old form as a silent alias or a hidden command and announced the removal
@@ -270,8 +270,8 @@ backend as it was sent, less its terminator.
   needs an argument.
 - From 0.4.0 a script can send any SCPI command, including one spelled
   like a directive, and can carry block data and `#H` values through
-  unharmed. Both are impossible today and neither was known to be.
-  Through 0.3.x the unprefixed format is still read, so `#` still starts
+  unharmed. Up to 0.3.x neither was possible, and neither was known to
+  be. 0.3.2 still reads the unprefixed format, so there `#` still starts
   a comment and `echo ` still names a directive.
 - A query with parameters or trailing whitespace gets its response from
   every gateway, where today it gets silence, and `visa query` accepts it,

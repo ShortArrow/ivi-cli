@@ -15,7 +15,7 @@ public static class VisaScriptCommand
     {
         var fileArg = new Argument<string>("file")
         {
-            Description = "Path to a SCPI script file (see ADR 0027 §2 for directives).",
+            Description = "Path to a SCPI script file: !sleep, !assert, !echo and !# are directives, every other line is sent as written.",
         };
         var deviceOpt = new Option<string?>("--device")
         {

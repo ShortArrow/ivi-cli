@@ -136,8 +136,8 @@ ivicli mock rule remove <scenario> <index>
 each verb names the scenario it operates on as an argument, so a
 `scenario` path segment ahead of it would bind nothing while hiding two
 of the three nouns from `ivicli mock --help`. The original
-`mock scenario scene ...` / `mock scenario rule ...` paths keep working,
-hidden from help, and are removed at 0.4.0.
+`mock scenario scene ...` / `mock scenario rule ...` paths stayed as
+hidden aliases through 0.3.x and are gone from 0.4.0.
 
 The scene `<index>` is 1-based and stable across `list` invocations
 within the same scenario revision.
