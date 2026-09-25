@@ -30,7 +30,7 @@ public sealed class HiSlipPyVisaInteropTests
     [Trait("Category", "Integration")]
     public async Task PyVisa_can_idn_query_in_proc_hislip_gateway()
     {
-        var port = GetFreePort();
+        var port = LoopbackGateway.FreePort();
         var deviceName = DeviceName.From("dut").ShouldBeOk();
         var device = new Device(
             deviceName,
@@ -62,7 +62,10 @@ public sealed class HiSlipPyVisaInteropTests
             NullLogger<HiSlipGatewayServer>.Instance
         );
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
-        var serverTask = gateway.RunAsync(server, config, cts.Token);
+        (port, var serverTask) = LoopbackGateway.Start(
+            server,
+            s => gateway.RunAsync(s, config, cts.Token)
+        );
         await WaitForListenerAsync(port, cts.Token);
 
         var (exitCode, stdout, stderr) = await RunPythonClientAsync(port, cts.Token);
@@ -116,15 +119,6 @@ public sealed class HiSlipPyVisaInteropTests
         var stdout = await stdoutTask;
         var stderr = await stderrTask;
         return (process.ExitCode, stdout, stderr);
-    }
-
-    private static int GetFreePort()
-    {
-        var listener = new TcpListener(IPAddress.Loopback, 0);
-        listener.Start();
-        var port = ((IPEndPoint)listener.LocalEndpoint).Port;
-        listener.Stop();
-        return port;
     }
 
     private static async Task WaitForListenerAsync(int port, CancellationToken ct)

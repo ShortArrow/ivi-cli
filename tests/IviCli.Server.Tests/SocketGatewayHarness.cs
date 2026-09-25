@@ -45,7 +45,7 @@ internal sealed class SocketGatewayHarness : IAsyncDisposable
 
     public static async Task<SocketGatewayHarness> StartAsync()
     {
-        var port = GetFreePort();
+        var port = LoopbackGateway.FreePort();
         var deviceName = DeviceName.From("dut").ShouldBeOk();
         var device = new Device(
             deviceName,
@@ -75,7 +75,10 @@ internal sealed class SocketGatewayHarness : IAsyncDisposable
         var gateway = new SocketGatewayServer(new FakeBackendFactory(fake), logger);
 
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
-        var serverTask = gateway.RunAsync(config.Servers.Single(), config, cts.Token);
+        (port, var serverTask) = LoopbackGateway.Start(
+            config.Servers.Single(),
+            s => gateway.RunAsync(s, config, cts.Token)
+        );
         await WaitForListenerAsync(port, cts.Token);
         await WaitForMessageAsync(logger, "client disconnected", 1, cts.Token);
         return new SocketGatewayHarness(port, logger, cts, serverTask);
@@ -109,15 +112,6 @@ internal sealed class SocketGatewayHarness : IAsyncDisposable
         }
         catch (OperationCanceledException) { }
         _cts.Dispose();
-    }
-
-    private static int GetFreePort()
-    {
-        var listener = new TcpListener(IPAddress.Loopback, 0);
-        listener.Start();
-        var port = ((IPEndPoint)listener.LocalEndpoint).Port;
-        listener.Stop();
-        return port;
     }
 
     private static async Task WaitForListenerAsync(int port, CancellationToken ct)

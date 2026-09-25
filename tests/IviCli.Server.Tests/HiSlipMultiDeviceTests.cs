@@ -29,7 +29,7 @@ public sealed class HiSlipMultiDeviceTests
     [Fact]
     public async Task Two_sub_addresses_on_one_server_route_to_distinct_devices()
     {
-        var port = GetFreePort();
+        var port = LoopbackGateway.FreePort();
 
         var psu = new Device(
             DeviceName.From("psu").ShouldBeOk(),
@@ -74,7 +74,10 @@ public sealed class HiSlipMultiDeviceTests
             NullLogger<HiSlipGatewayServer>.Instance
         );
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
-        var serverTask = gateway.RunAsync(server, config, cts.Token);
+        (port, var serverTask) = LoopbackGateway.Start(
+            server,
+            s => gateway.RunAsync(s, config, cts.Token)
+        );
 
         await WaitForListenerAsync(port, cts.Token);
 
@@ -115,7 +118,7 @@ public sealed class HiSlipMultiDeviceTests
     [Fact]
     public async Task Sub_address_with_no_matching_route_returns_fatal_error()
     {
-        var port = GetFreePort();
+        var port = LoopbackGateway.FreePort();
 
         var psu = new Device(
             DeviceName.From("psu").ShouldBeOk(),
@@ -144,7 +147,10 @@ public sealed class HiSlipMultiDeviceTests
             NullLogger<HiSlipGatewayServer>.Instance
         );
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
-        var serverTask = gateway.RunAsync(server, config, cts.Token);
+        (port, var serverTask) = LoopbackGateway.Start(
+            server,
+            s => gateway.RunAsync(s, config, cts.Token)
+        );
 
         await WaitForListenerAsync(port, cts.Token);
 
@@ -167,15 +173,6 @@ public sealed class HiSlipMultiDeviceTests
             await serverTask;
         }
         catch (OperationCanceledException) { }
-    }
-
-    private static int GetFreePort()
-    {
-        var listener = new TcpListener(IPAddress.Loopback, 0);
-        listener.Start();
-        var port = ((IPEndPoint)listener.LocalEndpoint).Port;
-        listener.Stop();
-        return port;
     }
 
     private static async Task WaitForListenerAsync(int port, CancellationToken ct)

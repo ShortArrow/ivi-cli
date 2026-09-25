@@ -31,12 +31,15 @@ public sealed class GatewayPeerAbortTests
         var logger = new RecordingLogger<HiSlipGatewayServer>();
         var gateway = new HiSlipGatewayServer(new FakeBackendFactory(new FakeBackend()), logger);
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
-        var serverTask = gateway.RunAsync(server, config, cts.Token);
-        await WaitForListenerAsync(server.Port.Value, cts.Token);
+        var (port, serverTask) = LoopbackGateway.Start(
+            server,
+            s => gateway.RunAsync(s, config, cts.Token)
+        );
+        await WaitForListenerAsync(port, cts.Token);
 
         using (var tcp = new TcpClient())
         {
-            await tcp.ConnectAsync(IPAddress.Loopback, server.Port.Value, cts.Token);
+            await tcp.ConnectAsync(IPAddress.Loopback, port, cts.Token);
             var stream = tcp.GetStream();
             var subAddress = "hislip0"u8.ToArray();
             var header = new byte[HiSlipMessage.HeaderSize];
@@ -66,15 +69,18 @@ public sealed class GatewayPeerAbortTests
         var logger = new RecordingLogger<Vxi11GatewayServer>();
         var gateway = new Vxi11GatewayServer(new FakeBackendFactory(new FakeBackend()), logger)
         {
-            PortmapUdpPort = GetFreePort(),
+            PortmapUdpPort = LoopbackGateway.FreePort(),
         };
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
-        var serverTask = gateway.RunAsync(server, config, cts.Token);
-        await WaitForListenerAsync(server.Port.Value, cts.Token);
+        var (port, serverTask) = LoopbackGateway.Start(
+            server,
+            s => gateway.RunAsync(s, config, cts.Token)
+        );
+        await WaitForListenerAsync(port, cts.Token);
 
         using (var tcp = new TcpClient())
         {
-            await tcp.ConnectAsync(IPAddress.Loopback, server.Port.Value, cts.Token);
+            await tcp.ConnectAsync(IPAddress.Loopback, port, cts.Token);
             var stream = tcp.GetStream();
             var writer = new Vxi11XdrCodec.XdrWriter();
             writer.WriteUInt32(1); // xid
@@ -171,7 +177,7 @@ public sealed class GatewayPeerAbortTests
             serverName,
             type,
             IpAddress.From("127.0.0.1").ShouldBeOk(),
-            Port.From(GetFreePort()).ShouldBeOk()
+            Port.From(LoopbackGateway.FreePort()).ShouldBeOk()
         );
         var config = ConfigDocument
             .Empty.AddDevice(device)
@@ -181,15 +187,6 @@ public sealed class GatewayPeerAbortTests
             .AddRoute(new Route(serverName, PublicEndpoint.From(endpoint).ShouldBeOk(), deviceName))
             .ShouldBeOk();
         return (server, config);
-    }
-
-    private static int GetFreePort()
-    {
-        var listener = new TcpListener(IPAddress.Loopback, 0);
-        listener.Start();
-        var port = ((IPEndPoint)listener.LocalEndpoint).Port;
-        listener.Stop();
-        return port;
     }
 
     private static async Task WaitForListenerAsync(int port, CancellationToken ct)

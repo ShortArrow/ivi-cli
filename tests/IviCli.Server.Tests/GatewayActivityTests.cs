@@ -118,7 +118,7 @@ public sealed class GatewayActivityTests
     public async Task HiSlip_gateway_emits_session_and_message_spans()
     {
         using var spans = new GatewaySpanCollector();
-        var port = GetFreePort();
+        var port = LoopbackGateway.FreePort();
         var (device, server, config) = BuildTopology(
             "hislip-span-srv",
             ServerType.HiSlip,
@@ -134,7 +134,10 @@ public sealed class GatewayActivityTests
             NullLogger<HiSlipGatewayServer>.Instance
         );
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
-        var serverTask = gateway.RunAsync(server, config, cts.Token);
+        (port, var serverTask) = LoopbackGateway.Start(
+            server,
+            s => gateway.RunAsync(s, config, cts.Token)
+        );
         await WaitForListenerAsync(port, cts.Token);
 
         var client = new HiSlipBackend(port);
@@ -170,7 +173,7 @@ public sealed class GatewayActivityTests
     {
         using var spans = new GatewaySpanCollector();
         using var callerListener = ListenTo(CallerSource);
-        var port = GetFreePort();
+        var port = LoopbackGateway.FreePort();
         var (device, server, config) = BuildTopology(
             "hislip-propagate-srv",
             ServerType.HiSlip,
@@ -186,7 +189,10 @@ public sealed class GatewayActivityTests
             NullLogger<HiSlipGatewayServer>.Instance
         );
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
-        var serverTask = gateway.RunAsync(server, config, cts.Token);
+        (port, var serverTask) = LoopbackGateway.Start(
+            server,
+            s => gateway.RunAsync(s, config, cts.Token)
+        );
         await WaitForListenerAsync(port, cts.Token);
 
         var client = new HiSlipBackend(port) { PropagateTraceContext = true };
@@ -223,7 +229,7 @@ public sealed class GatewayActivityTests
     {
         using var spans = new GatewaySpanCollector();
         using var callerListener = ListenTo(CallerSource);
-        var port = GetFreePort();
+        var port = LoopbackGateway.FreePort();
         var (device, server, config) = BuildTopology(
             "hislip-nopropagate-srv",
             ServerType.HiSlip,
@@ -239,7 +245,10 @@ public sealed class GatewayActivityTests
             NullLogger<HiSlipGatewayServer>.Instance
         );
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
-        var serverTask = gateway.RunAsync(server, config, cts.Token);
+        (port, var serverTask) = LoopbackGateway.Start(
+            server,
+            s => gateway.RunAsync(s, config, cts.Token)
+        );
         await WaitForListenerAsync(port, cts.Token);
 
         var client = new HiSlipBackend(port);
@@ -265,7 +274,7 @@ public sealed class GatewayActivityTests
     public async Task Vxi11_gateway_emits_session_and_message_spans()
     {
         using var spans = new GatewaySpanCollector();
-        var port = GetFreePort();
+        var port = LoopbackGateway.FreePort();
         var (device, server, config) = BuildTopology(
             "vxi11-span-srv",
             ServerType.Vxi11,
@@ -281,7 +290,10 @@ public sealed class GatewayActivityTests
             NullLogger<Vxi11GatewayServer>.Instance
         );
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
-        var serverTask = gateway.RunAsync(server, config, cts.Token);
+        (port, var serverTask) = LoopbackGateway.Start(
+            server,
+            s => gateway.RunAsync(s, config, cts.Token)
+        );
         await WaitForListenerAsync(port, cts.Token);
 
         var client = new Vxi11Backend(port);
@@ -305,7 +317,7 @@ public sealed class GatewayActivityTests
     public async Task Socket_gateway_emits_session_and_message_spans()
     {
         using var spans = new GatewaySpanCollector();
-        var port = GetFreePort();
+        var port = LoopbackGateway.FreePort();
         var (device, server, config) = BuildTopology(
             "socket-span-srv",
             ServerType.Socket,
@@ -321,7 +333,10 @@ public sealed class GatewayActivityTests
             NullLogger<SocketGatewayServer>.Instance
         );
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
-        var serverTask = gateway.RunAsync(server, config, cts.Token);
+        (port, var serverTask) = LoopbackGateway.Start(
+            server,
+            s => gateway.RunAsync(s, config, cts.Token)
+        );
         await WaitForListenerAsync(port, cts.Token);
 
         using (var tcp = new TcpClient())
@@ -375,15 +390,6 @@ public sealed class GatewayActivityTests
             await serverTask;
         }
         catch (OperationCanceledException) { }
-    }
-
-    private static int GetFreePort()
-    {
-        var listener = new TcpListener(IPAddress.Loopback, 0);
-        listener.Start();
-        var port = ((IPEndPoint)listener.LocalEndpoint).Port;
-        listener.Stop();
-        return port;
     }
 
     private static async Task WaitForListenerAsync(int port, CancellationToken ct)
