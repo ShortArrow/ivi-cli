@@ -38,8 +38,10 @@ introduced it: a deprecation warning promised for 0.3.x had to ship before
 - A tag on it runs the same release workflow. While its line is still the
   newest stable, the release moves the floating `latest` / `vX.Y` tags as
   any stable does. Once a newer line has a stable release, a maintenance
-  release must not take `latest` or the GitHub "Latest release" mark
-  back; that needs a change to `release.yml` before the first such tag.
+  release moves only its own `vX.Y` / `vX.Y-aot` tags and does not take
+  `latest`, `aot` or the GitHub "Latest release" mark back.
+  `.github/scripts/release-channel.sh` makes that call for `release.yml`
+  from the tags on `origin`.
 - The branch ends with the release it was cut for, and is deleted after.
   The repository ruleset that stops `main` being deleted or force-pushed
   covers `release/**` too, so the deletion is done by taking

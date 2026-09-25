@@ -263,12 +263,13 @@ jobs:
           minor="$(echo "$version_no_v" | awk -F. '{print "v"$1"."$2}')"
           sha7="$(git rev-parse --short=7 HEAD)"
           # A pre-release tag (v0.3.0-beta.1) publishes only its own tag
-          # and the commit tag; the floating `latest` and `vX.Y` tags keep
-          # pointing at the last final release.
+          # and the commit tag. A final release moves `vX.Y`, and `latest`
+          # too unless a higher final release exists (a maintenance
+          # release, ADR 0022).
           tags="${image}:${version},${image}:sha-${sha7}"
-          case "$version_no_v" in
-            *-*) ;;
-            *) tags="${tags},${image}:${minor},${image}:latest" ;;
+          case "$(.github/scripts/release-channel.sh "$version")" in
+            latest) tags="${tags},${image}:${minor},${image}:latest" ;;
+            maintenance) tags="${tags},${image}:${minor}" ;;
           esac
           {
             echo "image=$image"
@@ -430,12 +431,13 @@ jobs:
           minor="$(echo "$version_no_v" | awk -F. '{print "v"$1"."$2}')"
           sha7="$(git rev-parse --short=7 HEAD)"
           # A pre-release tag (v0.3.0-beta.1) publishes only its own tag
-          # and the commit tag; the floating `aot` and `vX.Y-aot` tags
-          # keep pointing at the last final release.
+          # and the commit tag. A final release moves `vX.Y-aot`, and `aot`
+          # too unless a higher final release exists (a maintenance
+          # release, ADR 0022).
           tags="${image}:${version}-aot ${image}:sha-${sha7}-aot"
-          case "$version_no_v" in
-            *-*) ;;
-            *) tags="${tags} ${image}:${minor}-aot ${image}:aot" ;;
+          case "$(.github/scripts/release-channel.sh "$version")" in
+            latest) tags="${tags} ${image}:${minor}-aot ${image}:aot" ;;
+            maintenance) tags="${tags} ${image}:${minor}-aot" ;;
           esac
           {
             echo "image=$image"
@@ -543,12 +545,13 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          case "${{ github.ref_name }}" in
-            *-*) prerelease="--prerelease" ;;
-            *) prerelease="" ;;
+          case "$(.github/scripts/release-channel.sh "${{ github.ref_name }}")" in
+            prerelease) channel="--prerelease" ;;
+            latest) channel="--latest" ;;
+            maintenance) channel="--latest=false" ;;
           esac
           gh release create "${{ github.ref_name }}" \
             --title "${{ github.ref_name }}" \
             --generate-notes \
-            $prerelease \
+            "$channel" \
             ./release-assets/*
