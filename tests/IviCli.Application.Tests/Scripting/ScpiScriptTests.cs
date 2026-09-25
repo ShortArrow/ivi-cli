@@ -33,59 +33,82 @@ public class ScpiScriptTests
         script.Directives[0].ShouldBeOfType<ScpiScriptDirective.Write>().Text.ShouldBe("*RST");
     }
 
-    [Fact]
-    public void Parse_ignores_blank_and_comment_lines()
+    [Theory]
+    [InlineData("!sleep 250")]
+    [InlineData("!SLEEP 250")]
+    public void Parse_reads_bang_sleep_as_sleep_directive(string line)
     {
-        var src = "\n# header\n*IDN?\n\n# trailing\n";
-        var script = ScpiScript.Parse(src).ShouldBeOk();
-        script.Directives.Length.ShouldBe(1);
-        script.Directives[0].Line.ShouldBe(3);
-    }
-
-    [Fact]
-    public void Parse_strips_trailing_comments()
-    {
-        var script = ScpiScript.Parse("*IDN? # ask identity").ShouldBeOk();
-        var q = script.Directives[0].ShouldBeOfType<ScpiScriptDirective.Query>();
-        q.Text.ShouldBe("*IDN?");
-    }
-
-    [Fact]
-    public void Parse_recognises_sleep_directive()
-    {
-        var script = ScpiScript.Parse("sleep 250").ShouldBeOk();
-        var s = script.Directives[0].ShouldBeOfType<ScpiScriptDirective.Sleep>();
+        var script = ScpiScript.Parse(line).ShouldBeOk();
+        var s = script
+            .Directives.ShouldHaveSingleItem()
+            .ShouldBeOfType<ScpiScriptDirective.Sleep>();
         s.Duration.ShouldBe(TimeSpan.FromMilliseconds(250));
     }
 
-    [Fact]
-    public void Parse_rejects_negative_sleep()
+    [Theory]
+    [InlineData("!sleep -1")]
+    [InlineData("!wait 5")]
+    public void Parse_rejects_invalid_bang_directive_at_its_line(string line)
     {
-        var result = ScpiScript.Parse("sleep -1");
-        result.ShouldBeOfType<Result<ScpiScript, ScpiScriptError>.Error>();
+        var result = ScpiScript.Parse(line);
+        var error = result.ShouldBeOfType<Result<ScpiScript, ScpiScriptError>.Error>();
+        error.Err.ShouldBeOfType<ScpiScriptInvalidDirective>().Line.ShouldBe(1);
+    }
+
+    [Theory]
+    [InlineData("!assert ^FAKE,.*$", "^FAKE,.*$")]
+    [InlineData("!assert ^#15", "^#15")]
+    public void Parse_reads_bang_assert_whole_line_as_pattern(string line, string pattern)
+    {
+        var script = ScpiScript.Parse(line).ShouldBeOk();
+        script.Directives[0].ShouldBeOfType<ScpiScriptDirective.Assert>().Pattern.ShouldBe(pattern);
+    }
+
+    [Theory]
+    [InlineData("!echo hello world", "hello world")]
+    [InlineData("!echo step #1 done", "step #1 done")]
+    public void Parse_reads_bang_echo_whole_line_as_text(string line, string text)
+    {
+        var script = ScpiScript.Parse(line).ShouldBeOk();
+        script.Directives[0].ShouldBeOfType<ScpiScriptDirective.Echo>().Text.ShouldBe(text);
     }
 
     [Fact]
-    public void Parse_recognises_assert_directive()
+    public void Parse_skips_bang_hash_comments_and_blank_lines_keeping_source_line_numbers()
     {
-        var script = ScpiScript.Parse("assert ^FAKE,.*$").ShouldBeOk();
-        var a = script.Directives[0].ShouldBeOfType<ScpiScriptDirective.Assert>();
-        a.Pattern.ShouldBe("^FAKE,.*$");
+        var script = ScpiScript.Parse("!# header\n*RST\n\n!# trailing\n*IDN?").ShouldBeOk();
+        script.Directives.Length.ShouldBe(2);
+        var write = script.Directives[0].ShouldBeOfType<ScpiScriptDirective.Write>();
+        write.Text.ShouldBe("*RST");
+        write.Line.ShouldBe(2);
+        var query = script.Directives[1].ShouldBeOfType<ScpiScriptDirective.Query>();
+        query.Text.ShouldBe("*IDN?");
+        query.Line.ShouldBe(5);
+    }
+
+    [Theory]
+    [InlineData("echo ON")]
+    [InlineData("sleep 10")]
+    [InlineData("assert ok")]
+    [InlineData("SOUR:VOLT #HFF")]
+    [InlineData("DATA #800001000AB")]
+    [InlineData("# header")]
+    public void Parse_sends_unprefixed_line_verbatim_as_write(string line)
+    {
+        var script = ScpiScript.Parse(line).ShouldBeOk();
+        script
+            .Directives.ShouldHaveSingleItem()
+            .ShouldBeOfType<ScpiScriptDirective.Write>()
+            .Text.ShouldBe(line);
     }
 
     [Fact]
-    public void Parse_recognises_echo_directive()
+    public void Parse_sends_query_with_hash_verbatim()
     {
-        var script = ScpiScript.Parse("echo hello world").ShouldBeOk();
-        var e = script.Directives[0].ShouldBeOfType<ScpiScriptDirective.Echo>();
-        e.Text.ShouldBe("hello world");
-    }
-
-    [Fact]
-    public void Parse_preserves_source_line_numbers()
-    {
-        var script = ScpiScript.Parse("# c1\n*RST\n*IDN?").ShouldBeOk();
-        script.Directives[0].Line.ShouldBe(2);
-        script.Directives[1].Line.ShouldBe(3);
+        var script = ScpiScript.Parse("*IDN? # ask identity").ShouldBeOk();
+        script
+            .Directives.ShouldHaveSingleItem()
+            .ShouldBeOfType<ScpiScriptDirective.Query>()
+            .Text.ShouldBe("*IDN? # ask identity");
     }
 }

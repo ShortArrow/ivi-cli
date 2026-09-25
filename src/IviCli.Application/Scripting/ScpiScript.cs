@@ -13,10 +13,19 @@ namespace IviCli.Application.Scripting;
 /// </summary>
 public sealed record ScpiScript(ImmutableArray<ScpiScriptDirective> Directives)
 {
+    private const char DirectivePrefix = '!';
+
     /// <summary>
     /// Parses the supplied script source into a structured
-    /// <see cref="ScpiScript"/>. Blank lines and lines starting with
-    /// <c>#</c> are ignored. Trailing <c># ...</c> comments are stripped.
+    /// <see cref="ScpiScript"/>. Each line is trimmed and blank lines are
+    /// skipped. A line beginning with <c>!</c> is an ivi-cli directive read
+    /// whole: <c>!sleep &lt;ms&gt;</c>, <c>!assert &lt;regex&gt;</c> or
+    /// <c>!echo &lt;text&gt;</c> (keywords case-insensitive), and <c>!#</c>
+    /// starts a comment line. Every other line, including any <c>#</c> in
+    /// it, is SCPI sent to the instrument exactly as written: a
+    /// <see cref="ScpiScriptDirective.Query"/> when
+    /// <see cref="ScpiMessage.IsQuery"/> holds, otherwise a
+    /// <see cref="ScpiScriptDirective.Write"/>.
     /// </summary>
     public static Result<ScpiScript, ScpiScriptError> Parse(string source)
     {
@@ -25,22 +34,27 @@ public sealed record ScpiScript(ImmutableArray<ScpiScriptDirective> Directives)
         for (var i = 0; i < lines.Length; i++)
         {
             var lineNumber = i + 1;
-            var raw = StripComment(lines[i]).Trim();
-            if (raw.Length == 0)
+            var written = lines[i].Trim();
+            if (written.Length == 0)
             {
                 continue;
             }
 
-            var parseResult = ParseDirective(raw, lineNumber);
-            if (parseResult is Result<ScpiScriptDirective, ScpiScriptError>.Ok { Value: var d })
+            var parsed =
+                written[0] == DirectivePrefix
+                    ? ParseDirective(written, lineNumber)
+                    : Result.Success<ScpiScriptDirective?, ScpiScriptError>(
+                        ParseScpi(written, lineNumber)
+                    );
+            switch (parsed)
             {
-                directives.Add(d);
-            }
-            else
-            {
-                return Result.Failure<ScpiScript, ScpiScriptError>(
-                    ((Result<ScpiScriptDirective, ScpiScriptError>.Error)parseResult).Err
-                );
+                case Result<ScpiScriptDirective?, ScpiScriptError>.Ok { Value: { } directive }:
+                    directives.Add(directive);
+                    break;
+                case Result<ScpiScriptDirective?, ScpiScriptError>.Error error:
+                    return Result.Failure<ScpiScript, ScpiScriptError>(error.Err);
+                default:
+                    break;
             }
         }
         return Result.Success<ScpiScript, ScpiScriptError>(
@@ -48,67 +62,87 @@ public sealed record ScpiScript(ImmutableArray<ScpiScriptDirective> Directives)
         );
     }
 
-    private static string StripComment(string line)
-    {
-        // Honor `#` only when it follows whitespace OR is the first non-space
-        // character. SCPI text rarely contains `#` so a literal split is OK
-        // for the v1 contract.
-        var idx = line.IndexOf('#');
-        return idx < 0 ? line : line[..idx];
-    }
+    private static ScpiScriptDirective ParseScpi(string written, int line) =>
+        ScpiMessage.IsQuery(written)
+            ? new ScpiScriptDirective.Query(line, written)
+            : new ScpiScriptDirective.Write(line, written);
 
-    private static Result<ScpiScriptDirective, ScpiScriptError> ParseDirective(string raw, int line)
+    /// <summary>
+    /// Reads a <c>!</c>-prefixed line; <c>null</c> for a <c>!#</c> comment.
+    /// </summary>
+    private static Result<ScpiScriptDirective?, ScpiScriptError> ParseDirective(
+        string written,
+        int line
+    )
     {
-        if (raw.StartsWith("sleep ", StringComparison.OrdinalIgnoreCase))
+        var body = written[1..];
+        if (body.StartsWith('#'))
         {
-            var arg = raw["sleep ".Length..].Trim();
+            return Result.Success<ScpiScriptDirective?, ScpiScriptError>(null);
+        }
+        if (TryReadArgument(body, "sleep", out var sleepArg))
+        {
             if (
-                !int.TryParse(arg, NumberStyles.Integer, CultureInfo.InvariantCulture, out var ms)
+                !int.TryParse(
+                    sleepArg.Trim(),
+                    NumberStyles.Integer,
+                    CultureInfo.InvariantCulture,
+                    out var ms
+                )
                 || ms < 0
             )
             {
-                return Result.Failure<ScpiScriptDirective, ScpiScriptError>(
-                    new ScpiScriptInvalidDirective(
-                        line,
-                        raw,
-                        "sleep argument must be a non-negative integer"
-                    )
-                );
+                return Invalid(line, written, "sleep argument must be a non-negative integer");
             }
-            return Result.Success<ScpiScriptDirective, ScpiScriptError>(
+            return Result.Success<ScpiScriptDirective?, ScpiScriptError>(
                 new ScpiScriptDirective.Sleep(line, TimeSpan.FromMilliseconds(ms))
             );
         }
-        if (raw.StartsWith("assert ", StringComparison.OrdinalIgnoreCase))
+        if (TryReadArgument(body, "assert", out var assertArg))
         {
-            var pattern = raw["assert ".Length..].Trim();
+            var pattern = assertArg.Trim();
             if (pattern.Length == 0)
             {
-                return Result.Failure<ScpiScriptDirective, ScpiScriptError>(
-                    new ScpiScriptInvalidDirective(line, raw, "assert requires a regex pattern")
-                );
+                return Invalid(line, written, "assert requires a regex pattern");
             }
-            return Result.Success<ScpiScriptDirective, ScpiScriptError>(
+            return Result.Success<ScpiScriptDirective?, ScpiScriptError>(
                 new ScpiScriptDirective.Assert(line, pattern)
             );
         }
-        if (raw.StartsWith("echo ", StringComparison.OrdinalIgnoreCase))
+        if (TryReadArgument(body, "echo", out var text))
         {
-            var text = raw["echo ".Length..];
-            return Result.Success<ScpiScriptDirective, ScpiScriptError>(
+            return Result.Success<ScpiScriptDirective?, ScpiScriptError>(
                 new ScpiScriptDirective.Echo(line, text)
             );
         }
-        if (ScpiMessage.IsQuery(raw))
-        {
-            return Result.Success<ScpiScriptDirective, ScpiScriptError>(
-                new ScpiScriptDirective.Query(line, raw)
-            );
-        }
-        return Result.Success<ScpiScriptDirective, ScpiScriptError>(
-            new ScpiScriptDirective.Write(line, raw)
-        );
+        return Invalid(line, written, "unknown directive; expected !sleep, !assert, !echo or !#");
     }
+
+    /// <summary>
+    /// True when <paramref name="body"/> is <paramref name="keyword"/>
+    /// (case-insensitive) followed by a space; <paramref name="argument"/>
+    /// is everything after that space.
+    /// </summary>
+    private static bool TryReadArgument(string body, string keyword, out string argument)
+    {
+        var prefix = keyword + " ";
+        if (body.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+        {
+            argument = body[prefix.Length..];
+            return true;
+        }
+        argument = string.Empty;
+        return false;
+    }
+
+    private static Result<ScpiScriptDirective?, ScpiScriptError> Invalid(
+        int line,
+        string raw,
+        string reason
+    ) =>
+        Result.Failure<ScpiScriptDirective?, ScpiScriptError>(
+            new ScpiScriptInvalidDirective(line, raw, reason)
+        );
 }
 
 /// <summary>A single directive within a parsed script.</summary>
