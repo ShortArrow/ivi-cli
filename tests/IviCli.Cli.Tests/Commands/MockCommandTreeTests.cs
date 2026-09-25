@@ -44,21 +44,21 @@ public sealed class MockCommandTreeTests
     [Theory]
     [InlineData("mock scenario scene add my-dmm idle")]
     [InlineData("mock scenario rule add my-dmm --in idle --match *IDN? --ack")]
-    public void The_nested_spelling_keeps_working_until_it_is_removed(string commandLine)
+    public void The_nested_spelling_is_gone(string commandLine)
     {
         // Given / When / Then
-        Parse(commandLine).Errors.ShouldBeEmpty();
+        Parse(commandLine).Errors.ShouldNotBeEmpty();
     }
 
     [Theory]
     [InlineData("scene")]
     [InlineData("rule")]
-    public void The_nested_spelling_is_hidden_from_help(string name)
+    public void Scenario_has_no_scene_or_rule_child(string name)
     {
         // Given
         var scenario = BuildMock().Subcommands.Single(c => c.Name == "scenario");
 
         // When / Then
-        scenario.Subcommands.Single(c => c.Name == name).Hidden.ShouldBeTrue();
+        scenario.Subcommands.ShouldNotContain(c => c.Name == name);
     }
 }

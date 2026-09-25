@@ -75,7 +75,7 @@ public sealed class DefaultScriptLinterTests
     public async Task LintAsync_never_flags_control_directives()
     {
         var linter = new DefaultScriptLinter();
-        var script = Parse(string.Join('\n', "sleep 100", "assert FAKE,.*", "echo hello world"));
+        var script = Parse(string.Join('\n', "!sleep 100", "!assert FAKE,.*", "!echo hello world"));
 
         var findings = await linter.LintAsync(script, default);
 
