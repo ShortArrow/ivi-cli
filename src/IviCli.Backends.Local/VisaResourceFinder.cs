@@ -6,8 +6,9 @@ namespace IviCli.Backends.Local;
 /// <summary>
 /// Production <see cref="IVisaResourceFinder"/> over the IVI Foundation
 /// VISA.NET shared components. <c>Ivi.Visa.GlobalResourceManager</c> locates
-/// an installed vendor implementation at runtime; every failure — no vendor
-/// implementation registered, or the implementation reporting "no resources
+/// an installed vendor implementation at runtime. Without a VISA runtime it
+/// is not called; every other failure — no vendor implementation
+/// registered, or the implementation reporting "no resources
 /// found", which VISA surfaces as an exception — comes back as a
 /// <see cref="LocalVisaError"/> rather than a throw.
 /// </summary>
@@ -16,6 +17,12 @@ public sealed class VisaResourceFinder : IVisaResourceFinder
     /// <inheritdoc/>
     public Result<ImmutableArray<string>, LocalVisaError> Find(string pattern)
     {
+        if (!VisaRuntime.IsInstalled)
+        {
+            return Result.Failure<ImmutableArray<string>, LocalVisaError>(
+                new LocalVisaRuntimeMissing(VisaRuntime.MissingDetail)
+            );
+        }
         try
         {
             var found = Ivi.Visa.GlobalResourceManager.Find(pattern);
