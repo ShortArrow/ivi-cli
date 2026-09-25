@@ -7,14 +7,20 @@ namespace IviCli.Backends.Local;
 /// <summary>
 /// Production <see cref="IVisaSessionFactory"/> over the IVI Foundation
 /// VISA.NET shared components. <see cref="GlobalResourceManager"/> locates an
-/// installed vendor implementation at runtime; when none is registered, every
-/// open returns <see cref="LocalVisaRuntimeMissing"/>.
+/// installed vendor implementation at runtime; when none is installed, every
+/// open returns <see cref="LocalVisaRuntimeMissing"/> without calling it.
 /// </summary>
 public sealed class VisaSessionFactory : IVisaSessionFactory
 {
     /// <inheritdoc/>
     public Result<IVisaSessionHandle, LocalVisaError> Open(VisaResource resource, TimeSpan timeout)
     {
+        if (!VisaRuntime.IsInstalled)
+        {
+            return Result.Failure<IVisaSessionHandle, LocalVisaError>(
+                new LocalVisaRuntimeMissing(VisaRuntime.MissingDetail)
+            );
+        }
         var resourceString = VisaResourceFormatter.Format(resource);
         var timeoutMs = (int)timeout.TotalMilliseconds;
         try
@@ -37,9 +43,7 @@ public sealed class VisaSessionFactory : IVisaSessionFactory
             )
         {
             return Result.Failure<IVisaSessionHandle, LocalVisaError>(
-                new LocalVisaRuntimeMissing(
-                    "no VISA implementation is registered; install a VISA runtime (e.g. NI-VISA or Keysight VISA)"
-                )
+                new LocalVisaRuntimeMissing(VisaRuntime.MissingDetail)
             );
         }
         catch (Exception ex)

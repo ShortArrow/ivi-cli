@@ -24,10 +24,10 @@ public static class PrereqProbe
     public static bool HasPyVisa => _pyvisa.Value;
 
     /// <summary>
-    /// True when <c>Ivi.Visa</c> can be reflection-loaded from the
-    /// current process. Indicates that the IVI Shared Components
-    /// (NI-VISA, Keysight IO Libraries, or compatible) are installed
-    /// and discoverable on the assembly resolution path (ADR 0037).
+    /// True when <c>Ivi.Visa</c> loads and so does its native conflict
+    /// manager, <c>visaConfMgr</c>. The assembly alone proves nothing: it
+    /// ships with ivi-cli. The native library comes only with a VISA
+    /// runtime (NI-VISA, Keysight IO Libraries, or compatible; ADR 0037).
     /// </summary>
     public static bool HasNiVisa => _niVisa.Value;
 
@@ -79,7 +79,19 @@ public static class PrereqProbe
         try
         {
             var assembly = System.Reflection.Assembly.Load("Ivi.Visa");
-            return assembly is not null;
+            if (
+                !System.Runtime.InteropServices.NativeLibrary.TryLoad(
+                    "visaConfMgr.dll",
+                    assembly,
+                    null,
+                    out var handle
+                )
+            )
+            {
+                return false;
+            }
+            System.Runtime.InteropServices.NativeLibrary.Free(handle);
+            return true;
         }
         catch
         {

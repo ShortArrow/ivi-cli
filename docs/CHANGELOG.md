@@ -67,6 +67,15 @@ All notable changes to ivi-cli are documented here. Format roughly follows
 
 ### Fixed
 
+- **A process no longer ends some time after a local VISA call on a
+  machine without a VISA runtime.** `Ivi.Visa` ships with ivi-cli, but
+  its native conflict manager comes only with a VISA runtime. Without
+  one, a failed `visa scan` or open of a local resource left behind an
+  object whose finalizer threw `DllNotFoundException` for
+  `visaConfMgr`, and the process ended whenever the garbage collector
+  reached it: a short command rarely lived that long, but `api start`
+  and `server start` could. The local backend now reports that no VISA
+  runtime is installed without calling `Ivi.Visa`.
 - **`-v`, `-vv`, `-q`, `--log-format` and `--log-file` are accepted.** The
   README documents them and the logger read them, but the command-line
   parser did not know them, so any command given one exited with
