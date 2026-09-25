@@ -240,11 +240,21 @@ jobs:
   # operating system, so they stay where they are and are not paid for
   # twice. It also gives the Windows ACL test on the session file its
   # first CI coverage; that assertion could only ever run here.
+  # win-arm64 runs too: v0.4.0's first tag run died there when the test
+  # host crashed on a VISA finalizer that no x64 runner had triggered.
   test-windows:
-    name: test (windows)
+    name: test (${{ matrix.name }})
     needs: changes
     if: needs.changes.outputs.code == 'true'
-    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: windows
+            runner: windows-latest
+          - name: windows-arm64
+            runner: windows-11-arm
+    runs-on: ${{ matrix.runner }}
     timeout-minutes: 20
     env:
       DOTNET_NOLOGO: true
