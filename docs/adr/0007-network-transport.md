@@ -159,8 +159,10 @@ to a future v4 ADR.
   there directly; VXI-11 skips the portmapper GETPORT and connects to the
   pinned Core port. Omitting the port keeps the well-known port (HiSLIP) or
   portmapper resolution (VXI-11, ADR 0029). SOCKET already carries its port
-  as the third segment. This matches the syntax pyvisa/NI-VISA emit, so the
-  same resource string works against ivi-cli and other VISA clients.
+  as the third segment. The HiSLIP form is the one NI-VISA and PyVISA
+  accept. For VXI-11, PyVISA-py pins the port on the host segment instead
+  (`TCPIP0::host,20001::inst0::INSTR`), and ivi-cli does not parse that
+  form.
 
 ### 5. TLS / authentication
 

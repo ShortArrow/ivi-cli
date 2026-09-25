@@ -80,7 +80,7 @@ public sealed class Vxi11PyVisaInteropTests
             "import sys\n"
             + "import pyvisa\n"
             + "rm = pyvisa.ResourceManager('@py')\n"
-            + $"inst = rm.open_resource('TCPIP0::127.0.0.1::inst0,{port}::INSTR', open_timeout=5000)\n"
+            + $"inst = rm.open_resource('TCPIP0::127.0.0.1,{port}::inst0::INSTR', open_timeout=5000)\n"
             + "inst.timeout = 5000\n"
             + "try:\n"
             + "    sys.stdout.write(inst.query('*IDN?').strip())\n"

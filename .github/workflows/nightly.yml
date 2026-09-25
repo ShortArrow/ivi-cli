@@ -47,11 +47,19 @@ jobs:
       - name: Build
         run: dotnet build --no-restore --configuration Release
 
+      # The HiSLIP and VXI-11 interop tests drive the gateways from
+      # PyVISA's pure-Python backend and skip when `import pyvisa` fails.
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.12'
+
+      - name: Install PyVISA
+        run: python -m pip install pyvisa==1.16.2 pyvisa-py==0.8.1
+
       - name: Integration tests
-        # When no integration tests match the filter the command exits non-zero;
-        # tolerate that until the suite grows. Hardware-dependent tests run only
-        # on self-hosted runners (not configured here).
-        continue-on-error: true
+        # Tests that need NI-VISA or the USB mock bench skip here; they run
+        # only where those are installed.
         run: |
           dotnet test --no-build --configuration Release \
             --filter "Category=Integration" \
