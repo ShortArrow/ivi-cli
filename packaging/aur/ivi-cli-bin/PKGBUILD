@@ -8,7 +8,7 @@
 # runtime and needs no .NET on the system at all.
 
 pkgname=ivi-cli-bin
-pkgver=0.3.1
+pkgver=0.3.2
 pkgrel=1
 pkgdesc="Integrated CLI for managing, diagnosing, and operating VISA/IVI instruments (prebuilt binary)"
 arch=('x86_64')
@@ -39,8 +39,8 @@ conflicts=('ivi-cli')
 # rewrites the file and destroys it. Without symbols to split out there is no
 # debug package either, and leaving it on ships an empty /usr/src/debug dir.
 options=('!strip' '!debug')
-source=("$pkgname-$pkgver.zip::$url/releases/download/v$pkgver/ivicli-$pkgver-linux-x64-selfcontained.zip")
-sha256sums=('741cd953c4fecc33788f93b1fe314dd9c32a02a4d24e374fab4b9e6e3035b2eb')
+source=("$pkgname-$pkgver.zip::$url/releases/download/v$pkgver/ivicli-$pkgver-linux-x64.zip")
+sha256sums=('7e4e39a573af5c816af18f172adc1caaff4095cef8abf1f13a1a5327fc6863bb')
 
 build() {
   chmod +x "$srcdir/ivicli"
