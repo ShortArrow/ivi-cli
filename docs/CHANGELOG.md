@@ -104,10 +104,14 @@ All notable changes to ivi-cli are documented here. Format roughly follows
   `client aborted the connection (ConnectionReset)`; SOCKET follows it
   with the usual `client disconnected`.
 
-## [0.3.2-beta.1] — 2026-08-25
+## [0.3.2] — 2026-09-25
 
 ### Added
 
+- **Scripts accept the `!` prefix that 0.4.0 requires.** `!sleep`,
+  `!assert` and `!echo` are the directives, and `!#` starts a comment. A
+  `!` line is read whole, so `#` inside it stays part of the text, as it
+  will for every line from 0.4.0.
 - **A second AUR package, `ivi-cli`**, built from source against the system
   .NET. It depends on `aspnet-runtime`, installs 6.5 MB rather than 102 MiB,
   and takes .NET security fixes through pacman; `ivi-cli-bin` remains the
@@ -144,8 +148,30 @@ All notable changes to ivi-cli are documented here. Format roughly follows
   are unaffected, as is the container, which consumes the publish output
   directly rather than these archives.
 
+### Deprecated
+
+- **Unprefixed script directives and `#` comments.** `sleep`, `assert` and
+  `echo` without `!`, and a `#` comment on its own line or after SCPI text,
+  still work in 0.3.x. `visa script` and `mock scenario record
+  --from-script` print a warning for each such line, and `visa lint`
+  reports it. 0.4.0 removes the unprefixed form: it sends every line
+  without `!` to the instrument as written, `#` included, since `#` also
+  starts block data and `#H`/`#Q`/`#B` numbers.
+
 ### Fixed
 
+- **`-v`, `-vv`, `-q`, `--log-format` and `--log-file` are accepted.** The
+  README documents them and the logger read them, but the command-line
+  parser did not know them, so any command given one exited with
+  `Unrecognized command or argument`.
+- **A client that resets its connection is logged as a disconnect, not as
+  an error.** A killed client, or one that gives up on a slow query and
+  reconnects, ends its TCP connection with a reset rather than a close.
+  The SOCKET, HiSLIP and VXI-11 gateways logged that as `connection
+  terminated with unexpected error` with a sixty-line stack trace, and
+  SOCKET never logged `client disconnected`. Each now logs one line,
+  `client aborted the connection (ConnectionReset)`; SOCKET follows it
+  with the usual `client disconnected`.
 - **`ivicli --version` and `--help` no longer emit scenario warnings.**
   Scenario activation ran before the command line was parsed, so an
   unloadable binding in `session.json` put a warning line ahead of the
@@ -154,8 +180,6 @@ All notable changes to ivi-cli are documented here. Format roughly follows
   help or a version, or that failed to parse — none of which opens a
   session. Every command that can reach a backend still activates exactly
   as before.
-
-
 - **The stated prerequisite for `dotnet tool install -g ivi-cli` was
   wrong.** Both READMEs said "the .NET 10 SDK or runtime"; the tool needs
   the **ASP.NET Core** 10 runtime, because the CLI's framework reference
