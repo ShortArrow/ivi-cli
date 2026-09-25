@@ -41,6 +41,10 @@ introduced it: a deprecation warning promised for 0.3.x had to ship before
   release must not take `latest` or the GitHub "Latest release" mark
   back; that needs a change to `release.yml` before the first such tag.
 - The branch ends with the release it was cut for, and is deleted after.
+  The repository ruleset that stops `main` being deleted or force-pushed
+  covers `release/**` too, so the deletion is done by taking
+  `release/**` out of that ruleset, deleting the branch, and putting it
+  back.
 
 ### Branch naming
 
