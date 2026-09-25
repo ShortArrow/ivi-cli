@@ -106,7 +106,7 @@ public sealed class HiSlipV2Tests
 
         public static async Task<Harness> StartAsync()
         {
-            var port = GetFreePort();
+            var port = LoopbackGateway.FreePort();
             var deviceName = DeviceName.From("dut").ShouldBeOk();
             var device = new Device(
                 deviceName,
@@ -138,7 +138,10 @@ public sealed class HiSlipV2Tests
                 NullLogger<HiSlipGatewayServer>.Instance
             );
             var cts = new CancellationTokenSource(TimeSpan.FromSeconds(20));
-            var serverTask = gateway.RunAsync(server, config, cts.Token);
+            (port, var serverTask) = LoopbackGateway.Start(
+                server,
+                s => gateway.RunAsync(s, config, cts.Token)
+            );
             await WaitForListenerAsync(port, cts.Token);
             return new Harness(port, gateway, cts, serverTask);
         }
@@ -232,15 +235,6 @@ public sealed class HiSlipV2Tests
                 }
                 offset += read;
             }
-        }
-
-        private static int GetFreePort()
-        {
-            var listener = new TcpListener(IPAddress.Loopback, 0);
-            listener.Start();
-            var port = ((IPEndPoint)listener.LocalEndpoint).Port;
-            listener.Stop();
-            return port;
         }
 
         private static async Task WaitForListenerAsync(int port, CancellationToken ct)

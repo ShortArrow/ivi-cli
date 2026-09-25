@@ -31,7 +31,10 @@ public sealed class HiSlipTriggerSrqTests
     {
         var (gateway, server, config, port, fake, deviceName) = BuildHarness();
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
-        var serverTask = gateway.RunAsync(server, config, cts.Token);
+        (port, var serverTask) = LoopbackGateway.Start(
+            server,
+            s => gateway.RunAsync(s, config, cts.Token)
+        );
         await WaitForListenerAsync(port, cts.Token);
 
         var device = config.FindDevice(deviceName)!;
@@ -56,7 +59,10 @@ public sealed class HiSlipTriggerSrqTests
     {
         var (gateway, server, config, port, fake, deviceName) = BuildHarness();
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
-        var serverTask = gateway.RunAsync(server, config, cts.Token);
+        (port, var serverTask) = LoopbackGateway.Start(
+            server,
+            s => gateway.RunAsync(s, config, cts.Token)
+        );
         await WaitForListenerAsync(port, cts.Token);
 
         var device = config.FindDevice(deviceName)!;
@@ -118,7 +124,10 @@ public sealed class HiSlipTriggerSrqTests
         );
 
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
-        var serverTask = gateway.RunAsync(server, config, cts.Token);
+        (port, var serverTask) = LoopbackGateway.Start(
+            server,
+            s => gateway.RunAsync(s, config, cts.Token)
+        );
         await WaitForListenerAsync(port, cts.Token);
 
         var device = config.FindDevice(deviceName)!;
@@ -183,7 +192,10 @@ public sealed class HiSlipTriggerSrqTests
         );
 
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
-        var serverTask = gateway.RunAsync(server, config, cts.Token);
+        (port, var serverTask) = LoopbackGateway.Start(
+            server,
+            s => gateway.RunAsync(s, config, cts.Token)
+        );
         await WaitForListenerAsync(port, cts.Token);
 
         var device = config.FindDevice(deviceName)!;
@@ -239,7 +251,7 @@ public sealed class HiSlipTriggerSrqTests
         DeviceName DeviceName
     ) BuildHarness()
     {
-        var port = GetFreePort();
+        var port = LoopbackGateway.FreePort();
         var deviceName = DeviceName.From("dut").ShouldBeOk();
         var device = new Device(
             deviceName,
@@ -265,15 +277,6 @@ public sealed class HiSlipTriggerSrqTests
             NullLogger<HiSlipGatewayServer>.Instance
         );
         return (gateway, srv, config, port, fake, deviceName);
-    }
-
-    private static int GetFreePort()
-    {
-        var listener = new TcpListener(IPAddress.Loopback, 0);
-        listener.Start();
-        var port = ((IPEndPoint)listener.LocalEndpoint).Port;
-        listener.Stop();
-        return port;
     }
 
     private static async Task WaitForListenerAsync(int port, CancellationToken ct)

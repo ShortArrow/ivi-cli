@@ -56,7 +56,10 @@ public sealed class SocketLiveRebindTests
         );
 
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
-        var serverTask = gateway.RunAsync(server, config, cts.Token);
+        (port, var serverTask) = LoopbackGateway.Start(
+            server,
+            s => gateway.RunAsync(s, config, cts.Token)
+        );
         await WaitForListenerAsync(port, cts.Token);
 
         using var tcp = new TcpClient();
@@ -104,7 +107,7 @@ public sealed class SocketLiveRebindTests
         int Port
     ) BuildHarness(Device device)
     {
-        var port = GetFreePort();
+        var port = LoopbackGateway.FreePort();
         var serverName = ServerName.From("socket-srv").ShouldBeOk();
         var endpoint = PublicEndpoint.From("socket0").ShouldBeOk();
         var bind = IpAddress.From("127.0.0.1").ShouldBeOk();
@@ -124,15 +127,6 @@ public sealed class SocketLiveRebindTests
             .AddRoute(route)
             .ShouldBeOk();
         return (server, config, port);
-    }
-
-    private static int GetFreePort()
-    {
-        var listener = new TcpListener(IPAddress.Loopback, 0);
-        listener.Start();
-        var port = ((IPEndPoint)listener.LocalEndpoint).Port;
-        listener.Stop();
-        return port;
     }
 
     private static async Task WaitForListenerAsync(int port, CancellationToken ct)

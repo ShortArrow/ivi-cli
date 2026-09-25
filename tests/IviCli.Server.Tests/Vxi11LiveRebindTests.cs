@@ -50,7 +50,10 @@ public sealed class Vxi11LiveRebindTests
             refresher
         );
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
-        var serverTask = gateway.RunAsync(server, config, cts.Token);
+        (port, var serverTask) = LoopbackGateway.Start(
+            server,
+            s => gateway.RunAsync(s, config, cts.Token)
+        );
         await WaitForListenerAsync(port, cts.Token);
 
         using var tcp = new TcpClient();
@@ -166,7 +169,7 @@ public sealed class Vxi11LiveRebindTests
         int Port
     ) BuildHarness()
     {
-        var port = GetFreePort();
+        var port = LoopbackGateway.FreePort();
         var deviceName = DeviceName.From("dut").ShouldBeOk();
         var device = new Device(
             deviceName,
@@ -222,15 +225,6 @@ public sealed class Vxi11LiveRebindTests
         _ = reader.ReadOpaque(); // verf body
         _ = reader.ReadUInt32(); // accept_stat
         return reader;
-    }
-
-    private static int GetFreePort()
-    {
-        var listener = new TcpListener(IPAddress.Loopback, 0);
-        listener.Start();
-        var port = ((IPEndPoint)listener.LocalEndpoint).Port;
-        listener.Stop();
-        return port;
     }
 
     private static async Task WaitForListenerAsync(int port, CancellationToken ct)

@@ -28,7 +28,7 @@ public sealed class Vxi11PyVisaInteropTests
     [Trait("Category", "Integration")]
     public async Task PyVisa_can_idn_query_in_proc_vxi11_gateway()
     {
-        var port = GetFreePort();
+        var port = LoopbackGateway.FreePort();
         var deviceName = DeviceName.From("dut").ShouldBeOk();
         var device = new Device(
             deviceName,
@@ -55,7 +55,10 @@ public sealed class Vxi11PyVisaInteropTests
             NullLogger<Vxi11GatewayServer>.Instance
         );
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
-        var serverTask = gateway.RunAsync(srv, config, cts.Token);
+        (port, var serverTask) = LoopbackGateway.Start(
+            srv,
+            s => gateway.RunAsync(s, config, cts.Token)
+        );
         await WaitForListenerAsync(port, cts.Token);
 
         var (exitCode, stdout, stderr) = await RunPythonClientAsync(port, cts.Token);
@@ -109,15 +112,6 @@ public sealed class Vxi11PyVisaInteropTests
         var stdout = await stdoutTask;
         var stderr = await stderrTask;
         return (process.ExitCode, stdout, stderr);
-    }
-
-    private static int GetFreePort()
-    {
-        var listener = new TcpListener(IPAddress.Loopback, 0);
-        listener.Start();
-        var port = ((IPEndPoint)listener.LocalEndpoint).Port;
-        listener.Stop();
-        return port;
     }
 
     private static async Task WaitForListenerAsync(int port, CancellationToken ct)
