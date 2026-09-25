@@ -1,6 +1,6 @@
 pkgbase = ivi-cli-bin
 	pkgdesc = Integrated CLI for managing, diagnosing, and operating VISA/IVI instruments (prebuilt binary)
-	pkgver = 0.3.2
+	pkgver = 0.4.0
 	pkgrel = 1
 	url = https://github.com/ShortArrow/ivi-cli
 	arch = x86_64
@@ -16,7 +16,7 @@ pkgbase = ivi-cli-bin
 	conflicts = ivi-cli
 	options = !strip
 	options = !debug
-	source = ivi-cli-bin-0.3.2.zip::https://github.com/ShortArrow/ivi-cli/releases/download/v0.3.2/ivicli-0.3.2-linux-x64.zip
-	sha256sums = 7e4e39a573af5c816af18f172adc1caaff4095cef8abf1f13a1a5327fc6863bb
+	source = ivi-cli-bin-0.4.0.zip::https://github.com/ShortArrow/ivi-cli/releases/download/v0.4.0/ivicli-0.4.0-linux-x64.zip
+	sha256sums = 577a31146202d1dcaabca991534a7cbffba2b52eb691a272ec0a700a5c4a998f
 
 pkgname = ivi-cli-bin
