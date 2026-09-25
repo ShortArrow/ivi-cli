@@ -118,7 +118,9 @@ All notable changes to ivi-cli are documented here. Format roughly follows
   terminated with unexpected error` with a sixty-line stack trace, and
   SOCKET never logged `client disconnected`. Each now logs one line,
   `client aborted the connection (ConnectionReset)`; SOCKET follows it
-  with the usual `client disconnected`.
+  with the usual `client disconnected`. An alert on the gateway's ERR lines
+  no longer fires for a client reset; every other unexpected failure of a
+  connection still logs at ERR with its stack trace.
 
 ## [0.3.2] — 2026-09-25
 
