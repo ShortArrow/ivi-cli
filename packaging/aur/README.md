@@ -5,8 +5,8 @@
 the self-contained `ivicli-<version>-linux-x64.zip` asset from the matching
 GitHub Release, so the package installs a working `ivicli` on a machine with no
 .NET at all. Releases up to v0.3.1 named that asset
-`ivicli-<version>-linux-x64-selfcontained.zip`, which is what the PKGBUILD
-still points at while it packages 0.3.1.
+`ivicli-<version>-linux-x64-selfcontained.zip`; packaging one of them means
+putting the suffix back in `source`.
 
 This directory is the source of truth. The AUR repository is a separate git
 repo containing only `PKGBUILD` and `.SRCINFO`; keeping the canonical copy here
@@ -16,9 +16,7 @@ means the packaging travels with the code it packages.
 
 1. Edit `ivi-cli-bin/PKGBUILD`: set `pkgver` to the new version and reset
    `pkgrel=1`. (`pkgrel` only moves when the packaging changes and the upstream
-   version does not.) The first bump past 0.3.1 also drops `-selfcontained`
-   from the asset name in `source`; the old name does not exist from v0.3.2 on,
-   and the download 404s.
+   version does not.)
 2. Replace `sha256sums`. Every release from v0.3.2 publishes a `SHA256SUMS`
    asset, so the hash can be read from there instead of downloading the zip:
 
