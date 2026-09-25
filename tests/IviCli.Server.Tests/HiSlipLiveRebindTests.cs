@@ -28,7 +28,7 @@ public sealed class HiSlipLiveRebindTests
     [Fact]
     public async Task Live_rebind_is_observed_mid_link()
     {
-        var port = GetFreePort();
+        var port = LoopbackGateway.FreePort();
         var deviceName = DeviceName.From("dut").ShouldBeOk();
         var device = new Device(
             deviceName,
@@ -73,7 +73,10 @@ public sealed class HiSlipLiveRebindTests
             refresher
         );
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
-        var serverTask = gateway.RunAsync(server, config, cts.Token);
+        (port, var serverTask) = LoopbackGateway.Start(
+            server,
+            s => gateway.RunAsync(s, config, cts.Token)
+        );
         await WaitForListenerAsync(port, cts.Token);
 
         var client = new HiSlipBackend(port);
@@ -112,15 +115,6 @@ public sealed class HiSlipLiveRebindTests
 
     private static SessionState SessionWith(DeviceName device, string scenario) =>
         SessionState.Empty.BindScenario(device, ScenarioName.From(scenario).ShouldBeOk());
-
-    private static int GetFreePort()
-    {
-        var listener = new TcpListener(IPAddress.Loopback, 0);
-        listener.Start();
-        var port = ((IPEndPoint)listener.LocalEndpoint).Port;
-        listener.Stop();
-        return port;
-    }
 
     private static async Task WaitForListenerAsync(int port, CancellationToken ct)
     {

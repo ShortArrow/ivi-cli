@@ -25,7 +25,7 @@ public sealed class HiSlipHealthcheckProbeTests
     [Fact]
     public async Task TCP_probe_does_not_emit_LogError()
     {
-        var port = GetFreePort();
+        var port = LoopbackGateway.FreePort();
         var deviceName = DeviceName.From("dut").ShouldBeOk();
         var device = new Device(
             deviceName,
@@ -54,7 +54,10 @@ public sealed class HiSlipHealthcheckProbeTests
             capturedLogger
         );
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
-        var serverTask = gateway.RunAsync(server, config, cts.Token);
+        (port, var serverTask) = LoopbackGateway.Start(
+            server,
+            s => gateway.RunAsync(s, config, cts.Token)
+        );
 
         await WaitForListenerAsync(port, cts.Token);
 
@@ -80,15 +83,6 @@ public sealed class HiSlipHealthcheckProbeTests
         capturedLogger.ErrorMessages.ShouldBeEmpty(
             "TCP probe disconnects must not produce LogError entries"
         );
-    }
-
-    private static int GetFreePort()
-    {
-        var listener = new TcpListener(IPAddress.Loopback, 0);
-        listener.Start();
-        var port = ((IPEndPoint)listener.LocalEndpoint).Port;
-        listener.Stop();
-        return port;
     }
 
     private static async Task WaitForListenerAsync(int port, CancellationToken ct)

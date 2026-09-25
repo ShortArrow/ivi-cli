@@ -90,7 +90,7 @@ internal sealed class UsbIpBench : IAsyncDisposable
         params (string BusId, UsbExportProfile Profile, string DeviceName)[] exports
     )
     {
-        var port = GetFreePort();
+        var port = LoopbackGateway.FreePort();
         var serverName = ServerName.From("usb-srv").ShouldBeOk();
         var server = new IviCli.Domain.Servers.Server(
             serverName,
@@ -130,7 +130,10 @@ internal sealed class UsbIpBench : IAsyncDisposable
         var gateway = new UsbIpGatewayServer(new FakeBackendFactory(backend), logger);
 
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(20));
-        var serverTask = gateway.RunAsync(server, config, cts.Token);
+        (port, var serverTask) = LoopbackGateway.Start(
+            server,
+            s => gateway.RunAsync(s, config, cts.Token)
+        );
         await WaitForListenerAsync(port, cts.Token);
         return new UsbIpBench(cts, serverTask, port, backend, devices);
     }
@@ -195,15 +198,6 @@ internal sealed class UsbIpBench : IAsyncDisposable
         }
         catch (OperationCanceledException) { }
         _cts.Dispose();
-    }
-
-    private static int GetFreePort()
-    {
-        var listener = new TcpListener(IPAddress.Loopback, 0);
-        listener.Start();
-        var port = ((IPEndPoint)listener.LocalEndpoint).Port;
-        listener.Stop();
-        return port;
     }
 
     private static async Task WaitForListenerAsync(int port, CancellationToken ct)

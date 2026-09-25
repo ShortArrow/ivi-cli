@@ -30,7 +30,7 @@ public sealed class HiSlipEndToEndTests
     [InlineData("MEAS:VOLT? CH1")]
     public async Task Query_returns_fake_response_through_gateway(string request)
     {
-        var port = GetFreePort();
+        var port = LoopbackGateway.FreePort();
         var deviceName = DeviceName.From("dut").ShouldBeOk();
         var device = new Device(
             deviceName,
@@ -67,7 +67,10 @@ public sealed class HiSlipEndToEndTests
             NullLogger<HiSlipGatewayServer>.Instance
         );
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
-        var serverTask = gateway.RunAsync(server, config, cts.Token);
+        (port, var serverTask) = LoopbackGateway.Start(
+            server,
+            s => gateway.RunAsync(s, config, cts.Token)
+        );
 
         await WaitForListenerAsync(port, cts.Token);
 
@@ -90,7 +93,7 @@ public sealed class HiSlipEndToEndTests
     [Fact]
     public async Task Query_uses_explicit_resource_port_over_backend_default()
     {
-        var port = GetFreePort();
+        var port = LoopbackGateway.FreePort();
         var deviceName = DeviceName.From("dut").ShouldBeOk();
         // Resource carries the gateway's port via the `hislip0,<port>` form.
         var device = new Device(
@@ -126,12 +129,19 @@ public sealed class HiSlipEndToEndTests
             NullLogger<HiSlipGatewayServer>.Instance
         );
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
-        var serverTask = gateway.RunAsync(server, config, cts.Token);
+        (port, var serverTask) = LoopbackGateway.Start(
+            server,
+            s => gateway.RunAsync(s, config, cts.Token)
+        );
 
         await WaitForListenerAsync(port, cts.Token);
 
         // Default constructor → well-known 4880, which is NOT where the gateway
         // listens. Success proves the resource port (hislip0,<port>) won.
+        device = device with
+        {
+            Resource = VisaResource.Parse($"TCPIP0::127.0.0.1::hislip0,{port}::INSTR").ShouldBeOk(),
+        };
         var client = new HiSlipBackend();
         (await client.OpenAsync(device, cts.Token)).ShouldBeOk();
 
@@ -147,15 +157,6 @@ public sealed class HiSlipEndToEndTests
             await serverTask;
         }
         catch (OperationCanceledException) { }
-    }
-
-    private static int GetFreePort()
-    {
-        var listener = new TcpListener(IPAddress.Loopback, 0);
-        listener.Start();
-        var port = ((IPEndPoint)listener.LocalEndpoint).Port;
-        listener.Stop();
-        return port;
     }
 
     private static async Task WaitForListenerAsync(int port, CancellationToken ct)

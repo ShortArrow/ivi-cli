@@ -31,7 +31,10 @@ public sealed class Vxi11EndToEndPairingTests
         fake.RespondToQuery(deviceName, "*IDN?", "FAKE,VXI11,IVI-CLI,1.0");
 
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
-        var serverTask = gateway.RunAsync(server, config, cts.Token);
+        (port, var serverTask) = LoopbackGateway.Start(
+            server,
+            s => gateway.RunAsync(s, config, cts.Token)
+        );
         await WaitForListenerAsync(port, cts.Token);
 
         var backend = new Vxi11Backend(port);
@@ -59,7 +62,10 @@ public sealed class Vxi11EndToEndPairingTests
         _ = fake;
 
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
-        var serverTask = gateway.RunAsync(server, config, cts.Token);
+        (port, var serverTask) = LoopbackGateway.Start(
+            server,
+            s => gateway.RunAsync(s, config, cts.Token)
+        );
         await WaitForListenerAsync(port, cts.Token);
 
         var backend = new Vxi11Backend(port);
@@ -87,7 +93,10 @@ public sealed class Vxi11EndToEndPairingTests
         fake.RespondToQuery(deviceName, "*IDN?", "FAKE,VXI11,IVI-CLI,1.0");
 
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
-        var serverTask = gateway.RunAsync(server, config, cts.Token);
+        (port, var serverTask) = LoopbackGateway.Start(
+            server,
+            s => gateway.RunAsync(s, config, cts.Token)
+        );
         await WaitForListenerAsync(port, cts.Token);
 
         var backend = new Vxi11Backend(port);
@@ -117,7 +126,7 @@ public sealed class Vxi11EndToEndPairingTests
         FakeBackend Fake
     ) BuildHarness()
     {
-        var port = GetFreePort();
+        var port = LoopbackGateway.FreePort();
         var deviceName = DeviceName.From("dut").ShouldBeOk();
         var device = new Device(
             deviceName,
@@ -143,15 +152,6 @@ public sealed class Vxi11EndToEndPairingTests
             NullLogger<Vxi11GatewayServer>.Instance
         );
         return (gateway, srv, config, port, fake);
-    }
-
-    private static int GetFreePort()
-    {
-        var listener = new TcpListener(IPAddress.Loopback, 0);
-        listener.Start();
-        var port = ((IPEndPoint)listener.LocalEndpoint).Port;
-        listener.Stop();
-        return port;
     }
 
     private static async Task WaitForListenerAsync(int port, CancellationToken ct)

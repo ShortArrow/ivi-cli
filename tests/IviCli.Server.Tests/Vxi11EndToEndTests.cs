@@ -28,7 +28,10 @@ public sealed class Vxi11EndToEndTests
     {
         var (gateway, server, config, port, fake) = BuildHarness();
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
-        var serverTask = gateway.RunAsync(server, config, cts.Token);
+        (port, var serverTask) = LoopbackGateway.Start(
+            server,
+            s => gateway.RunAsync(s, config, cts.Token)
+        );
         await WaitForListenerAsync(port, cts.Token);
         _ = fake;
 
@@ -70,7 +73,10 @@ public sealed class Vxi11EndToEndTests
         var (gateway, server, config, port, fake) = BuildHarness();
         fake.RespondToQuery(DeviceName.From("dut").ShouldBeOk(), request, "FAKE,VXI11,0,1.0");
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
-        var serverTask = gateway.RunAsync(server, config, cts.Token);
+        (port, var serverTask) = LoopbackGateway.Start(
+            server,
+            s => gateway.RunAsync(s, config, cts.Token)
+        );
         await WaitForListenerAsync(port, cts.Token);
 
         using var tcp = new TcpClient();
@@ -175,7 +181,10 @@ public sealed class Vxi11EndToEndTests
     {
         var (gateway, server, config, port, _) = BuildHarness();
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
-        var serverTask = gateway.RunAsync(server, config, cts.Token);
+        (port, var serverTask) = LoopbackGateway.Start(
+            server,
+            s => gateway.RunAsync(s, config, cts.Token)
+        );
         await WaitForListenerAsync(port, cts.Token);
 
         using var tcp = new TcpClient();
@@ -213,7 +222,10 @@ public sealed class Vxi11EndToEndTests
     {
         var (gateway, server, config, port, _) = BuildHarness();
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
-        var serverTask = gateway.RunAsync(server, config, cts.Token);
+        (port, var serverTask) = LoopbackGateway.Start(
+            server,
+            s => gateway.RunAsync(s, config, cts.Token)
+        );
         await WaitForListenerAsync(port, cts.Token);
 
         using var tcp = new TcpClient();
@@ -250,7 +262,10 @@ public sealed class Vxi11EndToEndTests
     {
         var (gateway, server, config, port, _) = BuildHarness();
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
-        var serverTask = gateway.RunAsync(server, config, cts.Token);
+        (port, var serverTask) = LoopbackGateway.Start(
+            server,
+            s => gateway.RunAsync(s, config, cts.Token)
+        );
         await WaitForListenerAsync(port, cts.Token);
 
         using var tcp = new TcpClient();
@@ -309,7 +324,10 @@ public sealed class Vxi11EndToEndTests
     {
         var (gateway, server, config, port, _) = BuildHarness();
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
-        var serverTask = gateway.RunAsync(server, config, cts.Token);
+        (port, var serverTask) = LoopbackGateway.Start(
+            server,
+            s => gateway.RunAsync(s, config, cts.Token)
+        );
         await WaitForListenerAsync(port, cts.Token);
 
         using var tcp = new TcpClient();
@@ -340,7 +358,10 @@ public sealed class Vxi11EndToEndTests
     {
         var (gateway, server, config, port, fake) = BuildHarness();
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
-        var serverTask = gateway.RunAsync(server, config, cts.Token);
+        (port, var serverTask) = LoopbackGateway.Start(
+            server,
+            s => gateway.RunAsync(s, config, cts.Token)
+        );
         await WaitForListenerAsync(port, cts.Token);
 
         using var tcp = new TcpClient();
@@ -403,7 +424,10 @@ public sealed class Vxi11EndToEndTests
     {
         var (gateway, server, config, port, fake) = BuildHarness();
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
-        var serverTask = gateway.RunAsync(server, config, cts.Token);
+        (port, var serverTask) = LoopbackGateway.Start(
+            server,
+            s => gateway.RunAsync(s, config, cts.Token)
+        );
         await WaitForListenerAsync(port, cts.Token);
 
         using var tcp = new TcpClient();
@@ -466,7 +490,10 @@ public sealed class Vxi11EndToEndTests
     {
         var (gateway, server, config, port, _) = BuildHarness();
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
-        var serverTask = gateway.RunAsync(server, config, cts.Token);
+        (port, var serverTask) = LoopbackGateway.Start(
+            server,
+            s => gateway.RunAsync(s, config, cts.Token)
+        );
         await WaitForListenerAsync(port, cts.Token);
 
         using var tcp = new TcpClient();
@@ -508,7 +535,7 @@ public sealed class Vxi11EndToEndTests
         FakeBackend Fake
     ) BuildHarness()
     {
-        var port = GetFreePort();
+        var port = LoopbackGateway.FreePort();
         var deviceName = DeviceName.From("dut").ShouldBeOk();
         var device = new IviCli.Domain.Devices.Device(
             deviceName,
@@ -569,15 +596,6 @@ public sealed class Vxi11EndToEndTests
         _ = reader.ReadOpaque(); // verf body
         _ = reader.ReadUInt32(); // accept_stat
         return reader;
-    }
-
-    private static int GetFreePort()
-    {
-        var listener = new TcpListener(IPAddress.Loopback, 0);
-        listener.Start();
-        var port = ((IPEndPoint)listener.LocalEndpoint).Port;
-        listener.Stop();
-        return port;
     }
 
     private static async Task WaitForListenerAsync(int port, CancellationToken ct)
