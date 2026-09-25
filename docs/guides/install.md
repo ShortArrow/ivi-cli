@@ -20,7 +20,7 @@ Every release carries a self-contained archive per platform, named
 runtime bundled, so it runs on a machine with no .NET at all.
 
 ```sh
-version=0.4.0-beta.1
+version=0.4.0
 curl -fsSL -o ivicli.zip \
   "https://github.com/ShortArrow/ivi-cli/releases/download/v${version}/ivicli-${version}-linux-x64.zip"
 unzip -j ivicli.zip ivicli -d ~/.local/bin
@@ -101,7 +101,7 @@ backend:
 
 ```toml
 [tools]
-"github:ShortArrow/ivi-cli" = { version = "0.4.0-beta.1", bin = "ivicli" }
+"github:ShortArrow/ivi-cli" = { version = "0.4.0", bin = "ivicli" }
 ```
 
 `bin = "ivicli"` is required: the backend looks for an executable named
