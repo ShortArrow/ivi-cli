@@ -54,11 +54,11 @@
       },
       "TestableIO.System.IO.Abstractions": {
         "type": "Direct",
-        "requested": "[22.2.0, )",
-        "resolved": "22.2.0",
-        "contentHash": "BQPyr0A1s2HvpVTZIyolrZ3ZdPn8DU2tqciaK1oco3pjm76fiKIk75eup4R9reZjNS75M+WJIICOlNX5OFt50g==",
+        "requested": "[22.3.0, )",
+        "resolved": "22.3.0",
+        "contentHash": "2dqQ5AEE61NkQ/0F31mhOXYhgzZOtC+RUuJajwYa7gPgZBqJVe9Mc/hnqXEbBSDOxGZ7hYsmULjzK3yqewB3FA==",
         "dependencies": {
-          "Testably.Abstractions.FileSystem.Interface": "10.3.0"
+          "Testably.Abstractions.FileSystem.Interface": "10.4.0"
         }
       },
       "TestableIO.System.IO.Abstractions.TestingHelpers": {
@@ -148,8 +148,8 @@
       },
       "Testably.Abstractions.FileSystem.Interface": {
         "type": "Transitive",
-        "resolved": "10.3.0",
-        "contentHash": "5ebMaoADkzjfW7GnZYKaUebV8XmUn++C/4sKk1PTzCiddEgbSKBq3pW4EWEi70rYJAK0gA1yDWrYFeHq18FvHQ=="
+        "resolved": "10.4.0",
+        "contentHash": "7G5NzIjs7544Dit0uuvYOOAzD8E4alQS2ENPGT3HV1Ks/1r55O7X4d9g6L273n70IDkgqNdBCmrkWxJLn0xCZA=="
       },
       "xunit.abstractions": {
         "type": "Transitive",
@@ -197,7 +197,7 @@
           "IviCli.Domain": "[0.4.0, )",
           "Microsoft.Extensions.DependencyInjection.Abstractions": "[10.0.12, )",
           "Microsoft.Extensions.Logging.Abstractions": "[10.0.12, )",
-          "TestableIO.System.IO.Abstractions": "[22.2.0, )"
+          "TestableIO.System.IO.Abstractions": "[22.3.0, )"
         }
       },
       "ivicli.backends.fake": {
@@ -220,7 +220,7 @@
           "Microsoft.Extensions.Logging.Abstractions": "[10.0.12, )",
           "NSubstitute": "[6.2.0, )",
           "Shouldly": "[4.3.0, )",
-          "TestableIO.System.IO.Abstractions": "[22.2.0, )",
+          "TestableIO.System.IO.Abstractions": "[22.3.0, )",
           "TestableIO.System.IO.Abstractions.TestingHelpers": "[22.2.0, )",
           "xunit": "[2.9.3, )"
         }
