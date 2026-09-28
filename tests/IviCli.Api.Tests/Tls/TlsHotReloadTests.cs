@@ -16,6 +16,7 @@ using IviCli.Backends.Fake;
 using IviCli.Domain.Configuration;
 using IviCli.TestKit;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Shouldly;
 
@@ -63,7 +64,7 @@ public sealed class TlsHotReloadTests
 
             (await ServedThumbprintAsync(port)).ShouldBe(cert1.Thumbprint);
 
-            File.WriteAllBytes(certPath, cert2.Pfx);
+            Rotate(certPath, cert2.Pfx);
             await PollUntilAsync(
                 rotation,
                 () => rotation.Current.ServerCertificate.Thumbprint == cert2.Thumbprint
@@ -86,17 +87,21 @@ public sealed class TlsHotReloadTests
         {
             var config = FileTlsConfig(certPath);
             var initial = TlsCertificateLoader.Load(config).ShouldBeOk();
+            var logger = new RecordingLogger<RotatingTlsCertificate>();
             var rotation = new RotatingTlsCertificate(
                 initial,
                 config,
-                NullLogger.Instance,
+                logger,
                 NullAuditLog.Instance
             );
 
-            File.WriteAllBytes(certPath, [0xDE, 0xAD, 0xBE, 0xEF]);
+            Rotate(certPath, [0xDE, 0xAD, 0xBE, 0xEF]);
             await rotation.PollOnceAsync(CancellationToken.None);
 
             rotation.Current.ServerCertificate.Thumbprint.ShouldBe(cert1.Thumbprint);
+            logger.Entries.ShouldContain(e =>
+                e.Level == LogLevel.Warning && e.Message.Contains("rotation rejected")
+            );
         }
         finally
         {
@@ -117,17 +122,21 @@ public sealed class TlsHotReloadTests
         {
             var config = FileTlsConfig(certPath);
             var initial = TlsCertificateLoader.Load(config).ShouldBeOk();
+            var logger = new RecordingLogger<RotatingTlsCertificate>();
             var rotation = new RotatingTlsCertificate(
                 initial,
                 config,
-                NullLogger.Instance,
+                logger,
                 NullAuditLog.Instance
             );
 
-            File.WriteAllBytes(certPath, expired.Pfx);
+            Rotate(certPath, expired.Pfx);
             await rotation.PollOnceAsync(CancellationToken.None);
 
             rotation.Current.ServerCertificate.Thumbprint.ShouldBe(cert1.Thumbprint);
+            logger.Entries.ShouldContain(e =>
+                e.Level == LogLevel.Warning && e.Message.Contains("rotation rejected")
+            );
         }
         finally
         {
@@ -148,7 +157,7 @@ public sealed class TlsHotReloadTests
             var audit = new RecordingAuditLog();
             var rotation = new RotatingTlsCertificate(initial, config, NullLogger.Instance, audit);
 
-            File.WriteAllBytes(certPath, cert2.Pfx);
+            Rotate(certPath, cert2.Pfx);
             await PollUntilAsync(rotation, () => audit.Events.Count > 0);
 
             var lifecycle = audit.Events.ShouldHaveSingleItem().ShouldBeOfType<ServerLifecycle>();
@@ -185,7 +194,7 @@ public sealed class TlsHotReloadTests
                 NullAuditLog.Instance
             );
 
-            File.WriteAllBytes(certPath, cert2.Pfx);
+            Rotate(certPath, cert2.Pfx);
             using (File.Open(certPath, FileMode.Open, FileAccess.Read, FileShare.None))
             {
                 await rotation.PollOnceAsync(CancellationToken.None);
@@ -284,6 +293,21 @@ public sealed class TlsHotReloadTests
             notAfter ?? DateTimeOffset.UtcNow.AddHours(1)
         );
         return (cert.Export(X509ContentType.Pfx), cert.Thumbprint);
+    }
+
+    /// <summary>
+    /// Replaces the file at <paramref name="path"/> and moves its
+    /// timestamp past the one it had. <see cref="RotatingTlsCertificate"/>
+    /// notices a rotation by the file's last-write time, which Windows
+    /// advances only once per clock tick; a test that writes twice in a
+    /// row can land both writes in one tick, and the rotation then looks
+    /// like no change at all.
+    /// </summary>
+    private static void Rotate(string path, byte[] bytes)
+    {
+        var before = File.GetLastWriteTimeUtc(path);
+        File.WriteAllBytes(path, bytes);
+        File.SetLastWriteTimeUtc(path, before.AddSeconds(1));
     }
 
     private static string WritePfx(byte[] pfx)
