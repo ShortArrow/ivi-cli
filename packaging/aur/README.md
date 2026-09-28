@@ -119,7 +119,7 @@ Then, for each release, copy the two files across and push:
 cp packaging/aur/ivi-cli-bin/{PKGBUILD,.SRCINFO} aur-ivi-cli-bin/
 cd aur-ivi-cli-bin
 git add PKGBUILD .SRCINFO
-git commit -m "upgpkg: ivi-cli-bin 0.3.2-1"
+git commit -m "upgpkg: ivi-cli-bin 0.4.0-1"
 git push
 ```
 

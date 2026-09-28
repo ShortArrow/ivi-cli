@@ -20,7 +20,7 @@
 # "No frameworks were found".
 
 pkgname=ivi-cli
-pkgver=0.3.2
+pkgver=0.4.0
 pkgrel=1
 pkgdesc="Integrated CLI for managing, diagnosing, and operating VISA/IVI instruments"
 arch=('x86_64')
@@ -34,7 +34,7 @@ conflicts=('ivi-cli-bin')
 # empty /usr/src/debug and a build-id symlink pointing at nothing.
 options=('!debug')
 source=("$pkgname-$pkgver.tar.gz::$url/archive/refs/tags/v$pkgver.tar.gz")
-sha256sums=('f74cebde2b2bb908642a8179e30f31745a706d959df497b5b633b7f46a43c087')
+sha256sums=('f7bf14544c4aa1d805fbc80cb2021a79a328e2230bbf66c41a4efac6b453c519')
 
 prepare() {
   cd "$srcdir/$pkgname-$pkgver"
