@@ -58,7 +58,8 @@ output:
 | Channel | Audience | Source of truth |
 | --- | --- | --- |
 | Self-contained single-file binary | Lab operators on Windows / Linux / macOS, 6 RIDs (linux-x64/arm64, win-x64/arm64, osx-x64/arm64) | release.yml `publish` job |
-| `dotnet tool` nupkg | .NET ecosystem users (`dotnet tool install -g ivicli`) | release.yml `pack` job |
+| `dotnet tool` nupkg | .NET ecosystem users (`dotnet tool install -g ivi-cli`) | release.yml `pack` job |
+| APT repository | Debian and Ubuntu users (`apt install ivicli`), see [ADR 0052](0052-apt-repository.md) | release.yml, published to `pkg.shortarrow.jp` |
 | **Container image (NEW, Batch V)** | **3rd-party VISA-app e2e test mocks; CI pipelines** | **release.yml `docker` job** |
 | Source build | Contributors | CONTRIBUTING.md |
 
