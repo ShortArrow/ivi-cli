@@ -73,6 +73,159 @@ jobs:
           name: integration-${{ matrix.os }}
           path: ./TestResults
 
+  # The mock seen through a real VISA stack: NI-VISA queries ivi-cli's
+  # HiSLIP, VXI-11 and SOCKET gateways, and the USB mock (ADR 0049) after
+  # usbip-win2 attaches it, as a serial port (CDC-ACM) and as a USBTMC
+  # instrument. Hosted Windows runners load usbip-win2's driver without
+  # test signing.
+  mock-ni-visa:
+    name: mock through NI-VISA (windows)
+    runs-on: windows-latest
+    timeout-minutes: 45
+    defaults:
+      run:
+        shell: pwsh
+    env:
+      DOTNET_NOLOGO: true
+      DOTNET_CLI_TELEMETRY_OPTOUT: true
+      NI_VISA_URL: https://download.ni.com/support/nipkg/products/ni-v/ni-visa/26.5/online/ni-visa_26.5_online.exe
+      NI_VISA_SHA256: e807858cb60329f9c2347434e687527b4bb98f1e4d9a79f265819c5930297543
+      USBIP_URL: https://github.com/vadimgrn/usbip-win2/releases/download/v.0.9.8.1/USBip-0.9.8.1-x64.exe
+      USBIP_SHA256: 38cad6d4432b52d5bb9409d9ad03b72fdffc4ada4cd3a48fbeca1a2752a8518a
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Install NI-VISA
+        run: |
+          $exe = Join-Path $env:RUNNER_TEMP 'ni-visa.exe'
+          Invoke-WebRequest $env:NI_VISA_URL -OutFile $exe
+          if ((Get-FileHash $exe -Algorithm SHA256).Hash -ne $env:NI_VISA_SHA256) { throw "NI-VISA installer checksum mismatch" }
+          # The installer is silent and has hung before; cap it.
+          $p = Start-Process $exe -ArgumentList '--quiet','--accept-eulas','--prevent-reboot' -PassThru
+          if (-not $p.WaitForExit(20 * 60 * 1000)) { $p | Stop-Process -Force; throw "NI-VISA installer did not finish in 20 minutes" }
+          # It exits -125071, asking for a reboot; nothing this job uses needs one.
+          "installer exit $($p.ExitCode)"
+          if (-not (Test-Path "$env:WINDIR\System32\visa64.dll")) { throw "visa64.dll not installed" }
+
+      - name: Install usbip-win2
+        run: |
+          $exe = Join-Path $env:RUNNER_TEMP 'usbip.exe'
+          Invoke-WebRequest $env:USBIP_URL -OutFile $exe
+          if ((Get-FileHash $exe -Algorithm SHA256).Hash -ne $env:USBIP_SHA256) { throw "usbip-win2 installer checksum mismatch" }
+          $p = Start-Process $exe -ArgumentList '/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART' -Wait -PassThru
+          if ($p.ExitCode -ne 0) { throw "usbip-win2 setup exited $($p.ExitCode)" }
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          global-json-file: global.json
+
+      - name: Publish ivicli
+        run: dotnet publish src/IviCli.Cli/IviCli.Cli.csproj -c Release -r win-x64 --self-contained true -o "$env:RUNNER_TEMP\ivicli"
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.12'
+
+      - name: Install PyVISA
+        run: python -m pip install pyvisa==1.16.2
+
+      # A gateway started in an earlier step was gone by the time a later
+      # step attached to it, so the gateways and every client share one step.
+      - name: Serve the mock and reach it through NI-VISA
+        run: |
+          $etc = Join-Path $env:RUNNER_TEMP 'etc'
+          Copy-Item -Recurse docker/etc/ivi-cli $etc
+          $env:IVICLI_CONFIG = "$etc\config.toml"
+          $cli = Join-Path $env:RUNNER_TEMP 'ivicli\ivicli.exe'
+          $usbip = 'C:\Program Files\USBip\usbip.exe'
+          $expected = 'IVICLI-MOCK,gateway,1,0.1.0'
+          & $cli server add usb-srv --type usbip
+          & $cli server route add usb-srv 1-1 mock1
+          & $cli server route add usb-srv 1-2 mock1 --profile cdc-acm
+
+          $env:IVICLI_MOCK_ONLY = '1'; $env:IVICLI_SCENARIO = 'default'; $env:IVICLI_SCENARIO_FOR = 'mock1'
+          foreach ($s in 'hislip-mock', 'socket-mock', 'vxi11-mock', 'usb-srv') {
+            Start-Process $cli -ArgumentList 'server', 'start', $s -RedirectStandardError "$env:RUNNER_TEMP\$s.log"
+            Start-Sleep -Seconds 2
+          }
+          Remove-Item Env:IVICLI_MOCK_ONLY, Env:IVICLI_SCENARIO, Env:IVICLI_SCENARIO_FOR
+          $deadline = (Get-Date).AddSeconds(30)
+          while ((Get-NetTCPConnection -State Listen -LocalPort 3240, 4880, 5025, 111 -ErrorAction SilentlyContinue | Select-Object -Unique LocalPort).Count -lt 4) {
+            if ((Get-Date) -gt $deadline) { throw "the gateways did not all start listening within 30 s" }
+            Start-Sleep -Seconds 1
+          }
+
+          @'
+          import sys, pyvisa
+          EXPECTED = "IVICLI-MOCK,gateway,1,0.1.0"
+          rm = pyvisa.ResourceManager()
+          def query(res, **kw):
+              i = rm.open_resource(res, open_timeout=5000, **kw)
+              i.timeout = 5000
+              try:
+                  return i.query("*IDN?").strip()
+              finally:
+                  i.close()
+          mode = sys.argv[1]
+          if mode == "tcpip":
+              failed = 0
+              for res, kw in [("TCPIP0::127.0.0.1::hislip0::INSTR", {}),
+                              ("TCPIP0::127.0.0.1::inst0::INSTR", {}),
+                              ("TCPIP0::127.0.0.1::5025::SOCKET", {"read_termination": "\n", "write_termination": "\n"})]:
+                  try:
+                      reply = query(res, **kw)
+                  except Exception as e:
+                      reply = f"{type(e).__name__}: {e}"
+                  ok = reply == EXPECTED
+                  failed += not ok
+                  print("OK  " if ok else "FAIL", res, repr(reply))
+              sys.exit(failed)
+          if mode == "serial":
+              for res in rm.list_resources("ASRL?*::INSTR"):
+                  try:
+                      reply = query(res, read_termination="\n", write_termination="\n", baud_rate=115200)
+                  except pyvisa.VisaIOError:
+                      continue
+                  print(res, repr(reply))
+                  sys.exit(0 if reply == EXPECTED else 1)
+              sys.exit("no serial resource answered *IDN?")
+          if mode == "usbtmc":
+              res = "USB0::0x1209::0x0001::mock1::INSTR"
+              reply = query(res)
+              print(res, repr(reply))
+              sys.exit(0 if reply == EXPECTED else 1)
+          '@ | Set-Content probe.py
+
+          "== TCPIP: HiSLIP, VXI-11, SOCKET"
+          python probe.py tcpip
+          if ($LASTEXITCODE -ne 0) { throw "NI-VISA could not query every TCPIP gateway" }
+
+          "== CDC-ACM"
+          & $usbip attach -r 127.0.0.1 -b 1-2
+          if ($LASTEXITCODE -ne 0) { throw "attach 1-2 failed" }
+          Start-Sleep -Seconds 10
+          python probe.py serial
+          if ($LASTEXITCODE -ne 0) { throw "NI-VISA could not query the CDC-ACM mock" }
+          & $usbip detach --all
+          Start-Sleep -Seconds 4
+
+          "== USBTMC"
+          & $usbip attach -r 127.0.0.1 -b 1-1
+          if ($LASTEXITCODE -ne 0) { throw "attach 1-1 failed" }
+          Start-Sleep -Seconds 10
+          python probe.py usbtmc
+          if ($LASTEXITCODE -ne 0) { throw "NI-VISA could not query the USBTMC mock" }
+          & $cli visa add nivisa-usb 'USB0::0x1209::0x0001::mock1::INSTR'
+          $reply = & $cli visa query nivisa-usb '*IDN?'
+          "ivicli through NI-VISA: $reply"
+          if ($reply -ne $expected) { throw "ivicli's Local backend did not get the mock's identity" }
+
+      - name: Gateway logs
+        if: always()
+        run: Get-ChildItem "$env:RUNNER_TEMP\*.log" | ForEach-Object { "== $($_.Name)"; Get-Content $_.FullName -Tail 20 }
+
   dependency-scan:
     name: dependency vulnerability scan
     runs-on: ubuntu-latest
