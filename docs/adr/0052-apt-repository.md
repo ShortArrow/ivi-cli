@@ -49,7 +49,8 @@ AUR yet.
 The repository is served at `https://pkg.shortarrow.jp/apt`. The
 `shortarrow.jp` zone is already on Cloudflare.
 
-- The signed metadata, `dists/` and the keyring, is a Cloudflare
+- The metadata, `dists/`, the keyring file and the keyring package are a
+  Cloudflare
   Pages site. It is small and changes on every release and every
   re-signing (§5).
 - The `.deb` files are GitHub Release assets and nothing else. The
@@ -73,6 +74,7 @@ The standard layout, with one suite:
 ```
 apt/
 ├── ivicli-archive-keyring.gpg
+├── keyring/ivicli-archive-keyring_<date>_all.deb
 ├── dists/stable/
 │   ├── InRelease
 │   ├── Release
@@ -104,6 +106,13 @@ architecture without changing the line every user has already written.
   has no ICU.
 - It depends on `ivicli-archive-keyring`, a second package from the
   same repository that holds only the repository's keyring (§5).
+- `ivicli-archive-keyring` is `Architecture: all`, built from the
+  public keys under `packaging/apt/keyring/`, and versioned by the date
+  its keys last changed (`2026.10.01`), independently of ivi-cli. A
+  rotation shipped from any release line therefore reaches every
+  machine, whichever ivi-cli version it runs. Being a few kilobytes, the
+  package is served from the site itself under `keyring/`, not through
+  the redirect, and appears in both architectures' `Packages`.
 - The Debian version is the release version with revision `1`
   (`0.4.0-1`). Packaging changes ship with the next release.
 - Pre-releases never enter the repository. A version containing `-`
@@ -124,19 +133,23 @@ architecture without changing the line every user has already written.
   after three years, and a standby key, kept offline and never used
   until it is needed.
 - `ivicli-archive-keyring` installs
-  `/usr/share/keyrings/ivicli-archive-keyring.gpg` with every current
-  key, standby included, the way Debian's own `debian-archive-keyring`
-  does. It is a package of its own so that removing `ivicli` leaves the
-  keyring, and with it the source, working. The install guide's first
-  step downloads the same keyring to the same path, and the source line
-  names it:
+  `/usr/share/keyrings/ivicli-archive-keyring.gpg` with the public half
+  of every current key, standby included, the way Debian's own
+  `debian-archive-keyring` does. It is a package of its own so that
+  removing `ivicli` leaves the keyring, and with it the source, working.
+  The install guide's first step downloads the same keyring to the same
+  path, and the source line names it:
 
   ```
   deb [signed-by=/usr/share/keyrings/ivicli-archive-keyring.gpg] https://pkg.shortarrow.jp/apt stable main
   ```
 
-  Installing the keyring package then takes the file over, and every
-  upgrade replaces it. Keys change on users' machines through
+  The guide then installs both packages by name,
+  `apt install ivicli-archive-keyring ivicli`, so APT marks the keyring
+  as installed by hand. Pulled in only as a dependency, it would be
+  marked automatic, and `apt autoremove` after removing `ivicli` would
+  delete it. Installing the keyring package takes the file over, and
+  every upgrade replaces it. Keys change on users' machines through
   `apt upgrade`, never by hand after the first step. Removing the
   keyring package itself leaves the source unverifiable until the first
   step is repeated.
@@ -144,8 +157,9 @@ architecture without changing the line every user has already written.
   least a year before the current one expires, and `InRelease` is signed
   by both until it does. A machine that never upgrades in that year
   stops verifying when the old key expires.
-- Compromise: the standby key becomes the signing key at once, and the
-  next keyring drops the compromised one. Clients already trust the
+- Compromise: the standby key becomes the signing key at once, its
+  private half moving into the environment below, and the next keyring
+  drops the compromised key and adds a newly generated standby. Clients already trust the
   standby key, so the replacement reaches them through an ordinary
   upgrade. Until a machine takes that upgrade, the compromised key still
   verifies there, and a package the attacker signed in that window,
@@ -170,18 +184,23 @@ architecture without changing the line every user has already written.
 
 ### 6. Publishing
 
-The `.deb` files are built from the `publish` job's self-contained
-artifacts before the GitHub Release is created, so they are attached to
-it and listed in its `SHA256SUMS` with every other asset. A separate
+The `ivicli` `.deb` files are built from the `publish` job's
+self-contained artifacts before the GitHub Release is created, so they
+are attached to it and listed in its `SHA256SUMS` with every other
+asset. The keyring package is not a release asset; its hash is in the
+signed `Packages`. A separate
 `apt` job then updates the repository:
 
 1. Skip a pre-release, and fail on a version containing `-`.
 2. Fetch the published `InRelease` and `Packages` and verify them
-   against the keyring in the repository source tree. Any failure stops
+   against the keys under `packaging/apt/keyring/`, the same source the
+   keyring package is built from. Any failure stops
    the job; it never signs what it could not verify. Creating the
    repository for the first time is an explicit input, not a fallback.
 3. Replace every entry for this upstream version with entries computed
-   from the `.deb` files this run built, for both architectures. The
+   from the `.deb` files this run built, for both architectures. When
+   `packaging/apt/keyring/` holds keys the published keyring package
+   does not, build a keyring package with today's date and add it too. The
    index is keyed by version: re-running a release, or re-creating its
    tag, rewrites that version's entries instead of leaving hashes of
    assets that no longer exist.
