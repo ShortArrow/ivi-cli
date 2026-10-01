@@ -99,10 +99,11 @@ architecture without changing the line every user has already written.
   `Depends` lists the native libraries the self-contained runtime loads:
   libc6, libgcc-s1, libstdc++6, zlib1g, ca-certificates, and OpenSSL as
   `libssl3 | libssl3t64`, the name Debian 12 and Ubuntu 24.04 give it
-  respectively. ICU is not needed, since the CLI is built with
-  invariant globalization.
-- It also installs the repository's keyring as
-  `/usr/share/keyrings/ivicli-archive-keyring.gpg` (§5).
+  respectively. ICU is not needed: the CLI runs with invariant
+  globalization, without which it aborts at start-up on a machine that
+  has no ICU.
+- It depends on `ivicli-archive-keyring`, a second package from the
+  same repository that holds only the repository's keyring (§5).
 - The Debian version is the release version with revision `1`
   (`0.4.0-1`). Packaging changes ship with the next release.
 - Pre-releases never enter the repository. A version containing `-`
@@ -122,17 +123,23 @@ architecture without changing the line every user has already written.
   touching anything else. There are two: a signing key, which expires
   after three years, and a standby key, kept offline and never used
   until it is needed.
-- The `ivicli` package carries the keyring with every current key,
-  standby included. The install guide's first step downloads the same
-  keyring to the same path, and the source line names it:
+- `ivicli-archive-keyring` installs
+  `/usr/share/keyrings/ivicli-archive-keyring.gpg` with every current
+  key, standby included, the way Debian's own `debian-archive-keyring`
+  does. It is a package of its own so that removing `ivicli` leaves the
+  keyring, and with it the source, working. The install guide's first
+  step downloads the same keyring to the same path, and the source line
+  names it:
 
   ```
   deb [signed-by=/usr/share/keyrings/ivicli-archive-keyring.gpg] https://pkg.shortarrow.jp/apt stable main
   ```
 
-  Installing the package then takes the file over, and every upgrade
-  replaces it. Keys change on users' machines through `apt upgrade`,
-  never by hand after the first step.
+  Installing the keyring package then takes the file over, and every
+  upgrade replaces it. Keys change on users' machines through
+  `apt upgrade`, never by hand after the first step. Removing the
+  keyring package itself leaves the source unverifiable until the first
+  step is repeated.
 - Rotation: a release whose keyring adds the next signing key ships at
   least a year before the current one expires, and `InRelease` is signed
   by both until it does. A machine that never upgrades in that year
@@ -140,11 +147,18 @@ architecture without changing the line every user has already written.
 - Compromise: the standby key becomes the signing key at once, and the
   next keyring drops the compromised one. Clients already trust the
   standby key, so the replacement reaches them through an ordinary
-  upgrade.
+  upgrade. Until a machine takes that upgrade, the compromised key still
+  verifies there, and a package the attacker signed in that window,
+  with a keyring of their choosing and maintainer scripts that run as
+  root, cannot be undone by the standby key. A machine that holds or
+  pins the keyring package never receives a new key.
 - The keys and the Cloudflare API token are secrets of a GitHub Actions
   environment, `apt-publish`, which accepts `v*` tags and the `main`
   branch. From `main`, only the re-signing and withdrawal workflows
-  below name that environment.
+  below name that environment. That is a convention: GitHub restricts
+  an environment by branch and tag, not by workflow file, so anyone who
+  can push a `v*` tag or change a workflow on `main` can reach the
+  keys.
 - `Release` carries `Date` and `Valid-Until`, 90 days after signing. A
   scheduled workflow re-signs the metadata weekly. Without an expiry, an
   attacker or a stale mirror could keep serving an old, validly signed
@@ -179,8 +193,11 @@ it depends on is already in place. Two workflows on `main` touch the
 repository besides it: the weekly re-signing, and a manual withdrawal
 that removes one version's entries and re-signs. Machines that
 installed a withdrawn version keep it, and `apt` offers the highest
-remaining version. All three share one concurrency group, so no two of
-them read and deploy the index at the same time.
+remaining version. All three share one concurrency group with
+`queue: max`, so no two of them read and deploy the index at the same
+time, and none waiting behind another is cancelled. Without `queue:
+max`, GitHub keeps one pending run per group and cancels the older
+one.
 
 The maintainer creates the Cloudflare Pages project and the
 `pkg.shortarrow.jp` record once, by hand, before the first publish.
