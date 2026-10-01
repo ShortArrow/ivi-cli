@@ -6,6 +6,15 @@ All notable changes to ivi-cli are documented here. Format roughly follows
 
 ## [Unreleased]
 
+### Fixed
+
+- **ivicli starts on a Linux machine without ICU.** The self-contained
+  Linux binaries aborted at start-up, before printing anything, with
+  `Couldn't find a valid ICU package installed on the system`: slim
+  container images and minimal servers ship no ICU. ivicli now runs with
+  the invariant culture, which nothing in it depended on, so it no longer
+  loads ICU at all.
+
 ## [0.4.0] — 2026-09-25
 
 ### Changed (breaking)
