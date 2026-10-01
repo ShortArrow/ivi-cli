@@ -45,8 +45,11 @@ the smaller download.
 
 ## Arch Linux
 
-The packages are not published to the AUR. Their PKGBUILDs are in this
-repository, and `makepkg` builds and installs either one:
+The packages are to be published to the AUR as
+[`ivi-cli-bin`](https://aur.archlinux.org/packages/ivi-cli-bin) and
+[`ivi-cli`](https://aur.archlinux.org/packages/ivi-cli), and are not there
+yet. Their PKGBUILDs are in this repository, and `makepkg` builds and
+installs either one:
 
 ```sh
 git clone https://github.com/ShortArrow/ivi-cli.git
