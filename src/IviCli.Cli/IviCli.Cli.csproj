@@ -3,6 +3,14 @@
     <OutputType>Exe</OutputType>
     <RootNamespace>IviCli.Cli</RootNamespace>
     <AssemblyName>ivicli</AssemblyName>
+    <!--
+      Without ICU on the machine the runtime aborts at start-up, which is
+      the state of slim container images and minimal servers. ivi-cli
+      formats and compares text invariantly already; the cost is that
+      System.CommandLine's parse errors and help headings are no longer
+      translated, so they print in English like the rest of the CLI.
+    -->
+    <InvariantGlobalization>true</InvariantGlobalization>
   </PropertyGroup>
 
   <!--
@@ -70,7 +78,6 @@
   -->
   <PropertyGroup Condition="'$(MockContainerAot)' == 'true'">
     <PublishAot>true</PublishAot>
-    <InvariantGlobalization>true</InvariantGlobalization>
     <StripSymbols>true</StripSymbols>
   </PropertyGroup>
 

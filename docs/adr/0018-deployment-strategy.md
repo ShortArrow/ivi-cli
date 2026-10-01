@@ -267,7 +267,7 @@ builds a NativeAOT variant of this image: a multi-stage build whose
 SDK stage runs `dotnet publish -p:MockContainerAot=true` for the
 RID it maps from BuildKit's `TARGETARCH` — the flavor property on
 `IviCli.Cli.csproj` that turns on
-`PublishAot`, `InvariantGlobalization`, `StripSymbols`, pins the
+`PublishAot` and `StripSymbols`, pins the
 plugin switch off so the trimmer deletes the loader, and demotes
 exactly four third-party ILC warning codes (`Ivi.Visa`,
 `Common.Logging`, one ASP.NET `ModelMetadata` member) while every
@@ -322,11 +322,13 @@ are the bytes the index points at. The manifest job gates the GitHub
 Release, which makes a failed AOT publish a failed release rather
 than a half-shipped one.
 
-`InvariantGlobalization` is accepted for this image. The mock's
-surface is ASCII SCPI, and the codebase already compares ordinally
-and formats invariantly throughout, so there is no culture-sensitive
-behaviour for the switch to change — it removes a capability nothing
-here uses.
+Every build of the CLI, this image included, runs with
+`InvariantGlobalization`: without ICU the self-contained binaries
+aborted at start-up. The codebase already compares ordinally and
+formats invariantly, so ivi-cli's own output does not change. What
+the switch takes away is the translation System.CommandLine ships
+for its parse errors and help headings, which now print in English
+whatever the user's language, like the rest of ivi-cli.
 
 The `runtime-deps` base is kept deliberately, and with it the
 18.7 MB ICU layer that `InvariantGlobalization` makes dead weight.
