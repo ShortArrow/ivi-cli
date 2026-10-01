@@ -33,6 +33,9 @@ updates:
       io-abstractions:
         patterns:
           - 'TestableIO.System.IO.Abstractions*'
+      opentelemetry:
+        patterns:
+          - 'OpenTelemetry*'
     labels:
       - dependencies
       - nuget
