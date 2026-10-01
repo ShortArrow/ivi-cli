@@ -49,7 +49,7 @@ AUR yet.
 The repository is served at `https://pkg.shortarrow.jp/apt`. The
 `shortarrow.jp` zone is already on Cloudflare.
 
-- The signed metadata, `dists/` and the public key, is a Cloudflare
+- The signed metadata, `dists/` and the keyring, is a Cloudflare
   Pages site. It is small and changes on every release and every
   re-signing (§5).
 - The `.deb` files are GitHub Release assets and nothing else. The
@@ -72,18 +72,12 @@ The standard layout, with one suite:
 
 ```
 apt/
-├── ivicli.gpg
+├── ivicli-archive-keyring.gpg
 ├── dists/stable/
 │   ├── InRelease
 │   ├── Release
 │   └── main/binary-{amd64,arm64}/Packages(.gz)
 └── pool/<tag>/ivicli_<version>_<arch>.deb   (redirected)
-```
-
-The source line is:
-
-```
-deb [signed-by=/etc/apt/keyrings/ivicli.gpg] https://pkg.shortarrow.jp/apt stable main
 ```
 
 A flat repository (`Packages` and `Release` beside the files, source
@@ -102,11 +96,15 @@ architecture without changing the line every user has already written.
   separate package with its own dependency line. One self-contained
   package serves both.
 - Installed as `/usr/lib/ivicli/ivicli` with a `/usr/bin/ivicli` symlink.
-  `Depends` lists the native libraries the .NET runtime needs on Linux,
-  as Microsoft documents them; where a library's package name differs
-  between Debian and Ubuntu releases (ICU), it is given as alternatives.
+  `Depends` lists the native libraries the self-contained runtime loads:
+  libc6, libgcc-s1, libstdc++6, zlib1g, ca-certificates, and OpenSSL as
+  `libssl3 | libssl3t64`, the name Debian 12 and Ubuntu 24.04 give it
+  respectively. ICU is not needed, since the CLI is built with
+  invariant globalization.
+- It also installs the repository's keyring as
+  `/usr/share/keyrings/ivicli-archive-keyring.gpg` (§5).
 - The Debian version is the release version with revision `1`
-  (`0.4.0-1`). A packaging-only fix raises the revision.
+  (`0.4.0-1`). Packaging changes ship with the next release.
 - Pre-releases never enter the repository. A version containing `-`
   would sort after the final release in Debian's ordering
   (`0.4.0-beta.1` > `0.4.0`), so the publishing job refuses one rather
@@ -117,27 +115,44 @@ architecture without changing the line every user has already written.
   `~/.dotnet/tools`, and whichever directory comes first on `PATH`
   wins. The install guide says how to tell which one runs.
 
-### 5. Signing key and freshness
+### 5. Signing keys and freshness
 
-- The repository has its own Ed25519 signing key, not the maintainer's
-  personal key: the key that signs every update should be one that can
-  be revoked and replaced without touching anything else. It expires
-  after two years. A replacement is published beside the old key and
-  signs `InRelease` together with it until the old one expires; a
-  compromised key is replaced the same way, at once, with the old one
-  revoked.
-- The private key is a secret of a GitHub Actions environment,
-  `apt-publish`, that only `v*` tags can deploy to. The public half is
-  published as a binary keyring at
-  `https://pkg.shortarrow.jp/apt/ivicli.gpg`, and the install guide
-  stores it in `/etc/apt/keyrings/`, where Debian places keys an
-  administrator adds by hand.
+- The repository has its own Ed25519 keys, not the maintainer's personal
+  key, so the key that signs every update can be replaced without
+  touching anything else. There are two: a signing key, which expires
+  after three years, and a standby key, kept offline and never used
+  until it is needed.
+- The `ivicli` package carries the keyring with every current key,
+  standby included. The install guide's first step downloads the same
+  keyring to the same path, and the source line names it:
+
+  ```
+  deb [signed-by=/usr/share/keyrings/ivicli-archive-keyring.gpg] https://pkg.shortarrow.jp/apt stable main
+  ```
+
+  Installing the package then takes the file over, and every upgrade
+  replaces it. Keys change on users' machines through `apt upgrade`,
+  never by hand after the first step.
+- Rotation: a release whose keyring adds the next signing key ships at
+  least a year before the current one expires, and `InRelease` is signed
+  by both until it does. A machine that never upgrades in that year
+  stops verifying when the old key expires.
+- Compromise: the standby key becomes the signing key at once, and the
+  next keyring drops the compromised one. Clients already trust the
+  standby key, so the replacement reaches them through an ordinary
+  upgrade.
+- The keys and the Cloudflare API token are secrets of a GitHub Actions
+  environment, `apt-publish`, which accepts `v*` tags and the `main`
+  branch. From `main`, only the re-signing and withdrawal workflows
+  below name that environment.
 - `Release` carries `Date` and `Valid-Until`, 90 days after signing. A
   scheduled workflow re-signs the metadata weekly. Without an expiry, an
   attacker or a stale mirror could keep serving an old, validly signed
   index and hide a fix; with it, a client refuses metadata that has not
   been re-signed for 90 days. If re-signing stops, users see an expired
-  repository rather than a silently stale one.
+  repository rather than a silently stale one. A client whose clock is
+  far off sees the repository as expired or not yet valid, as for any
+  APT source.
 
 ### 6. Publishing
 
@@ -148,31 +163,40 @@ it and listed in its `SHA256SUMS` with every other asset. A separate
 
 1. Skip a pre-release, and fail on a version containing `-`.
 2. Fetch the published `InRelease` and `Packages` and verify them
-   against the repository key. Any failure stops the job; it never
-   signs what it could not verify. Creating the repository for the
-   first time is an explicit input, not a fallback.
-3. Replace every entry for this version with entries computed from the
-   `.deb` files this run built, for both architectures. The index is
-   keyed by version: re-running a release, or re-creating its tag,
-   rewrites that version's entries instead of leaving hashes of assets
-   that no longer exist.
+   against the keyring in the repository source tree. Any failure stops
+   the job; it never signs what it could not verify. Creating the
+   repository for the first time is an explicit input, not a fallback.
+3. Replace every entry for this upstream version with entries computed
+   from the `.deb` files this run built, for both architectures. The
+   index is keyed by version: re-running a release, or re-creating its
+   tag, rewrites that version's entries instead of leaving hashes of
+   assets that no longer exist.
 4. Write `Release` with `Date` and `Valid-Until`, sign `InRelease`, and
    deploy the whole site in one Cloudflare Pages deployment.
 
 A failed `apt` job is retried by re-running that job; the GitHub Release
-it depends on is already in place. A version is withdrawn by a manual
-workflow that removes its entries and re-signs; machines that installed
-it keep it, and `apt` offers the highest remaining version.
+it depends on is already in place. Two workflows on `main` touch the
+repository besides it: the weekly re-signing, and a manual withdrawal
+that removes one version's entries and re-signs. Machines that
+installed a withdrawn version keep it, and `apt` offers the highest
+remaining version. All three share one concurrency group, so no two of
+them read and deploy the index at the same time.
+
+The maintainer creates the Cloudflare Pages project and the
+`pkg.shortarrow.jp` record once, by hand, before the first publish.
 
 ## Consequences
 
-- `apt update` and `apt upgrade` deliver new versions to Debian and
-  Ubuntu machines.
-- The release workflow depends on Cloudflare and on a second signing
-  key. If either is unavailable, the GitHub Release still ships, and the
-  repository lags until the `apt` job is re-run.
+- `apt update` and `apt upgrade` deliver new versions, and new keys, to
+  Debian and Ubuntu machines.
+- The release workflow depends on Cloudflare and on the repository
+  keys. If either is unavailable, the GitHub Release still ships, and
+  the repository lags until the `apt` job is re-run.
 - The repository must be re-signed at least every 90 days, by the
-  scheduled workflow.
+  scheduled workflow, and a new signing key must ship a year before the
+  current one expires.
+- The standby key must be stored offline and separately from the
+  signing key, or it protects nothing.
 - Every install depends on both Cloudflare and GitHub being reachable.
 - An RPM repository, if wanted later, can sit beside `apt/` on the same
   host and the same redirect.
@@ -195,6 +219,15 @@ layout served over HTTPS by a local server:
 
 `dpkg --compare-versions` in `debian:bookworm` gives `0.4.0-beta.1` >
 `0.4.0`, `0.4.0~beta.1` < `0.4.0` and `0.3.3` < `0.4.0`.
+
+In `debian:bookworm`, a keyring placed at
+`/usr/share/keyrings/ivicli-archive-keyring.gpg` by hand was taken over
+by a package that ships the same path: `dpkg -i` replaced it without an
+error, `dpkg -S` then named the package as its owner, and the next
+version of the package replaced it again. An `InRelease` signed by two
+Ed25519 keys verified with a keyring holding only one of them, in both
+containers, and one signed by a key that had expired in the client's
+keyring failed with `EXPKEYSIG`.
 
 Not yet verified: that the Cloudflare Pages `_redirects` rule with
 `:tag` and `:file` placeholders returns the 302 to an external host as
