@@ -1,7 +1,9 @@
 # AUR packaging
 
-`ivi-cli-bin/` holds the PKGBUILD published to the AUR as
-[`ivi-cli-bin`](https://aur.archlinux.org/packages/ivi-cli-bin). It repackages
+`ivi-cli-bin/` holds the PKGBUILD to be published to the AUR as
+[`ivi-cli-bin`](https://aur.archlinux.org/packages/ivi-cli-bin). Nothing is
+published there yet; until it is, `makepkg -si` in either directory builds
+and installs the package locally. It repackages
 the self-contained `ivicli-<version>-linux-x64.zip` asset from the matching
 GitHub Release, so the package installs a working `ivicli` on a machine with no
 .NET at all. Releases up to v0.3.1 named that asset

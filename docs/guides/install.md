@@ -10,8 +10,9 @@ want ivi-cli to depend on a .NET installation, or not?
 | [mise](#mise) | no | pinning a version per project |
 | [Container](#container) | no | running the mock instrument, not the CLI |
 
-Arch Linux users have a fifth route, [the AUR packages](#arch-linux-aur),
-covering both answers to that question.
+Arch Linux users can also build a pacman package from
+[the PKGBUILDs in this repository](#arch-linux), for either answer to
+that question.
 
 ## Self-contained binary
 
@@ -42,13 +43,19 @@ framework-dependent build. It is smaller and needs .NET installed, so
 reach for it only if you already meet the prerequisite below and want
 the smaller download.
 
-## Arch Linux (AUR)
+## Arch Linux
 
-Two packages, for two situations:
+The packages are to be published to the AUR as
+[`ivi-cli-bin`](https://aur.archlinux.org/packages/ivi-cli-bin) and
+[`ivi-cli`](https://aur.archlinux.org/packages/ivi-cli), and are not there
+yet. Their PKGBUILDs are in this repository, and `makepkg` builds and
+installs either one:
 
 ```sh
-paru -S ivi-cli-bin   # prebuilt, carries its own runtime, no .NET needed
-paru -S ivi-cli       # built from source against the system .NET
+git clone https://github.com/ShortArrow/ivi-cli.git
+cd ivi-cli/packaging/aur/ivi-cli-bin   # prebuilt, carries its own runtime, no .NET needed
+# or: cd ivi-cli/packaging/aur/ivi-cli # built from source against the system .NET
+makepkg -si
 ```
 
 `ivi-cli-bin` is the one to reach for on a machine with no .NET, and it
@@ -65,8 +72,8 @@ conflict, so pacman will not let you have both.
 Both install bash and zsh completions. There is no fish completion
 because the CLI emits bash, zsh and PowerShell only.
 
-The PKGBUILDs live in this repository under `packaging/aur/`, which is
-also where the version-bump procedure is written down.
+`packaging/aur/` is also where the version-bump procedure is written
+down.
 
 ## .NET tool
 
@@ -156,7 +163,7 @@ dotnet --list-runtimes
 **Only `Microsoft.NETCore.App` is listed.** The ASP.NET Core runtime is
 missing. Install it from the table above — on Arch,
 `sudo pacman -S aspnet-runtime`, or sidestep the question entirely with
-[`ivi-cli-bin`](#arch-linux-aur).
+[`ivi-cli-bin`](#arch-linux).
 
 **Nothing is listed, or the paths differ from the ".NET location" in the
 error.** The launcher and the runtimes disagree about where .NET lives.
