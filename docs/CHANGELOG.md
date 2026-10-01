@@ -6,6 +6,18 @@ All notable changes to ivi-cli are documented here. Format roughly follows
 
 ## [Unreleased]
 
+### Fixed
+
+- **ivicli starts on a Linux machine without ICU.** The self-contained
+  Linux binaries aborted at start-up, before printing anything, with
+  `Couldn't find a valid ICU package installed on the system`: slim
+  container images and minimal servers ship no ICU. ivicli now runs with
+  the invariant culture and no longer loads ICU. Two things change with
+  it. Parse errors and help headings, which came from System.CommandLine
+  in the user's language, now print in English like the rest of
+  ivicli. And `server log`, when a day's log had rolled over on size,
+  picked the oldest of that day's files; it now picks the newest.
+
 ## [0.4.0] — 2026-09-25
 
 ### Changed (breaking)
