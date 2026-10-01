@@ -108,7 +108,9 @@ architecture without changing the line every user has already written.
   same repository that holds only the repository's keyring (§5).
 - `ivicli-archive-keyring` is `Architecture: all`, built from the
   public keys under `packaging/apt/keyring/`, and versioned by the date
-  its keys last changed (`2026.10.01`), independently of ivi-cli. A
+  it was built with a counter (`2026.10.01.1`, then `2026.10.01.2` for a
+  second change that day), independently of ivi-cli. It is rebuilt only
+  when its keys change. A
   rotation shipped from any release line therefore reaches every
   machine, whichever ivi-cli version it runs. Being a few kilobytes, the
   package is served from the site itself under `keyring/`, not through
@@ -159,7 +161,10 @@ architecture without changing the line every user has already written.
   stops verifying when the old key expires.
 - Compromise: the standby key becomes the signing key at once, its
   private half moving into the environment below, and the next keyring
-  drops the compromised key and adds a newly generated standby. Clients already trust the
+  drops the compromised key and adds a newly generated standby. The
+  published index may have been altered with the compromised key, so the
+  repository is rebuilt from the GitHub Releases (§6) rather than
+  updated. Clients already trust the
   standby key, so the replacement reaches them through an ordinary
   upgrade. Until a machine takes that upgrade, the compromised key still
   verifies there, and a package the attacker signed in that window,
@@ -192,31 +197,42 @@ signed `Packages`. A separate
 `apt` job then updates the repository:
 
 1. Skip a pre-release, and fail on a version containing `-`.
-2. Fetch the published `InRelease` and `Packages` and verify them
-   against the keys under `packaging/apt/keyring/`, the same source the
-   keyring package is built from. Any failure stops
-   the job; it never signs what it could not verify. Creating the
-   repository for the first time is an explicit input, not a fallback.
-3. Replace every entry for this upstream version with entries computed
-   from the `.deb` files this run built, for both architectures. When
-   `packaging/apt/keyring/` holds keys the published keyring package
-   does not, build a keyring package with today's date and add it too. The
-   index is keyed by version: re-running a release, or re-creating its
-   tag, rewrites that version's entries instead of leaving hashes of
-   assets that no longer exist.
-4. Write `Release` with `Date` and `Valid-Until`, sign `InRelease`, and
-   deploy the whole site in one Cloudflare Pages deployment.
+2. Fetch the published site: `InRelease`, `Packages`, and every file the
+   site serves itself, the keyring and its packages. Verify `InRelease`
+   against the keys under `packaging/apt/keyring/`, and every fetched
+   file against its hash in `Packages`. Any failure stops the job; it
+   never signs what it could not verify.
+3. Replace the `ivicli` entries for this upstream version with entries
+   computed from the `.deb` files this run built, for both
+   architectures. The index is keyed by package name and version:
+   re-running a release, or re-creating its tag, rewrites that version's
+   entries instead of leaving hashes of assets that no longer exist.
+4. If the keys under `packaging/apt/keyring/` differ from those in the
+   newest published keyring package, in either direction, build a new
+   keyring package and add it.
+5. Write `Release` with `Date` and `Valid-Until`, sign `InRelease`, and
+   deploy the fetched site with these changes in one Cloudflare Pages
+   deployment. A deployment replaces the whole site, so a file the job
+   did not carry forward would disappear.
+
+A rebuild input replaces steps 2 and 3: the job builds the index from
+the `.deb` assets of every stable GitHub Release, checked against each
+release's `SHA256SUMS`, and the keyring package from
+`packaging/apt/keyring/`, trusting nothing on the live site. It creates
+the repository the first time, and recovers it after a compromise or a
+failed verification.
 
 A failed `apt` job is retried by re-running that job; the GitHub Release
 it depends on is already in place. Two workflows on `main` touch the
-repository besides it: the weekly re-signing, and a manual withdrawal
-that removes one version's entries and re-signs. Machines that
-installed a withdrawn version keep it, and `apt` offers the highest
-remaining version. All three share one concurrency group with
-`queue: max`, so no two of them read and deploy the index at the same
-time, and none waiting behind another is cancelled. Without `queue:
-max`, GitHub keeps one pending run per group and cancels the older
-one.
+repository besides it. The weekly re-signing also runs step 4, so a
+keyring change merged to `main` ships within a week without a release,
+or at once when the workflow is run by hand. A manual withdrawal removes
+one `ivicli` version's entries and re-signs; machines that installed a
+withdrawn version keep it, and `apt` offers the highest remaining
+version. All three share one concurrency group with `queue: max`, so no
+two of them read and deploy the site at the same time, and none waiting
+behind another is cancelled. Without `queue: max`, GitHub keeps one
+pending run per group and cancels the older one.
 
 The maintainer creates the Cloudflare Pages project and the
 `pkg.shortarrow.jp` record once, by hand, before the first publish.
