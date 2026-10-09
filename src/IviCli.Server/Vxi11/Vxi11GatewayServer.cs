@@ -762,7 +762,7 @@ public sealed class Vxi11GatewayServer : IGatewayServer
     }
 
     /// <summary>
-    /// The VXI-11 error code (Rev 1.0, B.5.3) a backend result reports to
+    /// The VXI-11 error code (Rev 1.0, B.5.2) a backend result reports to
     /// the client: 0 on success, 15 when the instrument timed out, 8 for an
     /// operation the backend does not support, 17 otherwise.
     /// </summary>

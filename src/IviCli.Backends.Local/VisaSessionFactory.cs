@@ -111,15 +111,7 @@ public sealed class VisaSessionFactory : IVisaSessionFactory
             }
         }
 
-        /// <summary>
-        /// A timeout the runtime reports (VI_ERROR_TMO) becomes
-        /// <see cref="LocalVisaTimeout"/>; anything else is an I/O failure.
-        /// </summary>
-        private LocalVisaError IoError(Exception ex) =>
-            ex is IOTimeoutException
-            || ex is NativeVisaException { ErrorCode: NativeErrorCode.Timeout }
-                ? new LocalVisaTimeout(_ioTimeout, ex)
-                : new LocalVisaIoFailure(ex.Message, ex);
+        private LocalVisaError IoError(Exception ex) => VisaIoErrors.From(ex, _ioTimeout);
 
         public Result<Unit, LocalVisaError> EnableServiceRequests(Action<byte> onStatusByte)
         {

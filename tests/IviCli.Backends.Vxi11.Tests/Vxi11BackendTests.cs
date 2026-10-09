@@ -173,7 +173,7 @@ public sealed class Vxi11BackendTests
     }
 
     [Fact]
-    public async Task Write_and_read_send_the_device_timeout_as_io_timeout()
+    public async Task Write_read_and_trigger_send_the_device_timeout_as_io_timeout()
     {
         var ioTimeouts = new List<uint>();
         await using var stub = await StubServer.StartAsync(programmer: session =>
@@ -201,6 +201,10 @@ public sealed class Vxi11BackendTests
                     writer.WriteOpaque("1\n"u8.ToArray());
                 }
             );
+            var trigger = session.ReadCall();
+            trigger.Procedure.ShouldBe(ProcDeviceTrigger);
+            ioTimeouts.Add(trigger.Word(2)); // lid, flags, io_timeout, ...
+            session.WriteReply(trigger.Xid, writer => writer.WriteInt32(Vxi11NoError));
         });
         var backend = new Vxi11Backend(stub.Port);
         var device = BuildDevice(timeoutMs: 1234);
@@ -209,9 +213,10 @@ public sealed class Vxi11BackendTests
         (
             await backend.QueryAsync(device, ScpiQuery.From("*OPC?").ShouldBeOk(), default)
         ).ShouldBeOk();
+        (await backend.TriggerAsync(device, default)).ShouldBeOk();
 
         await stub.WaitForClientAsync();
-        ioTimeouts.ShouldBe([1234u, 1234u]);
+        ioTimeouts.ShouldBe([1234u, 1234u, 1234u]);
     }
 
     [Fact]
