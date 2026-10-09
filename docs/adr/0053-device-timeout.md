@@ -101,6 +101,12 @@ with zero.
 - A timeout costs a reconnect on the next operation, including one the
   VXI-11 server or the VISA runtime reports.
 - Service requests raised while a dropped session is closed, before the
-  next operation reopens it, are lost.
+  next operation reopens it, are lost; on the Local backend, which
+  enables VISA service requests only when someone subscribes, so are
+  those raised before the listener has subscribed to the reopened
+  session.
+- A backend that does not honour cancellation is not cut short: the
+  Local backend, and a plugin backend that ignores its cancellation
+  token, are bounded only by their own timeouts.
 - The VXI-11 gateway still does not enforce a client's `io_timeout`
   (#249); `docs/conformance.md` lists it as a deviation.

@@ -173,15 +173,17 @@ public sealed class Vxi11BackendTests
     }
 
     [Fact]
-    public async Task Write_read_and_trigger_send_the_device_timeout_as_io_timeout()
+    public async Task Write_read_and_trigger_send_the_device_timeout_as_io_timeout_and_no_lock_timeout()
     {
         var ioTimeouts = new List<uint>();
+        var lockTimeouts = new List<uint>();
         await using var stub = await StubServer.StartAsync(programmer: session =>
         {
             AckCreateLink(session);
             AckInterruptSetup(session);
             var write = session.ReadCall();
-            ioTimeouts.Add(write.Word(1)); // lid, io_timeout, ...
+            ioTimeouts.Add(write.Word(1)); // lid, io_timeout, lock_timeout, ...
+            lockTimeouts.Add(write.Word(2));
             session.WriteReply(
                 write.Xid,
                 writer =>
@@ -191,7 +193,8 @@ public sealed class Vxi11BackendTests
                 }
             );
             var read = session.ReadCall();
-            ioTimeouts.Add(read.Word(2)); // lid, requestSize, io_timeout, ...
+            ioTimeouts.Add(read.Word(2)); // lid, requestSize, io_timeout, lock_timeout, ...
+            lockTimeouts.Add(read.Word(3));
             session.WriteReply(
                 read.Xid,
                 writer =>
@@ -203,7 +206,8 @@ public sealed class Vxi11BackendTests
             );
             var trigger = session.ReadCall();
             trigger.Procedure.ShouldBe(ProcDeviceTrigger);
-            ioTimeouts.Add(trigger.Word(2)); // lid, flags, io_timeout, ...
+            ioTimeouts.Add(trigger.Word(2)); // lid, flags, io_timeout, lock_timeout
+            lockTimeouts.Add(trigger.Word(3));
             session.WriteReply(trigger.Xid, writer => writer.WriteInt32(Vxi11NoError));
         });
         var backend = new Vxi11Backend(stub.Port);
@@ -217,6 +221,7 @@ public sealed class Vxi11BackendTests
 
         await stub.WaitForClientAsync();
         ioTimeouts.ShouldBe([1234u, 1234u, 1234u]);
+        lockTimeouts.ShouldBe([0u, 0u, 0u]);
     }
 
     [Fact]

@@ -280,6 +280,27 @@ public sealed class DeviceTimeoutBackendFactoryTests
     }
 
     [Fact]
+    public async Task Service_requests_survive_a_drop_whose_close_is_slow()
+    {
+        var device = Dev(300);
+        var (backend, inner, time) = Build(device);
+        using var cts = new CancellationTokenSource(Guard * 2);
+        var received = Channel.CreateUnbounded<ServiceRequest>();
+        var listening = Listen(backend, device, received.Writer, cts.Token);
+        await Until(() => inner.SrqSubscriptions == 1);
+        inner.StallQueries = true;
+        inner.StallCloses = true;
+
+        var pending = backend.QueryAsync(device, Idn, CancellationToken.None);
+        time.Advance(TimeSpan.FromMilliseconds(300));
+        await Task.Delay(100);
+
+        listening.IsCompleted.ShouldBeFalse();
+        time.Advance(TimeSpan.FromMilliseconds(300));
+        await pending.WaitAsync(Guard);
+    }
+
+    [Fact]
     public async Task Service_requests_end_when_the_caller_closes_the_session()
     {
         var device = Dev(300);

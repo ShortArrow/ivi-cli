@@ -77,6 +77,20 @@ public class LocalBackendTests
     }
 
     [Fact]
+    public async Task TriggerAsync_writes_TRG_to_the_session()
+    {
+        var factory = new FakeVisaSessionFactory();
+        var session = new FakeVisaSession();
+        factory.Sessions[VisaResourceFormatter.Format(Dev("psu").Resource)] = session;
+        var backend = new LocalBackend(factory);
+        await backend.OpenAsync(Dev("psu"), default);
+
+        (await backend.TriggerAsync(Dev("psu"), default)).ShouldBeOk();
+
+        session.Writes.ShouldBe(["*TRG"]);
+    }
+
+    [Fact]
     public async Task QueryAsync_returns_response_from_session()
     {
         var factory = new FakeVisaSessionFactory();

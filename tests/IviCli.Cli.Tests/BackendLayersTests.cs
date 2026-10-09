@@ -44,6 +44,22 @@ public sealed class BackendLayersTests
         (await QueryOnce(factory)).Err.ShouldBeOfType<TransportTimeout>();
     }
 
+    [Theory]
+    [MemberData(nameof(PoolEnabled))]
+    public void The_pool_is_the_outer_layer_only_when_enabled(bool poolEnabled)
+    {
+        var factory = BackendLayers.Compose(
+            new FakeBackendFactory(new FakeAnsweringBackend()),
+            plugins: null,
+            Pool(poolEnabled),
+            TimeProvider.System,
+            poolLogger: null
+        );
+
+        (factory is PoolingBackendFactory).ShouldBe(poolEnabled);
+        (factory is DeviceTimeoutBackendFactory).ShouldBe(!poolEnabled);
+    }
+
     [Fact]
     public async Task A_query_to_a_silent_plugin_backend_times_out()
     {
