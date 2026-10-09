@@ -14,8 +14,8 @@ All notable changes to ivi-cli are documented here. Format roughly follows
   for a silent instrument until the command was cancelled. Now every
   write, query, read and trigger fails with a timeout once `timeout_ms`
   has passed, and the next operation reconnects so a late reply is never
-  taken for a later answer. Opening a session may take the longer of
-  `timeout_ms` and 5 seconds. **A measurement that takes longer than its
+  taken for a later answer. Opening a session gets at least 5 seconds, or
+  `timeout_ms` if that is longer. **A measurement that takes longer than its
   device's `timeout_ms` (3000 ms unless set) now fails where it used to
   wait; raise `timeout_ms` for such devices.** The VXI-11 gateway reports
   an instrument's timeout as VXI-11 error 15. `docs/conformance.md` lists

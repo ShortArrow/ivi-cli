@@ -27,8 +27,8 @@ are.
 
 ### 1. One decorator bounds every backend
 
-`DeviceTimeoutBackendFactory` wraps the backend factory in the
-composition root, outside the plugin layer and inside the pool, so every
+`DeviceTimeoutBackendFactory` wraps the backend factory outside the
+plugin layer and inside the pool (`BackendLayers` in the CLI), so every
 backend, built in or from a plugin, gets the same rule:
 
 - write, query, read and trigger get the device timeout;
@@ -54,25 +54,39 @@ backend's own timeout error arrives first and the decorator is only the
 backstop. One second covers a reply in flight on a local network without
 making a silent instrument noticeably slower to fail.
 
+The Local backend calls VISA synchronously, so for it the decorator cannot
+step in at all: the runtime's own timeouts are the only bound on a VISA
+call, and the decorator only adds the recovery below.
+
 ### 3. A session that timed out is closed and reopened
 
-After a timeout the decorator closes the session and reopens it before
-the next operation. A reply that arrives late would otherwise be read as
-the answer to the next request on a transport with no request
-identifiers, such as SOCKET or serial. VISA and VXI-11 leave the session
-state after a timeout unspecified, and HiSLIP's MessageID rules and
-device clear could resynchronise without reconnecting; one rule for all
-transports was chosen over a recovery per transport. The close gets the
-operation's limit too and is abandoned past it, because a VXI-11 server
-answers calls in order and may still be busy with the call that timed
-out.
+After a timeout, whether the decorator's deadline passed or the backend
+returned `TransportTimeout` itself, the decorator closes the session and
+reopens it before the next operation. A reply that arrives late would
+otherwise be read as the answer to the next request on a transport with
+no request identifiers, such as SOCKET or serial, and a VISA session that
+timed out can still hold the reply in its buffers. VISA and VXI-11 leave
+the session state after a timeout unspecified, and HiSLIP's MessageID
+rules and device clear could resynchronise without reconnecting; one
+rule for all transports was chosen over a recovery per transport. The
+close gets the operation's limit too and is abandoned past it, because a
+VXI-11 server answers calls in order and may still be busy with the call
+that timed out; the VXI-11 backend releases its connection even when its close is
+abandoned.
+
+Closing the session ends its service-request stream. A gateway forwards
+service requests for as long as a client's link lasts, so the
+decorator's stream does not end with a session it dropped: it subscribes
+to the reopened session's stream instead, and ends only when the caller
+closes the session or stops listening.
 
 Closing a HiSLIP connection releases any lock it held (IVI-6.1 §2.6), so
 a timeout also gives up a HiSLIP lock.
 
 ### 4. Opening gets at least five seconds
 
-Opening gets the longer of the device timeout and five seconds. A short
+Opening gets the longer of the device timeout and five seconds, plus the
+grace of decision 2 for a backend that enforces the timeout itself. A short
 I/O timeout, chosen so a query fails fast, is not meant to cut a network
 connect short. VISA allows but does not require `viOpen`'s timeout to
 bound opening a network resource, and recommends 2000 ms when it is used
@@ -84,6 +98,9 @@ with zero.
   default 3000 ms whose measurement takes longer than that used to succeed
   through HiSLIP or SOCKET, and through VXI-11 up to the fixed 5 seconds;
   it now times out and has to have its `timeout_ms` raised.
-- A timeout costs a reconnect on the next operation.
+- A timeout costs a reconnect on the next operation, including one the
+  VXI-11 server or the VISA runtime reports.
+- Service requests raised while a dropped session is closed, before the
+  next operation reopens it, are lost.
 - The VXI-11 gateway still does not enforce a client's `io_timeout`
   (#249); `docs/conformance.md` lists it as a deviation.

@@ -199,6 +199,7 @@ The integration suite (real sockets, PyVISA interop) runs nightly on three OSes;
 - [PRD](docs/PRD.md) — full product requirements
 - [Architecture Decision Records](docs/adr/) — every Accepted decision behind the implementation.
 - [Domain glossary](docs/domain-glossary.md) — the ubiquitous-language catalog
+- [Standards conformance](docs/conformance.md) — what ivi-cli follows in VISA, VXI-11 and HiSLIP, where it deviates, and what it defines where they are silent
 - [Guides](docs/guides/) — task-oriented how-tos, starting with [Mock a VISA instrument](docs/guides/mock-a-visa-instrument.md)
 - [Samples](docs/samples/) — ready-made **mock instruments** for testing without hardware: drop-in scenarios + setup scripts (e.g. the [PSU mock](docs/samples/psu/))
 - [Contributing](docs/CONTRIBUTING.md) — local dev loop, branching, hooks
