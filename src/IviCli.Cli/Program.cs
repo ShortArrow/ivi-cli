@@ -301,6 +301,15 @@ internal static class Program
                     );
                 }
 
+                // Every backend, built-in or from a plugin, has each
+                // operation bounded by the device's timeout_ms. The pool
+                // wraps this layer, so a session dropped after a timeout
+                // is reopened under the lease the pool already holds.
+                factory = new IviCli.Application.Backends.DeviceTimeoutBackendFactory(
+                    factory,
+                    sp.GetRequiredService<TimeProvider>()
+                );
+
                 // Pool layer wraps the default factory when [pool] enabled.
                 // Capture wraps Pool so logical Open/Close events still
                 // appear 1:1 in the audit trail even when the pool elides

@@ -67,3 +67,24 @@ public sealed record LocalVisaIoFailure(string Detail, Exception? Inner) : Local
     /// <inheritdoc/>
     public override Exception? Cause => Inner;
 }
+
+/// <summary>
+/// An IO operation ran past the session's I/O timeout: the VISA runtime
+/// reported VI_ERROR_TMO.
+/// </summary>
+/// <param name="Elapsed">The I/O timeout the session was opened with.</param>
+/// <param name="Inner">The runtime's exception, for diagnostic logs only.</param>
+public sealed record LocalVisaTimeout(TimeSpan Elapsed, Exception? Inner) : LocalVisaError
+{
+    /// <inheritdoc/>
+    public override LogSeverity Severity => LogSeverity.Warning;
+
+    /// <inheritdoc/>
+    public override string Message => "VISA timeout after {Elapsed}";
+
+    /// <inheritdoc/>
+    public override IReadOnlyList<object?> LogArgs => new object?[] { Elapsed };
+
+    /// <inheritdoc/>
+    public override Exception? Cause => Inner;
+}

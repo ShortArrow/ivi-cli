@@ -13,29 +13,32 @@ namespace IviCli.Backends.Local;
 /// <see cref="IVisaSessionFactory"/> so unit tests can inject an
 /// in-memory fake, and the project compiles without a vendor SDK.
 /// </summary>
-public sealed class LocalBackend : IIviBackend
+public sealed class LocalBackend : IIviBackend, IEnforcesDeviceTimeout
 {
     private readonly IVisaSessionFactory _factory;
-    private readonly TimeSpan _openTimeout;
     private readonly Dictionary<DeviceName, LocalSession> _sessions = new();
     private readonly object _gate = new();
 
     /// <summary>
-    /// Creates a backend that uses <paramref name="factory"/> to open
-    /// VISA sessions with the supplied <paramref name="openTimeout"/>
-    /// (default 5 s).
+    /// Creates a backend that uses <paramref name="factory"/> to open VISA
+    /// sessions. A session's I/O timeout is the device timeout, and opening
+    /// gets the longer of that and <see cref="DeviceTimeoutBackendFactory.OpenFloor"/>.
     /// </summary>
-    public LocalBackend(IVisaSessionFactory factory, TimeSpan? openTimeout = null)
+    public LocalBackend(IVisaSessionFactory factory)
     {
         _factory = factory;
-        _openTimeout = openTimeout ?? TimeSpan.FromSeconds(5);
     }
 
     /// <inheritdoc/>
     public Task<Result<Unit, BackendError>> OpenAsync(Device device, CancellationToken ct)
     {
         ct.ThrowIfCancellationRequested();
-        var openResult = _factory.Open(device.Resource, _openTimeout);
+        var ioTimeout = device.Timeout.Value;
+        var openTimeout =
+            ioTimeout > DeviceTimeoutBackendFactory.OpenFloor
+                ? ioTimeout
+                : DeviceTimeoutBackendFactory.OpenFloor;
+        var openResult = _factory.Open(device.Resource, openTimeout, ioTimeout);
         if (openResult is not Result<IVisaSessionHandle, LocalVisaError>.Ok { Value: var handle })
         {
             var err = ((Result<IVisaSessionHandle, LocalVisaError>.Error)openResult).Err;
@@ -276,6 +279,7 @@ public sealed class LocalBackend : IIviBackend
                 o.Cause
             ),
             LocalVisaIoFailure i => new TransportDisconnected($"io failure: {i.Detail}", i.Cause),
+            LocalVisaTimeout t => new TransportTimeout(t.Elapsed, t.Inner),
             _ => new TransportDisconnected("unknown VISA failure"),
         };
 }

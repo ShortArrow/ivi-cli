@@ -13,7 +13,11 @@ namespace IviCli.Backends.Local;
 public sealed class VisaSessionFactory : IVisaSessionFactory
 {
     /// <inheritdoc/>
-    public Result<IVisaSessionHandle, LocalVisaError> Open(VisaResource resource, TimeSpan timeout)
+    public Result<IVisaSessionHandle, LocalVisaError> Open(
+        VisaResource resource,
+        TimeSpan openTimeout,
+        TimeSpan ioTimeout
+    )
     {
         if (!VisaRuntime.IsInstalled)
         {
@@ -22,7 +26,7 @@ public sealed class VisaSessionFactory : IVisaSessionFactory
             );
         }
         var resourceString = VisaResourceFormatter.Format(resource);
-        var timeoutMs = (int)timeout.TotalMilliseconds;
+        var timeoutMs = (int)openTimeout.TotalMilliseconds;
         try
         {
             var session = GlobalResourceManager.Open(resourceString, AccessModes.None, timeoutMs);
@@ -33,9 +37,9 @@ public sealed class VisaSessionFactory : IVisaSessionFactory
                     new LocalVisaOpenFailure(resourceString, "resource is not message-based", null)
                 );
             }
-            messageBased.TimeoutMilliseconds = timeoutMs;
+            messageBased.TimeoutMilliseconds = (int)ioTimeout.TotalMilliseconds;
             return Result.Success<IVisaSessionHandle, LocalVisaError>(
-                new VisaSessionHandle(messageBased)
+                new VisaSessionHandle(messageBased, ioTimeout)
             );
         }
         catch (Exception ex)
@@ -59,12 +63,14 @@ public sealed class VisaSessionFactory : IVisaSessionFactory
         private static readonly TimeSpan SrqWaitSlice = TimeSpan.FromMilliseconds(500);
 
         private readonly IMessageBasedSession _session;
+        private readonly TimeSpan _ioTimeout;
         private CancellationTokenSource? _srqPumpStop;
         private bool _disposed;
 
-        public VisaSessionHandle(IMessageBasedSession session)
+        public VisaSessionHandle(IMessageBasedSession session, TimeSpan ioTimeout)
         {
             _session = session;
+            _ioTimeout = ioTimeout;
         }
 
         public Result<Unit, LocalVisaError> Write(string text)
@@ -76,7 +82,7 @@ public sealed class VisaSessionFactory : IVisaSessionFactory
             }
             catch (Exception ex)
             {
-                return Result.Failure<Unit, LocalVisaError>(new LocalVisaIoFailure(ex.Message, ex));
+                return Result.Failure<Unit, LocalVisaError>(IoError(ex));
             }
         }
 
@@ -89,9 +95,7 @@ public sealed class VisaSessionFactory : IVisaSessionFactory
             }
             catch (Exception ex)
             {
-                return Result.Failure<string, LocalVisaError>(
-                    new LocalVisaIoFailure(ex.Message, ex)
-                );
+                return Result.Failure<string, LocalVisaError>(IoError(ex));
             }
         }
 
@@ -103,11 +107,19 @@ public sealed class VisaSessionFactory : IVisaSessionFactory
             }
             catch (Exception ex)
             {
-                return Result.Failure<string, LocalVisaError>(
-                    new LocalVisaIoFailure(ex.Message, ex)
-                );
+                return Result.Failure<string, LocalVisaError>(IoError(ex));
             }
         }
+
+        /// <summary>
+        /// A timeout the runtime reports (VI_ERROR_TMO) becomes
+        /// <see cref="LocalVisaTimeout"/>; anything else is an I/O failure.
+        /// </summary>
+        private LocalVisaError IoError(Exception ex) =>
+            ex is IOTimeoutException
+            || ex is NativeVisaException { ErrorCode: NativeErrorCode.Timeout }
+                ? new LocalVisaTimeout(_ioTimeout, ex)
+                : new LocalVisaIoFailure(ex.Message, ex);
 
         public Result<Unit, LocalVisaError> EnableServiceRequests(Action<byte> onStatusByte)
         {

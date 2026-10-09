@@ -27,7 +27,7 @@ namespace IviCli.Backends.Vxi11;
 /// port and does not answer GETPORT on 111) it falls back to the fixed
 /// port, preserving the gateway pairing.
 /// </summary>
-public sealed class Vxi11Backend : IIviBackend
+public sealed class Vxi11Backend : IIviBackend, IEnforcesDeviceTimeout
 {
     /// <summary>
     /// Fallback TCP port used when no portmapper answers. VXI-11 has no
@@ -216,8 +216,14 @@ public sealed class Vxi11Backend : IIviBackend
         }
         try
         {
-            await DeviceWriteAsync(session, command.Value, ct);
+            await DeviceWriteAsync(session, command.Value, IoTimeout(device), ct);
             return Result.Success<Unit, BackendError>(Unit.Value);
+        }
+        catch (Vxi11ReplyException ex) when (ex.Code == Vxi11IoTimeout)
+        {
+            return Result.Failure<Unit, BackendError>(
+                new TransportTimeout(device.Timeout.Value, ex)
+            );
         }
         catch (Exception ex) when (ex is SocketException or IOException or InvalidDataException)
         {
@@ -244,9 +250,15 @@ public sealed class Vxi11Backend : IIviBackend
         }
         try
         {
-            await DeviceWriteAsync(session, query.Value, ct);
-            var text = await DeviceReadAsync(session, ct);
+            await DeviceWriteAsync(session, query.Value, IoTimeout(device), ct);
+            var text = await DeviceReadAsync(session, IoTimeout(device), ct);
             return Result.Success<string, BackendError>(text);
+        }
+        catch (Vxi11ReplyException ex) when (ex.Code == Vxi11IoTimeout)
+        {
+            return Result.Failure<string, BackendError>(
+                new TransportTimeout(device.Timeout.Value, ex)
+            );
         }
         catch (Exception ex) when (ex is SocketException or IOException or InvalidDataException)
         {
@@ -269,8 +281,14 @@ public sealed class Vxi11Backend : IIviBackend
         }
         try
         {
-            var text = await DeviceReadAsync(session, ct);
+            var text = await DeviceReadAsync(session, IoTimeout(device), ct);
             return Result.Success<string, BackendError>(text);
+        }
+        catch (Vxi11ReplyException ex) when (ex.Code == Vxi11IoTimeout)
+        {
+            return Result.Failure<string, BackendError>(
+                new TransportTimeout(device.Timeout.Value, ex)
+            );
         }
         catch (Exception ex) when (ex is SocketException or IOException or InvalidDataException)
         {
@@ -292,8 +310,14 @@ public sealed class Vxi11Backend : IIviBackend
         }
         try
         {
-            await DeviceTriggerAsync(session, ct);
+            await DeviceTriggerAsync(session, IoTimeout(device), ct);
             return Result.Success<Unit, BackendError>(Unit.Value);
+        }
+        catch (Vxi11ReplyException ex) when (ex.Code == Vxi11IoTimeout)
+        {
+            return Result.Failure<Unit, BackendError>(
+                new TransportTimeout(device.Timeout.Value, ex)
+            );
         }
         catch (Exception ex) when (ex is SocketException or IOException or InvalidDataException)
         {
@@ -397,7 +421,11 @@ public sealed class Vxi11Backend : IIviBackend
         return lid;
     }
 
-    private static async Task DeviceTriggerAsync(Vxi11Session session, CancellationToken ct)
+    private static async Task DeviceTriggerAsync(
+        Vxi11Session session,
+        uint ioTimeoutMs,
+        CancellationToken ct
+    )
     {
         var call = BuildCall(
             session.NextXid(),
@@ -408,7 +436,7 @@ public sealed class Vxi11Backend : IIviBackend
             {
                 body.WriteInt32(session.LinkId);
                 body.WriteInt32(0); // flags (0 = no special semantics)
-                body.WriteUInt32(5000); // io_timeout
+                body.WriteUInt32(ioTimeoutMs); // io_timeout
                 body.WriteUInt32(0); // lock_timeout
             }
         );
@@ -417,7 +445,7 @@ public sealed class Vxi11Backend : IIviBackend
         var error = reply.ReadInt32();
         if (error != Vxi11NoError)
         {
-            throw new InvalidDataException($"device_trigger returned error {error}");
+            throw new Vxi11ReplyException("device_trigger", error);
         }
     }
 
@@ -507,9 +535,17 @@ public sealed class Vxi11Backend : IIviBackend
         }
     }
 
+    /// <summary>
+    /// The device timeout as the <c>io_timeout</c> the server enforces
+    /// (VXI-11 Rev 1.0, B.4.3).
+    /// </summary>
+    private static uint IoTimeout(Device device) =>
+        (uint)Math.Min(device.Timeout.Value.TotalMilliseconds, uint.MaxValue);
+
     private static async Task DeviceWriteAsync(
         Vxi11Session session,
         string scpi,
+        uint ioTimeoutMs,
         CancellationToken ct
     )
     {
@@ -522,7 +558,7 @@ public sealed class Vxi11Backend : IIviBackend
             body =>
             {
                 body.WriteInt32(session.LinkId);
-                body.WriteUInt32(5000); // io_timeout
+                body.WriteUInt32(ioTimeoutMs); // io_timeout
                 body.WriteUInt32(0); // lock_timeout
                 body.WriteInt32(WriteEndFlag);
                 body.WriteOpaque(data);
@@ -533,12 +569,16 @@ public sealed class Vxi11Backend : IIviBackend
         var error = reply.ReadInt32();
         if (error != Vxi11NoError)
         {
-            throw new InvalidDataException($"device_write returned error {error}");
+            throw new Vxi11ReplyException("device_write", error);
         }
         _ = reply.ReadUInt32(); // size acknowledged by server
     }
 
-    private static async Task<string> DeviceReadAsync(Vxi11Session session, CancellationToken ct)
+    private static async Task<string> DeviceReadAsync(
+        Vxi11Session session,
+        uint ioTimeoutMs,
+        CancellationToken ct
+    )
     {
         var assembled = new StringBuilder();
         for (var fragment = 0; fragment < 64; fragment++)
@@ -552,7 +592,7 @@ public sealed class Vxi11Backend : IIviBackend
                 {
                     body.WriteInt32(session.LinkId);
                     body.WriteUInt32(4096); // requestSize
-                    body.WriteUInt32(5000); // io_timeout
+                    body.WriteUInt32(ioTimeoutMs); // io_timeout
                     body.WriteUInt32(0); // lock_timeout
                     body.WriteInt32(0); // flags
                     body.WriteUInt32((byte)'\n'); // termChar
@@ -565,7 +605,7 @@ public sealed class Vxi11Backend : IIviBackend
             var error = reply.ReadInt32();
             if (error != Vxi11NoError)
             {
-                throw new InvalidDataException($"device_read returned error {error}");
+                throw new Vxi11ReplyException("device_read", error);
             }
             var reason = reply.ReadInt32();
             var data = reply.ReadOpaque();

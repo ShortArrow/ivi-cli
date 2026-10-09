@@ -218,6 +218,13 @@
           "Microsoft.Extensions.DependencyInjection.Abstractions": "[10.0.12, )"
         }
       },
+      "ivicli.backends.socket": {
+        "type": "Project",
+        "dependencies": {
+          "IviCli.Application": "[0.4.0, )",
+          "Microsoft.Extensions.DependencyInjection.Abstractions": "[10.0.12, )"
+        }
+      },
       "ivicli.backends.vxi11": {
         "type": "Project",
         "dependencies": {
