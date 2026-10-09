@@ -8,6 +8,20 @@ All notable changes to ivi-cli are documented here. Format roughly follows
 
 ### Fixed
 
+- **A device's `timeout_ms` bounds every operation.** It bounded none:
+  the VISA backend timed out after 5 seconds whatever it said, the VXI-11
+  client sent a fixed 5-second `io_timeout`, and HiSLIP and SOCKET waited
+  for a silent instrument until the command was cancelled. Now every
+  write, query, read and trigger fails with a timeout once `timeout_ms`
+  has passed, and the next operation reconnects so a late reply is never
+  taken for a later answer. Opening a session gets at least 5 seconds, or
+  `timeout_ms` if that is longer. **A measurement that takes longer than its
+  device's `timeout_ms` (3000 ms unless set) now fails where it used to
+  wait; raise `timeout_ms` for such devices.** The VXI-11 gateway reports
+  an instrument's timeout as VXI-11 error 15. `docs/conformance.md` lists
+  which of these rules come from VISA, VXI-11 and HiSLIP and which ivi-cli
+  defines where they are silent.
+
 - **ivicli starts on a Linux machine without ICU.** The self-contained
   Linux binaries aborted at start-up, before printing anything, with
   `Couldn't find a valid ICU package installed on the system`: slim

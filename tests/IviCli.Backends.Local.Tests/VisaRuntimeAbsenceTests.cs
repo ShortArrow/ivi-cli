@@ -17,7 +17,11 @@ public sealed class VisaRuntimeAbsenceTests
     {
         var resource = VisaResource.Parse("TCPIP0::0.0.0.0::inst0::INSTR").ShouldBeOk();
 
-        new VisaSessionFactory().Open(resource, TimeSpan.FromMilliseconds(200));
+        new VisaSessionFactory().Open(
+            resource,
+            TimeSpan.FromMilliseconds(200),
+            TimeSpan.FromMilliseconds(200)
+        );
         CollectGarbage();
     }
 

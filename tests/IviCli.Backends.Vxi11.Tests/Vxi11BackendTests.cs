@@ -173,6 +173,101 @@ public sealed class Vxi11BackendTests
     }
 
     [Fact]
+    public async Task Write_read_and_trigger_send_the_device_timeout_as_io_timeout_and_no_lock_timeout()
+    {
+        var ioTimeouts = new List<uint>();
+        var lockTimeouts = new List<uint>();
+        await using var stub = await StubServer.StartAsync(programmer: session =>
+        {
+            AckCreateLink(session);
+            AckInterruptSetup(session);
+            var write = session.ReadCall();
+            ioTimeouts.Add(write.Word(1)); // lid, io_timeout, lock_timeout, ...
+            lockTimeouts.Add(write.Word(2));
+            session.WriteReply(
+                write.Xid,
+                writer =>
+                {
+                    writer.WriteInt32(Vxi11NoError);
+                    writer.WriteUInt32(6);
+                }
+            );
+            var read = session.ReadCall();
+            ioTimeouts.Add(read.Word(2)); // lid, requestSize, io_timeout, lock_timeout, ...
+            lockTimeouts.Add(read.Word(3));
+            session.WriteReply(
+                read.Xid,
+                writer =>
+                {
+                    writer.WriteInt32(Vxi11NoError);
+                    writer.WriteInt32(ReadReasonEnd);
+                    writer.WriteOpaque("1\n"u8.ToArray());
+                }
+            );
+            var trigger = session.ReadCall();
+            trigger.Procedure.ShouldBe(ProcDeviceTrigger);
+            ioTimeouts.Add(trigger.Word(2)); // lid, flags, io_timeout, lock_timeout
+            lockTimeouts.Add(trigger.Word(3));
+            session.WriteReply(trigger.Xid, writer => writer.WriteInt32(Vxi11NoError));
+        });
+        var backend = new Vxi11Backend(stub.Port);
+        var device = BuildDevice(timeoutMs: 1234);
+        (await backend.OpenAsync(device, default)).ShouldBeOk();
+
+        (
+            await backend.QueryAsync(device, ScpiQuery.From("*OPC?").ShouldBeOk(), default)
+        ).ShouldBeOk();
+        (await backend.TriggerAsync(device, default)).ShouldBeOk();
+
+        await stub.WaitForClientAsync();
+        ioTimeouts.ShouldBe([1234u, 1234u, 1234u]);
+        lockTimeouts.ShouldBe([0u, 0u, 0u]);
+    }
+
+    [Fact]
+    public async Task A_close_cut_short_still_releases_the_connection()
+    {
+        await using var stub = await StubServer.StartAsync(programmer: session =>
+        {
+            AckCreateLink(session);
+            AckInterruptSetup(session);
+            session.WaitForHangUp();
+        });
+        var backend = new Vxi11Backend(stub.Port);
+        var device = BuildDevice();
+        (await backend.OpenAsync(device, default)).ShouldBeOk();
+        using var cts = new CancellationTokenSource(TimeSpan.FromMilliseconds(200));
+
+        try
+        {
+            await backend.CloseAsync(device, cts.Token).WaitAsync(TimeSpan.FromSeconds(5));
+        }
+        catch (OperationCanceledException) { }
+
+        await stub.WaitForClientAsync().WaitAsync(TimeSpan.FromSeconds(5));
+    }
+
+    private static void AckCreateLink(StubSession session)
+    {
+        var create = session.ReadCall();
+        create.Procedure.ShouldBe(ProcCreateLink);
+        session.WriteReply(
+            create.Xid,
+            writer =>
+            {
+                writer.WriteInt32(Vxi11NoError);
+                writer.WriteInt32(1); // lid
+                writer.WriteUInt32(0); // abort port
+                writer.WriteUInt32(16 * 1024 * 1024); // maxRecvSize
+            }
+        );
+    }
+
+    [Fact]
+    public void The_VXI11_backend_enforces_the_device_timeout_itself() =>
+        new Vxi11Backend(12345).ShouldBeAssignableTo<IEnforcesDeviceTimeout>();
+
+    [Fact]
     public async Task CloseAsync_is_noop_when_session_was_never_opened()
     {
         var backend = new Vxi11Backend(12345);
@@ -183,11 +278,11 @@ public sealed class Vxi11BackendTests
         result.ShouldBeOk();
     }
 
-    private static Device BuildDevice() =>
+    private static Device BuildDevice(int timeoutMs = 3000) =>
         new(
             DeviceName.From("dut").ShouldBeOk(),
             VisaResource.Parse("TCPIP0::127.0.0.1::inst0::INSTR").ShouldBeOk(),
-            Timeout.FromMilliseconds(3000).ShouldBeOk()
+            Timeout.FromMilliseconds(timeoutMs).ShouldBeOk()
         );
 
     private sealed class StubServer : IAsyncDisposable
@@ -270,7 +365,24 @@ public sealed class Vxi11BackendTests
             _ = reader.ReadOpaque(); // cred body
             _ = reader.ReadUInt32(); // verf flavor
             _ = reader.ReadOpaque(); // verf body
-            return new StubCall(xid, proc);
+            return new StubCall(xid, proc, bytes.AsMemory(reader.Position));
+        }
+
+        /// <summary>
+        /// Reads calls without answering them until the client closes the
+        /// connection.
+        /// </summary>
+        public void WaitForHangUp()
+        {
+            try
+            {
+                while (true)
+                {
+                    _ = ReadCall();
+                }
+            }
+            catch (Exception ex)
+                when (ex is IOException or EndOfStreamException or InvalidDataException) { }
         }
 
         public void WriteReply(uint xid, Action<Vxi11XdrCodec.XdrWriter> body)
@@ -296,5 +408,12 @@ public sealed class Vxi11BackendTests
         }
     }
 
-    private readonly record struct StubCall(uint Xid, uint Procedure);
+    private readonly record struct StubCall(uint Xid, uint Procedure, ReadOnlyMemory<byte> Args)
+    {
+        /// <summary>The XDR word at <paramref name="index"/> of the call's arguments.</summary>
+        public uint Word(int index) =>
+            System.Buffers.Binary.BinaryPrimitives.ReadUInt32BigEndian(
+                Args.Span.Slice(index * 4, 4)
+            );
+    }
 }
