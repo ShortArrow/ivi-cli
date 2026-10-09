@@ -20,15 +20,17 @@ namespace IviCli.Application.Backends;
 /// <item>Opening gets the longer of the device timeout and
 /// <see cref="OpenFloor"/>, since a short I/O timeout is not meant to cut
 /// a network connect short.</item>
-/// <item>After a timed-out operation the session is closed and reopened
-/// before the next one, so a reply that arrives late is never read as the
-/// answer to a later request. The close gets the operation's limit as
-/// well and is abandoned past it.</item>
+/// <item>After an operation times out, whether the deadline passed or the
+/// backend reported <see cref="TransportTimeout"/> itself, the session is
+/// closed and reopened before the next operation, so a reply that arrives
+/// late is never read as the answer to a later request. The close gets
+/// the operation's limit as well and is abandoned past it.</item>
 /// <item>A cancellation from the caller propagates unchanged; only the
 /// deadline turns into <see cref="TransportTimeout"/>.</item>
 /// </list>
 /// The service-request stream is not bounded: it waits for as long as
-/// the caller listens.
+/// the caller listens, and outlives a session this decorator dropped by
+/// subscribing again once the session is reopened.
 /// </remarks>
 public sealed class DeviceTimeoutBackendFactory : IBackendFactory
 {
@@ -64,6 +66,13 @@ public sealed class DeviceTimeoutBackendFactory : IBackendFactory
         private readonly TimeSpan _grace;
         private int _sessionDropped;
 
+        /// <summary>
+        /// Completed while the session is usable; replaced by a pending one
+        /// when this decorator drops the session, and completed again when
+        /// the session is reopened or the caller closes it.
+        /// </summary>
+        private TaskCompletionSource _reopened = Completed();
+
         public DeviceTimeoutBackend(IIviBackend inner, TimeProvider time)
         {
             _inner = inner;
@@ -72,17 +81,12 @@ public sealed class DeviceTimeoutBackendFactory : IBackendFactory
         }
 
         public Task<Result<Unit, BackendError>> OpenAsync(Device device, CancellationToken ct) =>
-            Bounded(
-                device,
-                OpenLimit(device),
-                dropSessionOnTimeout: false,
-                t => _inner.OpenAsync(device, t),
-                ct
-            );
+            Bounded(OpenLimit(device), t => _inner.OpenAsync(device, t), ct);
 
         public Task<Result<Unit, BackendError>> CloseAsync(Device device, CancellationToken ct)
         {
             Interlocked.Exchange(ref _sessionDropped, 0);
+            Volatile.Read(ref _reopened).TrySetResult();
             return _inner.CloseAsync(device, ct);
         }
 
@@ -104,10 +108,53 @@ public sealed class DeviceTimeoutBackendFactory : IBackendFactory
         public Task<Result<Unit, BackendError>> TriggerAsync(Device device, CancellationToken ct) =>
             Operation(device, t => _inner.TriggerAsync(device, t), ct);
 
-        public IAsyncEnumerable<ServiceRequest> ServiceRequestStream(
+        public async IAsyncEnumerable<ServiceRequest> ServiceRequestStream(
             Device device,
-            CancellationToken ct
-        ) => _inner.ServiceRequestStream(device, ct);
+            [EnumeratorCancellation] CancellationToken ct
+        )
+        {
+            while (true)
+            {
+                var reopened = Volatile.Read(ref _reopened);
+                await foreach (var srq in _inner.ServiceRequestStream(device, ct))
+                {
+                    yield return srq;
+                }
+                var next = Volatile.Read(ref _reopened);
+                if (next == reopened && next.Task.IsCompleted || !await Reopened(next, ct))
+                {
+                    yield break;
+                }
+            }
+        }
+
+        private static TaskCompletionSource NewSignal() =>
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        private static TaskCompletionSource Completed()
+        {
+            var signal = NewSignal();
+            signal.SetResult();
+            return signal;
+        }
+
+        /// <summary>
+        /// Waits for <paramref name="signal"/>, completed when a session
+        /// this decorator dropped is reopened; false if the caller stops
+        /// listening first.
+        /// </summary>
+        private static async Task<bool> Reopened(TaskCompletionSource signal, CancellationToken ct)
+        {
+            try
+            {
+                await signal.Task.WaitAsync(ct);
+                return true;
+            }
+            catch (OperationCanceledException) when (ct.IsCancellationRequested)
+            {
+                return false;
+            }
+        }
 
         private TimeSpan OperationLimit(Device device) => device.Timeout.Value + _grace;
 
@@ -128,20 +175,18 @@ public sealed class DeviceTimeoutBackendFactory : IBackendFactory
                     Interlocked.Exchange(ref _sessionDropped, 1);
                     return Result.Failure<T, BackendError>(openError);
                 }
+                Volatile.Read(ref _reopened).TrySetResult();
             }
-            return await Bounded(
-                device,
-                OperationLimit(device),
-                dropSessionOnTimeout: true,
-                op,
-                ct
-            );
+            var result = await Bounded(OperationLimit(device), op, ct);
+            if (result is Result<T, BackendError>.Error { Err: TransportTimeout })
+            {
+                await DropSession(device);
+            }
+            return result;
         }
 
         private async Task<Result<T, BackendError>> Bounded<T>(
-            Device device,
             TimeSpan limit,
-            bool dropSessionOnTimeout,
             Func<CancellationToken, Task<Result<T, BackendError>>> op,
             CancellationToken ct
         )
@@ -157,13 +202,13 @@ public sealed class DeviceTimeoutBackendFactory : IBackendFactory
             catch (OperationCanceledException)
                 when (deadline.IsCancellationRequested && !ct.IsCancellationRequested)
             {
-                return await TimedOut<T>(device, started, dropSessionOnTimeout);
+                return TimedOut<T>(started);
             }
             return
                 result is Result<T, BackendError>.Error
                 && deadline.IsCancellationRequested
                 && !ct.IsCancellationRequested
-                ? await TimedOut<T>(device, started, dropSessionOnTimeout)
+                ? TimedOut<T>(started)
                 : result;
         }
 
@@ -182,19 +227,20 @@ public sealed class DeviceTimeoutBackendFactory : IBackendFactory
             catch (OperationCanceledException) when (deadline.IsCancellationRequested) { }
         }
 
-        private async Task<Result<T, BackendError>> TimedOut<T>(
-            Device device,
-            long started,
-            bool dropSession
-        )
+        private Result<T, BackendError> TimedOut<T>(long started) =>
+            Result.Failure<T, BackendError>(new TransportTimeout(_time.GetElapsedTime(started)));
+
+        /// <summary>
+        /// Closes the session so the next operation reopens it. A fresh
+        /// reopen signal goes up before the close ends the session's
+        /// service-request stream, so a listener can tell this drop from a
+        /// close by the caller.
+        /// </summary>
+        private async Task DropSession(Device device)
         {
-            var elapsed = _time.GetElapsedTime(started);
-            if (dropSession)
-            {
-                await CloseWithin(device, OperationLimit(device));
-                Interlocked.Exchange(ref _sessionDropped, 1);
-            }
-            return Result.Failure<T, BackendError>(new TransportTimeout(elapsed));
+            Interlocked.Exchange(ref _reopened, NewSignal());
+            await CloseWithin(device, OperationLimit(device));
+            Interlocked.Exchange(ref _sessionDropped, 1);
         }
     }
 }

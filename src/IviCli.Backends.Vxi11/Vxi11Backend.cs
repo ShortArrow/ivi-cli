@@ -188,14 +188,16 @@ public sealed class Vxi11Backend : IIviBackend, IEnforcesDeviceTimeout
         }
         catch (Exception ex) when (ex is SocketException or IOException or InvalidDataException)
         {
-            // The session is going away regardless; surface the cleanup
-            // failure once and continue tearing down the TCP client.
-            session.Dispose();
             return Result.Failure<Unit, BackendError>(
                 new TransportDisconnected($"VXI-11 destroy_link failed: {ex.Message}", ex)
             );
         }
-        session.Dispose();
+        finally
+        {
+            // The session is going away regardless, even when the close is
+            // cancelled part way: the TCP client is released either way.
+            session.Dispose();
+        }
         return Result.Success<Unit, BackendError>(Unit.Value);
     }
 

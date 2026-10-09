@@ -284,60 +284,33 @@ internal static class Program
                             : sp.GetRequiredService<IviCli.Backends.Vxi11.Vxi11Backend>()
                     );
 
-                // Instrumenting layer always wraps Default — Activity /
-                // Meter calls are near-free without listeners, so this
-                // is cheap even when [telemetry] is disabled (ADR 0040).
-                factory = new IviCli.Application.Backends.InstrumentingBackendFactory(factory);
-
-                // Plugin layer consults plugin-registered backends before
-                // delegating to the built-in routing (ADR 0013). Only
-                // active when [plugins].enabled was true at startup.
-                if (pluginRegistrations.Count > 0)
-                {
-                    factory = new IviCli.Infrastructure.Plugins.PluginBackendFactory(
-                        factory,
-                        sp,
-                        pluginRegistrations
-                    );
-                }
-
-                // Every backend, built-in or from a plugin, has each
-                // operation bounded by the device's timeout_ms. The pool
-                // wraps this layer, so a session dropped after a timeout
-                // is reopened under the lease the pool already holds.
-                factory = new IviCli.Application.Backends.DeviceTimeoutBackendFactory(
-                    factory,
-                    sp.GetRequiredService<TimeProvider>()
-                );
-
-                // Pool layer wraps the default factory when [pool] enabled.
-                // Capture wraps Pool so logical Open/Close events still
-                // appear 1:1 in the audit trail even when the pool elides
-                // the underlying wire opens (ADR 0038 §5).
+                // Capture wraps the layered factory so logical Open/Close
+                // events still appear 1:1 in the audit trail even when the
+                // pool elides the underlying wire opens (ADR 0038 §5).
                 var loadedConfig =
                     sp.GetRequiredService<IviCli.Application.Configuration.IConfigStore>()
                         .LoadAsync(CancellationToken.None)
                         .GetAwaiter()
                         .GetResult();
-                if (
+                factory = BackendLayers.Compose(
+                    factory,
+                    pluginRegistrations.Count > 0
+                        ? inner => new IviCli.Infrastructure.Plugins.PluginBackendFactory(
+                            inner,
+                            sp,
+                            pluginRegistrations
+                        )
+                        : null,
                     loadedConfig
                         is Result<
                             IviCli.Domain.Configuration.ConfigDocument,
                             IviCli.Application.Configuration.ConfigStoreError
                         >.Ok { Value: var cfg }
-                    && cfg.Pool.Enabled
-                )
-                {
-                    var poolLogger = sp.GetService<
-                        ILogger<IviCli.Application.Backends.PoolingBackendFactory>
-                    >();
-                    factory = new IviCli.Application.Backends.PoolingBackendFactory(
-                        factory,
-                        cfg.Pool,
-                        sp.GetRequiredService<TimeProvider>(),
-                        poolLogger
-                    );
-                }
+                        ? cfg.Pool
+                        : null,
+                    sp.GetRequiredService<TimeProvider>(),
+                    sp.GetService<ILogger<IviCli.Application.Backends.PoolingBackendFactory>>()
+                );
 
                 // IVICLI_CAPTURE=<path> wraps the factory so every backend op
                 // streams into a NDJSON audit log (ADR 0031). Errors here fall
