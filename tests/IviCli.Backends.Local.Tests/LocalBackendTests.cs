@@ -26,7 +26,7 @@ public class LocalBackendTests
         factory.Sessions[VisaResourceFormatter.Format(Dev("psu").Resource)] = new FakeVisaSession();
         var backend = new LocalBackend(factory);
 
-        var result = await backend.OpenAsync(Dev("psu"), default);
+        var result = await backend.OpenAsync(Dev("psu"), TestContext.Current.CancellationToken);
         result.ShouldBeOk();
     }
 
@@ -36,7 +36,7 @@ public class LocalBackendTests
         var factory = new FakeVisaSessionFactory { ReturnRuntimeMissing = true };
         var backend = new LocalBackend(factory);
 
-        var result = await backend.OpenAsync(Dev("psu"), default);
+        var result = await backend.OpenAsync(Dev("psu"), TestContext.Current.CancellationToken);
         result.ShouldBeOfType<Result<Unit, BackendError>.Error>();
     }
 
@@ -48,7 +48,7 @@ public class LocalBackendTests
         var backend = new LocalBackend(factory);
 
         // When the open fails
-        var result = await backend.OpenAsync(Dev("psu"), default);
+        var result = await backend.OpenAsync(Dev("psu"), TestContext.Current.CancellationToken);
 
         // Then the mapped reason is rendered text, never a raw {Placeholder}
         var err = ((Result<Unit, BackendError>.Error)result).Err;
@@ -65,11 +65,11 @@ public class LocalBackendTests
         factory.Sessions[VisaResourceFormatter.Format(Dev("psu").Resource)] = session;
         var backend = new LocalBackend(factory);
 
-        await backend.OpenAsync(Dev("psu"), default);
+        await backend.OpenAsync(Dev("psu"), TestContext.Current.CancellationToken);
         var write = await backend.WriteAsync(
             Dev("psu"),
             ScpiCommand.From("*RST").ShouldBeOk(),
-            default
+            TestContext.Current.CancellationToken
         );
 
         write.ShouldBeOk();
@@ -83,9 +83,11 @@ public class LocalBackendTests
         var session = new FakeVisaSession();
         factory.Sessions[VisaResourceFormatter.Format(Dev("psu").Resource)] = session;
         var backend = new LocalBackend(factory);
-        await backend.OpenAsync(Dev("psu"), default);
+        await backend.OpenAsync(Dev("psu"), TestContext.Current.CancellationToken);
 
-        (await backend.TriggerAsync(Dev("psu"), default)).ShouldBeOk();
+        (
+            await backend.TriggerAsync(Dev("psu"), TestContext.Current.CancellationToken)
+        ).ShouldBeOk();
 
         session.Writes.ShouldBe(["*TRG"]);
     }
@@ -99,11 +101,11 @@ public class LocalBackendTests
         factory.Sessions[VisaResourceFormatter.Format(Dev("psu").Resource)] = session;
         var backend = new LocalBackend(factory);
 
-        await backend.OpenAsync(Dev("psu"), default);
+        await backend.OpenAsync(Dev("psu"), TestContext.Current.CancellationToken);
         var query = await backend.QueryAsync(
             Dev("psu"),
             ScpiQuery.From("*IDN?").ShouldBeOk(),
-            default
+            TestContext.Current.CancellationToken
         );
 
         query.ShouldBeOk().ShouldBe("FAKE,FAKE,0,1.0");
@@ -118,7 +120,7 @@ public class LocalBackendTests
         var write = await backend.WriteAsync(
             Dev("psu"),
             ScpiCommand.From("*RST").ShouldBeOk(),
-            default
+            TestContext.Current.CancellationToken
         );
         write.ShouldBeOfType<Result<Unit, BackendError>.Error>();
     }
@@ -131,14 +133,14 @@ public class LocalBackendTests
         factory.Sessions[VisaResourceFormatter.Format(Dev("psu").Resource)] = session;
         var backend = new LocalBackend(factory);
 
-        await backend.OpenAsync(Dev("psu"), default);
-        await backend.CloseAsync(Dev("psu"), default);
+        await backend.OpenAsync(Dev("psu"), TestContext.Current.CancellationToken);
+        await backend.CloseAsync(Dev("psu"), TestContext.Current.CancellationToken);
 
         session.Disposed.ShouldBeTrue();
         var write = await backend.WriteAsync(
             Dev("psu"),
             ScpiCommand.From("*RST").ShouldBeOk(),
-            default
+            TestContext.Current.CancellationToken
         );
         write.ShouldBeOfType<Result<Unit, BackendError>.Error>();
     }
@@ -198,7 +200,7 @@ public class LocalBackendTimeoutTests
         var device = Dev(deviceTimeoutMs);
         var (backend, factory, _) = Build(device);
 
-        (await backend.OpenAsync(device, default)).ShouldBeOk();
+        (await backend.OpenAsync(device, TestContext.Current.CancellationToken)).ShouldBeOk();
 
         factory.LastIoTimeout.ShouldBe(TimeSpan.FromMilliseconds(deviceTimeoutMs));
         factory.LastOpenTimeout.ShouldBe(TimeSpan.FromMilliseconds(expectedOpenMs));
@@ -210,12 +212,12 @@ public class LocalBackendTimeoutTests
         var device = Dev(300);
         var (backend, _, session) = Build(device);
         session.TimeOutAfter = TimeSpan.FromMilliseconds(300);
-        (await backend.OpenAsync(device, default)).ShouldBeOk();
+        (await backend.OpenAsync(device, TestContext.Current.CancellationToken)).ShouldBeOk();
 
         var result = await backend.QueryAsync(
             device,
             ScpiQuery.From("*IDN?").ShouldBeOk(),
-            default
+            TestContext.Current.CancellationToken
         );
 
         result

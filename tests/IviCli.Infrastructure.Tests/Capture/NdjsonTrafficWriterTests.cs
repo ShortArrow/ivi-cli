@@ -37,7 +37,7 @@ public sealed class NdjsonTrafficWriterTests
         var writer = new NdjsonTrafficWriter(fs, Path);
         await writer.AppendAsync(
             Event(TrafficOp.Query, data: "*IDN?", response: "ACME,PSU,1.0", latency: 12),
-            default
+            TestContext.Current.CancellationToken
         );
 
         var content = fs.File.ReadAllText(Path);
@@ -60,9 +60,12 @@ public sealed class NdjsonTrafficWriterTests
     {
         var fs = new MockFileSystem();
         var writer = new NdjsonTrafficWriter(fs, Path);
-        await writer.AppendAsync(Event(TrafficOp.Open), default);
-        await writer.AppendAsync(Event(TrafficOp.Write, data: "OUTP ON"), default);
-        await writer.AppendAsync(Event(TrafficOp.Close), default);
+        await writer.AppendAsync(Event(TrafficOp.Open), TestContext.Current.CancellationToken);
+        await writer.AppendAsync(
+            Event(TrafficOp.Write, data: "OUTP ON"),
+            TestContext.Current.CancellationToken
+        );
+        await writer.AppendAsync(Event(TrafficOp.Close), TestContext.Current.CancellationToken);
 
         var lines = fs.File.ReadAllText(Path).TrimEnd('\n').Split('\n');
         lines.Length.ShouldBe(3);
@@ -98,7 +101,7 @@ public sealed class NdjsonTrafficWriterTests
         var fs = new MockFileSystem();
         var nestedPath = "/var/log/ivi-cli/deeper/run.ndjson";
         var writer = new NdjsonTrafficWriter(fs, nestedPath);
-        await writer.AppendAsync(Event(TrafficOp.Open), default);
+        await writer.AppendAsync(Event(TrafficOp.Open), TestContext.Current.CancellationToken);
 
         fs.File.Exists(nestedPath).ShouldBeTrue();
     }

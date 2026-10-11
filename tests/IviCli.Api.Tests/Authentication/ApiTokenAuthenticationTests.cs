@@ -35,7 +35,7 @@ public sealed class ApiTokenAuthenticationTests
             authOptions: new ApiAuthenticationOptions { IsLoopback = false, AllowAnonymous = false }
         );
 
-        var resp = await host.Client.GetAsync("/healthz");
+        var resp = await host.Client.GetAsync("/healthz", TestContext.Current.CancellationToken);
 
         resp.StatusCode.ShouldBe(HttpStatusCode.OK);
     }
@@ -50,7 +50,7 @@ public sealed class ApiTokenAuthenticationTests
             authOptions: new ApiAuthenticationOptions { IsLoopback = false, AllowAnonymous = false }
         );
 
-        var resp = await host.Client.GetAsync("/v1/devices");
+        var resp = await host.Client.GetAsync("/v1/devices", TestContext.Current.CancellationToken);
 
         resp.StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
     }
@@ -69,7 +69,7 @@ public sealed class ApiTokenAuthenticationTests
             "ivicli_pat_INVALID"
         );
 
-        var resp = await host.Client.GetAsync("/v1/devices");
+        var resp = await host.Client.GetAsync("/v1/devices", TestContext.Current.CancellationToken);
 
         resp.StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
     }
@@ -88,7 +88,7 @@ public sealed class ApiTokenAuthenticationTests
             raw
         );
 
-        var resp = await host.Client.GetAsync("/v1/devices");
+        var resp = await host.Client.GetAsync("/v1/devices", TestContext.Current.CancellationToken);
 
         resp.StatusCode.ShouldBe(HttpStatusCode.OK);
     }
@@ -101,7 +101,7 @@ public sealed class ApiTokenAuthenticationTests
             authOptions: new ApiAuthenticationOptions { IsLoopback = true, AllowAnonymous = true }
         );
 
-        var resp = await host.Client.GetAsync("/v1/devices");
+        var resp = await host.Client.GetAsync("/v1/devices", TestContext.Current.CancellationToken);
 
         resp.StatusCode.ShouldBe(HttpStatusCode.OK);
     }
@@ -114,7 +114,7 @@ public sealed class ApiTokenAuthenticationTests
             authOptions: new ApiAuthenticationOptions { IsLoopback = false, AllowAnonymous = false }
         );
 
-        var resp = await host.Client.GetAsync("/v1/devices");
+        var resp = await host.Client.GetAsync("/v1/devices", TestContext.Current.CancellationToken);
 
         resp.StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
     }

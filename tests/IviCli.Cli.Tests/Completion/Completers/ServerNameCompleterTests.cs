@@ -30,7 +30,10 @@ public sealed class ServerNameCompleterTests
     public async Task CompleteAsync_returns_all_servers_when_prefix_empty()
     {
         var completer = new ServerNameCompleter(StoreWith(Srv("sock1"), Srv("hislip1")));
-        var candidates = await completer.CompleteAsync(string.Empty, default);
+        var candidates = await completer.CompleteAsync(
+            string.Empty,
+            TestContext.Current.CancellationToken
+        );
         string[] expected = ["hislip1", "sock1"];
         candidates.ShouldBe(expected);
     }
@@ -41,7 +44,10 @@ public sealed class ServerNameCompleterTests
         var completer = new ServerNameCompleter(
             StoreWith(Srv("sock1"), Srv("hislip1"), Srv("sock2"))
         );
-        var candidates = await completer.CompleteAsync("sock", default);
+        var candidates = await completer.CompleteAsync(
+            "sock",
+            TestContext.Current.CancellationToken
+        );
         string[] expected = ["sock1", "sock2"];
         candidates.ShouldBe(expected);
     }

@@ -21,10 +21,15 @@ public class FilePidRegistryTests
         var registry = new FilePidRegistry(fs, Dir);
         var startedAt = new DateTimeOffset(2026, 5, 24, 12, 0, 0, TimeSpan.Zero);
 
-        var write = await registry.WriteAsync(Name("sock1"), 4242, startedAt, default);
+        var write = await registry.WriteAsync(
+            Name("sock1"),
+            4242,
+            startedAt,
+            TestContext.Current.CancellationToken
+        );
         write.ShouldBeOk();
 
-        var read = await registry.ReadAsync(Name("sock1"), default);
+        var read = await registry.ReadAsync(Name("sock1"), TestContext.Current.CancellationToken);
         var entry = read.ShouldBeOk();
         entry.ShouldNotBeNull();
         entry!.ProcessId.ShouldBe(4242);
@@ -36,7 +41,7 @@ public class FilePidRegistryTests
     {
         var fs = new MockFileSystem();
         var registry = new FilePidRegistry(fs, Dir);
-        var read = await registry.ReadAsync(Name("missing"), default);
+        var read = await registry.ReadAsync(Name("missing"), TestContext.Current.CancellationToken);
         read.ShouldBeOk().ShouldBeNull();
     }
 
@@ -45,12 +50,20 @@ public class FilePidRegistryTests
     {
         var fs = new MockFileSystem();
         var registry = new FilePidRegistry(fs, Dir);
-        await registry.WriteAsync(Name("sock1"), 1, DateTimeOffset.UtcNow, default);
+        await registry.WriteAsync(
+            Name("sock1"),
+            1,
+            DateTimeOffset.UtcNow,
+            TestContext.Current.CancellationToken
+        );
 
-        var delete = await registry.DeleteAsync(Name("sock1"), default);
+        var delete = await registry.DeleteAsync(
+            Name("sock1"),
+            TestContext.Current.CancellationToken
+        );
         delete.ShouldBeOk();
 
-        var read = await registry.ReadAsync(Name("sock1"), default);
+        var read = await registry.ReadAsync(Name("sock1"), TestContext.Current.CancellationToken);
         read.ShouldBeOk().ShouldBeNull();
     }
 
@@ -59,7 +72,10 @@ public class FilePidRegistryTests
     {
         var fs = new MockFileSystem();
         var registry = new FilePidRegistry(fs, Dir);
-        var delete = await registry.DeleteAsync(Name("sock1"), default);
+        var delete = await registry.DeleteAsync(
+            Name("sock1"),
+            TestContext.Current.CancellationToken
+        );
         delete.ShouldBeOk();
     }
 
@@ -68,7 +84,12 @@ public class FilePidRegistryTests
     {
         var fs = new MockFileSystem();
         var registry = new FilePidRegistry(fs, Dir);
-        await registry.WriteAsync(Name("sock1"), 1, DateTimeOffset.UtcNow, default);
+        await registry.WriteAsync(
+            Name("sock1"),
+            1,
+            DateTimeOffset.UtcNow,
+            TestContext.Current.CancellationToken
+        );
         fs.Directory.Exists(Dir).ShouldBeTrue();
     }
 
@@ -77,10 +98,20 @@ public class FilePidRegistryTests
     {
         var fs = new MockFileSystem();
         var registry = new FilePidRegistry(fs, Dir);
-        await registry.WriteAsync(Name("zeta"), 1, DateTimeOffset.UtcNow, default);
-        await registry.WriteAsync(Name("alpha"), 2, DateTimeOffset.UtcNow, default);
+        await registry.WriteAsync(
+            Name("zeta"),
+            1,
+            DateTimeOffset.UtcNow,
+            TestContext.Current.CancellationToken
+        );
+        await registry.WriteAsync(
+            Name("alpha"),
+            2,
+            DateTimeOffset.UtcNow,
+            TestContext.Current.CancellationToken
+        );
 
-        var list = await registry.ListAsync(default);
+        var list = await registry.ListAsync(TestContext.Current.CancellationToken);
         var entries = list.ShouldBeOk();
         entries.Length.ShouldBe(2);
         entries[0].Name.Value.ShouldBe("alpha");
@@ -95,7 +126,7 @@ public class FilePidRegistryTests
         fs.AddFile("/var/lib/ivi-cli/servers/bad.pid", new MockFileData("not a pid"));
         var registry = new FilePidRegistry(fs, Dir);
 
-        var read = await registry.ReadAsync(Name("bad"), default);
+        var read = await registry.ReadAsync(Name("bad"), TestContext.Current.CancellationToken);
         read.ShouldBeOfType<Result<ServerProcessEntry?, ServerProcessRegistryError>.Error>();
     }
 }

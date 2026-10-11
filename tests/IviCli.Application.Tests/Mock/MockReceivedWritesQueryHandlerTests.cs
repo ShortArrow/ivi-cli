@@ -54,7 +54,7 @@ public sealed class MockReceivedWritesQueryHandlerTests
 
         var result = await handler.HandleAsync(
             new MockReceivedWritesQuery("dut", ":VOLT", null, "run.ndjson"),
-            default
+            TestContext.Current.CancellationToken
         );
 
         var writes = result.ShouldBeOk();
@@ -71,7 +71,7 @@ public sealed class MockReceivedWritesQueryHandlerTests
 
         var result = await handler.HandleAsync(
             new MockReceivedWritesQuery("dut", ":VOLT", null, "run.ndjson"),
-            default
+            TestContext.Current.CancellationToken
         );
 
         result.ShouldBeOk().Last().Data.ShouldBe(":VOLT 24.000");
@@ -86,7 +86,7 @@ public sealed class MockReceivedWritesQueryHandlerTests
 
         var result = await handler.HandleAsync(
             new MockReceivedWritesQuery("dut", ":CURR", null, "run.ndjson"),
-            default
+            TestContext.Current.CancellationToken
         );
 
         result.ShouldBeOk().ShouldBeEmpty();
@@ -101,7 +101,7 @@ public sealed class MockReceivedWritesQueryHandlerTests
 
         var result = await handler.HandleAsync(
             new MockReceivedWritesQuery("dut", Match: null, Exact: null, Path: "run.ndjson"),
-            default
+            TestContext.Current.CancellationToken
         );
 
         var expected = new[] { ":VOLT 1.000", ":CURR 3.300" };
@@ -118,7 +118,7 @@ public sealed class MockReceivedWritesQueryHandlerTests
 
         var result = await handler.HandleAsync(
             new MockReceivedWritesQuery("dut", Match: null, Exact: ":VOLT 24.000", "run.ndjson"),
-            default
+            TestContext.Current.CancellationToken
         );
 
         result.ShouldBeOk().ShouldHaveSingleItem().Data.ShouldBe(":VOLT 24.000");
@@ -131,7 +131,7 @@ public sealed class MockReceivedWritesQueryHandlerTests
 
         var result = await handler.HandleAsync(
             new MockReceivedWritesQuery("bad alias!", null, null, "run.ndjson"),
-            default
+            TestContext.Current.CancellationToken
         );
 
         result.ShouldBeError().ShouldBeOfType<MockReceivedWritesInvalidDevice>();
@@ -146,7 +146,7 @@ public sealed class MockReceivedWritesQueryHandlerTests
 
         var result = await handler.HandleAsync(
             new MockReceivedWritesQuery("dut", null, null, "missing.ndjson"),
-            default
+            TestContext.Current.CancellationToken
         );
 
         result.ShouldBeError().ShouldBeOfType<MockReceivedWritesIoFailure>();

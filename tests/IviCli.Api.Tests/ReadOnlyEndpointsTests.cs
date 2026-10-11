@@ -29,7 +29,7 @@ public sealed class ReadOnlyEndpointsTests
     public async Task GET_healthz_returns_200_ok()
     {
         await using var host = await ApiTestHost.StartAsync(ConfigDocument.Empty);
-        var resp = await host.Client.GetAsync("/healthz");
+        var resp = await host.Client.GetAsync("/healthz", TestContext.Current.CancellationToken);
         resp.StatusCode.ShouldBe(HttpStatusCode.OK);
     }
 
@@ -41,7 +41,10 @@ public sealed class ReadOnlyEndpointsTests
         doc = doc.SetDefaultDevice(DeviceName.From("psu1").ShouldBeOk()).ShouldBeOk();
         await using var host = await ApiTestHost.StartAsync(doc);
 
-        var listing = await host.Client.GetFromJsonAsync<DeviceListingDto>("/v1/devices");
+        var listing = await host.Client.GetFromJsonAsync<DeviceListingDto>(
+            "/v1/devices",
+            cancellationToken: TestContext.Current.CancellationToken
+        );
         listing.ShouldNotBeNull();
         listing!.Devices.Count.ShouldBe(2);
         listing.Default.ShouldBe("psu1");
@@ -56,7 +59,10 @@ public sealed class ReadOnlyEndpointsTests
         backend.RespondToQuery(DeviceName.From("psu1").ShouldBeOk(), "*IDN?", "ACME,PSU,1,1.0");
         await using var host = await ApiTestHost.StartAsync(doc, backend);
 
-        var status = await host.Client.GetFromJsonAsync<DeviceStatusDto>("/v1/devices/psu1/status");
+        var status = await host.Client.GetFromJsonAsync<DeviceStatusDto>(
+            "/v1/devices/psu1/status",
+            cancellationToken: TestContext.Current.CancellationToken
+        );
         status.ShouldNotBeNull();
         status!.Online.ShouldBeTrue();
         status.Idn.ShouldBe("ACME,PSU,1,1.0");
@@ -67,9 +73,14 @@ public sealed class ReadOnlyEndpointsTests
     {
         await using var host = await ApiTestHost.StartAsync(ConfigDocument.Empty);
 
-        var resp = await host.Client.GetAsync("/v1/devices/nope/status");
+        var resp = await host.Client.GetAsync(
+            "/v1/devices/nope/status",
+            TestContext.Current.CancellationToken
+        );
         resp.StatusCode.ShouldBe(HttpStatusCode.NotFound);
-        var error = await resp.Content.ReadFromJsonAsync<ErrorDto>();
+        var error = await resp.Content.ReadFromJsonAsync<ErrorDto>(
+            cancellationToken: TestContext.Current.CancellationToken
+        );
         error!.Error.Code.ShouldBe("device_not_found");
     }
 
@@ -88,7 +99,10 @@ public sealed class ReadOnlyEndpointsTests
             .ShouldBeOk();
         await using var host = await ApiTestHost.StartAsync(doc);
 
-        var listing = await host.Client.GetFromJsonAsync<ServerListingDto>("/v1/servers");
+        var listing = await host.Client.GetFromJsonAsync<ServerListingDto>(
+            "/v1/servers",
+            cancellationToken: TestContext.Current.CancellationToken
+        );
         listing.ShouldNotBeNull();
         listing!.Servers.Count.ShouldBe(1);
         listing.Servers[0].Name.ShouldBe("hislip-srv");
@@ -104,7 +118,10 @@ public sealed class ReadOnlyEndpointsTests
             scenarios: new[] { Scn("psu1-smoke"), Scn("dmm1-warmup") }
         );
 
-        var listing = await host.Client.GetFromJsonAsync<ScenarioListingDto>("/v1/scenarios");
+        var listing = await host.Client.GetFromJsonAsync<ScenarioListingDto>(
+            "/v1/scenarios",
+            cancellationToken: TestContext.Current.CancellationToken
+        );
         listing.ShouldNotBeNull();
         listing!.Scenarios.Count.ShouldBe(2);
         listing.Scenarios.ShouldContain("psu1-smoke");

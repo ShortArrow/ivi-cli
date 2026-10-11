@@ -23,7 +23,7 @@ public sealed class NdjsonAuditLogTests
                 Subject: "lab-dashboard",
                 Transport: "http"
             ),
-            default
+            TestContext.Current.CancellationToken
         );
         await sut.AppendAsync(
             new ApiRequest(
@@ -34,7 +34,7 @@ public sealed class NdjsonAuditLogTests
                 Subject: "lab-dashboard",
                 LatencyMs: 42
             ),
-            default
+            TestContext.Current.CancellationToken
         );
 
         var contents = fs.File.ReadAllText(Path);
@@ -62,7 +62,7 @@ public sealed class NdjsonAuditLogTests
                 Reason: "invalid_token",
                 Transport: "websocket"
             ),
-            default
+            TestContext.Current.CancellationToken
         );
 
         using var doc = JsonDocument.Parse(fs.File.ReadAllText(Path).TrimEnd());
@@ -80,7 +80,7 @@ public sealed class NdjsonAuditLogTests
 
         await sut.AppendAsync(
             new ServerLifecycle(DateTimeOffset.UtcNow, "hislip-srv", "start"),
-            default
+            TestContext.Current.CancellationToken
         );
 
         fs.File.Exists(Path).ShouldBeTrue();
@@ -99,7 +99,7 @@ public sealed class NdjsonAuditLogTests
                 Target: "psu1",
                 Subject: "cli/alice"
             ),
-            default
+            TestContext.Current.CancellationToken
         );
 
         using var doc = JsonDocument.Parse(fs.File.ReadAllText(Path).TrimEnd());
@@ -122,7 +122,7 @@ public sealed class NdjsonAuditLogTests
                 Action: "crashed",
                 Subject: "cli/bob"
             ),
-            default
+            TestContext.Current.CancellationToken
         );
 
         using var doc = JsonDocument.Parse(fs.File.ReadAllText(Path).TrimEnd());

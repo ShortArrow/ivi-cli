@@ -17,7 +17,7 @@ public sealed class TomlApiTokenStoreTests
         var fs = new MockFileSystem();
         var store = new TomlApiTokenStore(fs, Path);
 
-        var result = await store.LoadAsync(default);
+        var result = await store.LoadAsync(TestContext.Current.CancellationToken);
 
         result.ShouldBeOk().ShouldBe(ApiTokenDocument.Empty);
     }
@@ -36,8 +36,8 @@ public sealed class TomlApiTokenStoreTests
         );
         var doc = new ApiTokenDocument(ImmutableArray.Create(token));
 
-        (await store.SaveAsync(doc, default)).ShouldBeOk();
-        var loaded = (await store.LoadAsync(default)).ShouldBeOk();
+        (await store.SaveAsync(doc, TestContext.Current.CancellationToken)).ShouldBeOk();
+        var loaded = (await store.LoadAsync(TestContext.Current.CancellationToken)).ShouldBeOk();
 
         loaded.Tokens.Length.ShouldBe(1);
         var rt = loaded.Tokens[0];
@@ -61,7 +61,7 @@ public sealed class TomlApiTokenStoreTests
                         new ApiToken("abc123", "abc", "label", DateTimeOffset.UnixEpoch, null)
                     )
                 ),
-                default
+                TestContext.Current.CancellationToken
             )
         ).ShouldBeOk();
 
@@ -80,9 +80,12 @@ public sealed class TomlApiTokenStoreTests
             new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero),
             LastUsedAt: null
         );
-        await store.SaveAsync(new ApiTokenDocument(ImmutableArray.Create(token)), default);
+        await store.SaveAsync(
+            new ApiTokenDocument(ImmutableArray.Create(token)),
+            TestContext.Current.CancellationToken
+        );
 
-        var loaded = (await store.LoadAsync(default)).ShouldBeOk();
+        var loaded = (await store.LoadAsync(TestContext.Current.CancellationToken)).ShouldBeOk();
 
         loaded.Tokens[0].LastUsedAt.ShouldBeNull();
     }
@@ -101,9 +104,12 @@ public sealed class TomlApiTokenStoreTests
             Scopes: ImmutableArray.Create("read:devices", "write:scpi"),
             ExpiresAt: new DateTimeOffset(2027, 1, 1, 0, 0, 0, TimeSpan.Zero)
         );
-        await store.SaveAsync(new ApiTokenDocument(ImmutableArray.Create(token)), default);
+        await store.SaveAsync(
+            new ApiTokenDocument(ImmutableArray.Create(token)),
+            TestContext.Current.CancellationToken
+        );
 
-        var loaded = (await store.LoadAsync(default)).ShouldBeOk();
+        var loaded = (await store.LoadAsync(TestContext.Current.CancellationToken)).ShouldBeOk();
         var rt = loaded.Tokens[0];
         rt.Scopes.Length.ShouldBe(2);
         rt.Scopes.ShouldContain("read:devices");
@@ -129,7 +135,7 @@ public sealed class TomlApiTokenStoreTests
         );
         var store = new TomlApiTokenStore(fs, Path);
 
-        var loaded = (await store.LoadAsync(default)).ShouldBeOk();
+        var loaded = (await store.LoadAsync(TestContext.Current.CancellationToken)).ShouldBeOk();
 
         loaded.Tokens.Length.ShouldBe(1);
         loaded.Tokens[0].Scopes.IsDefaultOrEmpty.ShouldBeTrue();

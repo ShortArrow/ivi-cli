@@ -30,11 +30,14 @@ public sealed class VisaEndpointsTests
 
         var resp = await host.Client.PostAsJsonAsync(
             "/v1/devices/psu1/query",
-            new ScpiRequestDto("*IDN?")
+            new ScpiRequestDto("*IDN?"),
+            cancellationToken: TestContext.Current.CancellationToken
         );
 
         resp.StatusCode.ShouldBe(HttpStatusCode.OK);
-        var dto = await resp.Content.ReadFromJsonAsync<ScpiQueryResponseDto>();
+        var dto = await resp.Content.ReadFromJsonAsync<ScpiQueryResponseDto>(
+            cancellationToken: TestContext.Current.CancellationToken
+        );
         dto!.Response.ShouldBe("ACME,PSU,1,1.0");
     }
 
@@ -46,11 +49,14 @@ public sealed class VisaEndpointsTests
 
         var resp = await host.Client.PostAsJsonAsync(
             "/v1/devices/psu1/write",
-            new ScpiRequestDto("OUTP ON")
+            new ScpiRequestDto("OUTP ON"),
+            cancellationToken: TestContext.Current.CancellationToken
         );
 
         resp.StatusCode.ShouldBe(HttpStatusCode.OK);
-        var ack = await resp.Content.ReadFromJsonAsync<ScpiAckDto>();
+        var ack = await resp.Content.ReadFromJsonAsync<ScpiAckDto>(
+            cancellationToken: TestContext.Current.CancellationToken
+        );
         ack!.Ok.ShouldBeTrue();
     }
 
@@ -62,11 +68,14 @@ public sealed class VisaEndpointsTests
 
         var resp = await host.Client.PostAsJsonAsync(
             "/v1/devices/psu1/query",
-            new ScpiRequestDto("")
+            new ScpiRequestDto(""),
+            cancellationToken: TestContext.Current.CancellationToken
         );
 
         resp.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
-        var error = await resp.Content.ReadFromJsonAsync<ErrorDto>();
+        var error = await resp.Content.ReadFromJsonAsync<ErrorDto>(
+            cancellationToken: TestContext.Current.CancellationToken
+        );
         error!.Error.Code.ShouldBe("missing_scpi");
     }
 
@@ -79,11 +88,14 @@ public sealed class VisaEndpointsTests
         // Missing '?' — QueryDevice handler rejects this.
         var resp = await host.Client.PostAsJsonAsync(
             "/v1/devices/psu1/query",
-            new ScpiRequestDto("*IDN")
+            new ScpiRequestDto("*IDN"),
+            cancellationToken: TestContext.Current.CancellationToken
         );
 
         resp.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
-        var error = await resp.Content.ReadFromJsonAsync<ErrorDto>();
+        var error = await resp.Content.ReadFromJsonAsync<ErrorDto>(
+            cancellationToken: TestContext.Current.CancellationToken
+        );
         error!.Error.Code.ShouldBe("invalid_scpi");
     }
 
@@ -94,11 +106,14 @@ public sealed class VisaEndpointsTests
 
         var resp = await host.Client.PostAsJsonAsync(
             "/v1/devices/nope/query",
-            new ScpiRequestDto("*IDN?")
+            new ScpiRequestDto("*IDN?"),
+            cancellationToken: TestContext.Current.CancellationToken
         );
 
         resp.StatusCode.ShouldBe(HttpStatusCode.NotFound);
-        var error = await resp.Content.ReadFromJsonAsync<ErrorDto>();
+        var error = await resp.Content.ReadFromJsonAsync<ErrorDto>(
+            cancellationToken: TestContext.Current.CancellationToken
+        );
         error!.Error.Code.ShouldBe("device_not_found");
     }
 }

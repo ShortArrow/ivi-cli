@@ -79,7 +79,11 @@ public sealed class Vxi11XdrCodecTests
     {
         var payload = new byte[] { 0x01, 0x02, 0x03, 0x04, 0x05 };
         using var memory = new MemoryStream();
-        await Vxi11RecordFraming.WriteRecordAsync(memory, payload, default);
+        await Vxi11RecordFraming.WriteRecordAsync(
+            memory,
+            payload,
+            TestContext.Current.CancellationToken
+        );
 
         var framed = memory.ToArray();
         framed.Length.ShouldBe(4 + payload.Length);
@@ -90,7 +94,10 @@ public sealed class Vxi11XdrCodecTests
         framed[3].ShouldBe((byte)5);
 
         memory.Position = 0;
-        var roundTripped = await Vxi11RecordFraming.ReadRecordAsync(memory, default);
+        var roundTripped = await Vxi11RecordFraming.ReadRecordAsync(
+            memory,
+            TestContext.Current.CancellationToken
+        );
         roundTripped.ShouldBe(payload);
     }
 

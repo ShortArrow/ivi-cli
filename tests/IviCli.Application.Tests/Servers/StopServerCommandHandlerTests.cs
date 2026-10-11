@@ -41,10 +41,13 @@ public class StopServerCommandHandlerTests
             ServerName.From("sock1").ShouldBeOk(),
             1234,
             DateTimeOffset.UtcNow,
-            default
+            TestContext.Current.CancellationToken
         );
 
-        var result = await handler.HandleAsync(new StopServerCommand("sock1"), default);
+        var result = await handler.HandleAsync(
+            new StopServerCommand("sock1"),
+            TestContext.Current.CancellationToken
+        );
         var entry = result.ShouldBeOk();
         entry.ProcessId.ShouldBe(1234);
     }
@@ -53,7 +56,10 @@ public class StopServerCommandHandlerTests
     public async Task HandleAsync_fails_with_NotRunning_when_no_pid_file()
     {
         var (handler, _) = Build(MakeServer("sock1"));
-        var result = await handler.HandleAsync(new StopServerCommand("sock1"), default);
+        var result = await handler.HandleAsync(
+            new StopServerCommand("sock1"),
+            TestContext.Current.CancellationToken
+        );
         result.ShouldBeOfType<Result<ServerProcessEntry, StopServerError>.Error>();
         (
             (Result<ServerProcessEntry, StopServerError>.Error)result
@@ -64,7 +70,10 @@ public class StopServerCommandHandlerTests
     public async Task HandleAsync_fails_with_Unknown_when_server_absent_from_config()
     {
         var (handler, _) = Build();
-        var result = await handler.HandleAsync(new StopServerCommand("ghost"), default);
+        var result = await handler.HandleAsync(
+            new StopServerCommand("ghost"),
+            TestContext.Current.CancellationToken
+        );
         result.ShouldBeOfType<Result<ServerProcessEntry, StopServerError>.Error>();
         (
             (Result<ServerProcessEntry, StopServerError>.Error)result
@@ -75,7 +84,10 @@ public class StopServerCommandHandlerTests
     public async Task HandleAsync_fails_with_InvalidName_when_name_is_garbage()
     {
         var (handler, _) = Build();
-        var result = await handler.HandleAsync(new StopServerCommand("INVALID NAME"), default);
+        var result = await handler.HandleAsync(
+            new StopServerCommand("INVALID NAME"),
+            TestContext.Current.CancellationToken
+        );
         result.ShouldBeOfType<Result<ServerProcessEntry, StopServerError>.Error>();
         (
             (Result<ServerProcessEntry, StopServerError>.Error)result
@@ -87,12 +99,19 @@ public class StopServerCommandHandlerTests
     {
         var (handler, registry) = Build(MakeServer("sock1"));
         var name = ServerName.From("sock1").ShouldBeOk();
-        await registry.WriteAsync(name, 1234, DateTimeOffset.UtcNow, default);
+        await registry.WriteAsync(
+            name,
+            1234,
+            DateTimeOffset.UtcNow,
+            TestContext.Current.CancellationToken
+        );
 
-        var clear = await handler.ClearEntryAsync(name, default);
+        var clear = await handler.ClearEntryAsync(name, TestContext.Current.CancellationToken);
         clear.ShouldBeOk();
 
-        (await registry.ReadAsync(name, default)).ShouldBeOk().ShouldBeNull();
+        (await registry.ReadAsync(name, TestContext.Current.CancellationToken))
+            .ShouldBeOk()
+            .ShouldBeNull();
     }
 }
 

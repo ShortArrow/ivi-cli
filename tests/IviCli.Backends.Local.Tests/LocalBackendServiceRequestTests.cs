@@ -60,13 +60,16 @@ public class LocalBackendServiceRequestTests
         // Given an open session whose stream is being consumed
         var (backend, session) = await OpenedAsync();
         var consumer = ConsumeAsync(backend, Dev(), take: 1, CancellationToken.None);
-        await session.ServiceRequestsEnabled.WaitAsync(Patience);
+        await session.ServiceRequestsEnabled.WaitAsync(
+            Patience,
+            TestContext.Current.CancellationToken
+        );
 
         // When the instrument raises an SRQ with status byte 0x42
         session.RaiseServiceRequest(0x42);
 
         // Then one ServiceRequest carries that device and status byte
-        var observed = await consumer.WaitAsync(Patience);
+        var observed = await consumer.WaitAsync(Patience, TestContext.Current.CancellationToken);
         observed.Count.ShouldBe(1);
         observed[0].Device.Value.ShouldBe("psu");
         observed[0].StatusByte.ShouldBe<byte>(0x42);
@@ -77,12 +80,15 @@ public class LocalBackendServiceRequestTests
     {
         var (backend, session) = await OpenedAsync();
         var consumer = ConsumeAsync(backend, Dev(), take: 2, CancellationToken.None);
-        await session.ServiceRequestsEnabled.WaitAsync(Patience);
+        await session.ServiceRequestsEnabled.WaitAsync(
+            Patience,
+            TestContext.Current.CancellationToken
+        );
 
         session.RaiseServiceRequest(0x41);
         session.RaiseServiceRequest(0x42);
 
-        var observed = await consumer.WaitAsync(Patience);
+        var observed = await consumer.WaitAsync(Patience, TestContext.Current.CancellationToken);
         observed.Count.ShouldBe(2);
         observed[0].StatusByte.ShouldBe<byte>(0x41);
         observed[1].StatusByte.ShouldBe<byte>(0x42);
@@ -93,11 +99,17 @@ public class LocalBackendServiceRequestTests
     {
         var (backend, session) = await OpenedAsync();
         using var cts = new CancellationTokenSource();
-        var consumer = Task.Run(async () =>
-        {
-            await foreach (var _ in backend.ServiceRequestStream(Dev(), cts.Token)) { }
-        });
-        await session.ServiceRequestsEnabled.WaitAsync(Patience);
+        var consumer = Task.Run(
+            async () =>
+            {
+                await foreach (var _ in backend.ServiceRequestStream(Dev(), cts.Token)) { }
+            },
+            TestContext.Current.CancellationToken
+        );
+        await session.ServiceRequestsEnabled.WaitAsync(
+            Patience,
+            TestContext.Current.CancellationToken
+        );
 
         await cts.CancelAsync();
 

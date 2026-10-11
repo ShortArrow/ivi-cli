@@ -43,7 +43,7 @@ Clean Architecture + DDD + handler-level CQRS (see [ADR 0003](adr/0003-architect
 
 ## Tests
 
-xUnit + Shouldly + Testably.Abstractions. Tests mirror `src/` 1:1 (`IviCli.<Layer>.Tests`). TDD (Red → Green → Refactor) is expected for behavioural changes.
+xUnit v3 + Shouldly + Testably.Abstractions. Tests mirror `src/` 1:1 (`IviCli.<Layer>.Tests`). TDD (Red → Green → Refactor) is expected for behavioural changes.
 
 Integration tests carry `[Trait("Category", "Integration")]`; they are skipped by default in the PR build, and run on `nightly.yml`.
 

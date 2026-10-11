@@ -33,8 +33,12 @@ public class ReplayBackendTests
         var scenario = Scenario(new MockRule("*IDN?", new RuleAction.Respond("FAKE,REPLAY,0,1")));
         var backend = new ReplayBackend(scenario);
 
-        (await backend.OpenAsync(Dev(), default)).ShouldBeOk();
-        var resp = await backend.QueryAsync(Dev(), ScpiQuery.From("*IDN?").ShouldBeOk(), default);
+        (await backend.OpenAsync(Dev(), TestContext.Current.CancellationToken)).ShouldBeOk();
+        var resp = await backend.QueryAsync(
+            Dev(),
+            ScpiQuery.From("*IDN?").ShouldBeOk(),
+            TestContext.Current.CancellationToken
+        );
         resp.ShouldBeOk().ShouldBe("FAKE,REPLAY,0,1");
     }
 
@@ -45,7 +49,7 @@ public class ReplayBackendTests
         var resp = await backend.QueryAsync(
             Dev(),
             ScpiQuery.From("UNKNOWN?").ShouldBeOk(),
-            default
+            TestContext.Current.CancellationToken
         );
         resp.ShouldBeOfType<Result<string, BackendError>.Error>();
         ((Result<string, BackendError>.Error)resp).Err.ShouldBeOfType<ReplayMiss>();
@@ -57,7 +61,11 @@ public class ReplayBackendTests
         var scenario = Scenario(new MockRule("*RST", new RuleAction.Ack()));
         var backend = new ReplayBackend(scenario);
 
-        var write = await backend.WriteAsync(Dev(), ScpiCommand.From("*RST").ShouldBeOk(), default);
+        var write = await backend.WriteAsync(
+            Dev(),
+            ScpiCommand.From("*RST").ShouldBeOk(),
+            TestContext.Current.CancellationToken
+        );
         write.ShouldBeOk();
     }
 
@@ -66,7 +74,11 @@ public class ReplayBackendTests
     {
         var scenario = Scenario(new MockRule("*RST", new RuleAction.Respond("oops")));
         var backend = new ReplayBackend(scenario);
-        var write = await backend.WriteAsync(Dev(), ScpiCommand.From("*RST").ShouldBeOk(), default);
+        var write = await backend.WriteAsync(
+            Dev(),
+            ScpiCommand.From("*RST").ShouldBeOk(),
+            TestContext.Current.CancellationToken
+        );
         write.ShouldBeOfType<Result<Unit, BackendError>.Error>();
         ((Result<Unit, BackendError>.Error)write).Err.ShouldBeOfType<ReplayActionMismatch>();
     }
@@ -78,7 +90,11 @@ public class ReplayBackendTests
             new MockRule("BROKEN?", new RuleAction.Fail("transport_timeout", "simulated"))
         );
         var backend = new ReplayBackend(scenario);
-        var resp = await backend.QueryAsync(Dev(), ScpiQuery.From("BROKEN?").ShouldBeOk(), default);
+        var resp = await backend.QueryAsync(
+            Dev(),
+            ScpiQuery.From("BROKEN?").ShouldBeOk(),
+            TestContext.Current.CancellationToken
+        );
         resp.ShouldBeOfType<Result<string, BackendError>.Error>();
         var fail = (
             (Result<string, BackendError>.Error)resp
@@ -90,7 +106,7 @@ public class ReplayBackendTests
     public async Task ReadAsync_always_misses_in_pure_replay()
     {
         var backend = new ReplayBackend(Scenario());
-        var read = await backend.ReadAsync(Dev(), default);
+        var read = await backend.ReadAsync(Dev(), TestContext.Current.CancellationToken);
         read.ShouldBeOfType<Result<string, BackendError>.Error>();
         ((Result<string, BackendError>.Error)read).Err.ShouldBeOfType<ReplayMiss>();
     }

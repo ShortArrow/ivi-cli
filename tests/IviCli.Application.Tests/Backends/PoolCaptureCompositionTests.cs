@@ -44,11 +44,15 @@ public sealed class PoolCaptureCompositionTests
         for (var i = 0; i < 2; i++)
         {
             var backend = capture.CreateFor(Dev()).ShouldBeOk();
-            (await backend.OpenAsync(Dev(), default)).ShouldBeOk();
+            (await backend.OpenAsync(Dev(), TestContext.Current.CancellationToken)).ShouldBeOk();
             (
-                await backend.QueryAsync(Dev(), ScpiQuery.From("*IDN?").ShouldBeOk(), default)
+                await backend.QueryAsync(
+                    Dev(),
+                    ScpiQuery.From("*IDN?").ShouldBeOk(),
+                    TestContext.Current.CancellationToken
+                )
             ).ShouldBeOk();
-            (await backend.CloseAsync(Dev(), default)).ShouldBeOk();
+            (await backend.CloseAsync(Dev(), TestContext.Current.CancellationToken)).ShouldBeOk();
         }
 
         // Pool elision: one real inner open across two logical cycles.

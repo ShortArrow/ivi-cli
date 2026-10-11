@@ -30,7 +30,7 @@ public sealed class Vxi11PortmapperResolveTests
             "127.0.0.1",
             pmap.Port,
             TimeSpan.FromSeconds(3),
-            default
+            TestContext.Current.CancellationToken
         );
 
         resolved.ShouldBe(corePort);
@@ -48,7 +48,7 @@ public sealed class Vxi11PortmapperResolveTests
                 "127.0.0.1",
                 closedPort,
                 TimeSpan.FromSeconds(2),
-                default
+                TestContext.Current.CancellationToken
             )
         );
 
@@ -69,7 +69,9 @@ public sealed class Vxi11PortmapperResolveTests
             usePortmapper: true
         );
 
-        (await backend.OpenAsync(BuildDevice(), default)).ShouldBeOk();
+        (
+            await backend.OpenAsync(BuildDevice(), TestContext.Current.CancellationToken)
+        ).ShouldBeOk();
     }
 
     [Fact]
@@ -83,7 +85,9 @@ public sealed class Vxi11PortmapperResolveTests
             usePortmapper: true
         );
 
-        (await backend.OpenAsync(BuildDevice(), default)).ShouldBeOk();
+        (
+            await backend.OpenAsync(BuildDevice(), TestContext.Current.CancellationToken)
+        ).ShouldBeOk();
     }
 
     [Fact]
@@ -104,7 +108,7 @@ public sealed class Vxi11PortmapperResolveTests
             Timeout.FromMilliseconds(3000).ShouldBeOk()
         );
 
-        (await backend.OpenAsync(device, default)).ShouldBeOk();
+        (await backend.OpenAsync(device, TestContext.Current.CancellationToken)).ShouldBeOk();
     }
 
     private static Device BuildDevice() =>

@@ -41,7 +41,7 @@ public sealed class PlainTableSinkTests
             )
         );
 
-        await sink.EmitAsync(tick, default);
+        await sink.EmitAsync(tick, TestContext.Current.CancellationToken);
 
         var output = writer.ToString();
         output.ShouldContain("# tick 7");
@@ -65,7 +65,7 @@ public sealed class PlainTableSinkTests
             Snapshots: ImmutableArray<DeviceStatus>.Empty
         );
 
-        await sink.EmitAsync(tick, default);
+        await sink.EmitAsync(tick, TestContext.Current.CancellationToken);
 
         writer.ToString().ShouldContain("# tick 0");
     }

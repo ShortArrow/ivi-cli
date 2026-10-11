@@ -29,9 +29,13 @@ public sealed class InstrumentingBackendFactoryTests
         var factory = new InstrumentingBackendFactory(new FakeBackendFactory(fake));
 
         var backend = factory.CreateFor(Dev()).ShouldBeOk();
-        await backend.OpenAsync(Dev(), default);
-        await backend.QueryAsync(Dev(), ScpiQuery.From("*IDN?").ShouldBeOk(), default);
-        await backend.CloseAsync(Dev(), default);
+        await backend.OpenAsync(Dev(), TestContext.Current.CancellationToken);
+        await backend.QueryAsync(
+            Dev(),
+            ScpiQuery.From("*IDN?").ShouldBeOk(),
+            TestContext.Current.CancellationToken
+        );
+        await backend.CloseAsync(Dev(), TestContext.Current.CancellationToken);
 
         listener.Activities.Count.ShouldBe(3);
         var query = listener.Activities.Single(a => a.OperationName == "backend.query");
@@ -52,8 +56,12 @@ public sealed class InstrumentingBackendFactoryTests
         var factory = new InstrumentingBackendFactory(new FakeBackendFactory(fake));
 
         var backend = factory.CreateFor(Dev()).ShouldBeOk();
-        await backend.OpenAsync(Dev(), default);
-        await backend.QueryAsync(Dev(), ScpiQuery.From("*IDN?").ShouldBeOk(), default);
+        await backend.OpenAsync(Dev(), TestContext.Current.CancellationToken);
+        await backend.QueryAsync(
+            Dev(),
+            ScpiQuery.From("*IDN?").ShouldBeOk(),
+            TestContext.Current.CancellationToken
+        );
 
         var query = listener.Activities.Single(a => a.OperationName == "backend.query");
         query.Status.ShouldBe(ActivityStatusCode.Error);
@@ -68,9 +76,13 @@ public sealed class InstrumentingBackendFactoryTests
         var factory = new InstrumentingBackendFactory(new FakeBackendFactory(fake));
 
         var backend = factory.CreateFor(Dev()).ShouldBeOk();
-        await backend.OpenAsync(Dev(), default);
-        await backend.QueryAsync(Dev(), ScpiQuery.From("*IDN?").ShouldBeOk(), default);
-        await backend.CloseAsync(Dev(), default);
+        await backend.OpenAsync(Dev(), TestContext.Current.CancellationToken);
+        await backend.QueryAsync(
+            Dev(),
+            ScpiQuery.From("*IDN?").ShouldBeOk(),
+            TestContext.Current.CancellationToken
+        );
+        await backend.CloseAsync(Dev(), TestContext.Current.CancellationToken);
 
         meterListener.Measurements.Count.ShouldBe(3);
         meterListener.Measurements.ShouldContain(m => OpTag(m) == "open");

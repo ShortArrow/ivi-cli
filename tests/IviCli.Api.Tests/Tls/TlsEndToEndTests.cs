@@ -43,7 +43,10 @@ public sealed class TlsEndToEndTests
                 cert?.Thumbprint == serverCert.Thumbprint,
         };
         using var client = new HttpClient(handler);
-        var resp = await client.GetAsync($"https://localhost:{port}/healthz");
+        var resp = await client.GetAsync(
+            $"https://localhost:{port}/healthz",
+            TestContext.Current.CancellationToken
+        );
         resp.IsSuccessStatusCode.ShouldBeTrue();
     }
 
@@ -66,7 +69,10 @@ public sealed class TlsEndToEndTests
         };
         handler.ClientCertificates.Add(clientCert);
         using var client = new HttpClient(handler);
-        var resp = await client.GetAsync($"https://localhost:{port}/healthz");
+        var resp = await client.GetAsync(
+            $"https://localhost:{port}/healthz",
+            TestContext.Current.CancellationToken
+        );
         resp.IsSuccessStatusCode.ShouldBeTrue();
     }
 

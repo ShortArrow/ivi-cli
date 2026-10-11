@@ -60,7 +60,13 @@ public sealed class FakeBackendRuleSrqTests
             DevName()
         );
 
-        (await fake.QueryAsync(Dev(), ScpiQuery.From("MEAS?").ShouldBeOk(), default))
+        (
+            await fake.QueryAsync(
+                Dev(),
+                ScpiQuery.From("MEAS?").ShouldBeOk(),
+                TestContext.Current.CancellationToken
+            )
+        )
             .ShouldBeOk()
             .ShouldBe("1.23");
 
@@ -76,7 +82,13 @@ public sealed class FakeBackendRuleSrqTests
             DevName()
         );
 
-        (await fake.WriteAsync(Dev(), ScpiCommand.From("*OPC").ShouldBeOk(), default)).ShouldBeOk();
+        (
+            await fake.WriteAsync(
+                Dev(),
+                ScpiCommand.From("*OPC").ShouldBeOk(),
+                TestContext.Current.CancellationToken
+            )
+        ).ShouldBeOk();
 
         var observed = await DrainAsync(fake);
         observed.ShouldHaveSingleItem().StatusByte.ShouldBe<byte>(0x60);
@@ -97,7 +109,11 @@ public sealed class FakeBackendRuleSrqTests
         );
 
         (
-            await fake.WriteAsync(Dev(), ScpiCommand.From("INIT").ShouldBeOk(), default)
+            await fake.WriteAsync(
+                Dev(),
+                ScpiCommand.From("INIT").ShouldBeOk(),
+                TestContext.Current.CancellationToken
+            )
         ).ShouldBeError();
 
         var observed = await DrainAsync(fake);
@@ -112,7 +128,13 @@ public sealed class FakeBackendRuleSrqTests
             DevName()
         );
 
-        (await fake.WriteAsync(Dev(), ScpiCommand.From("*OPC").ShouldBeOk(), default)).ShouldBeOk();
+        (
+            await fake.WriteAsync(
+                Dev(),
+                ScpiCommand.From("*OPC").ShouldBeOk(),
+                TestContext.Current.CancellationToken
+            )
+        ).ShouldBeOk();
 
         (await DrainAsync(fake)).ShouldBeEmpty();
         fake.LastStatusByteFor(DevName()).ShouldBe<byte>(0);
@@ -152,7 +174,13 @@ public sealed class FakeBackendRuleSrqTests
             return null;
         });
 
-        (await fake.WriteAsync(Dev(), ScpiCommand.From("*OPC").ShouldBeOk(), default)).ShouldBeOk();
+        (
+            await fake.WriteAsync(
+                Dev(),
+                ScpiCommand.From("*OPC").ShouldBeOk(),
+                TestContext.Current.CancellationToken
+            )
+        ).ShouldBeOk();
 
         (await consumer).ShouldNotBeNull().StatusByte.ShouldBe<byte>(0x60);
         sceneWhenObserved.ShouldBe(Done);
@@ -173,10 +201,18 @@ public sealed class FakeBackendRuleSrqTests
         );
 
         (
-            await fake.WriteAsync(Dev(), ScpiCommand.From("FIRST").ShouldBeOk(), default)
+            await fake.WriteAsync(
+                Dev(),
+                ScpiCommand.From("FIRST").ShouldBeOk(),
+                TestContext.Current.CancellationToken
+            )
         ).ShouldBeOk();
         (
-            await fake.WriteAsync(Dev(), ScpiCommand.From("SECOND").ShouldBeOk(), default)
+            await fake.WriteAsync(
+                Dev(),
+                ScpiCommand.From("SECOND").ShouldBeOk(),
+                TestContext.Current.CancellationToken
+            )
         ).ShouldBeOk();
 
         var observed = await DrainAsync(fake);

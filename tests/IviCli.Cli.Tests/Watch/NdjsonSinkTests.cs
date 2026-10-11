@@ -35,7 +35,7 @@ public sealed class NdjsonSinkTests
             Snapshots: ImmutableArray.Create(status)
         );
 
-        await sink.EmitAsync(tick, default);
+        await sink.EmitAsync(tick, TestContext.Current.CancellationToken);
 
         var line = writer.ToString().TrimEnd('\r', '\n');
         line.ShouldNotContain("\n");

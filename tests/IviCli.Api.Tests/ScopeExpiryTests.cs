@@ -53,7 +53,7 @@ public sealed class ScopeExpiryTests
 
         host.Client.DefaultRequestHeaders.Authorization =
             new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", Raw);
-        var resp = await host.Client.GetAsync("/v1/devices");
+        var resp = await host.Client.GetAsync("/v1/devices", TestContext.Current.CancellationToken);
 
         resp.StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
         var fail = audit.Events.OfType<IviCli.Application.Audit.AuthFailed>().Single();
@@ -79,7 +79,8 @@ public sealed class ScopeExpiryTests
             new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", Raw);
         var resp = await host.Client.PostAsJsonAsync(
             "/v1/devices/psu1/query",
-            new ScpiRequestDto("*IDN?")
+            new ScpiRequestDto("*IDN?"),
+            cancellationToken: TestContext.Current.CancellationToken
         );
 
         resp.StatusCode.ShouldBe(HttpStatusCode.Forbidden);
@@ -102,7 +103,7 @@ public sealed class ScopeExpiryTests
 
         host.Client.DefaultRequestHeaders.Authorization =
             new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", Raw);
-        var resp = await host.Client.GetAsync("/v1/devices");
+        var resp = await host.Client.GetAsync("/v1/devices", TestContext.Current.CancellationToken);
 
         resp.StatusCode.ShouldBe(HttpStatusCode.OK);
     }
@@ -134,9 +135,15 @@ public sealed class ScopeExpiryTests
         host.Client.DefaultRequestHeaders.Authorization =
             new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", Raw);
 
-        (await host.Client.GetAsync("/v1/devices")).StatusCode.ShouldBe(HttpStatusCode.OK);
         (
-            await host.Client.PostAsJsonAsync("/v1/devices/psu1/query", new ScpiRequestDto("*IDN?"))
+            await host.Client.GetAsync("/v1/devices", TestContext.Current.CancellationToken)
+        ).StatusCode.ShouldBe(HttpStatusCode.OK);
+        (
+            await host.Client.PostAsJsonAsync(
+                "/v1/devices/psu1/query",
+                new ScpiRequestDto("*IDN?"),
+                cancellationToken: TestContext.Current.CancellationToken
+            )
         ).IsSuccessStatusCode.ShouldBeTrue();
     }
 }

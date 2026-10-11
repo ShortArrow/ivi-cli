@@ -44,21 +44,26 @@ public sealed class Vxi11InterruptChannelTests
 
         var observed = new List<ServiceRequest>();
         var consumerCts = CancellationTokenSource.CreateLinkedTokenSource(cts.Token);
-        var consumer = Task.Run(async () =>
-        {
-            try
+        var consumer = Task.Run(
+            async () =>
             {
-                await foreach (var srq in client.ServiceRequestStream(device, consumerCts.Token))
+                try
                 {
-                    observed.Add(srq);
-                    if (observed.Count >= 1)
+                    await foreach (
+                        var srq in client.ServiceRequestStream(device, consumerCts.Token)
+                    )
                     {
-                        consumerCts.Cancel();
+                        observed.Add(srq);
+                        if (observed.Count >= 1)
+                        {
+                            consumerCts.Cancel();
+                        }
                     }
                 }
-            }
-            catch (OperationCanceledException) { }
-        });
+                catch (OperationCanceledException) { }
+            },
+            TestContext.Current.CancellationToken
+        );
 
         // Give the gateway's forwarder ~300 ms to subscribe before
         // raising the SRQ.
@@ -67,7 +72,10 @@ public sealed class Vxi11InterruptChannelTests
 
         try
         {
-            await consumer.WaitAsync(TimeSpan.FromSeconds(3));
+            await consumer.WaitAsync(
+                TimeSpan.FromSeconds(3),
+                TestContext.Current.CancellationToken
+            );
         }
         catch (TaskCanceledException) { }
 

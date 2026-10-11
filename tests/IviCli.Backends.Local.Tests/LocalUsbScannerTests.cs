@@ -21,7 +21,9 @@ public class LocalUsbScannerTests
         var scanner = new LocalUsbScanner(finder);
 
         // When the scanner runs
-        var found = (await scanner.ScanAsync(ScanOptions.Default, default)).ShouldBeOk();
+        var found = (
+            await scanner.ScanAsync(ScanOptions.Default, TestContext.Current.CancellationToken)
+        ).ShouldBeOk();
 
         // Then both are reported as USB resources with no *IDN? probe
         found.Length.ShouldBe(2);
@@ -38,7 +40,7 @@ public class LocalUsbScannerTests
         var scanner = new LocalUsbScanner(finder);
 
         // When the scanner runs
-        await scanner.ScanAsync(ScanOptions.Default, default);
+        await scanner.ScanAsync(ScanOptions.Default, TestContext.Current.CancellationToken);
 
         // Then only the USB INSTR pattern was requested
         finder.Patterns.ShouldBe(["USB?*::INSTR"]);
@@ -54,7 +56,10 @@ public class LocalUsbScannerTests
         var scanner = new LocalUsbScanner(finder);
 
         // When the scanner runs
-        var result = await scanner.ScanAsync(ScanOptions.Default, default);
+        var result = await scanner.ScanAsync(
+            ScanOptions.Default,
+            TestContext.Current.CancellationToken
+        );
 
         // Then discovery contributes nothing rather than failing the scan
         result.ShouldBeOk().ShouldBeEmpty();
@@ -70,7 +75,10 @@ public class LocalUsbScannerTests
         var scanner = new LocalUsbScanner(finder);
 
         // When the scanner runs
-        var result = await scanner.ScanAsync(ScanOptions.Default, default);
+        var result = await scanner.ScanAsync(
+            ScanOptions.Default,
+            TestContext.Current.CancellationToken
+        );
 
         // Then the failure never reaches the aggregate scan result
         result.ShouldBeOk().ShouldBeEmpty();
@@ -84,7 +92,9 @@ public class LocalUsbScannerTests
         var scanner = new LocalUsbScanner(finder);
 
         // When the scanner runs
-        var found = (await scanner.ScanAsync(ScanOptions.Default, default)).ShouldBeOk();
+        var found = (
+            await scanner.ScanAsync(ScanOptions.Default, TestContext.Current.CancellationToken)
+        ).ShouldBeOk();
 
         // Then the valid entries are still reported
         found.Select(r => r.Resource.ToCanonical()).ShouldBe([TekScope, KeysightDmm]);
@@ -101,7 +111,9 @@ public class LocalUsbScannerTests
         var scanner = new LocalUsbScanner(finder);
 
         // When the scanner runs
-        var found = (await scanner.ScanAsync(ScanOptions.Default, default)).ShouldBeOk();
+        var found = (
+            await scanner.ScanAsync(ScanOptions.Default, TestContext.Current.CancellationToken)
+        ).ShouldBeOk();
 
         // Then only the USB resource is reported
         found.Select(r => r.Resource.ToCanonical()).ShouldBe([TekScope]);
@@ -115,7 +127,10 @@ public class LocalUsbScannerTests
         var scanner = new LocalUsbScanner(finder);
 
         // When the scanner runs
-        var result = await scanner.ScanAsync(ScanOptions.Default, default);
+        var result = await scanner.ScanAsync(
+            ScanOptions.Default,
+            TestContext.Current.CancellationToken
+        );
 
         // Then the scan succeeds with nothing to report
         result.ShouldBeOk().ShouldBeEmpty();

@@ -32,11 +32,13 @@ public sealed class AddRuleCommandHandlerTests
                 TransitionTo: null,
                 Srq: 0x60
             ),
-            default
+            TestContext.Current.CancellationToken
         );
         result.ShouldBeOk();
 
-        var loaded = (await store.LoadAsync(name, default)).ShouldBeOk();
+        var loaded = (
+            await store.LoadAsync(name, TestContext.Current.CancellationToken)
+        ).ShouldBeOk();
         loaded.Scenes[0].Rules.ShouldHaveSingleItem().Srq.ShouldBe<byte?>(0x60);
     }
 
@@ -58,11 +60,13 @@ public sealed class AddRuleCommandHandlerTests
                 FailDetail: null,
                 TransitionTo: null
             ),
-            default
+            TestContext.Current.CancellationToken
         );
         result.ShouldBeOk();
 
-        var loaded = (await store.LoadAsync(name, default)).ShouldBeOk();
+        var loaded = (
+            await store.LoadAsync(name, TestContext.Current.CancellationToken)
+        ).ShouldBeOk();
         loaded.Scenes[0].Rules.ShouldHaveSingleItem().Srq.ShouldBeNull();
     }
 }

@@ -24,7 +24,7 @@ public sealed class AuditLogTests
         var audit = new RecordingAuditLog();
         await using var host = await ApiTestHost.StartAsync(ConfigDocument.Empty, auditLog: audit);
 
-        var resp = await host.Client.GetAsync("/healthz");
+        var resp = await host.Client.GetAsync("/healthz", TestContext.Current.CancellationToken);
         resp.IsSuccessStatusCode.ShouldBeTrue();
 
         var apiRequests = audit.Events.OfType<ApiRequest>().ToList();
@@ -57,7 +57,7 @@ public sealed class AuditLogTests
 
         host.Client.DefaultRequestHeaders.Authorization =
             new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", "ivicli_pat_wrong");
-        var resp = await host.Client.GetAsync("/v1/devices");
+        var resp = await host.Client.GetAsync("/v1/devices", TestContext.Current.CancellationToken);
         ((int)resp.StatusCode).ShouldBe(401);
 
         var failures = audit.Events.OfType<AuthFailed>().ToList();
@@ -94,7 +94,7 @@ public sealed class AuditLogTests
 
         host.Client.DefaultRequestHeaders.Authorization =
             new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
-        var resp = await host.Client.GetAsync("/v1/devices");
+        var resp = await host.Client.GetAsync("/v1/devices", TestContext.Current.CancellationToken);
         ((int)resp.StatusCode).ShouldBe(200);
 
         var successes = audit.Events.OfType<AuthSucceeded>().ToList();

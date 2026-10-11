@@ -39,7 +39,8 @@ public sealed class PooledApiTests
         {
             var resp = await host.Client.PostAsJsonAsync(
                 "/v1/devices/psu1/query",
-                new ScpiRequestDto("*IDN?")
+                new ScpiRequestDto("*IDN?"),
+                cancellationToken: TestContext.Current.CancellationToken
             );
             resp.IsSuccessStatusCode.ShouldBeTrue();
         }

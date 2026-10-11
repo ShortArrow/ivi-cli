@@ -39,13 +39,16 @@ public sealed class NdjsonTrafficReaderTests
     {
         var fs = new MockFileSystem();
         var writer = new NdjsonTrafficWriter(fs, Path);
-        await writer.AppendAsync(Event(TrafficOp.Open), default);
-        await writer.AppendAsync(Event(TrafficOp.Query, data: "*IDN?", response: "ACME"), default);
-        await writer.AppendAsync(Event(TrafficOp.Close), default);
+        await writer.AppendAsync(Event(TrafficOp.Open), TestContext.Current.CancellationToken);
+        await writer.AppendAsync(
+            Event(TrafficOp.Query, data: "*IDN?", response: "ACME"),
+            TestContext.Current.CancellationToken
+        );
+        await writer.AppendAsync(Event(TrafficOp.Close), TestContext.Current.CancellationToken);
 
         var reader = new NdjsonTrafficReader(fs);
         var events = new List<TrafficEvent>();
-        await foreach (var ev in reader.ReadAsync(Path, default))
+        await foreach (var ev in reader.ReadAsync(Path, TestContext.Current.CancellationToken))
         {
             events.Add(ev);
         }
@@ -79,7 +82,7 @@ public sealed class NdjsonTrafficReaderTests
 
         var reader = new NdjsonTrafficReader(fs);
         var events = new List<TrafficEvent>();
-        await foreach (var read in reader.ReadAsync(Path, default))
+        await foreach (var read in reader.ReadAsync(Path, TestContext.Current.CancellationToken))
         {
             events.Add(read);
         }

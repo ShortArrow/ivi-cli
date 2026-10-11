@@ -43,7 +43,7 @@ Clean Architecture + DDD + handler レベル CQRS（[ADR 0003](adr/0003-architec
 
 ## テスト
 
-xUnit + Shouldly + Testably.Abstractions。テストは `src/` を 1:1 でミラー (`IviCli.<Layer>.Tests`)。挙動変更には TDD（Red → Green → Refactor）を採用してください。
+xUnit v3 + Shouldly + Testably.Abstractions。テストは `src/` を 1:1 でミラー (`IviCli.<Layer>.Tests`)。挙動変更には TDD（Red → Green → Refactor）を採用してください。
 
 Integration テストは `[Trait("Category", "Integration")]` を付与し、PR ビルドでは既定で skip され、`nightly.yml` で実行されます。
 

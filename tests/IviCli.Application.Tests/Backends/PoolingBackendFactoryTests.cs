@@ -41,11 +41,19 @@ public sealed class PoolingBackendFactoryTests
         for (var i = 0; i < 2; i++)
         {
             var backend = pool.CreateFor(Dev("dut")).ShouldBeOk();
-            (await backend.OpenAsync(Dev("dut"), default)).ShouldBeOk();
             (
-                await backend.QueryAsync(Dev("dut"), ScpiQuery.From("*IDN?").ShouldBeOk(), default)
+                await backend.OpenAsync(Dev("dut"), TestContext.Current.CancellationToken)
             ).ShouldBeOk();
-            (await backend.CloseAsync(Dev("dut"), default)).ShouldBeOk();
+            (
+                await backend.QueryAsync(
+                    Dev("dut"),
+                    ScpiQuery.From("*IDN?").ShouldBeOk(),
+                    TestContext.Current.CancellationToken
+                )
+            ).ShouldBeOk();
+            (
+                await backend.CloseAsync(Dev("dut"), TestContext.Current.CancellationToken)
+            ).ShouldBeOk();
         }
 
         fake.OpenCountFor(Dev("dut").Name).ShouldBe(1);
@@ -64,23 +72,23 @@ public sealed class PoolingBackendFactoryTests
         );
 
         var backend = pool.CreateFor(Dev("dut")).ShouldBeOk();
-        (await backend.OpenAsync(Dev("dut"), default)).ShouldBeOk();
-        (await backend.CloseAsync(Dev("dut"), default)).ShouldBeOk();
+        (await backend.OpenAsync(Dev("dut"), TestContext.Current.CancellationToken)).ShouldBeOk();
+        (await backend.CloseAsync(Dev("dut"), TestContext.Current.CancellationToken)).ShouldBeOk();
         fake.CloseCountFor(Dev("dut").Name).ShouldBe(0);
 
         // Advance past idle — sweep + lazy eviction should close the entry.
         time.Advance(TimeSpan.FromSeconds(11));
         // Trigger sweep via a fresh lease attempt on a different device.
         var other = pool.CreateFor(Dev("other")).ShouldBeOk();
-        (await other.OpenAsync(Dev("other"), default)).ShouldBeOk();
-        (await other.CloseAsync(Dev("other"), default)).ShouldBeOk();
+        (await other.OpenAsync(Dev("other"), TestContext.Current.CancellationToken)).ShouldBeOk();
+        (await other.CloseAsync(Dev("other"), TestContext.Current.CancellationToken)).ShouldBeOk();
         // Eviction Close is fire-and-forget; allow the task to complete.
         await WaitForAsync(() => fake.CloseCountFor(Dev("dut").Name) == 1);
         fake.CloseCountFor(Dev("dut").Name).ShouldBe(1);
 
         // A subsequent open on dut should call inner.OpenAsync again.
         var backend2 = pool.CreateFor(Dev("dut")).ShouldBeOk();
-        (await backend2.OpenAsync(Dev("dut"), default)).ShouldBeOk();
+        (await backend2.OpenAsync(Dev("dut"), TestContext.Current.CancellationToken)).ShouldBeOk();
         fake.OpenCountFor(Dev("dut").Name).ShouldBe(2);
     }
 
@@ -96,21 +104,29 @@ public sealed class PoolingBackendFactoryTests
         );
 
         var first = pool.CreateFor(Dev("dut", timeoutMs: 5000)).ShouldBeOk();
-        (await first.OpenAsync(Dev("dut", timeoutMs: 5000), default)).ShouldBeOk();
+        (
+            await first.OpenAsync(
+                Dev("dut", timeoutMs: 5000),
+                TestContext.Current.CancellationToken
+            )
+        ).ShouldBeOk();
 
         var secondReleased = new TaskCompletionSource();
-        var secondTask = Task.Run(async () =>
-        {
-            var second = pool.CreateFor(Dev("dut", timeoutMs: 5000)).ShouldBeOk();
-            (await second.OpenAsync(Dev("dut", timeoutMs: 5000), default)).ShouldBeOk();
-            secondReleased.SetResult();
-            await second.CloseAsync(Dev("dut", timeoutMs: 5000), default);
-        });
+        var secondTask = Task.Run(
+            async () =>
+            {
+                var second = pool.CreateFor(Dev("dut", timeoutMs: 5000)).ShouldBeOk();
+                (await second.OpenAsync(Dev("dut", timeoutMs: 5000), default)).ShouldBeOk();
+                secondReleased.SetResult();
+                await second.CloseAsync(Dev("dut", timeoutMs: 5000), default);
+            },
+            TestContext.Current.CancellationToken
+        );
 
         // Second must not have completed while first holds the lease.
         secondReleased.Task.IsCompleted.ShouldBeFalse();
-        await first.CloseAsync(Dev("dut", timeoutMs: 5000), default);
-        await secondTask.WaitAsync(TimeSpan.FromSeconds(3));
+        await first.CloseAsync(Dev("dut", timeoutMs: 5000), TestContext.Current.CancellationToken);
+        await secondTask.WaitAsync(TimeSpan.FromSeconds(3), TestContext.Current.CancellationToken);
         secondReleased.Task.IsCompleted.ShouldBeTrue();
 
         fake.OpenCountFor(Dev("dut").Name).ShouldBe(1); // both reused the same entry
@@ -128,10 +144,18 @@ public sealed class PoolingBackendFactoryTests
         );
 
         var holder = pool.CreateFor(Dev("dut", timeoutMs: 5000)).ShouldBeOk();
-        (await holder.OpenAsync(Dev("dut", timeoutMs: 5000), default)).ShouldBeOk();
+        (
+            await holder.OpenAsync(
+                Dev("dut", timeoutMs: 5000),
+                TestContext.Current.CancellationToken
+            )
+        ).ShouldBeOk();
 
         var second = pool.CreateFor(Dev("dut", timeoutMs: 50)).ShouldBeOk();
-        var openResult = await second.OpenAsync(Dev("dut", timeoutMs: 50), default);
+        var openResult = await second.OpenAsync(
+            Dev("dut", timeoutMs: 50),
+            TestContext.Current.CancellationToken
+        );
 
         openResult.ShouldBeError().ShouldBeOfType<PoolWaitTimeout>();
     }
@@ -152,21 +176,21 @@ public sealed class PoolingBackendFactoryTests
         );
 
         var backend = pool.CreateFor(Dev("dut")).ShouldBeOk();
-        (await backend.OpenAsync(Dev("dut"), default)).ShouldBeOk();
+        (await backend.OpenAsync(Dev("dut"), TestContext.Current.CancellationToken)).ShouldBeOk();
         var queryResult = await backend.QueryAsync(
             Dev("dut"),
             ScpiQuery.From("*IDN?").ShouldBeOk(),
-            default
+            TestContext.Current.CancellationToken
         );
         queryResult.ShouldBeError();
-        (await backend.CloseAsync(Dev("dut"), default)).ShouldBeOk();
+        (await backend.CloseAsync(Dev("dut"), TestContext.Current.CancellationToken)).ShouldBeOk();
 
         await WaitForAsync(() => fake.CloseCountFor(Dev("dut").Name) == 1);
         fake.CloseCountFor(Dev("dut").Name).ShouldBe(1);
 
         // Re-opening should issue a fresh inner.OpenAsync.
         var backend2 = pool.CreateFor(Dev("dut")).ShouldBeOk();
-        (await backend2.OpenAsync(Dev("dut"), default)).ShouldBeOk();
+        (await backend2.OpenAsync(Dev("dut"), TestContext.Current.CancellationToken)).ShouldBeOk();
         fake.OpenCountFor(Dev("dut").Name).ShouldBe(2);
     }
 
@@ -242,12 +266,12 @@ public sealed class PoolingBackendFactoryTests
             logger
         );
         var holder = pool.CreateFor(device).ShouldBeOk();
-        (await holder.OpenAsync(device, default)).ShouldBeOk();
+        (await holder.OpenAsync(device, TestContext.Current.CancellationToken)).ShouldBeOk();
 
         var waiter = pool.CreateFor(device).ShouldBeOk();
-        var waiting = waiter.OpenAsync(device, default);
+        var waiting = waiter.OpenAsync(device, TestContext.Current.CancellationToken);
         await WaitForAsync(() => logger.Entries.Any(e => e.Message.Contains("waiting")));
-        (await holder.CloseAsync(device, default)).ShouldBeOk();
+        (await holder.CloseAsync(device, TestContext.Current.CancellationToken)).ShouldBeOk();
         (await waiting).ShouldBeOk();
 
         var lines = logger.Entries.Where(e => e.Level == LogLevel.Debug).Select(e => e.Message);

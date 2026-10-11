@@ -26,7 +26,7 @@ public sealed class CapturingBackendTests
         var backend = new CapturingBackend(new FakeBackend(), sink);
         var device = Dev("psu1");
 
-        var result = await backend.OpenAsync(device, default);
+        var result = await backend.OpenAsync(device, TestContext.Current.CancellationToken);
 
         result.ShouldBeOk();
         sink.Events.Count.ShouldBe(1);
@@ -46,8 +46,12 @@ public sealed class CapturingBackendTests
         var device = Dev("psu1");
         var command = ScpiCommand.From("OUTP ON").ShouldBeOk();
 
-        await backend.OpenAsync(device, default);
-        var result = await backend.WriteAsync(device, command, default);
+        await backend.OpenAsync(device, TestContext.Current.CancellationToken);
+        var result = await backend.WriteAsync(
+            device,
+            command,
+            TestContext.Current.CancellationToken
+        );
 
         result.ShouldBeOk();
         var write = sink.Events.Last();
@@ -66,8 +70,8 @@ public sealed class CapturingBackendTests
         var device = Dev("psu1");
         var query = ScpiQuery.From("*IDN?").ShouldBeOk();
 
-        await backend.OpenAsync(device, default);
-        var result = await backend.QueryAsync(device, query, default);
+        await backend.OpenAsync(device, TestContext.Current.CancellationToken);
+        var result = await backend.QueryAsync(device, query, TestContext.Current.CancellationToken);
 
         result.ShouldBeOk().ShouldBe("ACME,PSU,1,1.0");
         var queryEvent = sink.Events.Last();
@@ -85,8 +89,8 @@ public sealed class CapturingBackendTests
         var backend = new CapturingBackend(new FakeBackend(), sink);
         var device = Dev("psu1");
 
-        await backend.OpenAsync(device, default);
-        await backend.CloseAsync(device, default);
+        await backend.OpenAsync(device, TestContext.Current.CancellationToken);
+        await backend.CloseAsync(device, TestContext.Current.CancellationToken);
 
         sink.Events.Last().Op.ShouldBe(TrafficOp.Close);
     }

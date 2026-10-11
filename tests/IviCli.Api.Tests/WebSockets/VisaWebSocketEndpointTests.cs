@@ -44,7 +44,7 @@ public sealed class VisaWebSocketEndpointTests
         var ws = host.Server.CreateWebSocketClient();
         using var socket = await ws.ConnectAsync(
             new Uri("ws://localhost/v1/devices/psu1/visa"),
-            default
+            TestContext.Current.CancellationToken
         );
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
 
@@ -65,7 +65,7 @@ public sealed class VisaWebSocketEndpointTests
         var ws = host.Server.CreateWebSocketClient();
         using var socket = await ws.ConnectAsync(
             new Uri("ws://localhost/v1/devices/psu1/visa"),
-            default
+            TestContext.Current.CancellationToken
         );
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
 
@@ -84,7 +84,7 @@ public sealed class VisaWebSocketEndpointTests
         var ws = host.Server.CreateWebSocketClient();
         using var socket = await ws.ConnectAsync(
             new Uri("ws://localhost/v1/devices/psu1/visa"),
-            default
+            TestContext.Current.CancellationToken
         );
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
 
@@ -104,16 +104,16 @@ public sealed class VisaWebSocketEndpointTests
 
         using var socket = await ws.ConnectAsync(
             new Uri("ws://localhost/v1/devices/nope/visa"),
-            default
+            TestContext.Current.CancellationToken
         );
 
-        using var reply = await ReceiveAsync(socket, default);
+        using var reply = await ReceiveAsync(socket, TestContext.Current.CancellationToken);
         reply.RootElement.GetProperty("event").GetString().ShouldBe("error");
         reply.RootElement.GetProperty("code").GetString().ShouldBe("device_not_found");
 
         // Drain the close frame.
         var buffer = new byte[64];
-        var closing = await socket.ReceiveAsync(buffer, default);
+        var closing = await socket.ReceiveAsync(buffer, TestContext.Current.CancellationToken);
         closing.MessageType.ShouldBe(WebSocketMessageType.Close);
     }
 }

@@ -21,8 +21,8 @@ public sealed class FakeBackendTriggerSrqTests
     public async Task TriggerAsync_increments_TriggerCountFor()
     {
         var fake = new FakeBackend();
-        (await fake.TriggerAsync(Dev(), default)).ShouldBeOk();
-        (await fake.TriggerAsync(Dev(), default)).ShouldBeOk();
+        (await fake.TriggerAsync(Dev(), TestContext.Current.CancellationToken)).ShouldBeOk();
+        (await fake.TriggerAsync(Dev(), TestContext.Current.CancellationToken)).ShouldBeOk();
 
         fake.TriggerCountFor(Dev().Name).ShouldBe(2);
     }
@@ -33,24 +33,30 @@ public sealed class FakeBackendTriggerSrqTests
         var fake = new FakeBackend();
         using var cts = new CancellationTokenSource();
         var observed = new List<ServiceRequest>();
-        var consumer = Task.Run(async () =>
-        {
-            await foreach (var srq in fake.ServiceRequestStream(Dev(), cts.Token))
+        var consumer = Task.Run(
+            async () =>
             {
-                observed.Add(srq);
-                if (observed.Count >= 2)
+                await foreach (var srq in fake.ServiceRequestStream(Dev(), cts.Token))
                 {
-                    cts.Cancel();
+                    observed.Add(srq);
+                    if (observed.Count >= 2)
+                    {
+                        cts.Cancel();
+                    }
                 }
-            }
-        });
+            },
+            TestContext.Current.CancellationToken
+        );
 
         fake.RaiseServiceRequest(Dev().Name, statusByte: 0x41);
         fake.RaiseServiceRequest(Dev().Name, statusByte: 0x42);
 
         try
         {
-            await consumer.WaitAsync(TimeSpan.FromSeconds(2));
+            await consumer.WaitAsync(
+                TimeSpan.FromSeconds(2),
+                TestContext.Current.CancellationToken
+            );
         }
         catch (TaskCanceledException)
         { /* expected — Cancel() trips the loop */

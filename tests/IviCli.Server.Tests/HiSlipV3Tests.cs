@@ -77,11 +77,14 @@ public sealed class HiSlipV3Tests
         await using var second = await harness.OpenSecondAsyncChannelAsync(sessionId: 2);
 
         // Schedule a release on the holder ~100ms in.
-        var releaseTask = Task.Run(async () =>
-        {
-            await Task.Delay(100);
-            await harness.SendAsync(HiSlipMessageType.AsyncLock, controlCode: 0);
-        });
+        var releaseTask = Task.Run(
+            async () =>
+            {
+                await Task.Delay(100);
+                await harness.SendAsync(HiSlipMessageType.AsyncLock, controlCode: 0);
+            },
+            TestContext.Current.CancellationToken
+        );
 
         var grant = await second.SendAsync(
             HiSlipMessageType.AsyncLock,
