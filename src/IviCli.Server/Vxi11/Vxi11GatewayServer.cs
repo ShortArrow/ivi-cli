@@ -652,7 +652,7 @@ public sealed class Vxi11GatewayServer : IGatewayServer
             else
             {
                 GatewayTelemetry.Complete(message, ok: false);
-                await WriteWriteReplyAsync(stream, xid, Vxi11IoError, size: 0, ct);
+                await WriteWriteReplyAsync(stream, xid, ErrorCodeFor(resp), size: 0, ct);
             }
         }
         else
@@ -672,7 +672,7 @@ public sealed class Vxi11GatewayServer : IGatewayServer
             }
             else
             {
-                await WriteWriteReplyAsync(stream, xid, Vxi11IoError, size: 0, ct);
+                await WriteWriteReplyAsync(stream, xid, ErrorCodeFor(wrote), size: 0, ct);
             }
         }
     }
@@ -758,13 +758,23 @@ public sealed class Vxi11GatewayServer : IGatewayServer
         );
         var triggerResult = await state.Backend.TriggerAsync(state.Device, ct);
         GatewayTelemetry.Complete(message, triggerResult is Result<Unit, BackendError>.Ok);
-        var error =
-            triggerResult is Result<Unit, BackendError>.Ok ? Vxi11NoError
-            : ((Result<Unit, BackendError>.Error)triggerResult).Err is BackendOperationNotSupported
-                ? Vxi11NotSupported
-            : Vxi11IoError;
-        await WriteErrorReplyAsync(stream, xid, error, ct);
+        await WriteErrorReplyAsync(stream, xid, ErrorCodeFor(triggerResult), ct);
     }
+
+    /// <summary>
+    /// The VXI-11 error code (Rev 1.0, B.5.2) a backend result reports to
+    /// the client: 0 on success, 15 when the instrument timed out, 8 for an
+    /// operation the backend does not support, 17 otherwise.
+    /// </summary>
+    private static int ErrorCodeFor<T>(Result<T, BackendError> result) =>
+        result switch
+        {
+            Result<T, BackendError>.Ok => Vxi11NoError,
+            Result<T, BackendError>.Error { Err: TransportTimeout } => Vxi11IoTimeout,
+            Result<T, BackendError>.Error { Err: BackendOperationNotSupported } =>
+                Vxi11NotSupported,
+            _ => Vxi11IoError,
+        };
 
     private async Task DoCreateIntrChanAsync(
         Stream stream,

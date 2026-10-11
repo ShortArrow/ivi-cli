@@ -15,7 +15,14 @@ public interface IVisaSessionFactory
     /// Opens a VISA session to <paramref name="resource"/>. The handle
     /// owns the underlying VISA session and must be disposed.
     /// </summary>
-    Result<IVisaSessionHandle, LocalVisaError> Open(VisaResource resource, TimeSpan timeout);
+    /// <param name="resource">The resource to open.</param>
+    /// <param name="openTimeout">How long opening may take (viOpen's timeout).</param>
+    /// <param name="ioTimeout">The session's I/O timeout (VI_ATTR_TMO_VALUE).</param>
+    Result<IVisaSessionHandle, LocalVisaError> Open(
+        VisaResource resource,
+        TimeSpan openTimeout,
+        TimeSpan ioTimeout
+    );
 }
 
 /// <summary>

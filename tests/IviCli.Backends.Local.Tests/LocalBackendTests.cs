@@ -77,6 +77,20 @@ public class LocalBackendTests
     }
 
     [Fact]
+    public async Task TriggerAsync_writes_TRG_to_the_session()
+    {
+        var factory = new FakeVisaSessionFactory();
+        var session = new FakeVisaSession();
+        factory.Sessions[VisaResourceFormatter.Format(Dev("psu").Resource)] = session;
+        var backend = new LocalBackend(factory);
+        await backend.OpenAsync(Dev("psu"), default);
+
+        (await backend.TriggerAsync(Dev("psu"), default)).ShouldBeOk();
+
+        session.Writes.ShouldBe(["*TRG"]);
+    }
+
+    [Fact]
     public async Task QueryAsync_returns_response_from_session()
     {
         var factory = new FakeVisaSessionFactory();
@@ -152,13 +166,86 @@ public class LocalBackendTests
     }
 }
 
+public class LocalBackendTimeoutTests
+{
+    private static Device Dev(int timeoutMs) =>
+        new(
+            DeviceName.From("psu").ShouldBeOk(),
+            VisaResource.Parse("TCPIP0::192.168.1.10::inst0::INSTR").ShouldBeOk(),
+            Timeout.FromMilliseconds(timeoutMs).ShouldBeOk()
+        );
+
+    private static (
+        LocalBackend Backend,
+        FakeVisaSessionFactory Factory,
+        FakeVisaSession Session
+    ) Build(Device device)
+    {
+        var factory = new FakeVisaSessionFactory();
+        var session = new FakeVisaSession();
+        factory.Sessions[VisaResourceFormatter.Format(device.Resource)] = session;
+        return (new LocalBackend(factory), factory, session);
+    }
+
+    [Theory]
+    [InlineData(300, 5000)]
+    [InlineData(8000, 8000)]
+    public async Task The_session_gets_the_device_timeout_for_IO_and_at_least_five_seconds_to_open(
+        int deviceTimeoutMs,
+        int expectedOpenMs
+    )
+    {
+        var device = Dev(deviceTimeoutMs);
+        var (backend, factory, _) = Build(device);
+
+        (await backend.OpenAsync(device, default)).ShouldBeOk();
+
+        factory.LastIoTimeout.ShouldBe(TimeSpan.FromMilliseconds(deviceTimeoutMs));
+        factory.LastOpenTimeout.ShouldBe(TimeSpan.FromMilliseconds(expectedOpenMs));
+    }
+
+    [Fact]
+    public async Task A_VISA_timeout_is_reported_as_TransportTimeout()
+    {
+        var device = Dev(300);
+        var (backend, _, session) = Build(device);
+        session.TimeOutAfter = TimeSpan.FromMilliseconds(300);
+        (await backend.OpenAsync(device, default)).ShouldBeOk();
+
+        var result = await backend.QueryAsync(
+            device,
+            ScpiQuery.From("*IDN?").ShouldBeOk(),
+            default
+        );
+
+        result
+            .ShouldBeOfType<Result<string, BackendError>.Error>()
+            .Err.ShouldBeOfType<TransportTimeout>()
+            .Elapsed.ShouldBe(TimeSpan.FromMilliseconds(300));
+    }
+
+    [Fact]
+    public void The_local_backend_enforces_the_device_timeout_itself() =>
+        new LocalBackend(
+            new FakeVisaSessionFactory()
+        ).ShouldBeAssignableTo<IEnforcesDeviceTimeout>();
+}
+
 internal sealed class FakeVisaSessionFactory : IVisaSessionFactory
 {
     public ConcurrentDictionary<string, FakeVisaSession> Sessions { get; } = new();
     public bool ReturnRuntimeMissing { get; set; }
+    public TimeSpan? LastOpenTimeout { get; private set; }
+    public TimeSpan? LastIoTimeout { get; private set; }
 
-    public Result<IVisaSessionHandle, LocalVisaError> Open(VisaResource resource, TimeSpan timeout)
+    public Result<IVisaSessionHandle, LocalVisaError> Open(
+        VisaResource resource,
+        TimeSpan openTimeout,
+        TimeSpan ioTimeout
+    )
     {
+        LastOpenTimeout = openTimeout;
+        LastIoTimeout = ioTimeout;
         if (ReturnRuntimeMissing)
         {
             return Result.Failure<IVisaSessionHandle, LocalVisaError>(
@@ -188,6 +275,9 @@ internal sealed class FakeVisaSession : IVisaSessionHandle
     public string? ReadResponse { get; set; }
     public bool Disposed { get; private set; }
 
+    /// <summary>Makes every query report a VISA timeout after this long.</summary>
+    public TimeSpan? TimeOutAfter { get; set; }
+
     /// <summary>Makes <see cref="EnableServiceRequests"/> report an IO failure.</summary>
     public bool FailServiceRequestEnable { get; set; }
 
@@ -206,6 +296,10 @@ internal sealed class FakeVisaSession : IVisaSessionHandle
     public Result<string, LocalVisaError> Query(string text)
     {
         Writes.Add(text);
+        if (TimeOutAfter is { } elapsed)
+        {
+            return Result.Failure<string, LocalVisaError>(new LocalVisaTimeout(elapsed, null));
+        }
         if (!QueryResponses.TryGetValue(text, out var response))
         {
             return Result.Failure<string, LocalVisaError>(

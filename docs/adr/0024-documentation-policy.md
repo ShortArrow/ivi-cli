@@ -30,6 +30,7 @@ This ADR establishes those conventions. It is the first ADR written in English; 
 | README | `/README.md` (+ optional `docs/README.jp.md`) | Project intro, install, quick start; reader-facing. The English `README.md` stays at the repo root so GitHub renders it on the project home page; translations live under `docs/` so added languages don't clutter the root. |
 | CONTRIBUTING | `docs/CONTRIBUTING.md` (+ optional `docs/CONTRIBUTING.jp.md`) | Developer onboarding. Under `docs/`; GitHub still surfaces it as the repository's contributing guideline. |
 | CHANGELOG | `docs/CHANGELOG.md` | Release-by-release user-visible changes |
+| Conformance | `docs/conformance.md` (+ optional `docs/conformance.jp.md`) | How ivi-cli relates to each standard it implements: what it follows, where it deviates, and what it defines where the standard is silent; reader-facing |
 | User manual / tutorials | `docs/user/` (future) | Long-form user-facing docs |
 | API reference | Generated from XML doc comments (future) | Public API surface |
 | `--help` text | Embedded in code via System.CommandLine annotations | Authoritative source for CLI usage |
@@ -39,7 +40,7 @@ README, CONTRIBUTING, and CHANGELOG are deferred until they have a non-trivial f
 ### 2. Language policy
 
 - **English is the primary language for all repository artifacts** — ADRs, domain glossary, code identifiers, code comments, docstrings, commit messages, PR titles/descriptions, `--help` text, CHANGELOG, CONTRIBUTING.
-- **Japanese translations are permitted only for reader-facing documents** as i18n companions: PRD and README. ADR / glossary / source artifacts are English-only.
+- **Japanese translations are permitted only for reader-facing documents** as i18n companions: PRD, README, CONTRIBUTING and conformance. ADR / glossary / source artifacts are English-only.
 - Paired bilingual documents use the language-switcher pattern (see §4).
 - Translations must be kept in sync within the same PR that changes the canonical English. If sync is broken and not repairable, the lagging translation file is archived rather than left misleading.
 

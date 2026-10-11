@@ -198,6 +198,7 @@ Integration スイート（実ソケット、PyVISA 相互運用）は 3 OS 上�
 - [PRD](PRD.jp.md) — プロダクト要件
 - [Architecture Decision Records](adr/) — Accepted な意思決定。
 - [Domain glossary](domain-glossary.md) — ユビキタス言語カタログ
+- [規格への準拠](conformance.jp.md) — VISA・VXI-11・HiSLIP のどこに準拠し、どこで逸脱し、規格が定めていない部分を ivi-cli がどう定めたか
 - [Guides](guides/) — タスク指向の how-to。まずは [Mock a VISA instrument](guides/mock-a-visa-instrument.md)
 - [Samples](samples/) — ハードウェアなしでテストするための **モック計測器** 一式: そのまま投入できる scenario + セットアップスクリプト (例: [PSU モック](samples/psu/))
 - [Contributing](CONTRIBUTING.jp.md) — ローカル開発・ブランチ運用・hooks

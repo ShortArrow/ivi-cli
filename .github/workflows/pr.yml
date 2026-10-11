@@ -66,6 +66,7 @@ jobs:
           check_pair 'docs/PRD.md' 'docs/PRD.jp.md'
           check_pair 'README.md' 'docs/README.jp.md'
           check_pair 'docs/CONTRIBUTING.md' 'docs/CONTRIBUTING.jp.md'
+          check_pair 'docs/conformance.md' 'docs/conformance.jp.md'
 
   version-changelog-sync:
     name: version / CHANGELOG sync
