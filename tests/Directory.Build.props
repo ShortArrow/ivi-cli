@@ -27,6 +27,8 @@
   <ItemGroup Condition="'$(IsTestProject)' == 'true'" Label="xUnit runner stack">
     <PackageReference Include="Microsoft.NET.Test.Sdk" />
     <PackageReference Include="xunit.v3" />
+    <!-- Referenced directly so the lock files hold it as Direct: Dependabot cannot bump a CentralTransitive entry. -->
+    <PackageReference Include="xunit.v3.extensibility.core" />
     <PackageReference Include="xunit.runner.visualstudio" />
     <PackageReference Include="coverlet.collector" />
   </ItemGroup>

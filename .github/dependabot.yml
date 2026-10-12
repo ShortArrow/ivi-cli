@@ -24,7 +24,6 @@ updates:
           - 'Shouldly*'
           - 'coverlet*'
           - 'Verify*'
-          - 'FsCheck*'
           - 'NetArchTest*'
           - 'Microsoft.NET.Test.Sdk'
       microsoft-extensions:

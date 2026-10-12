@@ -123,12 +123,12 @@ Create a shared library that consolidates:
 - Backend-related tests return `async Task` by default.
 - Set timeouts **explicitly on the test side as well**: standardize on `[Fact(Timeout=5000)]` to prevent deadlocks and infinite loops from hanging CI.
 - `CancellationToken` is already propagated to every method of the Backend port (0003 / 0015); tests must exercise the cancellation path explicitly.
-- A test that has no token of its own to pass passes `TestContext.Current.CancellationToken`, which xUnit cancels when the run is cancelled or the test times out. The xUnit1051 analyzer enforces this.
+- A test that has no token of its own to pass passes `TestContext.Current.CancellationToken`, which xUnit cancels when the run is cancelled or the test times out. The xUnit1051 analyzer enforces this only in the bodies of methods marked `[Fact]` or `[Theory]`; a `[Requires]` test, a helper or a lambda passes the token by hand. Cleanup that must run even after cancellation, such as closing a session in `finally`, passes `CancellationToken.None`.
 
 ### 11. Test framework and runner
 
 - Tests use **xUnit v3**. v2 receives only maintenance; v3 adds `TestContext.Current.CancellationToken` (§10), skipping at run time (`Assert.Skip`, `SkipUnless`, `SkipWhen`), and custom traits through `ITraitAttribute.GetTraits()` without a discoverer.
-- The runner is moving from VSTest to **Microsoft.Testing.Platform**. Test projects are executables there, and the platform adds hang and crash dumps and fails a run in which no test ran. Until the CI commands are rewritten for it (`--filter` for traits, coverage, TRX), `tests/Directory.Build.props` keeps xUnit v3 on VSTest with `IsTestingPlatformApplication` and `UseMicrosoftTestingPlatformRunner` set to `false`.
+- The runner is moving from VSTest to **Microsoft.Testing.Platform**. With xUnit v3 every test project is already an executable; the platform runs it directly instead of through VSTest's host, and adds hang and crash dumps and fails a run in which no test ran. Until the CI commands are rewritten for it (`--filter` for traits, coverage, TRX), `tests/Directory.Build.props` keeps xUnit v3 on VSTest with `IsTestingPlatformApplication` and `UseMicrosoftTestingPlatformRunner` set to `false`.
 - `IviCli.TestKit` references `xunit.v3.extensibility.core`, not `xunit.v3`: the latter turns a project into a test executable.
 
 ## Consequences
