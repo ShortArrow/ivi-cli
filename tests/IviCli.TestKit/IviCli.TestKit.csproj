@@ -7,7 +7,7 @@
       reusable library that ships xUnit-aware helpers (RequiresAttribute,
       etc.) but is not itself a test project — without this, the xUnit
       runner-stack ItemGroup in tests/Directory.Build.props would inject
-      a second xunit PackageReference and trip NU1504.
+      the xunit.v3 package, which turns a project into a test executable.
     -->
     <IsTestProject>false</IsTestProject>
   </PropertyGroup>
@@ -19,6 +19,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="xunit" />
+    <PackageReference Include="xunit.v3.extensibility.core" />
   </ItemGroup>
 </Project>

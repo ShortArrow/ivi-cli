@@ -16,7 +16,10 @@ public sealed class ScenarioNameCompleterTests
         MockScenario[] seed = [Sc("alpha"), Sc("beta")];
         var store = new FakeScenarioStore(seed);
         var completer = new ScenarioNameCompleter(store);
-        var candidates = await completer.CompleteAsync(string.Empty, default);
+        var candidates = await completer.CompleteAsync(
+            string.Empty,
+            TestContext.Current.CancellationToken
+        );
         string[] expected = ["alpha", "beta"];
         candidates.ShouldBe(expected);
     }
@@ -27,7 +30,7 @@ public sealed class ScenarioNameCompleterTests
         MockScenario[] seed = [Sc("alpha"), Sc("beta"), Sc("alphabet")];
         var store = new FakeScenarioStore(seed);
         var completer = new ScenarioNameCompleter(store);
-        var candidates = await completer.CompleteAsync("al", default);
+        var candidates = await completer.CompleteAsync("al", TestContext.Current.CancellationToken);
         string[] expected = ["alpha", "alphabet"];
         candidates.ShouldBe(expected);
     }

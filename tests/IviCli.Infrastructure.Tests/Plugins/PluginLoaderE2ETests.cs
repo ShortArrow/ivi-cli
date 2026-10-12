@@ -85,7 +85,11 @@ public sealed class PluginLoaderE2ETests
         );
         var backend = factory.CreateFor(acmeDevice).ShouldBeOk();
         var idn = (
-            await backend.QueryAsync(acmeDevice, ScpiQuery.From("*IDN?").ShouldBeOk(), default)
+            await backend.QueryAsync(
+                acmeDevice,
+                ScpiQuery.From("*IDN?").ShouldBeOk(),
+                TestContext.Current.CancellationToken
+            )
         ).ShouldBeOk();
         idn.ShouldBe("ACME,X100,42,1.0");
 

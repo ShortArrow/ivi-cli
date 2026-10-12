@@ -15,7 +15,7 @@ public sealed class DefaultScriptLinterTests
         var linter = new DefaultScriptLinter();
         var script = Parse("");
 
-        var findings = await linter.LintAsync(script, default);
+        var findings = await linter.LintAsync(script, TestContext.Current.CancellationToken);
 
         findings.ShouldBeEmpty();
     }
@@ -36,7 +36,7 @@ public sealed class DefaultScriptLinterTests
             )
         );
 
-        var findings = await linter.LintAsync(script, default);
+        var findings = await linter.LintAsync(script, TestContext.Current.CancellationToken);
 
         findings.ShouldBeEmpty();
     }
@@ -47,7 +47,7 @@ public sealed class DefaultScriptLinterTests
         var linter = new DefaultScriptLinter();
         var script = Parse("NOTAROOT:VOLT?");
 
-        var findings = await linter.LintAsync(script, default);
+        var findings = await linter.LintAsync(script, TestContext.Current.CancellationToken);
 
         var only = findings.ShouldHaveSingleItem();
         only.Line.ShouldBe(1);
@@ -62,7 +62,7 @@ public sealed class DefaultScriptLinterTests
         var linter = new DefaultScriptLinter();
         var script = Parse(string.Join('\n', "*IDN?", "BOGUS:READ?", "MEAS:VOLT?", "NOPE:WHAT?"));
 
-        var findings = await linter.LintAsync(script, default);
+        var findings = await linter.LintAsync(script, TestContext.Current.CancellationToken);
 
         findings.Length.ShouldBe(2);
         findings[0].Line.ShouldBe(2);
@@ -77,7 +77,7 @@ public sealed class DefaultScriptLinterTests
         var linter = new DefaultScriptLinter();
         var script = Parse(string.Join('\n', "!sleep 100", "!assert FAKE,.*", "!echo hello world"));
 
-        var findings = await linter.LintAsync(script, default);
+        var findings = await linter.LintAsync(script, TestContext.Current.CancellationToken);
 
         findings.ShouldBeEmpty();
     }
@@ -89,7 +89,7 @@ public sealed class DefaultScriptLinterTests
         var longText = "BOGUS:" + new string('X', 200);
         var script = Parse(longText);
 
-        var findings = await linter.LintAsync(script, default);
+        var findings = await linter.LintAsync(script, TestContext.Current.CancellationToken);
 
         var only = findings.ShouldHaveSingleItem();
         only.Snippet.Length.ShouldBe(80);

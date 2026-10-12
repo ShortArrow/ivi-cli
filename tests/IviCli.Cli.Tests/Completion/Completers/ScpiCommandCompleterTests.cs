@@ -10,7 +10,10 @@ public sealed class ScpiCommandCompleterTests
     {
         var completer = new ScpiCommandCompleter();
 
-        var candidates = await completer.CompleteAsync(string.Empty, default);
+        var candidates = await completer.CompleteAsync(
+            string.Empty,
+            TestContext.Current.CancellationToken
+        );
 
         candidates.Length.ShouldBeGreaterThan(20);
         candidates.ShouldContain("MEASure");
@@ -22,7 +25,7 @@ public sealed class ScpiCommandCompleterTests
     {
         var completer = new ScpiCommandCompleter();
 
-        var candidates = await completer.CompleteAsync("se", default);
+        var candidates = await completer.CompleteAsync("se", TestContext.Current.CancellationToken);
 
         candidates.ShouldContain("SENSe");
         candidates.ShouldNotContain("MEASure");

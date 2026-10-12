@@ -32,10 +32,10 @@ public sealed class PoolMetricsTests
         );
 
         var holder = pool.CreateFor(Dev("dut", 5000)).ShouldBeOk();
-        await holder.OpenAsync(Dev("dut", 5000), default);
+        await holder.OpenAsync(Dev("dut", 5000), TestContext.Current.CancellationToken);
 
         var second = pool.CreateFor(Dev("dut", 30)).ShouldBeOk();
-        var result = await second.OpenAsync(Dev("dut", 30), default);
+        var result = await second.OpenAsync(Dev("dut", 30), TestContext.Current.CancellationToken);
         result.ShouldBeError().ShouldBeOfType<PoolWaitTimeout>();
 
         // Counter is process-wide; a concurrently-running test may also
@@ -66,11 +66,11 @@ public sealed class PoolMetricsTests
             time
         );
         var a = lru.CreateFor(Dev("a")).ShouldBeOk();
-        await a.OpenAsync(Dev("a"), default);
-        await a.CloseAsync(Dev("a"), default);
+        await a.OpenAsync(Dev("a"), TestContext.Current.CancellationToken);
+        await a.CloseAsync(Dev("a"), TestContext.Current.CancellationToken);
         var b = lru.CreateFor(Dev("b")).ShouldBeOk();
-        await b.OpenAsync(Dev("b"), default);
-        await b.CloseAsync(Dev("b"), default);
+        await b.OpenAsync(Dev("b"), TestContext.Current.CancellationToken);
+        await b.CloseAsync(Dev("b"), TestContext.Current.CancellationToken);
 
         await WaitForAsync(() => listener.Counts.Sum() >= 1);
         listener.Counts.Sum().ShouldBeGreaterThanOrEqualTo(1);

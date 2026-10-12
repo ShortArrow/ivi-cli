@@ -30,7 +30,10 @@ public sealed class DeviceNameCompleterTests
     public async Task CompleteAsync_returns_all_devices_when_prefix_empty()
     {
         var completer = new DeviceNameCompleter(StoreWith(Dev("psu1"), Dev("dmm1")));
-        var candidates = await completer.CompleteAsync(string.Empty, default);
+        var candidates = await completer.CompleteAsync(
+            string.Empty,
+            TestContext.Current.CancellationToken
+        );
         string[] expected = ["dmm1", "psu1"];
         candidates.ShouldBe(expected);
     }
@@ -39,7 +42,10 @@ public sealed class DeviceNameCompleterTests
     public async Task CompleteAsync_filters_by_prefix()
     {
         var completer = new DeviceNameCompleter(StoreWith(Dev("psu1"), Dev("dmm1"), Dev("psu2")));
-        var candidates = await completer.CompleteAsync("psu", default);
+        var candidates = await completer.CompleteAsync(
+            "psu",
+            TestContext.Current.CancellationToken
+        );
         string[] expected = ["psu1", "psu2"];
         candidates.ShouldBe(expected);
     }

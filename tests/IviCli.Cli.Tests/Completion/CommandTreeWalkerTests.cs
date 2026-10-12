@@ -105,7 +105,12 @@ public sealed class CommandTreeWalkerTests
         registry.Bind(useCmd, "name", fakeCompleter);
 
         string[] tokens = ["visa", "use", string.Empty];
-        var candidates = await CommandTreeWalker.CompleteAsync(root, tokens, registry, default);
+        var candidates = await CommandTreeWalker.CompleteAsync(
+            root,
+            tokens,
+            registry,
+            TestContext.Current.CancellationToken
+        );
         candidates.ShouldContain("psu1");
         candidates.ShouldContain("dmm1");
     }
@@ -125,7 +130,12 @@ public sealed class CommandTreeWalkerTests
         registry.Bind(useCmd, "name", fakeCompleter);
 
         string[] tokens = ["visa", "use", "ps"];
-        var candidates = await CommandTreeWalker.CompleteAsync(root, tokens, registry, default);
+        var candidates = await CommandTreeWalker.CompleteAsync(
+            root,
+            tokens,
+            registry,
+            TestContext.Current.CancellationToken
+        );
         candidates.ShouldContain("psu1");
     }
 
@@ -135,7 +145,12 @@ public sealed class CommandTreeWalkerTests
         var root = BuildSampleRoot();
         var registry = new CompletionRegistry();
         string[] tokens = ["visa", "s"];
-        var candidates = await CommandTreeWalker.CompleteAsync(root, tokens, registry, default);
+        var candidates = await CommandTreeWalker.CompleteAsync(
+            root,
+            tokens,
+            registry,
+            TestContext.Current.CancellationToken
+        );
         candidates.ShouldContain("scan");
         candidates.ShouldContain("script");
         candidates.ShouldContain("status");

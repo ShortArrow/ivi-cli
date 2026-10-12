@@ -37,7 +37,7 @@ public sealed class XmlIviConfigurationStoreTests
             """;
         var sut = MakeSut(xml);
 
-        var result = await sut.ListDriversAsync(default);
+        var result = await sut.ListDriversAsync(TestContext.Current.CancellationToken);
 
         var drivers = result.ShouldBeOk();
         drivers.Length.ShouldBe(2);
@@ -71,7 +71,7 @@ public sealed class XmlIviConfigurationStoreTests
             """;
         var sut = MakeSut(xml);
 
-        var result = await sut.ListLogicalNamesAsync(default);
+        var result = await sut.ListLogicalNamesAsync(TestContext.Current.CancellationToken);
 
         var names = result.ShouldBeOk();
         names.Length.ShouldBe(2);
@@ -91,10 +91,10 @@ public sealed class XmlIviConfigurationStoreTests
         var fs = new MockFileSystem();
         var sut = new XmlIviConfigurationStore(fs, StorePath);
 
-        var driverResult = await sut.ListDriversAsync(default);
+        var driverResult = await sut.ListDriversAsync(TestContext.Current.CancellationToken);
         driverResult.ShouldBeError().ShouldBeOfType<IviConfigurationStoreNotFound>();
 
-        var logicalResult = await sut.ListLogicalNamesAsync(default);
+        var logicalResult = await sut.ListLogicalNamesAsync(TestContext.Current.CancellationToken);
         logicalResult.ShouldBeError().ShouldBeOfType<IviConfigurationStoreNotFound>();
     }
 
@@ -103,7 +103,7 @@ public sealed class XmlIviConfigurationStoreTests
     {
         var sut = MakeSut("<IviConfigStore><Unclosed>");
 
-        var result = await sut.ListDriversAsync(default);
+        var result = await sut.ListDriversAsync(TestContext.Current.CancellationToken);
 
         result.ShouldBeError().ShouldBeOfType<IviConfigurationStoreParseFailure>();
     }
@@ -123,7 +123,7 @@ public sealed class XmlIviConfigurationStoreTests
             """;
         var sut = MakeSut(xml);
 
-        var result = await sut.ListDriversAsync(default);
+        var result = await sut.ListDriversAsync(TestContext.Current.CancellationToken);
 
         result.ShouldBeOk().Single().Name.ShouldBe("NamespacedDriver");
     }
@@ -143,7 +143,7 @@ public sealed class XmlIviConfigurationStoreTests
             """;
         var sut = MakeSut(xml);
 
-        var result = await sut.ListDriversAsync(default);
+        var result = await sut.ListDriversAsync(TestContext.Current.CancellationToken);
 
         result.ShouldBeOk().Single().Name.ShouldBe("ValidDriver");
     }

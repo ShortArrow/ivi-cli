@@ -60,7 +60,7 @@ public sealed class Vxi11BackendTests
         var backend = new Vxi11Backend(stub.Port);
         var device = BuildDevice();
 
-        var result = await backend.OpenAsync(device, default);
+        var result = await backend.OpenAsync(device, TestContext.Current.CancellationToken);
 
         result.ShouldBeOk();
         await stub.WaitForClientAsync();
@@ -110,10 +110,10 @@ public sealed class Vxi11BackendTests
 
         var backend = new Vxi11Backend(stub.Port);
         var device = BuildDevice();
-        (await backend.OpenAsync(device, default)).ShouldBeOk();
+        (await backend.OpenAsync(device, TestContext.Current.CancellationToken)).ShouldBeOk();
 
         var query = ScpiQuery.From("*IDN?").ShouldBeOk();
-        var result = await backend.QueryAsync(device, query, default);
+        var result = await backend.QueryAsync(device, query, TestContext.Current.CancellationToken);
         result.ShouldBeOk().ShouldBe("FAKE,IDN");
 
         await stub.WaitForClientAsync();
@@ -149,10 +149,14 @@ public sealed class Vxi11BackendTests
 
         var backend = new Vxi11Backend(stub.Port);
         var device = BuildDevice();
-        (await backend.OpenAsync(device, default)).ShouldBeOk();
+        (await backend.OpenAsync(device, TestContext.Current.CancellationToken)).ShouldBeOk();
 
         var command = ScpiCommand.From("OUTP ON").ShouldBeOk();
-        var result = await backend.WriteAsync(device, command, default);
+        var result = await backend.WriteAsync(
+            device,
+            command,
+            TestContext.Current.CancellationToken
+        );
 
         result.ShouldBeError().ShouldBeOfType<TransportDisconnected>();
     }
@@ -167,7 +171,7 @@ public sealed class Vxi11BackendTests
             Timeout.FromMilliseconds(1000).ShouldBeOk()
         );
 
-        var result = await backend.OpenAsync(device, default);
+        var result = await backend.OpenAsync(device, TestContext.Current.CancellationToken);
 
         result.ShouldBeError().ShouldBeOfType<TransportDisconnected>();
     }
@@ -212,12 +216,16 @@ public sealed class Vxi11BackendTests
         });
         var backend = new Vxi11Backend(stub.Port);
         var device = BuildDevice(timeoutMs: 1234);
-        (await backend.OpenAsync(device, default)).ShouldBeOk();
+        (await backend.OpenAsync(device, TestContext.Current.CancellationToken)).ShouldBeOk();
 
         (
-            await backend.QueryAsync(device, ScpiQuery.From("*OPC?").ShouldBeOk(), default)
+            await backend.QueryAsync(
+                device,
+                ScpiQuery.From("*OPC?").ShouldBeOk(),
+                TestContext.Current.CancellationToken
+            )
         ).ShouldBeOk();
-        (await backend.TriggerAsync(device, default)).ShouldBeOk();
+        (await backend.TriggerAsync(device, TestContext.Current.CancellationToken)).ShouldBeOk();
 
         await stub.WaitForClientAsync();
         ioTimeouts.ShouldBe([1234u, 1234u, 1234u]);
@@ -235,16 +243,19 @@ public sealed class Vxi11BackendTests
         });
         var backend = new Vxi11Backend(stub.Port);
         var device = BuildDevice();
-        (await backend.OpenAsync(device, default)).ShouldBeOk();
+        (await backend.OpenAsync(device, TestContext.Current.CancellationToken)).ShouldBeOk();
         using var cts = new CancellationTokenSource(TimeSpan.FromMilliseconds(200));
 
         try
         {
-            await backend.CloseAsync(device, cts.Token).WaitAsync(TimeSpan.FromSeconds(5));
+            await backend
+                .CloseAsync(device, cts.Token)
+                .WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
         }
         catch (OperationCanceledException) { }
 
-        await stub.WaitForClientAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        await stub.WaitForClientAsync()
+            .WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
     }
 
     private static void AckCreateLink(StubSession session)
@@ -273,7 +284,7 @@ public sealed class Vxi11BackendTests
         var backend = new Vxi11Backend(12345);
         var device = BuildDevice();
 
-        var result = await backend.CloseAsync(device, default);
+        var result = await backend.CloseAsync(device, TestContext.Current.CancellationToken);
 
         result.ShouldBeOk();
     }

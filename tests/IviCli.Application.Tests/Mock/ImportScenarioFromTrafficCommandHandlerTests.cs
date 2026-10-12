@@ -41,14 +41,16 @@ public sealed class ImportScenarioFromTrafficCommandHandlerTests
                 DeviceFilter: null,
                 Force: false
             ),
-            default
+            TestContext.Current.CancellationToken
         );
 
         var summary = result.ShouldBeOk();
         summary.Name.Value.ShouldBe("psu1-smoke");
         summary.Device.ShouldBe("psu1");
         summary.Scenes.ShouldBe(2);
-        var loaded = (await store.LoadAsync(summary.Name, default)).ShouldBeOk();
+        var loaded = (
+            await store.LoadAsync(summary.Name, TestContext.Current.CancellationToken)
+        ).ShouldBeOk();
         loaded.Scenes.Single().Rules.Length.ShouldBe(2);
         loaded.IdnDefault.ShouldBe("ACME,PSU,1,1.0");
     }
@@ -69,7 +71,7 @@ public sealed class ImportScenarioFromTrafficCommandHandlerTests
                 null,
                 false
             ),
-            default
+            TestContext.Current.CancellationToken
         );
 
         result.ShouldBeError().ShouldBeOfType<ImportTrafficInvalidName>();
@@ -86,7 +88,7 @@ public sealed class ImportScenarioFromTrafficCommandHandlerTests
 
         var result = await handler.HandleAsync(
             new ImportScenarioFromTrafficCommand("run.ndjson", "x", null, false),
-            default
+            TestContext.Current.CancellationToken
         );
 
         result.ShouldBeError().ShouldBeOfType<ImportTrafficIoFailure>();

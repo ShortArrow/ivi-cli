@@ -53,7 +53,7 @@ public sealed class LocalBackendVisaInteropTests
         // bindings record initialised cleanly.
         var backend = new LocalBackend(factory);
         var result = backend
-            .OpenAsync(Dev("TCPIP0::0.0.0.0::inst0::INSTR"), default)
+            .OpenAsync(Dev("TCPIP0::0.0.0.0::inst0::INSTR"), TestContext.Current.CancellationToken)
             .GetAwaiter()
             .GetResult();
         result.ShouldBeOfType<Result<Unit, BackendError>.Error>();
@@ -68,7 +68,10 @@ public sealed class LocalBackendVisaInteropTests
         // 0.0.0.0 is not a routeable destination; VISA must reject the
         // session open rather than block indefinitely. The 500 ms device
         // timeout caps how long we wait.
-        var result = await backend.OpenAsync(Dev("TCPIP0::0.0.0.0::inst0::INSTR"), default);
+        var result = await backend.OpenAsync(
+            Dev("TCPIP0::0.0.0.0::inst0::INSTR"),
+            TestContext.Current.CancellationToken
+        );
 
         result.ShouldBeOfType<Result<Unit, BackendError>.Error>();
     }
@@ -81,7 +84,10 @@ public sealed class LocalBackendVisaInteropTests
         // through to the VISA runtime's TCP code; the failure must
         // surface as a clean BackendError (no thrown exception).
         var backend = new LocalBackend(new VisaSessionFactory());
-        var result = await backend.OpenAsync(Dev("TCPIP0::127.0.0.1::inst0::INSTR"), default);
+        var result = await backend.OpenAsync(
+            Dev("TCPIP0::127.0.0.1::inst0::INSTR"),
+            TestContext.Current.CancellationToken
+        );
 
         result.ShouldBeOfType<Result<Unit, BackendError>.Error>();
     }

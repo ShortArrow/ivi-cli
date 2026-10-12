@@ -16,7 +16,10 @@ public sealed class ApiTokenHandlersTests
         );
 
         var report = (
-            await handler.HandleAsync(new CreateApiTokenCommand("lab dashboard"), default)
+            await handler.HandleAsync(
+                new CreateApiTokenCommand("lab dashboard"),
+                TestContext.Current.CancellationToken
+            )
         ).ShouldBeOk();
 
         report.Token.ShouldStartWith("ivicli_pat_");
@@ -37,7 +40,10 @@ public sealed class ApiTokenHandlersTests
         var store = new FakeApiTokenStore();
         var handler = new CreateApiTokenCommandHandler(store);
         var report = (
-            await handler.HandleAsync(new CreateApiTokenCommand(""), default)
+            await handler.HandleAsync(
+                new CreateApiTokenCommand(""),
+                TestContext.Current.CancellationToken
+            )
         ).ShouldBeOk();
 
         report.Stored.Label.ShouldBe("");
@@ -49,7 +55,10 @@ public sealed class ApiTokenHandlersTests
         var store = new FakeApiTokenStore();
         var handler = new CreateApiTokenCommandHandler(store);
         var report = (
-            await handler.HandleAsync(new CreateApiTokenCommand(new string('x', 100)), default)
+            await handler.HandleAsync(
+                new CreateApiTokenCommand(new string('x', 100)),
+                TestContext.Current.CancellationToken
+            )
         ).ShouldBeOk();
 
         report.Stored.Label.Length.ShouldBe(64);
@@ -62,7 +71,10 @@ public sealed class ApiTokenHandlersTests
         store.FailNextSaveWith("disk full");
         var handler = new CreateApiTokenCommandHandler(store);
 
-        var result = await handler.HandleAsync(new CreateApiTokenCommand("x"), default);
+        var result = await handler.HandleAsync(
+            new CreateApiTokenCommand("x"),
+            TestContext.Current.CancellationToken
+        );
 
         result.ShouldBeError().ShouldBeOfType<ApiTokenStoreWriteFailure>();
     }
@@ -73,17 +85,17 @@ public sealed class ApiTokenHandlersTests
         var store = new FakeApiTokenStore();
         await new CreateApiTokenCommandHandler(store).HandleAsync(
             new CreateApiTokenCommand("a"),
-            default
+            TestContext.Current.CancellationToken
         );
         await new CreateApiTokenCommandHandler(store).HandleAsync(
             new CreateApiTokenCommand("b"),
-            default
+            TestContext.Current.CancellationToken
         );
 
         var listing = (
             await new ListApiTokensQueryHandler(store).HandleAsync(
                 new ListApiTokensQuery(),
-                default
+                TestContext.Current.CancellationToken
             )
         ).ShouldBeOk();
 
@@ -98,13 +110,16 @@ public sealed class ApiTokenHandlersTests
         var created = (
             await new CreateApiTokenCommandHandler(store).HandleAsync(
                 new CreateApiTokenCommand("victim"),
-                default
+                TestContext.Current.CancellationToken
             )
         ).ShouldBeOk();
         var handler = new RevokeApiTokenCommandHandler(store);
 
         var revoked = (
-            await handler.HandleAsync(new RevokeApiTokenCommand(created.Stored.Id), default)
+            await handler.HandleAsync(
+                new RevokeApiTokenCommand(created.Stored.Id),
+                TestContext.Current.CancellationToken
+            )
         ).ShouldBeOk();
 
         revoked.Id.ShouldBe(created.Stored.Id);
@@ -117,7 +132,10 @@ public sealed class ApiTokenHandlersTests
         var store = new FakeApiTokenStore();
         var handler = new RevokeApiTokenCommandHandler(store);
 
-        var result = await handler.HandleAsync(new RevokeApiTokenCommand("ffffff"), default);
+        var result = await handler.HandleAsync(
+            new RevokeApiTokenCommand("ffffff"),
+            TestContext.Current.CancellationToken
+        );
 
         result.ShouldBeError().ShouldBeOfType<RevokeApiTokenUnknown>();
     }

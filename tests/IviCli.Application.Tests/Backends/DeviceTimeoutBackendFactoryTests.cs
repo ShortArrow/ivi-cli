@@ -47,7 +47,7 @@ public sealed class DeviceTimeoutBackendFactoryTests
         time.Advance(TimeSpan.FromMilliseconds(299));
         pending.IsCompleted.ShouldBeFalse();
         time.Advance(TimeSpan.FromMilliseconds(1));
-        var result = await pending.WaitAsync(Guard);
+        var result = await pending.WaitAsync(Guard, TestContext.Current.CancellationToken);
 
         result
             .ShouldBeOfType<Result<string, BackendError>.Error>()
@@ -63,12 +63,14 @@ public sealed class DeviceTimeoutBackendFactoryTests
         inner.StallQueries = true;
         var pending = backend.QueryAsync(device, Idn, CancellationToken.None);
         time.Advance(TimeSpan.FromMilliseconds(300));
-        await pending.WaitAsync(Guard);
+        await pending.WaitAsync(Guard, TestContext.Current.CancellationToken);
         inner.Calls.ShouldBe(["query", "close"]);
 
         inner.StallQueries = false;
         (
-            await backend.QueryAsync(device, Idn, CancellationToken.None).WaitAsync(Guard)
+            await backend
+                .QueryAsync(device, Idn, CancellationToken.None)
+                .WaitAsync(Guard, TestContext.Current.CancellationToken)
         ).ShouldBeOk();
 
         inner.Calls.ShouldBe(["query", "close", "open", "query"]);
@@ -84,11 +86,11 @@ public sealed class DeviceTimeoutBackendFactoryTests
 
         var pending = backend.QueryAsync(device, Idn, CancellationToken.None);
         time.Advance(TimeSpan.FromMilliseconds(300));
-        await Task.Delay(50);
+        await Task.Delay(50, TestContext.Current.CancellationToken);
         pending.IsCompleted.ShouldBeFalse();
         time.Advance(TimeSpan.FromMilliseconds(300));
 
-        (await pending.WaitAsync(Guard))
+        (await pending.WaitAsync(Guard, TestContext.Current.CancellationToken))
             .ShouldBeOfType<Result<string, BackendError>.Error>()
             .Err.ShouldBeOfType<TransportTimeout>()
             .Elapsed.ShouldBe(TimeSpan.FromMilliseconds(300));
@@ -115,7 +117,11 @@ public sealed class DeviceTimeoutBackendFactoryTests
         var device = Dev(300);
         var (backend, inner, _) = Build(device);
 
-        (await backend.QueryAsync(device, Idn, CancellationToken.None).WaitAsync(Guard))
+        (
+            await backend
+                .QueryAsync(device, Idn, CancellationToken.None)
+                .WaitAsync(Guard, TestContext.Current.CancellationToken)
+        )
             .ShouldBeOk()
             .ShouldBe("ok");
         inner.Calls.ShouldBe(["query"]);
@@ -135,7 +141,7 @@ public sealed class DeviceTimeoutBackendFactoryTests
         );
         time.Advance(TimeSpan.FromMilliseconds(300));
 
-        (await pending.WaitAsync(Guard))
+        (await pending.WaitAsync(Guard, TestContext.Current.CancellationToken))
             .ShouldBeOfType<Result<Unit, BackendError>.Error>()
             .Err.ShouldBeOfType<TransportTimeout>();
     }
@@ -152,7 +158,7 @@ public sealed class DeviceTimeoutBackendFactoryTests
         pending.IsCompleted.ShouldBeFalse();
         time.Advance(TimeSpan.FromMilliseconds(1));
 
-        (await pending.WaitAsync(Guard))
+        (await pending.WaitAsync(Guard, TestContext.Current.CancellationToken))
             .ShouldBeOfType<Result<string, BackendError>.Error>()
             .Err.ShouldBeOfType<TransportTimeout>();
     }
@@ -169,7 +175,7 @@ public sealed class DeviceTimeoutBackendFactoryTests
         pending.IsCompleted.ShouldBeFalse();
         time.Advance(TimeSpan.FromMilliseconds(1));
 
-        (await pending.WaitAsync(Guard))
+        (await pending.WaitAsync(Guard, TestContext.Current.CancellationToken))
             .ShouldBeOfType<Result<Unit, BackendError>.Error>()
             .Err.ShouldBeOfType<TransportTimeout>();
     }
@@ -186,7 +192,7 @@ public sealed class DeviceTimeoutBackendFactoryTests
         pending.IsCompleted.ShouldBeFalse();
         time.Advance(TimeSpan.FromMilliseconds(1));
 
-        (await pending.WaitAsync(Guard))
+        (await pending.WaitAsync(Guard, TestContext.Current.CancellationToken))
             .ShouldBeOfType<Result<Unit, BackendError>.Error>()
             .Err.ShouldBeOfType<TransportTimeout>();
     }
@@ -201,7 +207,7 @@ public sealed class DeviceTimeoutBackendFactoryTests
         var pending = backend.ReadAsync(device, CancellationToken.None);
         time.Advance(TimeSpan.FromMilliseconds(300));
 
-        (await pending.WaitAsync(Guard))
+        (await pending.WaitAsync(Guard, TestContext.Current.CancellationToken))
             .ShouldBeOfType<Result<string, BackendError>.Error>()
             .Err.ShouldBeOfType<TransportTimeout>();
     }
@@ -216,7 +222,7 @@ public sealed class DeviceTimeoutBackendFactoryTests
         var pending = backend.TriggerAsync(device, CancellationToken.None);
         time.Advance(TimeSpan.FromMilliseconds(300));
 
-        (await pending.WaitAsync(Guard))
+        (await pending.WaitAsync(Guard, TestContext.Current.CancellationToken))
             .ShouldBeOfType<Result<Unit, BackendError>.Error>()
             .Err.ShouldBeOfType<TransportTimeout>();
     }
@@ -229,12 +235,18 @@ public sealed class DeviceTimeoutBackendFactoryTests
         var reported = new TransportTimeout(TimeSpan.FromMilliseconds(300));
         inner.QueryFailure = reported;
 
-        (await backend.QueryAsync(device, Idn, CancellationToken.None).WaitAsync(Guard))
+        (
+            await backend
+                .QueryAsync(device, Idn, CancellationToken.None)
+                .WaitAsync(Guard, TestContext.Current.CancellationToken)
+        )
             .ShouldBeOfType<Result<string, BackendError>.Error>()
             .Err.ShouldBeSameAs(reported);
         inner.QueryFailure = null;
         (
-            await backend.QueryAsync(device, Idn, CancellationToken.None).WaitAsync(Guard)
+            await backend
+                .QueryAsync(device, Idn, CancellationToken.None)
+                .WaitAsync(Guard, TestContext.Current.CancellationToken)
         ).ShouldBeOk();
 
         inner.Calls.ShouldBe(["query", "close", "open", "query"]);
@@ -247,9 +259,13 @@ public sealed class DeviceTimeoutBackendFactoryTests
         var (backend, inner, _) = Build(device);
         inner.QueryFailure = new TransportDisconnected("gone");
 
-        await backend.QueryAsync(device, Idn, CancellationToken.None).WaitAsync(Guard);
+        await backend
+            .QueryAsync(device, Idn, CancellationToken.None)
+            .WaitAsync(Guard, TestContext.Current.CancellationToken);
         inner.QueryFailure = null;
-        await backend.QueryAsync(device, Idn, CancellationToken.None).WaitAsync(Guard);
+        await backend
+            .QueryAsync(device, Idn, CancellationToken.None)
+            .WaitAsync(Guard, TestContext.Current.CancellationToken);
 
         inner.Calls.ShouldBe(["query", "query"]);
     }
@@ -267,10 +283,12 @@ public sealed class DeviceTimeoutBackendFactoryTests
         inner.StallQueries = true;
         var pending = backend.QueryAsync(device, Idn, CancellationToken.None);
         time.Advance(TimeSpan.FromMilliseconds(300));
-        await pending.WaitAsync(Guard);
+        await pending.WaitAsync(Guard, TestContext.Current.CancellationToken);
         inner.StallQueries = false;
         (
-            await backend.QueryAsync(device, Idn, CancellationToken.None).WaitAsync(Guard)
+            await backend
+                .QueryAsync(device, Idn, CancellationToken.None)
+                .WaitAsync(Guard, TestContext.Current.CancellationToken)
         ).ShouldBeOk();
         await Until(() => inner.SrqSubscriptions == 2);
         inner.RaiseServiceRequest(device, 0x60);
@@ -293,11 +311,11 @@ public sealed class DeviceTimeoutBackendFactoryTests
 
         var pending = backend.QueryAsync(device, Idn, CancellationToken.None);
         time.Advance(TimeSpan.FromMilliseconds(300));
-        await Task.Delay(100);
+        await Task.Delay(100, TestContext.Current.CancellationToken);
 
         listening.IsCompleted.ShouldBeFalse();
         time.Advance(TimeSpan.FromMilliseconds(300));
-        await pending.WaitAsync(Guard);
+        await pending.WaitAsync(Guard, TestContext.Current.CancellationToken);
     }
 
     [Fact]
@@ -312,7 +330,7 @@ public sealed class DeviceTimeoutBackendFactoryTests
 
         (await backend.CloseAsync(device, CancellationToken.None)).ShouldBeOk();
 
-        await listening.WaitAsync(Guard);
+        await listening.WaitAsync(Guard, TestContext.Current.CancellationToken);
         inner.SrqSubscriptions.ShouldBe(1);
     }
 
@@ -328,11 +346,11 @@ public sealed class DeviceTimeoutBackendFactoryTests
         inner.StallQueries = true;
         var pending = backend.QueryAsync(device, Idn, CancellationToken.None);
         time.Advance(TimeSpan.FromMilliseconds(300));
-        await pending.WaitAsync(Guard);
+        await pending.WaitAsync(Guard, TestContext.Current.CancellationToken);
 
         (await backend.CloseAsync(device, CancellationToken.None)).ShouldBeOk();
 
-        await listening.WaitAsync(Guard);
+        await listening.WaitAsync(Guard, TestContext.Current.CancellationToken);
     }
 
     private static Task Listen(

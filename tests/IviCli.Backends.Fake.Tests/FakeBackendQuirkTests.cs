@@ -97,8 +97,8 @@ public sealed class FakeBackendQuirkTests
         fake.RaiseServiceRequest(Dev().Name, statusByte: 0x42);
         (await DrainAsync(fake)).Count.ShouldBe(1);
 
-        (await fake.CloseAsync(Dev(), default)).ShouldBeOk();
-        (await fake.OpenAsync(Dev(), default)).ShouldBeOk();
+        (await fake.CloseAsync(Dev(), TestContext.Current.CancellationToken)).ShouldBeOk();
+        (await fake.OpenAsync(Dev(), TestContext.Current.CancellationToken)).ShouldBeOk();
         fake.RaiseServiceRequest(Dev().Name, statusByte: 0x43);
 
         var observed = await DrainAsync(fake);

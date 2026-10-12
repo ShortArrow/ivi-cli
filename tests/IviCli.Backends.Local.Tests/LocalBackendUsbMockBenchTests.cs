@@ -35,12 +35,20 @@ public sealed class LocalBackendUsbMockBenchTests
 
     private static async Task WriteAsync(LocalBackend backend, Device device, string line) =>
         (
-            await backend.WriteAsync(device, ScpiCommand.From(line).ShouldBeOk(), default)
+            await backend.WriteAsync(
+                device,
+                ScpiCommand.From(line).ShouldBeOk(),
+                TestContext.Current.CancellationToken
+            )
         ).ShouldBeOk();
 
     private static async Task AssertBenchScenarioIsActive(LocalBackend backend, Device device)
     {
-        var idn = await backend.QueryAsync(device, ScpiQuery.From("*IDN?").ShouldBeOk(), default);
+        var idn = await backend.QueryAsync(
+            device,
+            ScpiQuery.From("*IDN?").ShouldBeOk(),
+            TestContext.Current.CancellationToken
+        );
         idn.ShouldBeOk()
             .ShouldBe(
                 "IVICLI,SRQ-BENCH,0,1.0",
@@ -58,7 +66,7 @@ public sealed class LocalBackendUsbMockBenchTests
         // enabled once MoveNextAsync has been called)
         var backend = new LocalBackend(new VisaSessionFactory());
         var device = AttachedMock();
-        (await backend.OpenAsync(device, default)).ShouldBeOk();
+        (await backend.OpenAsync(device, TestContext.Current.CancellationToken)).ShouldBeOk();
         try
         {
             await AssertBenchScenarioIsActive(backend, device);
@@ -81,7 +89,7 @@ public sealed class LocalBackendUsbMockBenchTests
         }
         finally
         {
-            await backend.CloseAsync(device, default);
+            await backend.CloseAsync(device, CancellationToken.None);
         }
     }
 
@@ -92,7 +100,7 @@ public sealed class LocalBackendUsbMockBenchTests
         // Given the mock attached over USB/IP and the stream armed
         var backend = new LocalBackend(new VisaSessionFactory());
         var device = AttachedMock();
-        (await backend.OpenAsync(device, default)).ShouldBeOk();
+        (await backend.OpenAsync(device, TestContext.Current.CancellationToken)).ShouldBeOk();
         try
         {
             await AssertBenchScenarioIsActive(backend, device);
@@ -103,7 +111,9 @@ public sealed class LocalBackendUsbMockBenchTests
             var firstSrq = stream.MoveNextAsync();
 
             // When the backend asserts a trigger
-            (await backend.TriggerAsync(device, default)).ShouldBeOk();
+            (
+                await backend.TriggerAsync(device, TestContext.Current.CancellationToken)
+            ).ShouldBeOk();
 
             // Then the *TRG rule's distinct status byte proves the trigger
             // reached the device (0x41, not the *OPC rule's 0x60)
@@ -113,7 +123,7 @@ public sealed class LocalBackendUsbMockBenchTests
         }
         finally
         {
-            await backend.CloseAsync(device, default);
+            await backend.CloseAsync(device, CancellationToken.None);
         }
     }
 }

@@ -47,18 +47,33 @@ public sealed class MockReceivedWritesCaptureRoundTripTests
         var fs = new MockFileSystem();
         var writer = new NdjsonTrafficWriter(fs, Path);
         // Simulate what a serving gateway captures as a client drives it.
-        await writer.AppendAsync(Write("psu1", ":VOLT 12.000"), default);
-        await writer.AppendAsync(Query("psu1", ":MEAS:VOLT?"), default);
-        await writer.AppendAsync(Write("psu1", ":VOLT 24.000"), default);
-        await writer.AppendAsync(Write("psu1", ":CURR 3.300"), default);
-        await writer.AppendAsync(Write("other", ":VOLT 99.000"), default);
+        await writer.AppendAsync(
+            Write("psu1", ":VOLT 12.000"),
+            TestContext.Current.CancellationToken
+        );
+        await writer.AppendAsync(
+            Query("psu1", ":MEAS:VOLT?"),
+            TestContext.Current.CancellationToken
+        );
+        await writer.AppendAsync(
+            Write("psu1", ":VOLT 24.000"),
+            TestContext.Current.CancellationToken
+        );
+        await writer.AppendAsync(
+            Write("psu1", ":CURR 3.300"),
+            TestContext.Current.CancellationToken
+        );
+        await writer.AppendAsync(
+            Write("other", ":VOLT 99.000"),
+            TestContext.Current.CancellationToken
+        );
 
         var handler = new MockReceivedWritesQueryHandler(new NdjsonTrafficReader(fs));
 
         var volt = (
             await handler.HandleAsync(
                 new MockReceivedWritesQuery("psu1", ":VOLT", null, Path),
-                default
+                TestContext.Current.CancellationToken
             )
         ).ShouldBeOk();
         volt.Last().Data.ShouldBe(":VOLT 24.000");
@@ -66,7 +81,7 @@ public sealed class MockReceivedWritesCaptureRoundTripTests
         var curr = (
             await handler.HandleAsync(
                 new MockReceivedWritesQuery("psu1", ":CURR", null, Path),
-                default
+                TestContext.Current.CancellationToken
             )
         ).ShouldBeOk();
         curr.Last().Data.ShouldBe(":CURR 3.300");
@@ -77,14 +92,17 @@ public sealed class MockReceivedWritesCaptureRoundTripTests
     {
         var fs = new MockFileSystem();
         var writer = new NdjsonTrafficWriter(fs, Path);
-        await writer.AppendAsync(Write("other", ":VOLT 99.000"), default);
+        await writer.AppendAsync(
+            Write("other", ":VOLT 99.000"),
+            TestContext.Current.CancellationToken
+        );
 
         var handler = new MockReceivedWritesQueryHandler(new NdjsonTrafficReader(fs));
 
         var volt = (
             await handler.HandleAsync(
                 new MockReceivedWritesQuery("psu1", ":VOLT", null, Path),
-                default
+                TestContext.Current.CancellationToken
             )
         ).ShouldBeOk();
         volt.ShouldBeEmpty();

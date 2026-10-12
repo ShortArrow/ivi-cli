@@ -22,11 +22,17 @@ public sealed class CreateScenarioCommandHandlerTests
         var store = new FakeScenarioStore();
         var handler = new CreateScenarioCommandHandler(store);
 
-        var result = await handler.HandleAsync(new CreateScenarioCommand("demo"), default);
+        var result = await handler.HandleAsync(
+            new CreateScenarioCommand("demo"),
+            TestContext.Current.CancellationToken
+        );
         result.ShouldBeOk();
 
         var loaded = (
-            await store.LoadAsync(ScenarioName.From("demo").ShouldBeOk(), default)
+            await store.LoadAsync(
+                ScenarioName.From("demo").ShouldBeOk(),
+                TestContext.Current.CancellationToken
+            )
         ).ShouldBeOk();
         loaded.InitialScene.ShouldBe(SceneName.DefaultScene());
         loaded.Scenes.Length.ShouldBe(1);
@@ -41,12 +47,15 @@ public sealed class CreateScenarioCommandHandlerTests
 
         var result = await handler.HandleAsync(
             new CreateScenarioCommand("psu-fsm", InitialScene: "off"),
-            default
+            TestContext.Current.CancellationToken
         );
         result.ShouldBeOk();
 
         var loaded = (
-            await store.LoadAsync(ScenarioName.From("psu-fsm").ShouldBeOk(), default)
+            await store.LoadAsync(
+                ScenarioName.From("psu-fsm").ShouldBeOk(),
+                TestContext.Current.CancellationToken
+            )
         ).ShouldBeOk();
         var off = SceneName.From("off").ShouldBeOk();
         loaded.InitialScene.ShouldBe(off);
@@ -63,7 +72,7 @@ public sealed class CreateScenarioCommandHandlerTests
 
         var result = await handler.HandleAsync(
             new CreateScenarioCommand("demo", InitialScene: "INVALID NAME"),
-            default
+            TestContext.Current.CancellationToken
         );
         result.ShouldBeError().ShouldBeOfType<CreateScenarioInvalidInitialScene>();
     }
@@ -76,12 +85,15 @@ public sealed class CreateScenarioCommandHandlerTests
 
         var result = await handler.HandleAsync(
             new CreateScenarioCommand("demo", IdnDefault: "ACME,X,1,1.0", InitialScene: "ready"),
-            default
+            TestContext.Current.CancellationToken
         );
         result.ShouldBeOk();
 
         var loaded = (
-            await store.LoadAsync(ScenarioName.From("demo").ShouldBeOk(), default)
+            await store.LoadAsync(
+                ScenarioName.From("demo").ShouldBeOk(),
+                TestContext.Current.CancellationToken
+            )
         ).ShouldBeOk();
         loaded.IdnDefault.ShouldBe("ACME,X,1,1.0");
         loaded.InitialScene.ShouldBe(SceneName.From("ready").ShouldBeOk());
