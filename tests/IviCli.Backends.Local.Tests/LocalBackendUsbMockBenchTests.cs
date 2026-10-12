@@ -35,12 +35,20 @@ public sealed class LocalBackendUsbMockBenchTests
 
     private static async Task WriteAsync(LocalBackend backend, Device device, string line) =>
         (
-            await backend.WriteAsync(device, ScpiCommand.From(line).ShouldBeOk(), TestContext.Current.CancellationToken)
+            await backend.WriteAsync(
+                device,
+                ScpiCommand.From(line).ShouldBeOk(),
+                TestContext.Current.CancellationToken
+            )
         ).ShouldBeOk();
 
     private static async Task AssertBenchScenarioIsActive(LocalBackend backend, Device device)
     {
-        var idn = await backend.QueryAsync(device, ScpiQuery.From("*IDN?").ShouldBeOk(), TestContext.Current.CancellationToken);
+        var idn = await backend.QueryAsync(
+            device,
+            ScpiQuery.From("*IDN?").ShouldBeOk(),
+            TestContext.Current.CancellationToken
+        );
         idn.ShouldBeOk()
             .ShouldBe(
                 "IVICLI,SRQ-BENCH,0,1.0",
@@ -103,7 +111,9 @@ public sealed class LocalBackendUsbMockBenchTests
             var firstSrq = stream.MoveNextAsync();
 
             // When the backend asserts a trigger
-            (await backend.TriggerAsync(device, TestContext.Current.CancellationToken)).ShouldBeOk();
+            (
+                await backend.TriggerAsync(device, TestContext.Current.CancellationToken)
+            ).ShouldBeOk();
 
             // Then the *TRG rule's distinct status byte proves the trigger
             // reached the device (0x41, not the *OPC rule's 0x60)
