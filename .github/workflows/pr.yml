@@ -220,6 +220,8 @@ jobs:
           dotnet test --no-build --configuration Release \
             --filter "Category!=Integration" \
             --coverlet --coverlet-output-format cobertura \
+            --coverlet-include "[IviCli.*]*" --coverlet-include "[ivicli]*" \
+            --coverlet-exclude "[IviCli.TestKit]*" --coverlet-exclude "[IviCli.Plugin.Sample]*" \
             --hangdump --hangdump-timeout 5m --hangdump-type Heap \
             --results-directory ./TestResults
 
