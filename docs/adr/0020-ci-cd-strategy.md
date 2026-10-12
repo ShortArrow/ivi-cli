@@ -43,7 +43,7 @@ The workflow is split into three jobs (each becomes a required status check on `
 | --- | --- |
 | `pr-title-validation` | `amannn/action-semantic-pull-request` with the project's Conventional Commits type set |
 | `docs-sync-check` | If `docs/PRD.md` is touched, verify `docs/PRD.jp.md` is touched in the same PR (and vice versa). README has the equivalent check. Required only when the relevant paths are modified |
-| `build-and-test` | Combined gating job. Steps run sequentially: `dotnet tool restore` → `dotnet restore --locked-mode` → `dotnet csharpier check .` → `dotnet format analyzers --verify-no-changes --no-restore` → `dotnet build --no-restore --configuration Release` → `dotnet test --no-build --configuration Release --filter "Category!=Integration" --collect:"XPlat Code Coverage"` → conditional Codecov upload |
+| `build-and-test` | Combined gating job. Steps run sequentially: `dotnet tool restore` → `dotnet restore --locked-mode` → `dotnet csharpier check .` → `dotnet format analyzers --verify-no-changes --no-restore` → `dotnet build --no-restore --configuration Release` → `dotnet test --no-build --configuration Release --filter "Category!=Integration" --coverlet --coverlet-output-format cobertura --coverlet-include … --hangdump` (Microsoft.Testing.Platform, ADR 0009 §11) → conditional Codecov upload, and hang dumps uploaded when the job fails |
 
 The original ADR draft enumerated six separate jobs (`format-check` / `restore-locked` / `analyzers-check` / `build` / `test` / `coverage-upload`). The implementation collapses them into a single `build-and-test` job because (a) every step depends on the same restored NuGet cache and (b) GitHub's per-step UI surfaces failure attribution at the same granularity as per-job. Coverage upload is conditional on `CODECOV_TOKEN` and uses `fail_ci_if_error: false` — it is therefore non-blocking even within the combined job (matches §6).
 
@@ -55,7 +55,7 @@ Runner matrix: `ubuntu-latest`, `windows-latest`, `macos-latest`. Each OS runs t
 
 | Job | Notes |
 | --- | --- |
-| `integration` (matrix per OS) | `dotnet test --filter "Category=Integration"` with TRX artifact upload. NI-VISA hardware tests run only when a self-hosted runner with hardware is configured; otherwise the job degrades to "skip with notice" (`continue-on-error: true`) |
+| `integration` (matrix per OS) | `dotnet test --filter "Category=Integration" --ignore-exit-code 8 --report-xunit-trx` with TRX artifact upload; exit code 8 marks a test project without integration tests. NI-VISA hardware tests run only when a self-hosted runner with hardware is configured; otherwise the job degrades to "skip with notice" (`continue-on-error: true`) |
 | `dependency-scan` | `dotnet list package --vulnerable --include-transitive`; fails the workflow when high-severity findings appear. The same job runs `dotnet list package --deprecated` as a non-fatal final step (the original ADR draft listed this as a separate `dependency-deprecated` job — collapsing avoids a duplicate restore) |
 
 The nightly workflow does not gate merges; failures open auto-filed issues (deferred — initial revision simply notifies via the workflow run status).
@@ -76,7 +76,7 @@ Code signing is **not** introduced in Phase 1. Phase 2 adds it (separate ADR).
 
 ### 6. Coverage
 
-- Tool: `coverlet.collector` already present in test projects (ADR 0009 §7).
+- Tool: `coverlet.mtp`, referenced by every test project (ADR 0009 §7, §11).
 - Upload destination: **Codecov**.
 - Policy: visualization only; no minimum coverage threshold gates merges (ADR 0009 §9). Codecov's PR comment serves as the visibility surface.
 - Codecov upload token stored as a repository secret; missing token degrades the upload job to a no-op without failing the workflow.

@@ -219,8 +219,20 @@ jobs:
         run: |
           dotnet test --no-build --configuration Release \
             --filter "Category!=Integration" \
-            --collect:"XPlat Code Coverage" \
+            --coverlet --coverlet-output-format cobertura \
+            --coverlet-include "[IviCli.*]*" --coverlet-include "[ivicli]*" \
+            --coverlet-exclude "[IviCli.TestKit]*" --coverlet-exclude "[IviCli.Plugin.Sample]*" \
+            --hangdump --hangdump-timeout 5m --hangdump-type Heap \
             --results-directory ./TestResults
+
+      - name: Upload hang dumps
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: hang-dumps-linux
+          path: ./TestResults/**/*.dmp
+          if-no-files-found: ignore
+          retention-days: 7
 
       - name: Upload coverage to Codecov
         if: ${{ env.CODECOV_TOKEN != '' }}
@@ -280,4 +292,17 @@ jobs:
         run: dotnet build --no-restore --configuration Release
 
       - name: Test (unit + architecture)
-        run: dotnet test --no-build --configuration Release --filter "Category!=Integration"
+        run: >-
+          dotnet test --no-build --configuration Release
+          --filter "Category!=Integration"
+          --hangdump --hangdump-timeout 5m --hangdump-type Heap
+          --results-directory ./TestResults
+
+      - name: Upload hang dumps
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: hang-dumps-${{ matrix.name }}
+          path: ./TestResults/**/*.dmp
+          if-no-files-found: ignore
+          retention-days: 7

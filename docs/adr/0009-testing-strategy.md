@@ -97,7 +97,7 @@ All lifecycle test targets in PRD §13.3 (open success/failure, query/read timeo
 | **NetArchTest** | Detect dependency-direction violations, layer violations, missing interface implementations, etc. from 0021 | Adopted |
 | **Verify** (snapshot) | `--json` output contract, help text, rendered output | Adopted |
 | **FsCheck** (property-based) | VO invariants (VisaResource parse/serialize roundtrip, Timeout range constraints, etc.) | Adopted with scope limited to VO-related areas; no test uses it yet, so `FsCheck.Xunit.v3` is added with the first one |
-| **coverlet** | Coverage measurement | Adopted (visualization only, no numeric gate) |
+| **coverlet** (`coverlet.mtp`) | Coverage measurement | Adopted (visualization only, no numeric gate) |
 | **Stryker.NET** (mutation) | Verifying test quality | **Not adopted** (overkill for Phase 1) |
 
 ### 8. Shared Test Helper: `tests/IviCli.TestKit/`
@@ -128,7 +128,12 @@ Create a shared library that consolidates:
 ### 11. Test framework and runner
 
 - Tests use **xUnit v3**. v2 receives only maintenance; v3 adds `TestContext.Current.CancellationToken` (§10), skipping at run time (`Assert.Skip`, `SkipUnless`, `SkipWhen`), and custom traits through `ITraitAttribute.GetTraits()` without a discoverer.
-- The runner is moving from VSTest to **Microsoft.Testing.Platform**. With xUnit v3 every test project is already an executable; the platform runs it directly instead of through VSTest's host, and adds hang and crash dumps and fails a run in which no test ran. Until the CI commands are rewritten for it (`--filter` for traits, coverage, TRX), `tests/Directory.Build.props` keeps xUnit v3 on VSTest with `IsTestingPlatformApplication` and `UseMicrosoftTestingPlatformRunner` set to `false`.
+- The runner is **Microsoft.Testing.Platform**, not VSTest. Every test project is an executable (`OutputType` `Exe`, set in `tests/Directory.Build.props` with `UseMicrosoftTestingPlatformRunner`), and `global.json` makes `dotnet test` drive it. A run in which a test project executed no test fails with exit code 8. The integration run ignores that code, because most projects have no integration test, and so it also passes when its filter matches nothing; the unit run does not, because every project has unit tests.
+- `dotnet test --filter` keeps the VSTest filter syntax: xUnit's platform integration accepts it, so `--filter "Category!=Integration"` works as before.
+- Extensions are packages: `coverlet.mtp` for coverage (`--coverlet --coverlet-output-format cobertura`) and `Microsoft.Testing.Extensions.HangDump` (`--hangdump`). TRX comes from xUnit (`--report-xunit-trx`), one file per test project.
+- `coverlet.mtp` leaves out compiler-generated code, so a positional record such as `Device` has no lines to cover, and its default exclusions, built from the test project's dependencies, include the CLI assembly `ivicli`. CI therefore names what to measure: `--coverlet-include "[IviCli.*]*" --coverlet-include "[ivicli]*" --coverlet-exclude "[IviCli.TestKit]*" --coverlet-exclude "[IviCli.Plugin.Sample]*"`. An explicit exclusion replaces the default list.
+- CI writes a heap dump when no test has started or finished for five minutes, which ends the run with exit code 7, and uploads the dump when the job fails.
+- An IDE's test explorer must support Microsoft.Testing.Platform; the VSTest adapter `xunit.runner.visualstudio` is no longer referenced.
 - `IviCli.TestKit` references `xunit.v3.extensibility.core`, not `xunit.v3`: the latter turns a project into a test executable.
 
 ## Consequences
