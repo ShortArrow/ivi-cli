@@ -59,11 +59,14 @@ jobs:
 
       - name: Integration tests
         # Tests that need NI-VISA or the USB mock bench skip here; they run
-        # only where those are installed.
+        # only where those are installed. Exit code 8 means a test project
+        # has no integration tests, which is true of most of them.
         run: |
           dotnet test --no-build --configuration Release \
             --filter "Category=Integration" \
-            --logger "trx;LogFileName=integration.trx" \
+            --ignore-exit-code 8 \
+            --report-xunit-trx \
+            --hangdump --hangdump-timeout 5m --hangdump-type Heap \
             --results-directory ./TestResults
 
       - name: Upload integration test results

@@ -9,9 +9,13 @@
     <!-- CA1707: test method names follow `<Method>_<Scenario>_<Expectation>` per ADR 0009 §3. -->
     <!-- CA1062: public surface argument-null guards aren't relevant in test code. -->
     <NoWarn>$(NoWarn);CA1707;CA1062</NoWarn>
-    <!-- Run xUnit v3 under VSTest until the move to Microsoft.Testing.Platform (ADR 0009 §11). -->
-    <IsTestingPlatformApplication>false</IsTestingPlatformApplication>
-    <UseMicrosoftTestingPlatformRunner>false</UseMicrosoftTestingPlatformRunner>
+    <!-- The test executable runs Microsoft.Testing.Platform, which `dotnet test` drives through global.json (ADR 0009 §11). -->
+    <UseMicrosoftTestingPlatformRunner>true</UseMicrosoftTestingPlatformRunner>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(IsTestProject)' == 'true'">
+    <!-- xUnit v3 test projects are executables. -->
+    <OutputType>Exe</OutputType>
   </PropertyGroup>
 
   <!-- Packages useful to every test-side project (including TestKit). -->
@@ -25,12 +29,11 @@
 
   <!-- Packages exclusive to actual *.Tests projects (the test runner stack). -->
   <ItemGroup Condition="'$(IsTestProject)' == 'true'" Label="xUnit runner stack">
-    <PackageReference Include="Microsoft.NET.Test.Sdk" />
     <PackageReference Include="xunit.v3" />
     <!-- Referenced directly so the lock files hold it as Direct: Dependabot cannot bump a CentralTransitive entry. -->
     <PackageReference Include="xunit.v3.extensibility.core" />
-    <PackageReference Include="xunit.runner.visualstudio" />
-    <PackageReference Include="coverlet.collector" />
+    <PackageReference Include="coverlet.mtp" />
+    <PackageReference Include="Microsoft.Testing.Extensions.HangDump" />
   </ItemGroup>
 
   <ItemGroup Condition="'$(IsTestProject)' == 'true'">

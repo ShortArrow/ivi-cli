@@ -25,7 +25,7 @@ updates:
           - 'coverlet*'
           - 'Verify*'
           - 'NetArchTest*'
-          - 'Microsoft.NET.Test.Sdk'
+          - 'Microsoft.Testing.*'
       microsoft-extensions:
         patterns:
           - 'Microsoft.Extensions.*'
