@@ -240,8 +240,11 @@ The maintainer creates the Cloudflare Pages project and the
 ### 7. Checks in CI
 
 All of these run on GitHub-hosted runners, which cost nothing for a
-public repository. The checks read the repository and need no key, so
-they run outside the `apt-publish` environment with `contents: read`.
+public repository. The install test and the post-publish check read the
+repository and need no key, so they run outside the `apt-publish`
+environment with `contents: read`. The re-signing check runs inside
+the re-signing workflow, which holds the keys, and its issue step needs
+`issues: write`.
 
 - **Install test.** Both `.deb` files are built from a self-contained
   publish, amd64 on `ubuntu-latest` and arm64 on `ubuntu-24.04-arm`.
@@ -250,17 +253,19 @@ they run outside the `apt-publish` environment with `contents: read`.
   with `apt` in fresh `debian:bookworm` and `ubuntu:24.04` containers,
   and runs `ivicli --version`. A missing `Depends` entry for a library
   the runtime loads at start-up shows as a binary that does not start
-  in a container that has only what `apt` installed. OpenSSL and
-  `ca-certificates` are loaded only on the first TLS connection, so the
-  test does not cover them; their entries are checked by reading
-  `Depends`, not by running.
+  in a container that has only what `apt` installed. A library loaded
+  only on first use, such as OpenSSL on the first TLS connection, and the
+  certificate files of `ca-certificates` are not exercised; their
+  entries are reviewed in the pull request that changes `Depends`.
   - It runs on pull requests that change `packaging/apt/`, the
     workflows that build or publish the packages, or what decides the
-    published binary: `src/IviCli.Cli/`, `Directory.Build.props`,
+    published binary: `src/`, `Directory.Build.props`,
     `Directory.Packages.props` and `global.json`. No secret is involved,
     so pull requests from forks run it too.
-  - It also runs in `release.yml` before `gh release create`, so a
-    package that does not install never becomes a release asset.
+  - It also runs in `release.yml`, in a job after `publish` that
+    `pack`, `docker` and `release` wait for, so a package that does not
+    install stops the release before NuGet, ghcr.io or the GitHub
+    Release receives anything.
 - **After publishing.** For a stable release, once the `apt` job
   deploys, a job on each architecture follows the install guide against
   `https://pkg.shortarrow.jp/apt` in the same two containers. It checks
