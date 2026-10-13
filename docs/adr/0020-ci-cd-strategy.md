@@ -43,9 +43,9 @@ The workflow is split into three jobs (each becomes a required status check on `
 | --- | --- |
 | `pr-title-validation` | `amannn/action-semantic-pull-request` with the project's Conventional Commits type set |
 | `docs-sync-check` | If `docs/PRD.md` is touched, verify `docs/PRD.jp.md` is touched in the same PR (and vice versa). README has the equivalent check. Required only when the relevant paths are modified |
-| `build-and-test` | Combined gating job. Steps run sequentially: `dotnet tool restore` → `dotnet restore --locked-mode` → `dotnet csharpier check .` → `dotnet format analyzers --verify-no-changes --no-restore` → `dotnet build --no-restore --configuration Release` → `dotnet test --no-build --configuration Release --filter "Category!=Integration" --coverlet --coverlet-output-format cobertura --coverlet-include … --hangdump` (Microsoft.Testing.Platform, ADR 0009 §11) → conditional Codecov upload, and hang dumps uploaded when the job fails |
+| `build-and-test` | Combined gating job. Steps run sequentially: `dotnet tool restore` → `dotnet restore --locked-mode` → `dotnet csharpier check .` → `dotnet format analyzers --verify-no-changes --no-restore` → `dotnet build --no-restore --configuration Release` → `dotnet test --no-build --configuration Release --filter "Category!=Integration" --coverlet --coverlet-output-format cobertura --coverlet-include … --hangdump` (Microsoft.Testing.Platform, ADR 0009 §11) → coverage summary written to the job summary by ReportGenerator, and hang dumps uploaded when the job fails |
 
-The original ADR draft enumerated six separate jobs (`format-check` / `restore-locked` / `analyzers-check` / `build` / `test` / `coverage-upload`). The implementation collapses them into a single `build-and-test` job because (a) every step depends on the same restored NuGet cache and (b) GitHub's per-step UI surfaces failure attribution at the same granularity as per-job. Coverage upload is conditional on `CODECOV_TOKEN` and uses `fail_ci_if_error: false` — it is therefore non-blocking even within the combined job (matches §6).
+The original ADR draft enumerated six separate jobs (`format-check` / `restore-locked` / `analyzers-check` / `build` / `test` / `coverage-upload`). The implementation collapses them into a single `build-and-test` job because (a) every step depends on the same restored NuGet cache and (b) GitHub's per-step UI surfaces failure attribution at the same granularity as per-job. The coverage summary reports numbers and never fails the job on them (matches §6).
 
 All jobs are required for merge; `docs-sync-check` is conditional on path touch.
 
@@ -77,9 +77,8 @@ Code signing is **not** introduced in Phase 1. Phase 2 adds it (separate ADR).
 ### 6. Coverage
 
 - Tool: `coverlet.mtp`, referenced by every test project (ADR 0009 §7, §11).
-- Upload destination: **Codecov**.
-- Policy: visualization only; no minimum coverage threshold gates merges (ADR 0009 §9). Codecov's PR comment serves as the visibility surface.
-- Codecov upload token stored as a repository secret; missing token degrades the upload job to a no-op without failing the workflow.
+- Where it shows: the `build-and-test` job's summary on the workflow run. ReportGenerator (a local dotnet tool) merges the per-project cobertura files into line and branch coverage per assembly and class. No external coverage service is used, so there is no upload token.
+- Policy: visualization only; no minimum coverage threshold gates merges (ADR 0009 §9).
 
 ### 7. Required status checks for `main`
 
@@ -125,7 +124,6 @@ All third-party actions are pinned by commit SHA (e.g. `actions/checkout@8a4c...
 
 | Secret | Purpose | Phase |
 | --- | --- | --- |
-| `CODECOV_TOKEN` | Coverage upload (optional for public repos) | 1 |
 | Code signing certificate | Binary signing | 2 |
 
 All secrets stored as repository / environment secrets; never written to logs.
