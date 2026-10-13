@@ -51,11 +51,12 @@ All jobs are required for merge; `docs-sync-check` is conditional on path touch.
 
 ### 4. `nightly.yml`
 
-Runner matrix: `ubuntu-latest`, `windows-latest`, `macos-latest`. Each OS runs the same job set.
+`integration` runs on `ubuntu-latest`, `windows-latest` and `macos-latest`; the other jobs run on one runner each.
 
 | Job | Notes |
 | --- | --- |
-| `integration` (matrix per OS) | `dotnet test --filter "Category=Integration" --ignore-exit-code 8 --report-xunit-trx` with TRX artifact upload; exit code 8 marks a test project without integration tests. NI-VISA hardware tests run only when a self-hosted runner with hardware is configured; otherwise the job degrades to "skip with notice" (`continue-on-error: true`) |
+| `integration` (matrix per OS) | `dotnet test --filter "Category=Integration" --ignore-exit-code 8 --report-xunit-trx` with TRX artifact upload; exit code 8 marks a test project without integration tests. A test that needs NI-VISA, the USB mock bench or real hardware carries `[Requires(...)]` and is skipped with the missing prerequisite named when the runner lacks it (ADR 0037) |
+| `mock-ni-visa` (`windows-latest`) | Installs NI-VISA and usbip-win2, then has NI-VISA query ivi-cli's HiSLIP, VXI-11 and SOCKET gateways and the USB mock (ADR 0049) attached as a CDC-ACM serial port and as a USBTMC instrument |
 | `dependency-scan` | `dotnet list package --vulnerable --include-transitive`; fails the workflow when high-severity findings appear. The same job runs `dotnet list package --deprecated` as a non-fatal final step (the original ADR draft listed this as a separate `dependency-deprecated` job — collapsing avoids a duplicate restore) |
 
 The nightly workflow does not gate merges; failures open auto-filed issues (deferred — initial revision simply notifies via the workflow run status).
