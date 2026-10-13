@@ -11,8 +11,9 @@ namespace IviCli.Application.Watch;
 /// Application-layer handler for the <c>visa watch</c> verb. Loops at
 /// <see cref="WatchDevicesCommand.Interval"/>, probes every resolved
 /// device once per tick via <see cref="IDeviceStatusProbe"/>, and emits
-/// a <see cref="WatchTick"/> to the supplied sink. Cancellation exits
-/// the loop cleanly without surfacing an exception.
+/// a <see cref="WatchTick"/> to the supplied sink. Cancellation by the
+/// caller's token, at any point including while the configuration loads,
+/// ends the watch with success instead of surfacing an exception.
 /// </summary>
 public sealed class WatchDevicesCommandHandler
 {
@@ -40,7 +41,15 @@ public sealed class WatchDevicesCommandHandler
             );
         }
 
-        var configResult = await _configStore.LoadAsync(ct);
+        Result<ConfigDocument, ConfigStoreError> configResult;
+        try
+        {
+            configResult = await _configStore.LoadAsync(ct);
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            return Result.Success<Unit, WatchDevicesError>(Unit.Value);
+        }
         if (configResult is not Result<ConfigDocument, ConfigStoreError>.Ok { Value: var config })
         {
             var err = ((Result<ConfigDocument, ConfigStoreError>.Error)configResult).Err;

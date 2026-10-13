@@ -139,6 +139,26 @@ public sealed class WatchDevicesCommandHandlerTests
         result.ShouldBeOk();
     }
 
+    [Fact]
+    public async Task HandleAsync_returns_success_when_cancelled_before_the_config_loads()
+    {
+        var probe = new RecordingProbe();
+        var handler = new WatchDevicesCommandHandler(Store(Dev("psu1")), probe);
+        var sink = new CollectingSink();
+        using var cts = new CancellationTokenSource();
+        await cts.CancelAsync();
+
+        var result = await handler.HandleAsync(
+            new WatchDevicesCommand(null, TimeSpan.FromSeconds(5), MaxIterations: null),
+            sink,
+            cts.Token
+        );
+
+        result.ShouldBeOk();
+        sink.Ticks.ShouldBeEmpty();
+        probe.Calls.ShouldBeEmpty();
+    }
+
     private sealed class CollectingSink : IWatchDevicesSink
     {
         public List<WatchTick> Ticks { get; } = new();
