@@ -239,33 +239,58 @@ The maintainer creates the Cloudflare Pages project and the
 
 ### 7. Checks in CI
 
-All three run on GitHub-hosted runners, which cost nothing for a public
-repository.
+All of these run on GitHub-hosted runners, which cost nothing for a
+public repository. The checks read the repository and need no key, so
+they run outside the `apt-publish` environment with `contents: read`.
 
-- **Pull requests.** A pull request that changes `packaging/apt/` or the
-  workflows that build or publish the packages builds both `.deb` files
-  from a self-contained publish, amd64 on `ubuntu-latest` and arm64 on
-  `ubuntu-24.04-arm`. Each runner serves them from a throwaway
-  repository signed with a key generated for the run, and installs
-  `ivicli-archive-keyring` and `ivicli` with `apt` in fresh
-  `debian:bookworm` and `ubuntu:24.04` containers, then runs
-  `ivicli --version`. A missing `Depends` entry shows as a binary that
-  does not start in a container that has only what `apt` installed. No
-  secret is involved, so pull requests from forks run it too.
-- **After publishing.** Once the `apt` job deploys, a job on each
-  architecture follows the install guide against
-  `https://pkg.shortarrow.jp/apt` in the same two containers and checks
-  that `ivicli --version` reports the version just released. This is the
-  only check that goes through Cloudflare, the `_redirects` rule and
-  GitHub's asset URLs together. A failure leaves the GitHub Release in
-  place and marks the run failed; the repository is fixed and the `apt`
-  job re-run (§6).
-- **Re-signing.** The weekly re-signing ends with `apt update` against
-  the live repository in a container, and a failure of either step
-  opens an issue, or comments on the one already open. With weekly runs
+- **Install test.** Both `.deb` files are built from a self-contained
+  publish, amd64 on `ubuntu-latest` and arm64 on `ubuntu-24.04-arm`.
+  Each runner serves them from a throwaway repository signed with a key
+  generated for the run, installs `ivicli-archive-keyring` and `ivicli`
+  with `apt` in fresh `debian:bookworm` and `ubuntu:24.04` containers,
+  and runs `ivicli --version`. A missing `Depends` entry for a library
+  the runtime loads at start-up shows as a binary that does not start
+  in a container that has only what `apt` installed. OpenSSL and
+  `ca-certificates` are loaded only on the first TLS connection, so the
+  test does not cover them; their entries are checked by reading
+  `Depends`, not by running.
+  - It runs on pull requests that change `packaging/apt/`, the
+    workflows that build or publish the packages, or what decides the
+    published binary: `src/IviCli.Cli/`, `Directory.Build.props`,
+    `Directory.Packages.props` and `global.json`. No secret is involved,
+    so pull requests from forks run it too.
+  - It also runs in `release.yml` before `gh release create`, so a
+    package that does not install never becomes a release asset.
+- **After publishing.** For a stable release, once the `apt` job
+  deploys, a job on each architecture follows the install guide against
+  `https://pkg.shortarrow.jp/apt` in the same two containers. It checks
+  that `apt-cache madison ivicli` lists `<version>-1`, installs
+  `ivicli=<version>-1` and checks that `ivicli --version` reports it. It
+  names the version because a maintenance release on an older line is
+  not the highest one, and `apt install ivicli` would pick the newer
+  line (§4). This is the only check that goes through Cloudflare, the
+  `_redirects` rule and GitHub's asset URLs together. A failure leaves
+  the GitHub Release in place and marks the run failed. A failure of
+  Cloudflare, the redirect or the site is fixed and the `apt` job
+  re-run (§6). A defect in the package itself cannot be fixed by a
+  re-run, which uses the workflow and the assets of the tag: the version
+  is withdrawn (§6) and the fix ships with the next release.
+- **Re-signing.** The weekly re-signing ends by fetching the live
+  `InRelease` and checking that its `Date` and `Valid-Until` are the
+  ones just signed, then runs `apt update` against it in a container. A
+  deployment that reports success while the old index is still served
+  fails here; `apt update` alone would accept that index until it
+  expires. A failure of any step opens an issue, or comments on the one
+  already open, and the next successful run closes it. With weekly runs
   and a 90-day `Valid-Until`, about twelve runs can fail before users
   see an expired repository, and the issue makes the first failure
   visible instead of the last.
+  - A run that never starts opens no issue. GitHub disables a scheduled
+    workflow in a public repository after 60 days without activity in
+    the repository, so a quiet period longer than that is the one way
+    re-signing stops silently. The gap is accepted: any push resets the
+    60 days, and after a longer pause the maintainer re-enables the
+    workflow and runs it by hand.
 
 ## Consequences
 
@@ -315,4 +340,4 @@ Not yet verified: that the Cloudflare Pages `_redirects` rule with
 `:tag` and `:file` placeholders returns the 302 to an external host as
 intended, and the repository over Cloudflare's own certificate. Both are
 checked on a test site before the first publish, and after that by the
-post-publish check on every release (§7).
+post-publish check on every stable release (§7).
