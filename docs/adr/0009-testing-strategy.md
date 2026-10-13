@@ -114,7 +114,7 @@ Create a shared library that consolidates:
 
 ### 9. Coverage policy
 
-- Measure with coverlet and surface the result via PR comments — visualization only.
+- Measure with coverlet and show the result in the CI job's summary, merged across test projects by ReportGenerator — visualization only. No external coverage service is used.
 - **No numeric gate.** The project's policy is "stick to TDD as a behavior," and tests written after the fact to meet a coverage number distort that goal.
 - A script that mechanically detects coverage drops is acceptable for informational purposes (non-blocking).
 

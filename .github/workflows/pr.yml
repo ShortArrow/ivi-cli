@@ -234,15 +234,11 @@ jobs:
           if-no-files-found: ignore
           retention-days: 7
 
-      - name: Upload coverage to Codecov
-        if: ${{ env.CODECOV_TOKEN != '' }}
-        env:
-          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
-        uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-          directory: ./TestResults
-          fail_ci_if_error: false
+      - name: Coverage summary
+        run: |
+          dotnet reportgenerator "-reports:TestResults/*.cobertura*.xml" \
+            "-targetdir:CoverageReport" "-reporttypes:MarkdownSummaryGithub"
+          cat CoverageReport/SummaryGithub.md >> "$GITHUB_STEP_SUMMARY"
 
   # The suite has always run on Linux here and on every platform only at
   # release time, which is a bad place to learn that a test is
