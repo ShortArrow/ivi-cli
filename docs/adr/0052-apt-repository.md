@@ -237,6 +237,36 @@ pending run per group and cancels the older one.
 The maintainer creates the Cloudflare Pages project and the
 `pkg.shortarrow.jp` record once, by hand, before the first publish.
 
+### 7. Checks in CI
+
+All three run on GitHub-hosted runners, which cost nothing for a public
+repository.
+
+- **Pull requests.** A pull request that changes `packaging/apt/` or the
+  workflows that build or publish the packages builds both `.deb` files
+  from a self-contained publish, amd64 on `ubuntu-latest` and arm64 on
+  `ubuntu-24.04-arm`. Each runner serves them from a throwaway
+  repository signed with a key generated for the run, and installs
+  `ivicli-archive-keyring` and `ivicli` with `apt` in fresh
+  `debian:bookworm` and `ubuntu:24.04` containers, then runs
+  `ivicli --version`. A missing `Depends` entry shows as a binary that
+  does not start in a container that has only what `apt` installed. No
+  secret is involved, so pull requests from forks run it too.
+- **After publishing.** Once the `apt` job deploys, a job on each
+  architecture follows the install guide against
+  `https://pkg.shortarrow.jp/apt` in the same two containers and checks
+  that `ivicli --version` reports the version just released. This is the
+  only check that goes through Cloudflare, the `_redirects` rule and
+  GitHub's asset URLs together. A failure leaves the GitHub Release in
+  place and marks the run failed; the repository is fixed and the `apt`
+  job re-run (§6).
+- **Re-signing.** The weekly re-signing ends with `apt update` against
+  the live repository in a container, and a failure of either step
+  opens an issue, or comments on the one already open. With weekly runs
+  and a 90-day `Valid-Until`, about twelve runs can fail before users
+  see an expired repository, and the issue makes the first failure
+  visible instead of the last.
+
 ## Consequences
 
 - `apt update` and `apt upgrade` deliver new versions, and new keys, to
@@ -284,4 +314,5 @@ keyring failed with `EXPKEYSIG`.
 Not yet verified: that the Cloudflare Pages `_redirects` rule with
 `:tag` and `:file` placeholders returns the 302 to an external host as
 intended, and the repository over Cloudflare's own certificate. Both are
-checked on a test site before the first publish.
+checked on a test site before the first publish, and after that by the
+post-publish check on every release (§7).
