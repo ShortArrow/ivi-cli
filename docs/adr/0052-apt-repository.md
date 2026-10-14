@@ -28,7 +28,7 @@ Size also matters. The self-contained linux-x64 archive of v0.4.0 is
 47.2 MB and the linux-arm64 one 45.0 MB, so every release adds about
 90 MB of packages before the `.deb` compression is counted. GitHub Pages
 limits a site to 1 GB, which about eleven releases would exceed, and
-Cloudflare Pages refuses any single file over 25 MiB.
+Cloudflare Workers static assets refuse any single file over 25 MiB.
 
 ## Decision
 
@@ -49,14 +49,20 @@ AUR yet.
 The repository is served at `https://pkg.shortarrow.jp/apt`. The
 `shortarrow.jp` zone is already on Cloudflare.
 
-- The metadata, `dists/`, the keyring file and the keyring package are a
-  Cloudflare
-  Pages site. It is small and changes on every release and every
-  re-signing (§5).
+- The metadata, `dists/`, the keyring file and the keyring package are
+  the static assets of a Cloudflare Worker that has no script. They are
+  small and change on every release and every re-signing (§5). Requests
+  for static assets are free and unlimited, and a request no asset or
+  rule matches gets a 404.
 - The `.deb` files are GitHub Release assets and nothing else. The
   repository's `pool/<tag>/<file>` path answers with a 302 to
   `https://github.com/ShortArrow/ivi-cli/releases/download/<tag>/<file>`,
   set by one rule in the site's `_redirects`.
+
+Cloudflare Pages would serve the same files with the same `_redirects`.
+Workers static assets were chosen because Cloudflare's documentation
+describes Workers as having the broader feature set and offers a
+migration from Pages to Workers, not the reverse.
 
 A package therefore has one copy, in the release that built it, and
 every version stays installable without a size limit. The user's source
@@ -211,9 +217,10 @@ signed `Packages`. A separate
    newest published keyring package, in either direction, build a new
    keyring package and add it.
 5. Write `Release` with `Date` and `Valid-Until`, sign `InRelease`, and
-   deploy the fetched site with these changes in one Cloudflare Pages
-   deployment. A deployment replaces the whole site, so a file the job
-   did not carry forward would disappear.
+   deploy the fetched site with these changes as one new version of the
+   Worker, with `wrangler deploy`. Each version serves the files its
+   upload manifest lists and no others, so a file the job did not carry
+   forward would disappear.
 
 A rebuild input replaces steps 2 and 3: the job builds the index from
 the `.deb` assets of every stable GitHub Release, checked against each
@@ -234,8 +241,9 @@ two of them read and deploy the site at the same time, and none waiting
 behind another is cancelled. Without `queue: max`, GitHub keeps one
 pending run per group and cancels the older one.
 
-The maintainer creates the Cloudflare Pages project and the
-`pkg.shortarrow.jp` record once, by hand, before the first publish.
+The maintainer creates the Worker and attaches `pkg.shortarrow.jp` to
+it as a Custom Domain once, by hand, before the first publish;
+Cloudflare creates the DNS record and the certificate for it.
 
 ### 7. Checks in CI
 
@@ -341,8 +349,10 @@ Ed25519 keys verified with a keyring holding only one of them, in both
 containers, and one signed by a key that had expired in the client's
 keyring failed with `EXPKEYSIG`.
 
-Not yet verified: that the Cloudflare Pages `_redirects` rule with
+Not yet verified: that the Workers static assets `_redirects` rule with
 `:tag` and `:file` placeholders returns the 302 to an external host as
-intended, and the repository over Cloudflare's own certificate. Both are
-checked on a test site before the first publish, and after that by the
-post-publish check on every stable release (§7).
+intended, that a new version stops serving a file its manifest leaves
+out, and the repository over Cloudflare's own certificate. All three are
+checked on a test site before the first publish. The redirect and the
+certificate are then checked again by the post-publish check on every
+stable release (§7).
