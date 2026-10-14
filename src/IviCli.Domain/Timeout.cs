@@ -52,6 +52,18 @@ public sealed record Timeout
     public static Result<Timeout, TimeoutError> FromMilliseconds(int milliseconds) =>
         From(TimeSpan.FromMilliseconds(milliseconds));
 
+    /// <summary>
+    /// The timeout of <paramref name="milliseconds"/>, or <see cref="Maximum"/>
+    /// when that is longer. For a duration a peer chose, such as a VXI-11
+    /// client's <c>io_timeout</c>, where a value past the maximum, up to
+    /// "wait forever", asks for the longest wait the domain allows.
+    /// </summary>
+    public static Timeout AtMostMilliseconds(uint milliseconds)
+    {
+        var value = TimeSpan.FromMilliseconds(milliseconds);
+        return new Timeout(value < Maximum ? value : Maximum);
+    }
+
     /// <inheritdoc/>
     public override string ToString() => $"{Milliseconds}ms";
 }

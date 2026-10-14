@@ -438,8 +438,8 @@ public sealed class Vxi11Backend : IIviBackend, IEnforcesDeviceTimeout
             {
                 body.WriteInt32(session.LinkId);
                 body.WriteInt32(0); // flags (0 = no special semantics)
-                body.WriteUInt32(ioTimeoutMs); // io_timeout
                 body.WriteUInt32(0); // lock_timeout
+                body.WriteUInt32(ioTimeoutMs); // io_timeout
             }
         );
         await Vxi11RecordFraming.WriteRecordAsync(session.Stream, call, ct);

@@ -399,8 +399,8 @@ public sealed class Vxi11EndToEndTests
             {
                 writer.WriteInt32(lid);
                 writer.WriteInt32(0); // flags
-                writer.WriteUInt32(1000);
-                writer.WriteUInt32(0);
+                writer.WriteUInt32(0); // lock_timeout
+                writer.WriteUInt32(1000); // io_timeout
             }
         );
         await Vxi11RecordFraming.WriteRecordAsync(stream, triggerCall, cts.Token);

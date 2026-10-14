@@ -24,7 +24,9 @@ namespace IviCli.Application.Backends;
 /// backend reported <see cref="TransportTimeout"/> itself, the session is
 /// closed and reopened before the next operation, so a reply that arrives
 /// late is never read as the answer to a later request. The close gets
-/// the operation's limit as well and is abandoned past it.</item>
+/// the operation's limit as well and is abandoned past it. The reopen uses
+/// the device the session was opened with, so a timeout that one
+/// operation carried for itself does not outlive it.</item>
 /// <item>A cancellation from the caller propagates unchanged; only the
 /// deadline turns into <see cref="TransportTimeout"/>.</item>
 /// </list>
@@ -67,6 +69,13 @@ public sealed class DeviceTimeoutBackendFactory : IBackendFactory
         private int _sessionDropped;
 
         /// <summary>
+        /// The device the caller opened the session with, which a reopen
+        /// uses: an operation may carry a different timeout for itself
+        /// alone, and the reopened session must not keep it.
+        /// </summary>
+        private Device? _opened;
+
+        /// <summary>
         /// Completed while the session is usable; replaced by a pending one
         /// when this decorator drops the session, and completed again when
         /// the session is reopened or the caller closes it.
@@ -80,7 +89,13 @@ public sealed class DeviceTimeoutBackendFactory : IBackendFactory
             _grace = inner is IEnforcesDeviceTimeout ? EnforcedGrace : TimeSpan.Zero;
         }
 
-        public Task<Result<Unit, BackendError>> OpenAsync(Device device, CancellationToken ct) =>
+        public Task<Result<Unit, BackendError>> OpenAsync(Device device, CancellationToken ct)
+        {
+            Volatile.Write(ref _opened, device);
+            return Reopen(device, ct);
+        }
+
+        private Task<Result<Unit, BackendError>> Reopen(Device device, CancellationToken ct) =>
             Bounded(OpenLimit(device), t => _inner.OpenAsync(device, t), ct);
 
         public Task<Result<Unit, BackendError>> CloseAsync(Device device, CancellationToken ct)
@@ -169,7 +184,7 @@ public sealed class DeviceTimeoutBackendFactory : IBackendFactory
         {
             if (Interlocked.CompareExchange(ref _sessionDropped, 0, 1) == 1)
             {
-                var reopened = await OpenAsync(device, ct);
+                var reopened = await Reopen(Volatile.Read(ref _opened) ?? device, ct);
                 if (reopened is Result<Unit, BackendError>.Error { Err: var openError })
                 {
                     Interlocked.Exchange(ref _sessionDropped, 1);

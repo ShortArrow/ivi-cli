@@ -35,6 +35,31 @@ public class TimeoutTests
         result.ShouldBeOk().Value.ShouldBe(Timeout.Maximum);
     }
 
+    [Theory]
+    [InlineData(0u, 0)]
+    [InlineData(2_000u, 2_000)]
+    [InlineData(3_600_000u, 3_600_000)]
+    public void AtMostMilliseconds_WithinMaximum_KeepsTheDuration(uint milliseconds, int expected)
+    {
+        // Given / When
+        var timeout = Timeout.AtMostMilliseconds(milliseconds);
+
+        // Then
+        timeout.Value.ShouldBe(TimeSpan.FromMilliseconds(expected));
+    }
+
+    [Theory]
+    [InlineData(3_600_001u)]
+    [InlineData(uint.MaxValue)]
+    public void AtMostMilliseconds_PastMaximum_ReturnsMaximum(uint milliseconds)
+    {
+        // Given / When
+        var timeout = Timeout.AtMostMilliseconds(milliseconds);
+
+        // Then
+        timeout.Value.ShouldBe(Timeout.Maximum);
+    }
+
     [Fact]
     public void From_WithNegativeDuration_ReturnsInvalidTimeoutValue()
     {

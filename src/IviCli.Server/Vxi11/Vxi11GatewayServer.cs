@@ -625,6 +625,7 @@ public sealed class Vxi11GatewayServer : IGatewayServer
 
         using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(ct, state.Cts.Token);
         var opCt = linkedCts.Token;
+        var device = WithClientTimeout(state.Device, parms.IoTimeout);
         using var message = GatewayTelemetry.StartMessage(
             "vxi11",
             "scpi",
@@ -642,7 +643,7 @@ public sealed class Vxi11GatewayServer : IGatewayServer
                 await WriteWriteReplyAsync(stream, xid, Vxi11SyntaxError, size: 0, ct);
                 return;
             }
-            var resp = await state.Backend.QueryAsync(state.Device, q, opCt);
+            var resp = await state.Backend.QueryAsync(device, q, opCt);
             if (resp is Result<string, BackendError>.Ok { Value: var responseText })
             {
                 state.PendingRead = Encoding.ASCII.GetBytes(responseText);
@@ -664,7 +665,7 @@ public sealed class Vxi11GatewayServer : IGatewayServer
                 await WriteWriteReplyAsync(stream, xid, Vxi11SyntaxError, size: 0, ct);
                 return;
             }
-            var wrote = await state.Backend.WriteAsync(state.Device, c, opCt);
+            var wrote = await state.Backend.WriteAsync(device, c, opCt);
             GatewayTelemetry.Complete(message, wrote is Result<Unit, BackendError>.Ok);
             if (wrote is Result<Unit, BackendError>.Ok)
             {
@@ -756,10 +757,34 @@ public sealed class Vxi11GatewayServer : IGatewayServer
             state.SessionActivity,
             remoteParent: default
         );
-        var triggerResult = await state.Backend.TriggerAsync(state.Device, ct);
+        var triggerResult = await state.Backend.TriggerAsync(
+            WithClientTimeout(state.Device, parms.IoTimeout),
+            ct
+        );
         GatewayTelemetry.Complete(message, triggerResult is Result<Unit, BackendError>.Ok);
         await WriteErrorReplyAsync(stream, xid, ErrorCodeFor(triggerResult), ct);
     }
+
+    /// <summary>
+    /// <paramref name="device"/> with the client's <c>io_timeout</c> as its
+    /// timeout, for one backend call. The server allows at least
+    /// <c>io_timeout</c> for an operation and ends one that runs past it
+    /// with error 15 (VXI-11 Rev 1.0, B.4.3, RULE B.6.19, B.6.44); the
+    /// backend factory's <see cref="DeviceTimeoutBackendFactory"/> layer
+    /// enforces the device timeout it is handed, so the call gets the
+    /// client's limit rather than the routed device's. A value past
+    /// <see cref="Timeout.Maximum"/> is held to that maximum. An
+    /// <c>io_timeout</c> of 0 keeps the device's own timeout: a proxied
+    /// call cannot complete in no time, and taking 0 literally would fail
+    /// every call and reconnect after each one.
+    /// </summary>
+    private static Device WithClientTimeout(Device device, uint ioTimeoutMs) =>
+        ioTimeoutMs == 0
+            ? device
+            : device with
+            {
+                Timeout = Timeout.AtMostMilliseconds(ioTimeoutMs),
+            };
 
     /// <summary>
     /// The VXI-11 error code (Rev 1.0, B.5.2) a backend result reports to
