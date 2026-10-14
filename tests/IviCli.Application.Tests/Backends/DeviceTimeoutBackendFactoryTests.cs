@@ -76,6 +76,34 @@ public sealed class DeviceTimeoutBackendFactoryTests
         inner.Calls.ShouldBe(["query", "close", "open", "query"]);
     }
 
+    /// <summary>
+    /// A caller may hand an operation a device with a different timeout,
+    /// as the VXI-11 gateway does with a client's <c>io_timeout</c>; the
+    /// session reopened after that operation times out keeps the timeout it
+    /// was first opened with.
+    /// </summary>
+    [Fact]
+    public async Task A_session_reopened_after_a_timeout_keeps_the_timeout_it_was_opened_with()
+    {
+        var device = Dev(3000);
+        var shorter = device with { Timeout = Timeout.FromMilliseconds(300).ShouldBeOk() };
+        var (backend, inner, time) = Build(device);
+        (await backend.OpenAsync(device, CancellationToken.None)).ShouldBeOk();
+        inner.StallQueries = true;
+        var pending = backend.QueryAsync(shorter, Idn, CancellationToken.None);
+        time.Advance(TimeSpan.FromMilliseconds(300));
+        await pending.WaitAsync(Guard, TestContext.Current.CancellationToken);
+
+        inner.StallQueries = false;
+        (
+            await backend
+                .QueryAsync(shorter, Idn, CancellationToken.None)
+                .WaitAsync(Guard, TestContext.Current.CancellationToken)
+        ).ShouldBeOk();
+
+        inner.OpenedWith.ShouldBe([device.Timeout, device.Timeout]);
+    }
+
     [Fact]
     public async Task Closing_a_timed_out_session_is_bounded_too()
     {
@@ -392,6 +420,9 @@ public sealed class DeviceTimeoutBackendFactoryTests
         private int _srqSubscriptions;
 
         public List<string> Calls { get; } = [];
+
+        /// <summary>The device timeout each open was given, in order.</summary>
+        public List<Timeout> OpenedWith { get; } = [];
         public bool StallOpens { get; set; }
         public bool StallQueries { get; set; }
         public bool StallWrites { get; set; }
@@ -413,6 +444,7 @@ public sealed class DeviceTimeoutBackendFactoryTests
         public async Task<Result<Unit, BackendError>> OpenAsync(Device device, CancellationToken ct)
         {
             Calls.Add("open");
+            OpenedWith.Add(device.Timeout);
             await StallIf(StallOpens, ct);
             _serviceRequests = Channel.CreateUnbounded<ServiceRequest>();
             return Result.Success<Unit, BackendError>(Unit.Value);

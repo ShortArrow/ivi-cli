@@ -773,13 +773,18 @@ public sealed class Vxi11GatewayServer : IGatewayServer
     /// backend factory's <see cref="DeviceTimeoutBackendFactory"/> layer
     /// enforces the device timeout it is handed, so the call gets the
     /// client's limit rather than the routed device's. A value past
-    /// <see cref="Timeout.Maximum"/> is held to that maximum.
+    /// <see cref="Timeout.Maximum"/> is held to that maximum. An
+    /// <c>io_timeout</c> of 0 keeps the device's own timeout: a proxied
+    /// call cannot complete in no time, and taking 0 literally would fail
+    /// every call and reconnect after each one.
     /// </summary>
     private static Device WithClientTimeout(Device device, uint ioTimeoutMs) =>
-        device with
-        {
-            Timeout = Timeout.AtMostMilliseconds(ioTimeoutMs),
-        };
+        ioTimeoutMs == 0
+            ? device
+            : device with
+            {
+                Timeout = Timeout.AtMostMilliseconds(ioTimeoutMs),
+            };
 
     /// <summary>
     /// The VXI-11 error code (Rev 1.0, B.5.2) a backend result reports to

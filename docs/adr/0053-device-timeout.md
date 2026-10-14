@@ -110,5 +110,7 @@ with zero.
   token, are bounded only by their own timeouts.
 - The VXI-11 gateway hands each call the client's `io_timeout` as the
   device timeout, so this layer enforces the client's limit rather than
-  the routed device's. Behind the Local backend, VISA still cuts a
-  longer `io_timeout` short at the timeout the session was opened with.
+  the routed device's; a session reopened after a timeout keeps the
+  timeout it was opened with. Behind the Local backend only the session's
+  own timeout applies: VISA cuts a longer `io_timeout` short, and a
+  VISA call that outlasts a shorter one cannot be interrupted.

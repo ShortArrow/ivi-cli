@@ -72,6 +72,52 @@ public sealed class Vxi11GatewayIoTimeoutTests
     }
 
     [Fact]
+    public async Task A_write_past_the_clients_io_timeout_ends_with_a_timeout()
+    {
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        await using var bench = Bench.Start(
+            new Instrument(answerAfter: System.Threading.Timeout.InfiniteTimeSpan),
+            gatewayDeviceTimeout: Long,
+            ioTimeout: Short,
+            cts.Token
+        );
+
+        var result = await bench.Client.WriteAsync(
+            bench.Device,
+            ScpiCommand.From("*RST").ShouldBeOk(),
+            cts.Token
+        );
+
+        result
+            .ShouldBeOfType<Result<Unit, BackendError>.Error>()
+            .Err.ShouldBeOfType<TransportTimeout>();
+    }
+
+    /// <summary>
+    /// An <c>io_timeout</c> of 0 leaves the routed device's timeout in
+    /// place instead of failing every call at once.
+    /// </summary>
+    [Fact]
+    public async Task A_zero_io_timeout_falls_back_to_the_device_timeout()
+    {
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        await using var bench = Bench.Start(
+            new Instrument(answerAfter: Short),
+            gatewayDeviceTimeout: TimeSpan.FromSeconds(5),
+            ioTimeout: TimeSpan.Zero,
+            cts.Token
+        );
+
+        var result = await bench.Client.QueryAsync(
+            bench.Device,
+            ScpiQuery.From("*IDN?").ShouldBeOk(),
+            cts.Token
+        );
+
+        result.ShouldBeOk().ShouldBe(Instrument.Answer);
+    }
+
+    [Fact]
     public async Task A_trigger_past_the_clients_io_timeout_ends_with_a_timeout()
     {
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
@@ -184,8 +230,8 @@ public sealed class Vxi11GatewayIoTimeoutTests
     }
 
     /// <summary>
-    /// An instrument that accepts every command at once and answers a query
-    /// or completes a trigger only after <c>answerAfter</c>.
+    /// An instrument that accepts a command, answers a query and completes
+    /// a trigger only after <c>answerAfter</c>.
     /// </summary>
     private sealed class Instrument(TimeSpan answerAfter) : IIviBackend
     {
@@ -197,11 +243,15 @@ public sealed class Vxi11GatewayIoTimeoutTests
         public Task<Result<Unit, BackendError>> CloseAsync(Device device, CancellationToken ct) =>
             Task.FromResult(Result.Success<Unit, BackendError>(Unit.Value));
 
-        public Task<Result<Unit, BackendError>> WriteAsync(
+        public async Task<Result<Unit, BackendError>> WriteAsync(
             Device device,
             ScpiCommand command,
             CancellationToken ct
-        ) => Task.FromResult(Result.Success<Unit, BackendError>(Unit.Value));
+        )
+        {
+            await Task.Delay(answerAfter, ct);
+            return Result.Success<Unit, BackendError>(Unit.Value);
+        }
 
         public async Task<Result<string, BackendError>> QueryAsync(
             Device device,

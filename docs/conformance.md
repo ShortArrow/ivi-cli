@@ -75,9 +75,9 @@ abandon a VISA call in progress: only the runtime's own timeouts end one.
 | --- | --- | --- |
 | Follows | An instrument behind the gateway that times out on a write is reported to the client as error 15 (RULE B.6.19). | [ClientTimeoutTests][ct] |
 | Follows | Each `device_write` and `device_trigger` gets the `io_timeout` the client sent in place of the routed device's `timeout_ms`: the gateway waits at least that long and ends a call that runs past it with error 15 (B.4.3, RULE B.6.19, B.6.44). | [Vxi11GatewayIoTimeoutTests][gt] |
-| ivi-cli defines | A query runs during the `device_write` that carries it, so that call's `io_timeout` bounds the instrument's answer, and `device_read` returns the buffered answer at once. An `io_timeout` past one hour, including VISA's "infinite", is held to one hour, the longest device timeout ivi-cli accepts. | [Vxi11GatewayIoTimeoutTests][gt], [TimeoutTests][tt] |
+| ivi-cli defines | A query runs during the `device_write` that carries it, so that call's `io_timeout` bounds the instrument's answer, and `device_read` returns the buffered answer at once. An `io_timeout` past one hour, including VISA's "infinite", is held to one hour, the longest device timeout ivi-cli accepts. An `io_timeout` of 0 keeps the routed device's `timeout_ms`, since a proxied call cannot complete in no time. After a call times out, the session to the instrument is reopened with the device's own `timeout_ms`, not the client's. | [Vxi11GatewayIoTimeoutTests][gt], [TimeoutTests][tt], [DeviceTimeoutBackendFactoryTests][dt] |
 | ivi-cli defines | `lock_timeout` is ignored: the gateway implements no `device_lock`, so no call waits for a lock. | — |
-| Deviates | Behind the Local backend, the VISA session keeps the I/O timeout it was opened with, the device's `timeout_ms`, so VISA cuts short an `io_timeout` longer than that and the client gets error 15 early. | — |
+| Deviates | Behind the Local backend, only the device's `timeout_ms` applies, in both directions. The VISA session keeps the I/O timeout it was opened with, so VISA cuts a longer `io_timeout` short with error 15, and a VISA call cannot be interrupted, so an answer that arrives after a shorter `io_timeout` is still returned as a success. | — |
 
 ### HiSLIP client
 

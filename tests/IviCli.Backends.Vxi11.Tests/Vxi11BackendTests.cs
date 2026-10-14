@@ -210,8 +210,8 @@ public sealed class Vxi11BackendTests
             );
             var trigger = session.ReadCall();
             trigger.Procedure.ShouldBe(ProcDeviceTrigger);
-            ioTimeouts.Add(trigger.Word(2)); // lid, flags, io_timeout, lock_timeout
-            lockTimeouts.Add(trigger.Word(3));
+            ioTimeouts.Add(trigger.Word(3)); // lid, flags, lock_timeout, io_timeout
+            lockTimeouts.Add(trigger.Word(2));
             session.WriteReply(trigger.Xid, writer => writer.WriteInt32(Vxi11NoError));
         });
         var backend = new Vxi11Backend(stub.Port);
