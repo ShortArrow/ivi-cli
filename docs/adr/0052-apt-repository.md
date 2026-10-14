@@ -57,7 +57,15 @@ The repository is served at `https://pkg.shortarrow.jp/apt`. The
 - The `.deb` files are GitHub Release assets and nothing else. The
   repository's `pool/<tag>/<file>` path answers with a 302 to
   `https://github.com/ShortArrow/ivi-cli/releases/download/<tag>/<file>`,
-  set by one rule in the site's `_redirects`.
+  set by one rule in the `_redirects` file at the root of the uploaded
+  assets, which the Custom Domain serves at the host's root:
+
+  ```
+  /apt/pool/:tag/:file https://github.com/ShortArrow/ivi-cli/releases/download/:tag/:file 302
+  ```
+
+  A redirect applies whether or not an asset matches, so `pool/` never
+  holds a file of its own.
 
 Cloudflare Pages would serve the same files with the same `_redirects`.
 Workers static assets were chosen because Cloudflare's documentation
@@ -177,7 +185,9 @@ architecture without changing the line every user has already written.
   with a keyring of their choosing and maintainer scripts that run as
   root, cannot be undone by the standby key. A machine that holds or
   pins the keyring package never receives a new key.
-- The keys and the Cloudflare API token are secrets of a GitHub Actions
+- The keys and a Cloudflare API token limited to editing Workers
+  scripts on the one account, with that account's ID, are secrets of a
+  GitHub Actions
   environment, `apt-publish`, which accepts `v*` tags and the `main`
   branch. From `main`, only the re-signing and withdrawal workflows
   below name that environment. That is a convention: GitHub restricts
@@ -243,7 +253,10 @@ pending run per group and cancels the older one.
 
 The maintainer creates the Worker and attaches `pkg.shortarrow.jp` to
 it as a Custom Domain once, by hand, before the first publish;
-Cloudflare creates the DNS record and the certificate for it.
+Cloudflare creates the DNS record and the certificate for it. The
+hostname must not already have a CNAME record, and every path
+on it goes to this Worker. The Worker's `wrangler` configuration, with
+its assets directory, lives in `packaging/apt/`.
 
 ### 7. Checks in CI
 
@@ -318,8 +331,9 @@ the re-signing workflow, which holds the keys, and its issue step needs
 - The standby key must be stored offline and separately from the
   signing key, or it protects nothing.
 - Every install depends on both Cloudflare and GitHub being reachable.
-- An RPM repository, if wanted later, can sit beside `apt/` on the same
-  host and the same redirect.
+- An RPM repository, if wanted later, can sit beside `apt/` in the same
+  Worker's assets, with its own redirect rule, since the Custom Domain
+  sends the whole host to this Worker.
 
 ## Verification
 
@@ -352,7 +366,9 @@ keyring failed with `EXPKEYSIG`.
 Not yet verified: that the Workers static assets `_redirects` rule with
 `:tag` and `:file` placeholders returns the 302 to an external host as
 intended, that a new version stops serving a file its manifest leaves
-out, and the repository over Cloudflare's own certificate. All three are
-checked on a test site before the first publish. The redirect and the
+out, that files without an extension such as `InRelease` and
+`Packages` are served at their exact paths, and the repository over
+Cloudflare's own certificate. All four are checked on a test site
+before the first publish. The redirect and the
 certificate are then checked again by the post-publish check on every
 stable release (§7).
