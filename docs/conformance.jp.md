@@ -61,7 +61,10 @@ Local バックエンドは VISA ランタイムを同期的に呼び出すの�
 | 種類 | 振る舞い | テスト |
 | --- | --- | --- |
 | 準拠 | ゲートウェイの後ろの機器が書き込みでタイムアウトしたら、クライアントにエラー 15 を返します（RULE B.6.19）。 | [ClientTimeoutTests][ct] |
-| 逸脱 | クライアントが送った `io_timeout` を守りません。VXI-11 は、それを超えた呼び出しをサーバーがエラー 15 で終えることを求めています（RULE B.6.19、B.6.27、B.6.44）。[#249](https://github.com/ShortArrow/ivi-cli/issues/249) で追跡しています。 | — |
+| 準拠 | `device_write` と `device_trigger` には、転送先のデバイスの `timeout_ms` ではなく、クライアントが送った `io_timeout` を使います。少なくともその時間は待ち、それを超えた呼び出しはエラー 15 で終えます（B.4.3、RULE B.6.19、B.6.44）。 | [Vxi11GatewayIoTimeoutTests][gt] |
+| ivi-cli の定め | 問い合わせは、それを運ぶ `device_write` の間に実行します。そのため機器の応答の期限はその呼び出しの `io_timeout` で、`device_read` はためておいた応答をすぐに返します。1 時間を超える `io_timeout` は、VISA の「無限」も含めて 1 時間として扱います。ivi-cli が受け付けるデバイスの timeout の上限です。 | [Vxi11GatewayIoTimeoutTests][gt]、[TimeoutTests][tt] |
+| ivi-cli の定め | `lock_timeout` は使いません。ゲートウェイは `device_lock` を実装しておらず、ロックを待つ呼び出しがないためです。 | — |
+| 逸脱 | ローカルのバックエンドの後ろでは、VISA のセッションが開いたときの I/O タイムアウト（デバイスの `timeout_ms`）のままです。そのため、それより長い `io_timeout` は VISA に打ち切られ、クライアントには早くエラー 15 が返ります。 | — |
 
 ### HiSLIP クライアント
 
@@ -78,6 +81,8 @@ Local バックエンドは VISA ランタイムを同期的に呼び出すの�
 
 [dt]: ../tests/IviCli.Application.Tests/Backends/DeviceTimeoutBackendFactoryTests.cs
 [ct]: ../tests/IviCli.Server.Tests/ClientTimeoutTests.cs
+[gt]: ../tests/IviCli.Server.Tests/Vxi11GatewayIoTimeoutTests.cs
+[tt]: ../tests/IviCli.Domain.Tests/TimeoutTests.cs
 [bl]: ../tests/IviCli.Cli.Tests/BackendLayersTests.cs
 [lt]: ../tests/IviCli.Backends.Local.Tests/LocalBackendTests.cs
 [ve]: ../tests/IviCli.Backends.Local.Tests/VisaIoErrorsTests.cs

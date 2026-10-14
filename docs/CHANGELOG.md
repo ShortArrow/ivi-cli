@@ -22,6 +22,14 @@ All notable changes to ivi-cli are documented here. Format roughly follows
   which of these rules come from VISA, VXI-11 and HiSLIP and which ivi-cli
   defines where they are silent.
 
+- **The VXI-11 gateway honours the client's `io_timeout`.** It
+  bounded each call by the routed device's `timeout_ms` instead, so a
+  client that allowed longer got error 15 early, and one that allowed
+  less waited longer than it asked. Each `device_write` and
+  `device_trigger` now gets the client's `io_timeout`, held to one hour.
+  Behind the Local (VISA) backend, a longer `io_timeout` is still cut
+  short at the device's `timeout_ms`.
+
 - **ivicli starts on a Linux machine without ICU.** The self-contained
   Linux binaries aborted at start-up, before printing anything, with
   `Couldn't find a valid ICU package installed on the system`: slim

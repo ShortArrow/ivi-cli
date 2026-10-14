@@ -108,5 +108,7 @@ with zero.
 - A backend that does not honour cancellation is not cut short: the
   Local backend, and a plugin backend that ignores its cancellation
   token, are bounded only by their own timeouts.
-- The VXI-11 gateway still does not enforce a client's `io_timeout`
-  (#249); `docs/conformance.md` lists it as a deviation.
+- The VXI-11 gateway hands each call the client's `io_timeout` as the
+  device timeout, so this layer enforces the client's limit rather than
+  the routed device's. Behind the Local backend, VISA still cuts a
+  longer `io_timeout` short at the timeout the session was opened with.
