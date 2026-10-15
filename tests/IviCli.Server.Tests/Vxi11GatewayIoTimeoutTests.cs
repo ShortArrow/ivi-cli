@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using System.Net;
 using System.Net.Sockets;
 using System.Runtime.CompilerServices;
@@ -165,17 +164,17 @@ public sealed class Vxi11GatewayIoTimeoutTests
             cts.Token
         );
 
-        var watch = Stopwatch.StartNew();
+        using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cts.Token);
+        deadline.CancelAfter(TimeSpan.FromSeconds(5));
+
         var error = await RawWriteAsync(
             bench.Port,
             ioTimeoutMs: 300,
             lockTimeoutMs: 60_000,
-            cts.Token
+            deadline.Token
         );
-        watch.Stop();
 
         error.ShouldBe(Vxi11IoTimeout);
-        watch.Elapsed.ShouldBeLessThan(TimeSpan.FromSeconds(5));
     }
 
     /// <summary>
