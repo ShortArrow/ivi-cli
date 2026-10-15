@@ -92,6 +92,30 @@ connect short. VISA allows but does not require `viOpen`'s timeout to
 bound opening a network resource, and recommends 2000 ms when it is used
 with zero.
 
+### 5. The VXI-11 gateway bounds each call by the client's `io_timeout`
+
+A VXI-11 server allows at least the `io_timeout` a client sends and ends
+a call that runs past it with error 15 (B.4.3, RULE B.6.19, B.6.44). The
+gateway hands the backend a copy of the routed device whose timeout is
+that `io_timeout`, for each `device_write` and `device_trigger`, so the
+decorator of decision 1 enforces the client's limit rather than the
+device's.
+
+- A query runs during the `device_write` that carries it, and
+  `device_read` returns the buffered answer, so the write's `io_timeout`
+  is the one that bounds the instrument's answer.
+- An `io_timeout` past one hour, including VISA's "infinite", is held to
+  one hour, the longest device timeout ivi-cli accepts.
+- An `io_timeout` of 0 keeps the device's timeout. A proxied call cannot
+  complete in no time, and taking 0 literally would fail every call and
+  reconnect after each one.
+- A session reopened after a timeout is opened with the device it was
+  first opened with, so one call's `io_timeout` does not stay on the
+  session, or, with the pool on, on other clients' sessions for that
+  device.
+- `lock_timeout` is ignored: the gateway implements no `device_lock`, so
+  no call waits for a lock.
+
 ## Consequences
 
 - `timeout_ms` now changes behaviour on every backend. A device with the
@@ -108,9 +132,7 @@ with zero.
 - A backend that does not honour cancellation is not cut short: the
   Local backend, and a plugin backend that ignores its cancellation
   token, are bounded only by their own timeouts.
-- The VXI-11 gateway hands each call the client's `io_timeout` as the
-  device timeout, so this layer enforces the client's limit rather than
-  the routed device's; a session reopened after a timeout keeps the
-  timeout it was opened with. Behind the Local backend only the session's
-  own timeout applies: VISA cuts a longer `io_timeout` short, and a
-  VISA call that outlasts a shorter one cannot be interrupted.
+- Behind the Local backend, the VXI-11 gateway's `io_timeout` does not
+  reach VISA: the session keeps the timeout it was opened with, so VISA
+  cuts a longer `io_timeout` short, and a VISA call that outlasts a
+  shorter one cannot be interrupted.
