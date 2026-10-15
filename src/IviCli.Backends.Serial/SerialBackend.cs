@@ -55,19 +55,19 @@ public sealed class SerialBackend : IIviBackend, IEnforcesDeviceTimeout
             previous.Dispose();
         }
 
+        var opening = Task.Run(
+            () => _lines.Open(port, device.Serial ?? SerialSettings.Default, device.Timeout.Value),
+            ct
+        );
         ISerialLine line;
         try
         {
-            line = await Task.Run(
-                    () =>
-                        _lines.Open(
-                            port,
-                            device.Serial ?? SerialSettings.Default,
-                            device.Timeout.Value
-                        ),
-                    ct
-                )
-                .WaitAsync(ct);
+            line = await opening.WaitAsync(ct);
+        }
+        catch (OperationCanceledException)
+        {
+            ReleaseWhenOpened(opening);
+            throw;
         }
         catch (SerialLineUnavailableException ex)
         {
@@ -207,6 +207,18 @@ public sealed class SerialBackend : IIviBackend, IEnforcesDeviceTimeout
             );
         }
     }
+
+    /// <summary>
+    /// Releases the port an open the caller gave up on opens later: nothing
+    /// else holds the line, and a held port refuses every later open.
+    /// </summary>
+    private static void ReleaseWhenOpened(Task<ISerialLine> opening) =>
+        _ = opening.ContinueWith(
+            static opened => opened.Result.Dispose(),
+            CancellationToken.None,
+            TaskContinuationOptions.OnlyOnRanToCompletion,
+            TaskScheduler.Default
+        );
 
     /// <summary>
     /// A failure reason that names the resource masked and the exception by

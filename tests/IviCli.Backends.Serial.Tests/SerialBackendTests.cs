@@ -216,6 +216,33 @@ public sealed class SerialBackendTests
     }
 
     /// <summary>
+    /// An open the caller gave up on that completes later releases the port
+    /// it opened: nothing else will, and a held port refuses every later
+    /// open.
+    /// </summary>
+    [Fact(Timeout = 10000)]
+    public async Task An_open_given_up_on_releases_the_port_when_it_completes()
+    {
+        using var release = new ManualResetEventSlim();
+        var factory = new FakeLineFactory { OpenBlocksUntil = release };
+        var backend = new SerialBackend(factory);
+        using var giveUp = CancellationTokenSource.CreateLinkedTokenSource(
+            TestContext.Current.CancellationToken
+        );
+
+        var opening = backend.OpenAsync(Dev(), giveUp.Token);
+        await giveUp.CancelAsync();
+        await Should.ThrowAsync<OperationCanceledException>(() => opening);
+        release.Set();
+
+        for (var i = 0; i < 100 && !factory.Line.Disposed; i++)
+        {
+            await Task.Delay(20, TestContext.Current.CancellationToken);
+        }
+        factory.Line.Disposed.ShouldBeTrue();
+    }
+
+    /// <summary>
     /// A port is exclusive, so opening a device again releases its line
     /// before opening the port anew.
     /// </summary>
@@ -406,8 +433,12 @@ public sealed class SerialBackendTests
         public SerialSettings? OpenedSettings { get; private set; }
         public TimeSpan? OpenedTimeout { get; private set; }
 
+        /// <summary>Holds an open until set, as a slow driver might.</summary>
+        public ManualResetEventSlim? OpenBlocksUntil { get; init; }
+
         public ISerialLine Open(string port, SerialSettings settings, TimeSpan timeout)
         {
+            OpenBlocksUntil?.Wait();
             if (OpenFails is not null)
             {
                 throw OpenFails;
