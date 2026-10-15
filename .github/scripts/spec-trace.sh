@@ -18,9 +18,21 @@ sep=$'\x1f'
 # Prints "<kind><sep><spec cell><sep><row>" for each data row of every table.
 rows() {
   awk -F' [|] ' -v sep="$sep" '
-    /^[|]/ && body { kind = substr($1, 3); spec = $NF; sub(/ *[|]$/, "", spec); print kind sep spec sep $0; next }
-    /^[|] *---/ { body = 1; next }
+    /^[|] *:?-{3,}/ { body = 1; next }
+    /^[|]/ && body {
+      kind = $1; sub(/^[|] */, "", kind); sub(/ *$/, "", kind)
+      spec = $NF; sub(/ *[|]$/, "", spec)
+      print kind sep spec sep $0; next
+    }
     !/^[|]/ { body = 0 }
+  ' "$1"
+}
+
+# Prints the header row of each table whose last column is not "Spec".
+headers_without_spec() {
+  awk '
+    /^[|] *:?-{3,}/ { if (header !~ /[|] *Spec *[|] *$/) print header }
+    { header = $0 }
   ' "$1"
 }
 
@@ -39,15 +51,21 @@ en_rows="$(rows "$en")"
 cited="$(cut -d"$sep" -f2 <<<"$en_rows" | clauses | sort -u)"
 tagged="$(cut -f1 "$tags_file" | tr -d '\r' | sort -u)"
 
-while IFS="$sep" read -r kind spec row; do
-  [ -n "$row" ] || continue
-  if [ -z "$(clauses <<<"$spec")" ]; then
-    fail "$en: an entry cites no clause: $row"
-  fi
-  if [ "$kind" = Deviates ] && ! grep -qE '/issues/[0-9]+' <<<"$row"; then
-    fail "$en: a Deviates entry links no issue: $row"
-  fi
-done <<<"$en_rows"
+for doc in "$en" "$jp"; do
+  while read -r header; do
+    [ -n "$header" ] || continue
+    fail "$doc: a table's last column is not Spec: $header"
+  done < <(headers_without_spec "$doc")
+  while IFS="$sep" read -r kind spec row; do
+    [ -n "$row" ] || continue
+    if [ -z "$(clauses <<<"$spec")" ]; then
+      fail "$doc: an entry cites no clause: $row"
+    fi
+    if { [ "$kind" = Deviates ] || [ "$kind" = 逸脱 ]; } && ! grep -qE '/issues/[0-9]+' <<<"$row"; then
+      fail "$doc: a Deviates entry links no issue: $row"
+    fi
+  done < <(rows "$doc")
+done
 
 while read -r clause; do
   [ -n "$clause" ] || continue

@@ -84,8 +84,32 @@ jp '| 逸脱 | ローカルは io_timeout を無視する。 | VXI-11 B.4.3 |'
 expect "a deviation linking no issue" "Local ignores io_timeout."
 
 en '| Deviates | Local ignores io_timeout ([#266](https://github.com/ShortArrow/ivi-cli/issues/266)). | VXI-11 B.4.3 |'
+jp '| 逸脱 | ローカルは io_timeout を無視する（[#266](https://github.com/ShortArrow/ivi-cli/issues/266)）。 | VXI-11 B.4.3 |'
 expect "a deviation linking its issue" pass
 
+en '| Deviates  | Padded kind. | VXI-11 B.4.3 |'
+jp '| 逸脱 | 余白のある種類。 | VXI-11 B.4.3 |'
+expect "a deviation whose kind cell is padded" "Padded kind."
+
+en '| Deviates | Linked ([#266](https://github.com/ShortArrow/ivi-cli/issues/266)). | VXI-11 B.4.3 |'
+jp '| 逸脱 | リンクがない。 | VXI-11 B.4.3 |'
+expect "a Japanese deviation linking no issue" "リンクがない。"
+
+en ''
+jp ''
+cat >>"$dir/en.md" <<'EOF'
+
+| Kind | Behaviour | Spec |
+| :--- | :--- | :--- |
+| Follows | Aligned table. | VXI-11 RULE B.9.99 |
+EOF
+expect "a table whose separator has alignment colons" "VXI-11 RULE B.9.99"
+
+en ''
+sed -i 's/| Kind | Behaviour | Spec |/| Kind | Behaviour | Tests |/' "$dir/en.md"
+expect "a table whose last column is not Spec" "Tests"
+
+en '| Deviates | Linked ([#266](https://github.com/ShortArrow/ivi-cli/issues/266)). | VXI-11 B.4.3 |'
 jp '| 逸脱 | ローカルは io_timeout を無視する。 | VXI-11 B.4.4 |'
 expect "a Japanese Spec cell that differs" "jp.md"
 

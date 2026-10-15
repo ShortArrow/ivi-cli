@@ -212,7 +212,6 @@ public class LocalBackendTimeoutTests
     [Fact]
     [Spec(Standard.Visa, "§6.1.1")]
     [Spec(Standard.Visa, "§6.1.4")]
-    [Spec(Standard.Adr, "0053 §3")]
     public async Task A_VISA_timeout_is_reported_as_TransportTimeout()
     {
         var device = Dev(300);
