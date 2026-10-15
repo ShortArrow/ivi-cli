@@ -26,6 +26,43 @@ public sealed class LocalBackendVisaTerminationTests
     [Trait("Category", "Integration")]
     public async Task A_query_ends_with_the_write_terminator_and_reads_up_to_the_read_terminator()
     {
+        var (request, replies) = await Exchange(
+            Termination.Cr,
+            Termination.CrLf,
+            "1.5\r2.0\r",
+            readsAfterQuery: 1
+        );
+
+        request.ShouldBe("MEAS?\r\n");
+        replies.ShouldBe(["1.5", "2.0"]);
+    }
+
+    /// <summary>
+    /// The reply ends at exactly the read terminator, so with LF a CR before
+    /// it stays, where a line read would remove it.
+    /// </summary>
+    [Requires("ni-visa")]
+    [Trait("Category", "Integration")]
+    public async Task A_CR_before_an_LF_terminator_stays_in_the_reply()
+    {
+        var (_, replies) = await Exchange(Termination.Lf, Termination.Lf, "1.5\r\n");
+
+        replies.ShouldBe(["1.5\r"]);
+    }
+
+    /// <summary>
+    /// Sends <c>MEAS?</c> as a query to a SOCKET device with the given
+    /// terminators whose instrument answers <paramref name="answer"/>, then
+    /// reads <paramref name="readsAfterQuery"/> more replies.
+    /// </summary>
+    /// <returns>What the instrument received, and the replies in order.</returns>
+    private static async Task<(string Request, List<string> Replies)> Exchange(
+        Termination read,
+        Termination write,
+        string answer,
+        int readsAfterQuery = 0
+    )
+    {
         var ct = TestContext.Current.CancellationToken;
         using var listener = new TcpListener(IPAddress.Loopback, 0);
         listener.Start();
@@ -33,24 +70,30 @@ public sealed class LocalBackendVisaTerminationTests
         var request = new TaskCompletionSource<string>(
             TaskCreationOptions.RunContinuationsAsynchronously
         );
-        var instrument = Answer(listener, "MEAS?\r\n", "1.5\r2.0\r", request, ct);
+        var instrument = Answer(listener, "MEAS?" + write.Value, answer, request, ct);
         var device = new Device(
             DeviceName.From("dmm").ShouldBeOk(),
             VisaResource.Parse($"TCPIP0::127.0.0.1::{port}::SOCKET").ShouldBeOk(),
             Timeout.FromMilliseconds(2000).ShouldBeOk(),
-            ReadTermination: Termination.Cr,
-            WriteTermination: Termination.CrLf
+            ReadTermination: read,
+            WriteTermination: write
         );
         var backend = new LocalBackend(new VisaSessionFactory());
 
         (await backend.OpenAsync(device, ct)).ShouldBeOk();
         try
         {
-            var reply = await backend.QueryAsync(device, ScpiQuery.From("MEAS?").ShouldBeOk(), ct);
-
-            reply.ShouldBeOk().ShouldBe("1.5");
-            (await request.Task).ShouldBe("MEAS?\r\n");
-            (await backend.ReadAsync(device, ct)).ShouldBeOk().ShouldBe("2.0");
+            var replies = new List<string>
+            {
+                (
+                    await backend.QueryAsync(device, ScpiQuery.From("MEAS?").ShouldBeOk(), ct)
+                ).ShouldBeOk(),
+            };
+            for (var i = 0; i < readsAfterQuery; i++)
+            {
+                replies.Add((await backend.ReadAsync(device, ct)).ShouldBeOk());
+            }
+            return (await request.Task, replies);
         }
         finally
         {

@@ -168,10 +168,12 @@ of `"\n"`, `"\r"` or `"\r\n"`.
 ### 7. A serial port is exclusive
 
 - Opening a port that the operating system reports as busy fails with a
-  new `BackendError`, `TransportInUse`, which names the port. Whether a
-  port another program already has open is reported as busy depends on
-  the platform and that program: Windows always does, while on Linux and
-  macOS only a port opened for exclusive use is.
+  new `BackendError`, `TransportInUse`, which names the resource, masked
+  in logs. A VISA open of any resource that another session holds or has
+  locked fails with the same error. Whether a port another program already
+  has open is reported as busy depends on the platform and that program:
+  Windows always does, while on Linux and macOS only a port opened for
+  exclusive use is.
 - The pool (ADR 0038) holds a serial session as it holds a HiSLIP, VXI-11,
   SOCKET or VISA one: after release it stays open until it has been idle
   for `[pool] idle_timeout`, 60 seconds by default, or is evicted to stay

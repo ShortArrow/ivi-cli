@@ -258,17 +258,14 @@ internal static class Program
                         "true",
                         StringComparison.OrdinalIgnoreCase
                     );
-                if (!mockOnly)
-                {
-                    // [telemetry] hislip_propagation: precede each op with the
-                    // caller's W3C trace context so an ivi-cli gateway joins
-                    // the trace (ADR 0040). Off by default — foreign HiSLIP
-                    // servers answer the vendor message with a non-fatal Error.
-                    sp.GetRequiredService<IviCli.Backends.HiSlip.HiSlipBackend>().PropagateTraceContext =
-                        bootstrapConfig.Telemetry.Enabled
-                        && bootstrapConfig.Telemetry.HiSlipPropagationEnabled;
-                }
-                var factory = TransportRouting.Create(sp, fallback, mockOnly);
+                // [telemetry] hislip_propagation is off by default (ADR 0040).
+                var factory = TransportRouting.Create(
+                    sp,
+                    fallback,
+                    mockOnly,
+                    propagateTraceContext: bootstrapConfig.Telemetry.Enabled
+                        && bootstrapConfig.Telemetry.HiSlipPropagationEnabled
+                );
 
                 // Capture wraps the layered factory so logical Open/Close
                 // events still appear 1:1 in the audit trail even when the

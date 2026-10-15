@@ -38,21 +38,9 @@ public sealed class VisaSessionFactory : IVisaSessionFactory
                     new LocalVisaOpenFailure(resourceString, "resource is not message-based", null)
                 );
             }
-            // A session left to the finalizer can end the process (#228), so
-            // one that fails to set up is disposed here.
-            try
+            if (SetUp(messageBased, options) is Result<Unit, LocalVisaError>.Error refused)
             {
-                messageBased.TimeoutMilliseconds = (int)options.IoTimeout.TotalMilliseconds;
-                if (SetUp(messageBased, options) is Result<Unit, LocalVisaError>.Error refused)
-                {
-                    messageBased.Dispose();
-                    return Result.Failure<IVisaSessionHandle, LocalVisaError>(refused.Err);
-                }
-            }
-            catch
-            {
-                messageBased.Dispose();
-                throw;
+                return Result.Failure<IVisaSessionHandle, LocalVisaError>(refused.Err);
             }
             return Result.Success<IVisaSessionHandle, LocalVisaError>(
                 new VisaSessionHandle(messageBased, options)
@@ -75,28 +63,48 @@ public sealed class VisaSessionFactory : IVisaSessionFactory
     }
 
     /// <summary>
-    /// Sets up the serial line and the read terminator the options ask for
-    /// (ADR 0055 §4, §5).
+    /// Sets up a newly opened <paramref name="session"/> as
+    /// <paramref name="options"/> say: the I/O timeout, the serial line, and
+    /// the read terminator (ADR 0055 §4, §5). A session that fails to set
+    /// up is disposed, refused or thrown, since a session left to the
+    /// finalizer can end the process (#228).
     /// </summary>
-    private static Result<Unit, LocalVisaError> SetUp(
+    /// <returns>
+    /// Success, or <see cref="LocalVisaSettingRefused"/> for a serial setting
+    /// the driver refused.
+    /// </returns>
+    public static Result<Unit, LocalVisaError> SetUp(
         IMessageBasedSession session,
         VisaSessionOptions options
     )
     {
-        if (options.Serial is { } serial && session is ISerialSession serialSession)
+        ArgumentNullException.ThrowIfNull(session);
+        ArgumentNullException.ThrowIfNull(options);
+        try
         {
-            var configured = VisaSerialLine.Configure(serialSession, serial);
-            if (configured is Result<Unit, LocalVisaError>.Error)
+            session.TimeoutMilliseconds = (int)options.IoTimeout.TotalMilliseconds;
+            if (
+                options.Serial is { } serial
+                && session is ISerialSession serialSession
+                && VisaSerialLine.Configure(serialSession, serial)
+                    is Result<Unit, LocalVisaError>.Error refused
+            )
             {
-                return configured;
+                session.Dispose();
+                return refused;
             }
+            if (options.ReadTermination is { } terminator)
+            {
+                session.TerminationCharacter = VisaTermination.Character(terminator);
+                session.TerminationCharacterEnabled = true;
+            }
+            return Result.Success<Unit, LocalVisaError>(Unit.Value);
         }
-        if (options.ReadTermination is { } terminator)
+        catch
         {
-            session.TerminationCharacter = VisaTermination.Character(terminator);
-            session.TerminationCharacterEnabled = true;
+            session.Dispose();
+            throw;
         }
-        return Result.Success<Unit, LocalVisaError>(Unit.Value);
     }
 
     private sealed class VisaSessionHandle : IVisaSessionHandle

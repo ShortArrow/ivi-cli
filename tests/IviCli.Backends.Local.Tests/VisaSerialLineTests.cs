@@ -139,7 +139,8 @@ public sealed class VisaSerialLineTests
 
 /// <summary>
 /// An <see cref="ISerialSession"/> that records the properties set on it
-/// and refuses one, as a serial driver refuses a value it cannot set.
+/// and whether it was disposed, and refuses one property, as a serial
+/// driver refuses a value it cannot set, or fails on one otherwise.
 /// </summary>
 public class RecordingSerialSession : DispatchProxy
 {
@@ -147,6 +148,11 @@ public class RecordingSerialSession : DispatchProxy
 
     /// <summary>The property whose setter throws, as the runtime does.</summary>
     public string? Refuses { get; set; }
+
+    /// <summary>The property whose setter throws something the runtime does not.</summary>
+    public string? Fails { get; set; }
+
+    public bool Disposed { get; private set; }
 
     public static (ISerialSession Session, RecordingSerialSession Recorder) Create()
     {
@@ -157,6 +163,11 @@ public class RecordingSerialSession : DispatchProxy
     protected override object? Invoke(MethodInfo? targetMethod, object?[]? args)
     {
         ArgumentNullException.ThrowIfNull(targetMethod);
+        if (targetMethod.Name == nameof(IDisposable.Dispose))
+        {
+            Disposed = true;
+            return null;
+        }
         if (!targetMethod.Name.StartsWith("set_", StringComparison.Ordinal))
         {
             throw new NotSupportedException(targetMethod.Name);
@@ -165,6 +176,10 @@ public class RecordingSerialSession : DispatchProxy
         if (property == Refuses)
         {
             throw new NativeVisaException(NativeErrorCode.UnsupportedAttributeValue);
+        }
+        if (property == Fails)
+        {
+            throw new InvalidOperationException(property);
         }
         Sets.Add((property, args![0]));
         return null;

@@ -186,6 +186,33 @@ public class LocalBackendTests
         error.Cause.ShouldBeSameAs(native);
     }
 
+    /// <summary>A port's name is masked in the reason, as logs mask it (ADR 0055 §1).</summary>
+    [Fact]
+    public async Task A_refused_serial_setting_masks_the_port()
+    {
+        var factory = new FakeVisaSessionFactory
+        {
+            RefusesSetting = new LocalVisaSettingRefused(
+                "parity",
+                new Ivi.Visa.NativeVisaException(Ivi.Visa.NativeErrorCode.UnsupportedAttributeValue)
+            ),
+        };
+        var port = VisaResource.Parse("ASRL/dev/ttyUSB0::INSTR").ShouldBeOk();
+
+        var result = await new LocalBackend(factory).OpenAsync(
+            Dev("dmm", port),
+            TestContext.Current.CancellationToken
+        );
+
+        result
+            .ShouldBeError()
+            .ShouldBeOfType<TransportDisconnected>()
+            .Reason.ShouldBe(
+                $"opening {port.ToLogString()} failed: the serial driver refused parity"
+            );
+        port.ToLogString().ShouldNotContain("ttyUSB0");
+    }
+
     private static readonly VisaResource Asrl = VisaResource.Parse("ASRL1::INSTR").ShouldBeOk();
 
     private static FakeVisaSessionFactory Factory(Device device)

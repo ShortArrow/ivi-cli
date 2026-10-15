@@ -23,12 +23,16 @@ public static class TransportRouting
     /// and anything those do not take to <paramref name="fallback"/>. With
     /// <paramref name="mockOnly"/> (<c>IVICLI_MOCK_ONLY</c>) every device
     /// goes to <paramref name="fallback"/>, so nothing connects out
-    /// (ADR 0018).
+    /// (ADR 0018). <paramref name="propagateTraceContext"/> makes the HiSLIP
+    /// backend precede each operation with the caller's W3C trace context,
+    /// so an ivi-cli gateway joins the trace (ADR 0040); foreign HiSLIP
+    /// servers answer that vendor message with a non-fatal error.
     /// </summary>
     public static IBackendFactory Create(
         IServiceProvider services,
         IIviBackend fallback,
-        bool mockOnly
+        bool mockOnly,
+        bool propagateTraceContext
     )
     {
         if (mockOnly)
@@ -37,10 +41,12 @@ public static class TransportRouting
         }
         var local = services.GetRequiredService<LocalBackend>();
         var serial = services.GetRequiredService<SerialBackend>();
+        var hislip = services.GetRequiredService<HiSlipBackend>();
+        hislip.PropagateTraceContext = propagateTraceContext;
         return new DefaultBackendFactory(
             fallbackBackend: fallback,
             localBackend: local,
-            hislipBackend: services.GetRequiredService<HiSlipBackend>(),
+            hislipBackend: hislip,
             socketBackend: services.GetRequiredService<SocketBackend>(),
             vxi11Backend: services.GetRequiredService<Vxi11Backend>(),
             serialBackend: serial,

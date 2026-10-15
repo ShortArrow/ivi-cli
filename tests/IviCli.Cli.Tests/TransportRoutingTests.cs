@@ -64,15 +64,53 @@ public sealed class TransportRoutingTests
         var fallback = new FakeBackend();
 
         var backend = TransportRouting
-            .Create(Services(), fallback, mockOnly: true)
+            .Create(Services(), fallback, mockOnly: true, propagateTraceContext: false)
             .CreateFor(Device(resource))
             .ShouldBeOk();
 
         backend.ShouldBeSameAs(fallback);
     }
 
+    /// <summary>Every other resource kind goes to the backend its service registration built.</summary>
+    [Theory]
+    [InlineData("TCPIP0::host::hislip0::INSTR", typeof(HiSlipBackend))]
+    [InlineData("TCPIP0::host::inst0::INSTR", typeof(Vxi11Backend))]
+    [InlineData("TCPIP0::host::5025::SOCKET", typeof(SocketBackend))]
+    [InlineData("TCPIP0::host::gpib0,5::INSTR", typeof(LocalBackend))]
+    [InlineData("USB0::0x0699::0x0408::C012345::INSTR", typeof(LocalBackend))]
+    [InlineData("GPIB0::5::INSTR", typeof(LocalBackend))]
+    [InlineData("ASRLCOM9::INSTR", typeof(SerialBackend))]
+    public void Each_resource_kind_goes_to_its_registered_backend(string resource, Type expected)
+    {
+        var services = Services();
+
+        var backend = TransportRouting
+            .Create(services, new FakeBackend(), mockOnly: false, propagateTraceContext: false)
+            .CreateFor(Device(resource))
+            .ShouldBeOk();
+
+        backend.ShouldBeSameAs(services.GetRequiredService(expected));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void The_HiSLIP_backend_propagates_the_trace_context_as_asked(bool propagate)
+    {
+        var services = Services();
+
+        TransportRouting.Create(services, new FakeBackend(), mockOnly: false, propagate);
+
+        services.GetRequiredService<HiSlipBackend>().PropagateTraceContext.ShouldBe(propagate);
+    }
+
     private IBackendFactory Create(bool mockOnly) =>
-        TransportRouting.Create(Services(), new FakeBackend(), mockOnly);
+        TransportRouting.Create(
+            Services(),
+            new FakeBackend(),
+            mockOnly,
+            propagateTraceContext: false
+        );
 
     private ServiceProvider Services()
     {
