@@ -123,6 +123,11 @@ public sealed class TomlConfigStore : IConfigStore
             await _fs.File.WriteAllTextAsync(tempPath, serialized, ct);
             await ReplaceAsync(tempPath, ct);
         }
+        catch (OperationCanceledException)
+        {
+            DeleteQuietly(tempPath);
+            throw;
+        }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
             DeleteQuietly(tempPath);
@@ -134,7 +139,7 @@ public sealed class TomlConfigStore : IConfigStore
         return Result.Success<Unit, ConfigStoreError>(Unit.Value);
     }
 
-    /// <summary>Removes a temp file a failed save left, if it can.</summary>
+    /// <summary>Removes the temp file a failed or cancelled save left, if it can.</summary>
     private void DeleteQuietly(string tempPath)
     {
         try

@@ -71,5 +71,33 @@ public sealed class TomlConfigStoreConcurrencyTests : IDisposable
         saveFailures.ShouldBe(0);
     }
 
+    /// <summary>
+    /// Each save stages its own temp file, so one a cancelled save left would
+    /// stay for good; a cancelled save removes it. Windows refuses to replace
+    /// a file another program holds without sharing it, which keeps the save
+    /// retrying until it is cancelled; Linux and macOS replace it regardless.
+    /// </summary>
+    [Fact(Timeout = 10000)]
+    public async Task A_save_cancelled_while_retrying_leaves_no_temp_file()
+    {
+        Assert.SkipUnless(OperatingSystem.IsWindows(), "only Windows refuses the replace");
+        var path = Path.Combine(_directory, "config.toml");
+        var store = new TomlConfigStore(new FileSystem(), path);
+        (
+            await store.SaveAsync(ConfigDocument.Empty, TestContext.Current.CancellationToken)
+        ).ShouldBeOk();
+        using var held = File.Open(path, FileMode.Open, FileAccess.Read, FileShare.None);
+        using var cts = CancellationTokenSource.CreateLinkedTokenSource(
+            TestContext.Current.CancellationToken
+        );
+        cts.CancelAfter(TimeSpan.FromMilliseconds(50));
+
+        await Should.ThrowAsync<OperationCanceledException>(() =>
+            store.SaveAsync(ConfigDocument.Empty, cts.Token)
+        );
+
+        Directory.GetFiles(_directory, "*.tmp").ShouldBeEmpty();
+    }
+
     public void Dispose() => Directory.Delete(_directory, recursive: true);
 }
