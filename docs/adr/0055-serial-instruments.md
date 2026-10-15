@@ -117,11 +117,16 @@ flow_control = "none"  # none | xon_xoff | rts_cts
   configuration error.
 - The Serial backend applies them as `SerialPort` properties, and the
   Local backend as `ISerialSession` attributes. A value the platform's
-  serial driver cannot set fails the open with a message that names it.
+  serial driver cannot set fails the open, naming the setting when the
+  driver says which; the driver's own message is not passed on, since it
+  can carry the port's name.
 - Both backends assert DTR while the port is open: the Serial backend
   through `SerialPort.DtrEnable`, the Local backend through
   `VI_ATTR_ASRL_DTR_STATE`. An instrument that needs DTR to talk then
-  behaves the same on both.
+  behaves the same on both. The Serial backend raises DTR after opening
+  the port, and a port with no modem lines to raise it on, such as a
+  pseudo-terminal, is used without it: `SerialPort` fails its open when
+  asked for DTR there.
 - `visa add` takes them as options.
 
 They live on the device rather than in the resource text because VISA's
