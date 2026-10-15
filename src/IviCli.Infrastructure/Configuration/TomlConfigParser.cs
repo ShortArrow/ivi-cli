@@ -1,3 +1,5 @@
+using System.Globalization;
+using System.Text;
 using IviCli.Application.Configuration;
 using IviCli.Domain;
 using IviCli.Domain.Configuration;
@@ -59,6 +61,16 @@ public static class TomlConfigParser
     private const string PluginsTable = "plugins";
     private const string PluginsEnabledField = "enabled";
     private const string PluginsAllowedField = "allowed";
+    private const string AsrlArray = "asrl";
+    private const string BoardField = "board";
+    private const string SerialTable = "serial";
+    private const string BaudField = "baud";
+    private const string DataBitsField = "data_bits";
+    private const string ParityField = "parity";
+    private const string StopBitsField = "stop_bits";
+    private const string FlowControlField = "flow_control";
+    private const string ReadTerminationField = "read_termination";
+    private const string WriteTerminationField = "write_termination";
 
     /// <summary>
     /// Parses a TOML document into a validated <see cref="ConfigDocument"/>.
@@ -105,6 +117,42 @@ public static class TomlConfigParser
                 }
 
                 config = addOk.Value;
+            }
+        }
+
+        // ASRL board registrations (optional, ADR 0055 §3).
+        if (model.TryGetValue(AsrlArray, out var asrlValue))
+        {
+            if (asrlValue is not TomlTableArray asrlTable)
+            {
+                return Fail($"expected an array of tables at [[{AsrlArray}]]");
+            }
+            foreach (var row in asrlTable)
+            {
+                var registrationResult = ParseAsrlBoard(row);
+                if (
+                    registrationResult
+                    is not Result<AsrlBoardRegistration, ConfigStoreError>.Ok registrationOk
+                )
+                {
+                    return Result.Failure<ConfigDocument, ConfigStoreError>(
+                        (
+                            (Result<
+                                AsrlBoardRegistration,
+                                ConfigStoreError
+                            >.Error)registrationResult
+                        ).Err
+                    );
+                }
+                var addResult = config.AddAsrlBoard(registrationOk.Value);
+                if (addResult is not Result<ConfigDocument, ConfigError>.Ok asrlAddOk)
+                {
+                    return Fail(
+                        $"config validation failed: "
+                            + ((Result<ConfigDocument, ConfigError>.Error)addResult).Err.Message
+                    );
+                }
+                config = asrlAddOk.Value;
             }
         }
 
@@ -401,8 +449,33 @@ public static class TomlConfigParser
         {
             builder.AppendLine(inv, $"[[{DevicesArray}]]");
             builder.AppendLine(inv, $"{NameField} = \"{device.Name.Value}\"");
-            builder.AppendLine(inv, $"{ResourceField} = \"{FormatResource(device.Resource)}\"");
+            builder.AppendLine(inv, $"{ResourceField} = {Quote(FormatResource(device.Resource))}");
             builder.AppendLine(inv, $"{TimeoutMillisecondsField} = {device.Timeout.Milliseconds}");
+            if (device.ReadTermination is { } readTermination)
+            {
+                builder.AppendLine(inv, $"{ReadTerminationField} = {Quote(readTermination.Value)}");
+            }
+            if (device.WriteTermination is { } writeTermination)
+            {
+                builder.AppendLine(
+                    inv,
+                    $"{WriteTerminationField} = {Quote(writeTermination.Value)}"
+                );
+            }
+            if (device.Serial is { } serial && serial != SerialSettings.Default)
+            {
+                builder.AppendLine();
+                builder.AppendLine(inv, $"[{DevicesArray}.{SerialTable}]");
+                AppendSerialSettings(builder, serial);
+            }
+            builder.AppendLine();
+        }
+
+        foreach (var registration in document.AsrlBoards)
+        {
+            builder.AppendLine(inv, $"[[{AsrlArray}]]");
+            builder.AppendLine(inv, $"{BoardField} = {registration.Board}");
+            builder.AppendLine(inv, $"{PortField} = {Quote(registration.Port)}");
             builder.AppendLine();
         }
 
@@ -629,9 +702,278 @@ public static class TomlConfigParser
             return FailDevice($"invalid timeout for '{nameRaw}': {timeoutMs}");
         }
 
+        var readTermination = ParseTermination(table, ReadTerminationField, nameRaw);
+        if (readTermination is Result<Termination?, ConfigStoreError>.Error readError)
+        {
+            return Result.Failure<Device, ConfigStoreError>(readError.Err);
+        }
+        var writeTermination = ParseTermination(table, WriteTerminationField, nameRaw);
+        if (writeTermination is Result<Termination?, ConfigStoreError>.Error writeError)
+        {
+            return Result.Failure<Device, ConfigStoreError>(writeError.Err);
+        }
+        var serial = ParseSerial(table, nameRaw);
+        if (serial is Result<SerialSettings?, ConfigStoreError>.Error serialError)
+        {
+            return Result.Failure<Device, ConfigStoreError>(serialError.Err);
+        }
+
         return Result.Success<Device, ConfigStoreError>(
-            new Device(nameOk.Value, resourceOk.Value, timeoutOk.Value)
+            new Device(
+                nameOk.Value,
+                resourceOk.Value,
+                timeoutOk.Value,
+                ((Result<SerialSettings?, ConfigStoreError>.Ok)serial).Value,
+                ((Result<Termination?, ConfigStoreError>.Ok)readTermination).Value,
+                ((Result<Termination?, ConfigStoreError>.Ok)writeTermination).Value
+            )
         );
+    }
+
+    private static Result<Termination?, ConfigStoreError> ParseTermination(
+        TomlTable table,
+        string field,
+        string deviceName
+    )
+    {
+        if (!table.TryGetValue(field, out var value))
+        {
+            return Result.Success<Termination?, ConfigStoreError>(null);
+        }
+        return
+            value is string raw && Termination.From(raw) is Result<Termination, DeviceError>.Ok ok
+            ? Result.Success<Termination?, ConfigStoreError>(ok.Value)
+            : Result.Failure<Termination?, ConfigStoreError>(
+                new ConfigStoreParseFailure(
+                    $"invalid {field} for '{deviceName}': use \"\\n\", \"\\r\" or \"\\r\\n\""
+                )
+            );
+    }
+
+    private static Result<SerialSettings?, ConfigStoreError> ParseSerial(
+        TomlTable table,
+        string deviceName
+    )
+    {
+        if (!table.TryGetValue(SerialTable, out var value))
+        {
+            return Result.Success<SerialSettings?, ConfigStoreError>(null);
+        }
+        if (value is not TomlTable serial)
+        {
+            return FailSerial($"[{DevicesArray}.{SerialTable}] of '{deviceName}' must be a table");
+        }
+
+        var defaults = SerialSettings.Default;
+        var baud = defaults.Baud;
+        var dataBits = defaults.DataBits;
+        var parity = defaults.Parity;
+        var stopBits = defaults.StopBits;
+        var flowControl = defaults.FlowControl;
+
+        if (serial.TryGetValue(BaudField, out var baudValue))
+        {
+            if (baudValue is not long b || b > int.MaxValue || b < int.MinValue)
+            {
+                return FailSerial($"{BaudField} of '{deviceName}' must be an integer");
+            }
+            baud = (int)b;
+        }
+        if (serial.TryGetValue(DataBitsField, out var dataBitsValue))
+        {
+            if (dataBitsValue is not long d || d > int.MaxValue || d < int.MinValue)
+            {
+                return FailSerial($"{DataBitsField} of '{deviceName}' must be an integer");
+            }
+            dataBits = (int)d;
+        }
+        if (serial.TryGetValue(ParityField, out var parityValue))
+        {
+            if (parityValue is not string p || ParseParity(p) is not { } parsedParity)
+            {
+                return FailSerial(
+                    $"{ParityField} of '{deviceName}' must be none, odd, even, mark or space"
+                );
+            }
+            parity = parsedParity;
+        }
+        if (serial.TryGetValue(StopBitsField, out var stopBitsValue))
+        {
+            if (ParseStopBits(stopBitsValue) is not { } parsedStopBits)
+            {
+                return FailSerial($"{StopBitsField} of '{deviceName}' must be 1, 1.5 or 2");
+            }
+            stopBits = parsedStopBits;
+        }
+        if (serial.TryGetValue(FlowControlField, out var flowValue))
+        {
+            if (flowValue is not string f || ParseFlowControl(f) is not { } parsedFlow)
+            {
+                return FailSerial(
+                    $"{FlowControlField} of '{deviceName}' must be none, xon_xoff or rts_cts"
+                );
+            }
+            flowControl = parsedFlow;
+        }
+
+        return SerialSettings.From(baud, dataBits, parity, stopBits, flowControl) switch
+        {
+            Result<SerialSettings, DeviceError>.Ok ok => Result.Success<
+                SerialSettings?,
+                ConfigStoreError
+            >(ok.Value),
+            Result<SerialSettings, DeviceError>.Error err => FailSerial(
+                $"invalid serial settings for '{deviceName}': {err.Err.Message}"
+            ),
+            _ => throw new InvalidOperationException("unknown Result variant"),
+        };
+    }
+
+    private static SerialParity? ParseParity(string raw) =>
+        raw switch
+        {
+            "none" => SerialParity.None,
+            "odd" => SerialParity.Odd,
+            "even" => SerialParity.Even,
+            "mark" => SerialParity.Mark,
+            "space" => SerialParity.Space,
+            _ => null,
+        };
+
+    private static SerialStopBits? ParseStopBits(object raw) =>
+        raw switch
+        {
+            1L or 1.0 => SerialStopBits.One,
+            1.5 => SerialStopBits.OnePointFive,
+            2L or 2.0 => SerialStopBits.Two,
+            _ => null,
+        };
+
+    private static SerialFlowControl? ParseFlowControl(string raw) =>
+        raw switch
+        {
+            "none" => SerialFlowControl.None,
+            "xon_xoff" => SerialFlowControl.XonXoff,
+            "rts_cts" => SerialFlowControl.RtsCts,
+            _ => null,
+        };
+
+    /// <summary>Appends the settings that differ from <see cref="SerialSettings.Default"/>.</summary>
+    private static void AppendSerialSettings(StringBuilder builder, SerialSettings serial)
+    {
+        var inv = CultureInfo.InvariantCulture;
+        var defaults = SerialSettings.Default;
+        if (serial.Baud != defaults.Baud)
+        {
+            builder.AppendLine(inv, $"{BaudField} = {serial.Baud}");
+        }
+        if (serial.DataBits != defaults.DataBits)
+        {
+            builder.AppendLine(inv, $"{DataBitsField} = {serial.DataBits}");
+        }
+        if (serial.Parity != defaults.Parity)
+        {
+            builder.AppendLine(inv, $"{ParityField} = {Quote(FormatParity(serial.Parity))}");
+        }
+        if (serial.StopBits != defaults.StopBits)
+        {
+            builder.AppendLine(inv, $"{StopBitsField} = {FormatStopBits(serial.StopBits)}");
+        }
+        if (serial.FlowControl != defaults.FlowControl)
+        {
+            builder.AppendLine(
+                inv,
+                $"{FlowControlField} = {Quote(FormatFlowControl(serial.FlowControl))}"
+            );
+        }
+    }
+
+    private static string FormatParity(SerialParity parity) =>
+        parity switch
+        {
+            SerialParity.None => "none",
+            SerialParity.Odd => "odd",
+            SerialParity.Even => "even",
+            SerialParity.Mark => "mark",
+            SerialParity.Space => "space",
+            _ => throw new ArgumentOutOfRangeException(nameof(parity), parity, null),
+        };
+
+    private static string FormatStopBits(SerialStopBits stopBits) =>
+        stopBits switch
+        {
+            SerialStopBits.One => "1",
+            SerialStopBits.OnePointFive => "1.5",
+            SerialStopBits.Two => "2",
+            _ => throw new ArgumentOutOfRangeException(nameof(stopBits), stopBits, null),
+        };
+
+    private static string FormatFlowControl(SerialFlowControl flowControl) =>
+        flowControl switch
+        {
+            SerialFlowControl.None => "none",
+            SerialFlowControl.XonXoff => "xon_xoff",
+            SerialFlowControl.RtsCts => "rts_cts",
+            _ => throw new ArgumentOutOfRangeException(nameof(flowControl), flowControl, null),
+        };
+
+    private static Result<AsrlBoardRegistration, ConfigStoreError> ParseAsrlBoard(TomlTable row)
+    {
+        if (
+            !row.TryGetValue(BoardField, out var boardValue)
+            || boardValue is not long board
+            || board > int.MaxValue
+            || board < int.MinValue
+            || !row.TryGetValue(PortField, out var portValue)
+            || portValue is not string port
+        )
+        {
+            return Result.Failure<AsrlBoardRegistration, ConfigStoreError>(
+                new ConfigStoreParseFailure(
+                    $"[[{AsrlArray}]] entry needs an integer '{BoardField}' and a string '{PortField}'"
+                )
+            );
+        }
+        return AsrlBoardRegistration.From((int)board, port) switch
+        {
+            Result<AsrlBoardRegistration, ConfigError>.Ok ok => Result.Success<
+                AsrlBoardRegistration,
+                ConfigStoreError
+            >(ok.Value),
+            Result<AsrlBoardRegistration, ConfigError>.Error err => Result.Failure<
+                AsrlBoardRegistration,
+                ConfigStoreError
+            >(new ConfigStoreParseFailure($"invalid [[{AsrlArray}]] entry: {err.Err.Message}")),
+            _ => throw new InvalidOperationException("unknown Result variant"),
+        };
+    }
+
+    /// <summary>
+    /// A TOML basic string holding <paramref name="value"/>, with backslashes,
+    /// quotes and control characters escaped.
+    /// </summary>
+    private static string Quote(string value)
+    {
+        var builder = new StringBuilder("\"");
+        foreach (var c in value)
+        {
+            builder.Append(
+                c switch
+                {
+                    '\\' => "\\\\",
+                    '"' => "\\\"",
+                    '\n' => "\\n",
+                    '\r' => "\\r",
+                    '\t' => "\\t",
+                    < ' ' or '\u007f' => string.Create(
+                        CultureInfo.InvariantCulture,
+                        $"\\u{(int)c:X4}"
+                    ),
+                    _ => c.ToString(),
+                }
+            );
+        }
+        return builder.Append('"').ToString();
     }
 
     private static Result<PoolConfig, ConfigStoreError> ParsePool(TomlTable table)
@@ -899,6 +1241,9 @@ public static class TomlConfigParser
 
     private static Result<ConfigDocument, ConfigStoreError> Fail(string reason) =>
         Result.Failure<ConfigDocument, ConfigStoreError>(new ConfigStoreParseFailure(reason));
+
+    private static Result<SerialSettings?, ConfigStoreError> FailSerial(string reason) =>
+        Result.Failure<SerialSettings?, ConfigStoreError>(new ConfigStoreParseFailure(reason));
 
     private static Result<Device, ConfigStoreError> FailDevice(string reason) =>
         Result.Failure<Device, ConfigStoreError>(new ConfigStoreParseFailure(reason));
