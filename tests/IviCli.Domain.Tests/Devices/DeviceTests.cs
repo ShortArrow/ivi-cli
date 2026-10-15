@@ -120,4 +120,39 @@ public class DeviceTests
         changed.Serial.ShouldBeNull();
         spelled.ShouldBe(omitted);
     }
+
+    /// <summary>
+    /// HiSLIP, VXI-11, USBTMC and GPIB end messages themselves, so a
+    /// terminator set on such a device has no effect (ADR 0055 §5).
+    /// </summary>
+    [Theory]
+    [InlineData("TCPIP0::host::hislip0::INSTR", true)]
+    [InlineData("TCPIP0::host::inst0::INSTR", true)]
+    [InlineData("TCPIP0::host::INSTR", true)]
+    [InlineData("USB0::0x0699::0x0408::C012345::INSTR", true)]
+    [InlineData("GPIB0::5::INSTR", true)]
+    [InlineData("TCPIP0::host::5025::SOCKET", false)]
+    [InlineData("ASRL1::INSTR", false)]
+    [InlineData("ASRL/dev/ttyUSB0::INSTR", false)]
+    public void IgnoresTermination_WhenTheTransportEndsMessagesItself(string resource, bool ignored)
+    {
+        // Given
+        var device = new Device(Name("d"), Resource(resource), T(3000)) with
+        {
+            ReadTermination = Termination.Cr,
+        };
+
+        // When / Then
+        device.IgnoresTermination.ShouldBe(ignored);
+    }
+
+    [Fact]
+    public void IgnoresTermination_IsFalseWithoutTerminators()
+    {
+        // Given
+        var device = new Device(Name("d"), Resource("TCPIP0::host::hislip0::INSTR"), T(3000));
+
+        // When / Then
+        device.IgnoresTermination.ShouldBeFalse();
+    }
 }

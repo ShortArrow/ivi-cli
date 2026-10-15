@@ -57,6 +57,16 @@ public sealed record Device(
     /// <summary>Whether the device is on a serial line, that is, has an ASRL resource.</summary>
     public bool IsSerial => Resource is VisaResource.AsrlBoard or VisaResource.AsrlPort;
 
+    /// <summary>
+    /// Whether the device sets a terminator that has no effect: HiSLIP,
+    /// VXI-11, USBTMC and GPIB end messages themselves, so only SOCKET and
+    /// serial devices use one (ADR 0055 §5).
+    /// </summary>
+    public bool IgnoresTermination =>
+        (ReadTermination is not null || WriteTermination is not null)
+        && Resource
+            is not (VisaResource.TcpipSocket or VisaResource.AsrlBoard or VisaResource.AsrlPort);
+
     private static SerialSettings? WithoutDefaults(SerialSettings? settings) =>
         settings == SerialSettings.Default ? null : settings;
 }
