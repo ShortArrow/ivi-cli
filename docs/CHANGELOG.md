@@ -14,11 +14,12 @@ All notable changes to ivi-cli are documented here. Format roughly follows
   settings and terminators. An `ASRL1::INSTR` device opens the port its
   board is registered for in the `[[asrl]]` table, or goes through a VISA
   runtime when the board is not registered; when neither can open it, the
-  error shows the `visa asrl add` line that registers it (ADR 0055). A
-  port another program holds is reported as in use. Under
-  `IVICLI_MOCK_ONLY` a serial device answers from the mock, as every other
-  device does. Serial settings and terminators do not yet reach a device
-  opened through VISA.
+  error shows the `visa asrl add` line that registers it (ADR 0055).
+  Through VISA, the serial settings and terminators are set on the VISA
+  session and DTR is asserted, as when the port is opened directly. A
+  port another program holds is reported as in use, and so is a VISA
+  resource another session holds or has locked. Under `IVICLI_MOCK_ONLY`
+  a serial device answers from the mock, as every other device does.
 
 - **`visa asrl add`, `list` and `remove` register serial board numbers.**
   `ivicli visa asrl add 1 /dev/ttyUSB0` records which port `ASRL1::INSTR`

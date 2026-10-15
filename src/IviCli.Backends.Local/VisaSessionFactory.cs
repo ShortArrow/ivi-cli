@@ -1,5 +1,6 @@
 using Ivi.Visa;
 using IviCli.Domain;
+using IviCli.Domain.Devices;
 using IviCli.Domain.Visa;
 
 namespace IviCli.Backends.Local;
@@ -15,10 +16,10 @@ public sealed class VisaSessionFactory : IVisaSessionFactory
     /// <inheritdoc/>
     public Result<IVisaSessionHandle, LocalVisaError> Open(
         VisaResource resource,
-        TimeSpan openTimeout,
-        TimeSpan ioTimeout
+        VisaSessionOptions options
     )
     {
+        ArgumentNullException.ThrowIfNull(options);
         if (!VisaRuntime.IsInstalled)
         {
             return Result.Failure<IVisaSessionHandle, LocalVisaError>(
@@ -26,7 +27,7 @@ public sealed class VisaSessionFactory : IVisaSessionFactory
             );
         }
         var resourceString = VisaResourceFormatter.Format(resource);
-        var timeoutMs = (int)openTimeout.TotalMilliseconds;
+        var timeoutMs = (int)options.OpenTimeout.TotalMilliseconds;
         try
         {
             var session = GlobalResourceManager.Open(resourceString, AccessModes.None, timeoutMs);
@@ -37,9 +38,24 @@ public sealed class VisaSessionFactory : IVisaSessionFactory
                     new LocalVisaOpenFailure(resourceString, "resource is not message-based", null)
                 );
             }
-            messageBased.TimeoutMilliseconds = (int)ioTimeout.TotalMilliseconds;
+            // A session left to the finalizer can end the process (#228), so
+            // one that fails to set up is disposed here.
+            try
+            {
+                messageBased.TimeoutMilliseconds = (int)options.IoTimeout.TotalMilliseconds;
+                if (SetUp(messageBased, options) is Result<Unit, LocalVisaError>.Error refused)
+                {
+                    messageBased.Dispose();
+                    return Result.Failure<IVisaSessionHandle, LocalVisaError>(refused.Err);
+                }
+            }
+            catch
+            {
+                messageBased.Dispose();
+                throw;
+            }
             return Result.Success<IVisaSessionHandle, LocalVisaError>(
-                new VisaSessionHandle(messageBased, ioTimeout)
+                new VisaSessionHandle(messageBased, options)
             );
         }
         catch (Exception ex)
@@ -58,26 +74,55 @@ public sealed class VisaSessionFactory : IVisaSessionFactory
         }
     }
 
+    /// <summary>
+    /// Sets up the serial line and the read terminator the options ask for
+    /// (ADR 0055 §4, §5).
+    /// </summary>
+    private static Result<Unit, LocalVisaError> SetUp(
+        IMessageBasedSession session,
+        VisaSessionOptions options
+    )
+    {
+        if (options.Serial is { } serial && session is ISerialSession serialSession)
+        {
+            var configured = VisaSerialLine.Configure(serialSession, serial);
+            if (configured is Result<Unit, LocalVisaError>.Error)
+            {
+                return configured;
+            }
+        }
+        if (options.ReadTermination is { } terminator)
+        {
+            session.TerminationCharacter = VisaTermination.Character(terminator);
+            session.TerminationCharacterEnabled = true;
+        }
+        return Result.Success<Unit, LocalVisaError>(Unit.Value);
+    }
+
     private sealed class VisaSessionHandle : IVisaSessionHandle
     {
         private static readonly TimeSpan SrqWaitSlice = TimeSpan.FromMilliseconds(500);
 
         private readonly IMessageBasedSession _session;
         private readonly TimeSpan _ioTimeout;
+        private readonly Termination? _readTermination;
+        private readonly Termination? _writeTermination;
         private CancellationTokenSource? _srqPumpStop;
         private bool _disposed;
 
-        public VisaSessionHandle(IMessageBasedSession session, TimeSpan ioTimeout)
+        public VisaSessionHandle(IMessageBasedSession session, VisaSessionOptions options)
         {
             _session = session;
-            _ioTimeout = ioTimeout;
+            _ioTimeout = options.IoTimeout;
+            _readTermination = options.ReadTermination;
+            _writeTermination = options.WriteTermination;
         }
 
         public Result<Unit, LocalVisaError> Write(string text)
         {
             try
             {
-                _session.FormattedIO.WriteLine(text);
+                WriteMessage(text);
                 return Result.Success<Unit, LocalVisaError>(Unit.Value);
             }
             catch (Exception ex)
@@ -90,7 +135,7 @@ public sealed class VisaSessionFactory : IVisaSessionFactory
         {
             try
             {
-                _session.FormattedIO.WriteLine(text);
+                WriteMessage(text);
                 return Result.Success<string, LocalVisaError>(ReadResponse());
             }
             catch (Exception ex)
@@ -174,7 +219,27 @@ public sealed class VisaSessionFactory : IVisaSessionFactory
             }
         }
 
-        private string ReadResponse() => _session.FormattedIO.ReadLine().TrimEnd('\r', '\n');
+        private void WriteMessage(string text)
+        {
+            if (_writeTermination is { } terminator)
+            {
+                _session.RawIO.Write(VisaTermination.Encode(text, terminator));
+            }
+            else
+            {
+                _session.FormattedIO.WriteLine(text);
+            }
+        }
+
+        /// <summary>
+        /// Reads one reply: up to the termination character when a read
+        /// terminator is set, which the session ends each read at, and
+        /// otherwise a line, with a trailing CR removed (ADR 0055 §5).
+        /// </summary>
+        private string ReadResponse() =>
+            _readTermination is { } terminator
+                ? VisaTermination.ReadMessage(() => _session.RawIO.Read(), terminator)
+                : _session.FormattedIO.ReadLine().TrimEnd('\r', '\n');
 
         public void Dispose()
         {

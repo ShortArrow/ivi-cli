@@ -165,8 +165,9 @@ and `NETStandard.Library` — contribute no file to any distribution; they are
 listed because they sit in the dependency closure the check reads, and
 attributing them costs nothing. Each `runtime.<platform>.runtime.native.System.IO.Ports`
 package carries the native library `System.IO.Ports` needs on one platform:
-a self-contained archive and the container image carry the one for their own
-platform, and the `dotnet tool` package carries all of them.
+each platform's archive, self-contained or framework-dependent, and the
+container image carry the one for their own platform, and the `dotnet tool`
+package carries all of them.
 
 The MIT License, which applies to each work above with that entry's own
 copyright notice substituted:

@@ -258,48 +258,17 @@ internal static class Program
                         "true",
                         StringComparison.OrdinalIgnoreCase
                     );
-                var hislipBackend = mockOnly
-                    ? null
-                    : sp.GetRequiredService<IviCli.Backends.HiSlip.HiSlipBackend>();
-                if (hislipBackend is not null)
+                if (!mockOnly)
                 {
                     // [telemetry] hislip_propagation: precede each op with the
                     // caller's W3C trace context so an ivi-cli gateway joins
                     // the trace (ADR 0040). Off by default — foreign HiSLIP
                     // servers answer the vendor message with a non-fatal Error.
-                    hislipBackend.PropagateTraceContext =
+                    sp.GetRequiredService<IviCli.Backends.HiSlip.HiSlipBackend>().PropagateTraceContext =
                         bootstrapConfig.Telemetry.Enabled
                         && bootstrapConfig.Telemetry.HiSlipPropagationEnabled;
                 }
-                var localBackend = mockOnly
-                    ? null
-                    : sp.GetRequiredService<IviCli.Backends.Local.LocalBackend>();
-                var serialBackend = mockOnly
-                    ? null
-                    : sp.GetRequiredService<IviCli.Backends.Serial.SerialBackend>();
-                IviCli.Application.Backends.IBackendFactory factory =
-                    new IviCli.Infrastructure.Backends.DefaultBackendFactory(
-                        fallbackBackend: fallback,
-                        localBackend: localBackend,
-                        hislipBackend: hislipBackend,
-                        socketBackend: mockOnly
-                            ? null
-                            : sp.GetRequiredService<IviCli.Backends.Socket.SocketBackend>(),
-                        vxi11Backend: mockOnly
-                            ? null
-                            : sp.GetRequiredService<IviCli.Backends.Vxi11.Vxi11Backend>(),
-                        serialBackend: serialBackend,
-                        // ASRL<board>::INSTR: a board the [[asrl]] table registers
-                        // opens on the serial backend, any other through VISA
-                        // (ADR 0055 §2, §3).
-                        asrlBoardBackend: serialBackend is null
-                            ? null
-                            : new IviCli.Infrastructure.Backends.AsrlBoardBackend(
-                                sp.GetRequiredService<IviCli.Application.Configuration.IConfigStore>(),
-                                serialBackend,
-                                localBackend
-                            )
-                    );
+                var factory = TransportRouting.Create(sp, fallback, mockOnly);
 
                 // Capture wraps the layered factory so logical Open/Close
                 // events still appear 1:1 in the audit trail even when the

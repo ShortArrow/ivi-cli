@@ -63,10 +63,11 @@ public sealed record TransportDisconnected(string Reason, Exception? InnerExcept
 }
 
 /// <summary>
-/// The port is held by another program or session, so it cannot be opened
-/// (ADR 0055 §7).
+/// The resource is held by another program or session, so it cannot be
+/// opened: a serial port the operating system reports as busy, or a VISA
+/// resource another session holds or has locked (ADR 0055 §7).
 /// </summary>
-/// <param name="Device">The device whose port is busy.</param>
+/// <param name="Device">The device whose resource is busy.</param>
 /// <param name="Resource">The device's resource, masked in logs.</param>
 /// <param name="InnerException">Optional adapter-captured exception, for diagnostic logs only.</param>
 public sealed record TransportInUse(
@@ -79,11 +80,12 @@ public sealed record TransportInUse(
     public override LogSeverity Severity => LogSeverity.Error;
 
     /// <inheritdoc/>
-    public override string Message => "the port of {Device} ({Resource}) is in use";
+    public override string Message =>
+        "{Resource} of {Device} is in use by another program or session";
 
     /// <inheritdoc/>
     public override IReadOnlyList<object?> LogArgs =>
-        new object?[] { Device, Resource.ToLogString() };
+        new object?[] { Resource.ToLogString(), Device };
 
     /// <inheritdoc/>
     public override Exception? Cause => InnerException;
@@ -130,7 +132,12 @@ public sealed record VisaRuntimeMissing(string Detail) : BackendError
 /// <summary>The VISA runtime does not know the resource.</summary>
 /// <param name="Device">The device.</param>
 /// <param name="Resource">The device's resource, masked in logs.</param>
-public sealed record ResourceNotFound(DeviceName Device, VisaResource Resource) : BackendError
+/// <param name="InnerException">Optional adapter-captured exception, for diagnostic logs only.</param>
+public sealed record ResourceNotFound(
+    DeviceName Device,
+    VisaResource Resource,
+    Exception? InnerException = null
+) : BackendError
 {
     /// <inheritdoc/>
     public override LogSeverity Severity => LogSeverity.Error;
@@ -141,6 +148,9 @@ public sealed record ResourceNotFound(DeviceName Device, VisaResource Resource) 
     /// <inheritdoc/>
     public override IReadOnlyList<object?> LogArgs =>
         new object?[] { Resource.ToLogString(), Device };
+
+    /// <inheritdoc/>
+    public override Exception? Cause => InnerException;
 }
 
 /// <summary>The instrument did not respond to the request.</summary>

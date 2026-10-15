@@ -52,6 +52,27 @@ public sealed record LocalVisaOpenFailure(string Resource, string Detail, Except
     public override Exception? Cause => Inner;
 }
 
+/// <summary>
+/// The serial driver refused a serial setting while the session was set up
+/// (ADR 0055 §4).
+/// </summary>
+/// <param name="Setting">The setting's configuration name, such as <c>baud</c>.</param>
+/// <param name="Inner">The runtime's exception, for diagnostic logs only.</param>
+public sealed record LocalVisaSettingRefused(string Setting, Exception Inner) : LocalVisaError
+{
+    /// <inheritdoc/>
+    public override LogSeverity Severity => LogSeverity.Error;
+
+    /// <inheritdoc/>
+    public override string Message => "the serial driver refused {Setting}";
+
+    /// <inheritdoc/>
+    public override IReadOnlyList<object?> LogArgs => new object?[] { Setting };
+
+    /// <inheritdoc/>
+    public override Exception? Cause => Inner;
+}
+
 /// <summary>An IO operation against an open session failed.</summary>
 public sealed record LocalVisaIoFailure(string Detail, Exception? Inner) : LocalVisaError
 {
