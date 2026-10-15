@@ -144,8 +144,11 @@ jobs:
           head="${{ github.event.pull_request.head.sha }}"
           changed=$(git diff --name-only "$base" "$head")
           # Docs-only = every changed path is a *.md file or lives under docs/.
-          # Anything else (code, csproj, Dockerfile, workflows, …) needs the build.
-          if echo "$changed" | grep -qvE '(\.md$|^docs/)'; then
+          # Anything else (code, csproj, Dockerfile, workflows, …) needs the build,
+          # and so does the conformance document, which is checked against the
+          # tests (ADR 0054).
+          if echo "$changed" | grep -qvE '(\.md$|^docs/)' \
+            || echo "$changed" | grep -qE '^docs/conformance(\.jp)?\.md$'; then
             echo "code=true" >> "$GITHUB_OUTPUT"
           else
             echo "code=false" >> "$GITHUB_OUTPUT"
@@ -214,6 +217,18 @@ jobs:
 
       - name: Build
         run: dotnet build --no-restore --configuration Release
+
+      - name: Conformance document against the tests' Spec traits
+        run: |
+          set -euo pipefail
+          bash .github/scripts/spec-trace.test.sh
+          for project in tests/*.Tests; do
+            name="$(basename "$project")"
+            dotnet "$(ls "$project"/bin/Release/*/"$name".dll)" --list-tests json
+          done \
+            | jq -r '.tests[] | .displayName as $test | .traits[]? | select(.key == "Spec") | "\(.value)\t\($test)"' \
+            >"$RUNNER_TEMP/spec-tags.tsv"
+          bash .github/scripts/spec-trace.sh "$RUNNER_TEMP/spec-tags.tsv" docs/conformance.md docs/conformance.jp.md
 
       - name: Test (unit + architecture)
         run: |
