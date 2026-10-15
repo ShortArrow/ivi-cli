@@ -38,6 +38,9 @@ public static class ApplicationServiceCollectionExtensions
         services.AddSingleton<IDeviceStatusProbe, DefaultDeviceStatusProbe>();
         services.AddSingleton<StatusDeviceCommandHandler>();
         services.AddSingleton<ScanDevicesQueryHandler>();
+        services.AddSingleton<AddAsrlBoardCommandHandler>();
+        services.AddSingleton<RemoveAsrlBoardCommandHandler>();
+        services.AddSingleton<ListAsrlBoardsQueryHandler>();
         services.AddSingleton<DoctorQueryHandler>();
         services.AddSingleton<ScriptDeviceCommandHandler>();
         services.AddSingleton<MonitorDeviceCommandHandler>();

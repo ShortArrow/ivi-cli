@@ -4,6 +4,7 @@ using IviCli.Application.Auth;
 using IviCli.Application.Backends;
 using IviCli.Application.Capture;
 using IviCli.Application.Configuration;
+using IviCli.Application.Devices;
 using IviCli.Application.Drivers;
 using IviCli.Application.Mock;
 using IviCli.Application.Servers;
@@ -11,6 +12,7 @@ using IviCli.Application.Session;
 using IviCli.Infrastructure.Audit;
 using IviCli.Infrastructure.Backends;
 using IviCli.Infrastructure.Configuration;
+using IviCli.Infrastructure.Devices;
 using IviCli.Infrastructure.Drivers;
 using IviCli.Infrastructure.Mock;
 using IviCli.Infrastructure.Servers;
@@ -44,6 +46,9 @@ public static class InfrastructureServiceCollectionExtensions
     )
     {
         services.AddSingleton<IFileSystem, FileSystem>();
+        services.AddSingleton<ISerialPorts>(sp => new SystemSerialPorts(
+            sp.GetRequiredService<IFileSystem>()
+        ));
         services.AddSingleton<IConfigStore>(sp => new TomlConfigStore(
             sp.GetRequiredService<IFileSystem>(),
             configPath
