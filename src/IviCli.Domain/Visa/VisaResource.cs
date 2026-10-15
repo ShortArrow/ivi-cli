@@ -13,8 +13,9 @@ namespace IviCli.Domain.Visa;
 /// dispatches today: <see cref="Tcpip"/> (LXI / HiSLIP / VXI-11
 /// instrument), <see cref="TcpipSocket"/> (raw-socket SCPI on a
 /// TCP port — see ADR 0018 §3), <see cref="Usb"/>, and
-/// <see cref="Gpib"/>. Additional transports are added as new
-/// backend dispatch cases land.
+/// <see cref="Gpib"/>, and the two serial forms <see cref="AsrlBoard"/>
+/// and <see cref="AsrlPort"/> (ADR 0055). Additional transports are added
+/// as new backend dispatch cases land.
 /// </remarks>
 public abstract partial record VisaResource
 {
@@ -191,6 +192,43 @@ public abstract partial record VisaResource
                 );
     }
 
+    /// <summary>
+    /// A serial resource named by board number, <c>ASRL1::INSTR</c>. Which
+    /// port the board is comes from the machine's <c>[[asrl]]</c>
+    /// registrations or from a VISA runtime (ADR 0055 §2).
+    /// </summary>
+    /// <param name="Board">The board number; <c>ASRL::INSTR</c> is board <c>0</c>.</param>
+    public sealed record AsrlBoard(int Board) : VisaResource
+    {
+        // A board number carries no sensitive segment.
+        /// <inheritdoc/>
+        public override string ToLogString() => ToCanonical();
+
+        /// <inheritdoc/>
+        public override string ToCanonical() =>
+            string.Create(CultureInfo.InvariantCulture, $"ASRL{Board}::INSTR");
+    }
+
+    /// <summary>
+    /// A serial resource named by port, <c>ASRL/dev/ttyUSB0::INSTR</c> or
+    /// <c>ASRLCOM3::INSTR</c>, opened without a VISA runtime (ADR 0055 §2).
+    /// </summary>
+    /// <param name="Port">
+    /// The port name; never only digits, which would name a board instead.
+    /// </param>
+    public sealed record AsrlPort(string Port) : VisaResource
+    {
+        /// <summary>
+        /// Masks the port name: a stable name such as
+        /// <c>/dev/serial/by-id/usb-FTDI_…</c> carries the adapter's serial
+        /// number.
+        /// </summary>
+        public override string ToLogString() => "ASRL***::INSTR";
+
+        /// <inheritdoc/>
+        public override string ToCanonical() => $"ASRL{Port}::INSTR";
+    }
+
     /// <summary>Inclusive upper bound for GPIB primary and secondary addresses.</summary>
     public const int MaxGpibAddress = 30;
 
@@ -202,6 +240,9 @@ public abstract partial record VisaResource
 
     [GeneratedRegex("^GPIB(?<board>[0-9]*)$")]
     private static partial Regex GpibPrefix();
+
+    [GeneratedRegex("^ASRL(?<board>[0-9]*)$")]
+    private static partial Regex AsrlBoardPrefix();
 
     [GeneratedRegex("^0[xX](?<hex>[0-9a-fA-F]{4})$")]
     private static partial Regex UsbIdentifier();
@@ -248,6 +289,11 @@ public abstract partial record VisaResource
         if (segments[0].StartsWith("GPIB", StringComparison.Ordinal))
         {
             return ParseGpib(raw, segments);
+        }
+
+        if (segments[0].StartsWith("ASRL", StringComparison.Ordinal))
+        {
+            return ParseAsrl(raw, segments);
         }
 
         return Fail(raw);
@@ -463,6 +509,40 @@ public abstract partial record VisaResource
         return Result.Success<VisaResource, VisaResourceError>(
             new Gpib(board, primaryAddress, secondaryAddress)
         );
+    }
+
+    private static Result<VisaResource, VisaResourceError> ParseAsrl(string raw, string[] segments)
+    {
+        // Accepted forms:
+        //   ASRL[N]::INSTR      board N, 0 when omitted
+        //   ASRL<port>::INSTR   a port name that is not only digits
+        if (segments.Length != 2 || segments[1] != InstrSuffix)
+        {
+            return Fail(raw);
+        }
+
+        var boardMatch = AsrlBoardPrefix().Match(segments[0]);
+        if (!boardMatch.Success)
+        {
+            return Result.Success<VisaResource, VisaResourceError>(
+                new AsrlPort(segments[0]["ASRL".Length..])
+            );
+        }
+
+        var boardText = boardMatch.Groups["board"].Value;
+        if (boardText.Length == 0)
+        {
+            return Result.Success<VisaResource, VisaResourceError>(new AsrlBoard(0));
+        }
+
+        return int.TryParse(
+            boardText,
+            NumberStyles.None,
+            CultureInfo.InvariantCulture,
+            out var board
+        )
+            ? Result.Success<VisaResource, VisaResourceError>(new AsrlBoard(board))
+            : Fail(raw);
     }
 
     private static bool TryParseGpibAddress(string raw, out int address)

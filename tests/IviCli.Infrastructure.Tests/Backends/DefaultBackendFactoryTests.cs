@@ -113,6 +113,40 @@ public sealed class DefaultBackendFactoryTests
         picked.ShouldBe("hislip");
     }
 
+    /// <summary>
+    /// No backend opens a serial resource yet, so it fails instead of
+    /// answering from the Fake backend (ADR 0055 §2).
+    /// </summary>
+    [Theory]
+    [InlineData("ASRL1::INSTR")]
+    [InlineData("ASRL/dev/ttyUSB0::INSTR")]
+    public void A_serial_resource_is_an_unsupported_transport(string resource)
+    {
+        var factory = new DefaultBackendFactory(
+            new MarkerBackend("fallback"),
+            localBackend: new MarkerBackend("local")
+        );
+
+        var result = factory.CreateFor(BuildDevice(resource));
+
+        result.ShouldBeError().ShouldBeOfType<UnsupportedTransport>();
+    }
+
+    [Theory]
+    [InlineData("ASRL1::INSTR")]
+    [InlineData("ASRL/dev/ttyUSB0::INSTR")]
+    public void A_serial_resource_with_an_active_scenario_reaches_the_mock(string resource)
+    {
+        var factory = new DefaultBackendFactory(
+            new ScenarioAwareMarkerBackend("fallback", hasActiveScenario: true)
+        );
+
+        var picked = (ScenarioAwareMarkerBackend)
+            factory.CreateFor(BuildDevice(resource)).ShouldBeOk();
+
+        picked.Tag.ShouldBe("fallback");
+    }
+
     private static Device BuildDevice(string resource) =>
         new(
             DeviceName.From("d").ShouldBeOk(),
