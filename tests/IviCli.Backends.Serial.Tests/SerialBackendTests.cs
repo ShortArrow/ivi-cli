@@ -86,11 +86,11 @@ public sealed class SerialBackendTests
     }
 
     /// <summary>
-    /// A setting the platform's driver cannot set, such as 1.5 stop bits on
-    /// Linux, fails the open with the driver's message (ADR 0055 §4).
+    /// A setting the port refuses fails the open and names the setting, but
+    /// not with the exception's message, which can carry the port (ADR 0055 §4).
     /// </summary>
     [Fact]
-    public async Task A_setting_the_driver_refuses_fails_the_open_with_its_message()
+    public async Task A_setting_the_port_refuses_fails_the_open_naming_it()
     {
         var factory = new FakeLineFactory
         {
@@ -134,6 +134,101 @@ public sealed class SerialBackendTests
         var error = result.ShouldBeError();
         error.Cause.ShouldBeNull();
         string.Join(" ", error.LogArgs).ShouldNotContain("A1B2C3");
+    }
+
+    /// <summary>
+    /// A refused port name is a port that cannot be opened, not a refused
+    /// setting.
+    /// </summary>
+    [Fact]
+    public async Task A_refused_port_name_is_not_reported_as_a_refused_setting()
+    {
+#pragma warning disable CA2208 // Mimics SerialPort, which names its own portName parameter.
+        var factory = new FakeLineFactory
+        {
+            OpenFails = new ArgumentException("bad port", "portName"),
+        };
+#pragma warning restore CA2208
+
+        var result = await new SerialBackend(factory).OpenAsync(Dev(), Ct);
+
+        result
+            .ShouldBeError()
+            .ShouldBeOfType<TransportDisconnected>()
+            .Reason.ShouldNotContain("refused");
+    }
+
+    /// <summary>
+    /// A port the operating system names as missing, or as one the user may
+    /// not open, says so in words the port name is not part of.
+    /// </summary>
+    [Fact]
+    public async Task A_port_that_is_unavailable_says_why()
+    {
+        var factory = new FakeLineFactory
+        {
+            OpenFails = new SerialLineUnavailableException("the port does not exist"),
+        };
+
+        var result = await new SerialBackend(factory).OpenAsync(Dev(), Ct);
+
+        result
+            .ShouldBeError()
+            .ShouldBeOfType<TransportDisconnected>()
+            .Reason.ShouldContain("the port does not exist");
+    }
+
+    /// <summary>
+    /// A port call that never returns is abandoned at the device timeout by
+    /// the timeout decorator, which needs the call off the caller's thread
+    /// and the wait to honour cancellation (ADR 0055 §8).
+    /// </summary>
+    [Fact(Timeout = 10000)]
+    public async Task A_read_that_never_returns_is_abandoned_at_the_device_timeout()
+    {
+        var factory = new FakeLineFactory();
+        using var release = new ManualResetEventSlim();
+        factory.Line.ReadBlocksUntil = release;
+        var device = Dev(timeoutMs: 200);
+        var bounded = new DeviceTimeoutBackendFactory(
+            new FakeBackendFactory(new SerialBackend(factory)),
+            TimeProvider.System
+        )
+            .CreateFor(device)
+            .ShouldBeOk();
+        try
+        {
+            (await bounded.OpenAsync(device, TestContext.Current.CancellationToken)).ShouldBeOk();
+
+            var read = bounded.ReadAsync(device, TestContext.Current.CancellationToken);
+            var finished = await Task.WhenAny(
+                read,
+                Task.Delay(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken)
+            );
+
+            finished.ShouldBe(read);
+            (await read).ShouldBeError().ShouldBeOfType<TransportTimeout>();
+        }
+        finally
+        {
+            release.Set();
+        }
+    }
+
+    /// <summary>
+    /// A port is exclusive, so opening a device again releases its line
+    /// before opening the port anew.
+    /// </summary>
+    [Fact]
+    public async Task Opening_an_open_device_again_releases_its_line_first()
+    {
+        var factory = new FakeLineFactory { Exclusive = true };
+        var backend = new SerialBackend(factory);
+        (await backend.OpenAsync(Dev(), Ct)).ShouldBeOk();
+
+        var reopened = await backend.OpenAsync(Dev(), Ct);
+
+        reopened.ShouldBeOk();
     }
 
     [Fact]
@@ -300,8 +395,13 @@ public sealed class SerialBackendTests
 
     private sealed class FakeLineFactory : ISerialLineFactory
     {
-        public FakeLine Line { get; } = new();
+        public FakeLine Line { get; private set; } = new();
         public Exception? OpenFails { get; init; }
+
+        /// <summary>Refuse to open while the last line is still open, as an exclusive port does.</summary>
+        public bool Exclusive { get; init; }
+
+        private bool _opened;
         public string? OpenedPort { get; private set; }
         public SerialSettings? OpenedSettings { get; private set; }
         public TimeSpan? OpenedTimeout { get; private set; }
@@ -312,6 +412,15 @@ public sealed class SerialBackendTests
             {
                 throw OpenFails;
             }
+            if (Exclusive && _opened)
+            {
+                if (!Line.Disposed)
+                {
+                    throw new UnauthorizedAccessException("the port is in use");
+                }
+                Line = new FakeLine();
+            }
+            _opened = true;
             OpenedPort = port;
             OpenedSettings = settings;
             OpenedTimeout = timeout;
@@ -326,6 +435,7 @@ public sealed class SerialBackendTests
         public Queue<string> Replies { get; } = new();
         public Exception? ReadFails { get; set; }
         public Exception? WriteFails { get; set; }
+        public ManualResetEventSlim? ReadBlocksUntil { get; set; }
         public bool Disposed { get; private set; }
 
         public void Write(string text)
@@ -339,6 +449,11 @@ public sealed class SerialBackendTests
 
         public string ReadTo(string terminator)
         {
+            if (ReadBlocksUntil is { } release)
+            {
+                release.Wait();
+                throw new TimeoutException();
+            }
             if (ReadFails is not null)
             {
                 throw ReadFails;

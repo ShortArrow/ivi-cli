@@ -48,17 +48,33 @@ public sealed class SerialBackend : IIviBackend, IEnforcesDeviceTimeout
             return Result.Failure<Unit, BackendError>(new UnsupportedTransport(device.Name));
         }
 
+        if (_sessions.TryRemove(device.Name, out var previous))
+        {
+            // A port is exclusive: release this device's line before opening
+            // the port again.
+            previous.Dispose();
+        }
+
         ISerialLine line;
         try
         {
             line = await Task.Run(
-                () =>
-                    _lines.Open(
-                        port,
-                        device.Serial ?? SerialSettings.Default,
-                        device.Timeout.Value
-                    ),
-                ct
+                    () =>
+                        _lines.Open(
+                            port,
+                            device.Serial ?? SerialSettings.Default,
+                            device.Timeout.Value
+                        ),
+                    ct
+                )
+                .WaitAsync(ct);
+        }
+        catch (SerialLineUnavailableException ex)
+        {
+            return Result.Failure<Unit, BackendError>(
+                new TransportDisconnected(
+                    $"opening {device.Resource.ToLogString()} failed: {ex.Message}"
+                )
             );
         }
         catch (UnauthorizedAccessException)
@@ -88,10 +104,6 @@ public sealed class SerialBackend : IIviBackend, IEnforcesDeviceTimeout
             );
         }
 
-        if (_sessions.TryRemove(device.Name, out var previous))
-        {
-            previous.Dispose();
-        }
         _sessions[device.Name] = line;
         return Result.Success<Unit, BackendError>(Unit.Value);
     }
@@ -179,7 +191,9 @@ public sealed class SerialBackend : IIviBackend, IEnforcesDeviceTimeout
         }
         try
         {
-            return Result.Success<T, BackendError>(await Task.Run(() => operation(line), ct));
+            return Result.Success<T, BackendError>(
+                await Task.Run(() => operation(line), ct).WaitAsync(ct)
+            );
         }
         catch (TimeoutException)
         {

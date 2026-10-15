@@ -9,8 +9,8 @@ public sealed class SerialPortLineFactory : ISerialLineFactory
 {
     private const string WindowsDevicePrefix = @"\\.\";
 
-    /// <summary>EBUSY, which Linux and macOS give for a port opened for exclusive use.</summary>
-    private const int Busy = 16;
+    private const int NoSuchPort = 2; // ENOENT on Linux and macOS
+    private const int PermissionDenied = 13; // EACCES on Linux and macOS
 
     /// <inheritdoc/>
     public ISerialLine Open(string port, SerialSettings settings, TimeSpan timeout)
@@ -23,18 +23,42 @@ public sealed class SerialPortLineFactory : ISerialLineFactory
             AssertDtr(serialPort);
             return new SerialPortLine(serialPort);
         }
-        catch (IOException ex) when (!OperatingSystem.IsWindows() && ex.HResult == Busy)
-        {
-            // SerialPort opens a port for exclusive use, so a second open of
-            // a port ivi-cli or another program holds that way fails busy.
-            serialPort.Dispose();
-            throw new UnauthorizedAccessException("the port is in use", ex);
-        }
-        catch
+        catch (Exception ex)
         {
             serialPort.Dispose();
-            throw;
+            var translated = Translate(ex, OperatingSystem.IsWindows());
+            if (ReferenceEquals(translated, ex))
+            {
+                throw;
+            }
+            throw translated;
         }
+    }
+
+    /// <summary>
+    /// The exception a failed open stands for. On Linux and macOS
+    /// <c>SerialPort</c> reports every failed open as access denied and keeps
+    /// the errno in the inner exception: a missing port and one the user may
+    /// not open become <see cref="SerialLineUnavailableException"/>, and the
+    /// rest, a busy port among them, stay access denied, which the backend
+    /// reports as in use. On Windows, access denied already means in use.
+    /// </summary>
+    public static Exception Translate(Exception failure, bool windows)
+    {
+        ArgumentNullException.ThrowIfNull(failure);
+        if (windows || failure is not UnauthorizedAccessException { InnerException: { } inner })
+        {
+            return failure;
+        }
+        return inner.HResult switch
+        {
+            NoSuchPort => new SerialLineUnavailableException("the port does not exist", failure),
+            PermissionDenied => new SerialLineUnavailableException(
+                "permission denied; on Linux, add the user to the group that owns the port, usually dialout",
+                failure
+            ),
+            _ => failure,
+        };
     }
 
     /// <summary>
@@ -99,7 +123,8 @@ public sealed class SerialPortLineFactory : ISerialLineFactory
                 null
             ),
         };
-        var milliseconds = (int)timeout.TotalMilliseconds;
+        // SerialPort refuses 0; a device timeout of 0 means not to wait.
+        var milliseconds = Math.Max(1, (int)timeout.TotalMilliseconds);
         serialPort.ReadTimeout = milliseconds;
         serialPort.WriteTimeout = milliseconds;
         serialPort.Encoding = Encoding.Latin1;

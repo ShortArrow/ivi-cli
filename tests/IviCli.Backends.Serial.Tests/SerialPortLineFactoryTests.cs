@@ -125,6 +125,58 @@ public sealed class SerialPortLineFactoryTests
         port.PortName.ShouldBe("COM10");
     }
 
+    /// <summary>
+    /// A device timeout of 0 means not to wait; <c>SerialPort</c> refuses 0,
+    /// so the port gets its shortest timeout, 1 ms.
+    /// </summary>
+    [Fact]
+    public void A_zero_timeout_becomes_the_shortest_the_port_takes()
+    {
+        using var port = new SerialPort();
+
+        SerialPortLineFactory.Configure(port, "COM7", SerialSettings.Default, TimeSpan.Zero);
+
+        port.ReadTimeout.ShouldBe(1);
+        port.WriteTimeout.ShouldBe(1);
+    }
+
+    /// <summary>
+    /// On Linux and macOS, <c>SerialPort</c> reports every failed open as
+    /// access denied and keeps the reason, an errno, in the inner exception.
+    /// </summary>
+    [Theory]
+    [InlineData(16, "in-use")]
+    [InlineData(2, "the port does not exist")]
+    [InlineData(13, "permission denied")]
+    public void A_failed_open_on_Unix_is_told_apart_by_its_errno(int errno, string expected)
+    {
+        var failure = new UnauthorizedAccessException(
+            "Access to the port '/dev/ttyUSB0' is denied.",
+            new IOException("errno", errno)
+        );
+
+        var translated = SerialPortLineFactory.Translate(failure, windows: false);
+
+        if (expected == "in-use")
+        {
+            translated.ShouldBeOfType<UnauthorizedAccessException>();
+        }
+        else
+        {
+            translated
+                .ShouldBeOfType<SerialLineUnavailableException>()
+                .Message.ShouldStartWith(expected);
+        }
+    }
+
+    [Fact]
+    public void A_failed_open_on_Windows_is_left_as_it_is()
+    {
+        var failure = new UnauthorizedAccessException("denied", new IOException("errno", 2));
+
+        SerialPortLineFactory.Translate(failure, windows: true).ShouldBeSameAs(failure);
+    }
+
     private static SerialSettings With(
         SerialParity parity = SerialParity.None,
         SerialStopBits stopBits = SerialStopBits.One,

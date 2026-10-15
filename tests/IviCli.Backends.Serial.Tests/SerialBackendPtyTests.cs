@@ -19,8 +19,6 @@ namespace IviCli.Backends.Serial.Tests;
 /// </summary>
 public sealed class SerialBackendPtyTests
 {
-    private static CancellationToken Ct => TestContext.Current.CancellationToken;
-
     private static Device Dev(string port, string name = "dmm", int timeoutMs = 500) =>
         new(
             DeviceName.From(name).ShouldBeOk(),
@@ -28,14 +26,14 @@ public sealed class SerialBackendPtyTests
             Timeout.FromMilliseconds(timeoutMs).ShouldBeOk()
         );
 
-    [Requires("socat")]
+    [Requires("socat", Timeout = 10000)]
     public async Task A_query_reaches_the_instrument_and_returns_its_answer()
     {
-        await using var pty = await PtyPair.StartAsync(Ct);
+        await using var pty = await PtyPair.StartAsync(TestContext.Current.CancellationToken);
         using var instrument = pty.Instrument();
         var device = Dev(pty.Port);
         var backend = new SerialBackend(new SerialPortLineFactory());
-        (await backend.OpenAsync(device, Ct)).ShouldBeOk();
+        (await backend.OpenAsync(device, TestContext.Current.CancellationToken)).ShouldBeOk();
 
         var answer = Task.Run(
             () =>
@@ -43,42 +41,80 @@ public sealed class SerialBackendPtyTests
                 instrument.ReadLine().ShouldBe("*IDN?");
                 instrument.Write("ACME,DMM,1,2.0\r\n");
             },
-            Ct
+            TestContext.Current.CancellationToken
         );
-        var result = await backend.QueryAsync(device, ScpiQuery.From("*IDN?").ShouldBeOk(), Ct);
+        var result = await backend.QueryAsync(
+            device,
+            ScpiQuery.From("*IDN?").ShouldBeOk(),
+            TestContext.Current.CancellationToken
+        );
         await answer;
 
         result.ShouldBeOk().ShouldBe("ACME,DMM,1,2.0");
         await backend.CloseAsync(device, CancellationToken.None);
     }
 
-    [Requires("socat")]
+    [Requires("socat", Timeout = 10000)]
     public async Task A_read_terminator_of_CR_ends_the_reply_there()
     {
-        await using var pty = await PtyPair.StartAsync(Ct);
+        await using var pty = await PtyPair.StartAsync(TestContext.Current.CancellationToken);
         using var instrument = pty.Instrument();
         var device = Dev(pty.Port) with { ReadTermination = Termination.Cr };
         var backend = new SerialBackend(new SerialPortLineFactory());
-        (await backend.OpenAsync(device, Ct)).ShouldBeOk();
+        (await backend.OpenAsync(device, TestContext.Current.CancellationToken)).ShouldBeOk();
 
         instrument.Write("1.5\r");
-        var result = await backend.ReadAsync(device, Ct);
+        var result = await backend.ReadAsync(device, TestContext.Current.CancellationToken);
 
         result.ShouldBeOk().ShouldBe("1.5");
         await backend.CloseAsync(device, CancellationToken.None);
     }
 
-    [Requires("socat")]
+    /// <summary>
+    /// A CRLF terminator ends the reply after both characters, and a byte
+    /// above 0x7F reaches the reply unchanged.
+    /// </summary>
+    [Requires("socat", Timeout = 10000)]
+    public async Task A_CRLF_terminator_and_a_Latin1_byte_reach_the_reply()
+    {
+        await using var pty = await PtyPair.StartAsync(TestContext.Current.CancellationToken);
+        using var instrument = pty.Instrument();
+        var device = Dev(pty.Port) with { ReadTermination = Termination.CrLf };
+        var backend = new SerialBackend(new SerialPortLineFactory());
+        (await backend.OpenAsync(device, TestContext.Current.CancellationToken)).ShouldBeOk();
+
+        instrument.Write("12.5 \u00b5V\r\n");
+        var result = await backend.ReadAsync(device, TestContext.Current.CancellationToken);
+
+        result.ShouldBeOk().ShouldBe("12.5 \u00b5V");
+        await backend.CloseAsync(device, CancellationToken.None);
+    }
+
+    [Requires("socat", Timeout = 10000)]
+    public async Task A_port_that_does_not_exist_says_so()
+    {
+        var device = Dev(Path.Combine(Path.GetTempPath(), "ivicli-no-such-port"));
+        var backend = new SerialBackend(new SerialPortLineFactory());
+
+        var result = await backend.OpenAsync(device, TestContext.Current.CancellationToken);
+
+        result
+            .ShouldBeError()
+            .ShouldBeOfType<TransportDisconnected>()
+            .Reason.ShouldContain("does not exist");
+    }
+
+    [Requires("socat", Timeout = 10000)]
     public async Task A_silent_instrument_times_out_after_the_device_timeout()
     {
-        await using var pty = await PtyPair.StartAsync(Ct);
+        await using var pty = await PtyPair.StartAsync(TestContext.Current.CancellationToken);
         using var instrument = pty.Instrument();
         var device = Dev(pty.Port, timeoutMs: 300);
         var backend = new SerialBackend(new SerialPortLineFactory());
-        (await backend.OpenAsync(device, Ct)).ShouldBeOk();
+        (await backend.OpenAsync(device, TestContext.Current.CancellationToken)).ShouldBeOk();
 
         var watch = Stopwatch.StartNew();
-        var result = await backend.ReadAsync(device, Ct);
+        var result = await backend.ReadAsync(device, TestContext.Current.CancellationToken);
         watch.Stop();
 
         result.ShouldBeError().ShouldBeOfType<TransportTimeout>();
@@ -87,18 +123,24 @@ public sealed class SerialBackendPtyTests
         await backend.CloseAsync(device, CancellationToken.None);
     }
 
-    [Requires("socat")]
+    [Requires("socat", Timeout = 10000)]
     public async Task A_closed_port_opens_again()
     {
-        await using var pty = await PtyPair.StartAsync(Ct);
+        await using var pty = await PtyPair.StartAsync(TestContext.Current.CancellationToken);
         using var instrument = pty.Instrument();
         var device = Dev(pty.Port);
         var backend = new SerialBackend(new SerialPortLineFactory());
 
-        (await backend.OpenAsync(device, Ct)).ShouldBeOk();
-        (await backend.CloseAsync(device, Ct)).ShouldBeOk();
-        (await backend.OpenAsync(device, Ct)).ShouldBeOk();
-        (await backend.WriteAsync(device, ScpiCommand.From("*RST").ShouldBeOk(), Ct)).ShouldBeOk();
+        (await backend.OpenAsync(device, TestContext.Current.CancellationToken)).ShouldBeOk();
+        (await backend.CloseAsync(device, TestContext.Current.CancellationToken)).ShouldBeOk();
+        (await backend.OpenAsync(device, TestContext.Current.CancellationToken)).ShouldBeOk();
+        (
+            await backend.WriteAsync(
+                device,
+                ScpiCommand.From("*RST").ShouldBeOk(),
+                TestContext.Current.CancellationToken
+            )
+        ).ShouldBeOk();
 
         instrument.ReadLine().ShouldBe("*RST");
         await backend.CloseAsync(device, CancellationToken.None);
@@ -108,16 +150,16 @@ public sealed class SerialBackendPtyTests
     /// A second session on a port one already holds fails as in use
     /// (ADR 0055 §7): ivi-cli opens a port for exclusive use.
     /// </summary>
-    [Requires("socat")]
+    [Requires("socat", Timeout = 10000)]
     public async Task A_port_another_session_holds_is_in_use()
     {
-        await using var pty = await PtyPair.StartAsync(Ct);
+        await using var pty = await PtyPair.StartAsync(TestContext.Current.CancellationToken);
         var first = Dev(pty.Port, name: "first");
         var second = Dev(pty.Port, name: "second");
         var backend = new SerialBackend(new SerialPortLineFactory());
-        (await backend.OpenAsync(first, Ct)).ShouldBeOk();
+        (await backend.OpenAsync(first, TestContext.Current.CancellationToken)).ShouldBeOk();
 
-        var result = await backend.OpenAsync(second, Ct);
+        var result = await backend.OpenAsync(second, TestContext.Current.CancellationToken);
 
         result.ShouldBeError().ShouldBeOfType<TransportInUse>();
         await backend.CloseAsync(first, CancellationToken.None);
