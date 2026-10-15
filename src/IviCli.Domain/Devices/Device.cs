@@ -22,4 +22,27 @@ namespace IviCli.Domain.Devices;
 /// <param name="Name">The unique alias.</param>
 /// <param name="Resource">The VISA resource that addresses the instrument.</param>
 /// <param name="Timeout">The per-device default operation timeout.</param>
-public sealed record Device(DeviceName Name, VisaResource Resource, Timeout Timeout);
+/// <param name="Serial">
+/// The serial line's settings, which only an ASRL device has (ADR 0055 §4);
+/// <see langword="null"/> means VISA's defaults.
+/// </param>
+/// <param name="ReadTermination">
+/// The sequence that ends a reply on SOCKET and serial; <see langword="null"/>
+/// keeps each backend's own rule (ADR 0055 §5).
+/// </param>
+/// <param name="WriteTermination">
+/// The sequence that ends a command on SOCKET and serial; <see langword="null"/>
+/// means LF (ADR 0055 §5).
+/// </param>
+public sealed record Device(
+    DeviceName Name,
+    VisaResource Resource,
+    Timeout Timeout,
+    SerialSettings? Serial = null,
+    Termination? ReadTermination = null,
+    Termination? WriteTermination = null
+)
+{
+    /// <summary>Whether the device is on a serial line, that is, has an ASRL resource.</summary>
+    public bool IsSerial => Resource is VisaResource.AsrlBoard or VisaResource.AsrlPort;
+}

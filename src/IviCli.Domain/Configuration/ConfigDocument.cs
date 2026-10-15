@@ -157,6 +157,12 @@ public sealed record ConfigDocument
                 new DuplicateDeviceName(device.Name)
             );
         }
+        if (device.Serial is not null && !device.IsSerial)
+        {
+            return Result.Failure<ConfigDocument, ConfigError>(
+                new SerialSettingsOnNonSerialDevice(device.Name)
+            );
+        }
         return Result.Success<ConfigDocument, ConfigError>(With(devices: Devices.Add(device)));
     }
 

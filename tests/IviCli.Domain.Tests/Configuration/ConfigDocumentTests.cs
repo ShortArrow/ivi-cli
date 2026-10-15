@@ -48,6 +48,41 @@ public class ConfigDocumentTests
     }
 
     [Fact]
+    public void AddDevice_SerialSettingsOnASerialDevice_AppendsDevice()
+    {
+        // Given
+        var device = Dev("dmm", resource: "ASRL1::INSTR") with
+        {
+            Serial = SerialSettings.Default,
+        };
+
+        // When
+        var result = ConfigDocument.Empty.AddDevice(device);
+
+        // Then
+        result.ShouldBeOk().Devices[0].Serial.ShouldBe(SerialSettings.Default);
+    }
+
+    [Fact]
+    public void AddDevice_SerialSettingsOnANetworkDevice_ReturnsSerialSettingsOnNonSerialDevice()
+    {
+        // Given
+        var device = Dev("psu1") with
+        {
+            Serial = SerialSettings.Default,
+        };
+
+        // When
+        var result = ConfigDocument.Empty.AddDevice(device);
+
+        // Then
+        result
+            .ShouldBeError()
+            .ShouldBeOfType<SerialSettingsOnNonSerialDevice>()
+            .Name.ShouldBe(Name("psu1"));
+    }
+
+    [Fact]
     public void AddDevice_WithDuplicateName_ReturnsDuplicateDeviceName()
     {
         // Given

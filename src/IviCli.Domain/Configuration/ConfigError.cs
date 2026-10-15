@@ -38,6 +38,22 @@ public sealed record DuplicateDeviceName(DeviceName Name) : ConfigError
 }
 
 /// <summary>
+/// A device that is not on a serial line carried serial settings (ADR 0055 §4).
+/// </summary>
+/// <param name="Name">The device.</param>
+public sealed record SerialSettingsOnNonSerialDevice(DeviceName Name) : ConfigError
+{
+    /// <inheritdoc/>
+    public override LogSeverity Severity => LogSeverity.Warning;
+
+    /// <inheritdoc/>
+    public override string Message => "device {Name} has serial settings but is not an ASRL device";
+
+    /// <inheritdoc/>
+    public override IReadOnlyList<object?> LogArgs => new object?[] { Name };
+}
+
+/// <summary>
 /// An operation referenced a device name that does not exist in the configuration.
 /// </summary>
 /// <param name="Name">The missing device name.</param>
