@@ -131,16 +131,18 @@ public static class VisaScanCommand
             );
             switch (addResult)
             {
-                case Result<Domain.Devices.DeviceName, AddDeviceError>.Ok ok:
-                    Console.WriteLine($"  added: {ok.Value.Value} → {FormatResource(r.Resource)}");
+                case Result<Domain.Devices.Device, AddDeviceError>.Ok ok:
+                    Console.WriteLine(
+                        $"  added: {ok.Value.Name.Value} → {FormatResource(r.Resource)}"
+                    );
                     added++;
                     break;
-                case Result<Domain.Devices.DeviceName, AddDeviceError>.Error err
+                case Result<Domain.Devices.Device, AddDeviceError>.Error err
                     when err.Err is AddDeviceNameTaken:
                     Console.WriteLine($"  skipped (alias taken): {alias}");
                     skipped++;
                     break;
-                case Result<Domain.Devices.DeviceName, AddDeviceError>.Error err:
+                case Result<Domain.Devices.Device, AddDeviceError>.Error err:
                     Console.Error.WriteLine(
                         $"  failed to add {alias}: {IviErrorMessages.Render(err.Err)}"
                     );

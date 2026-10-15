@@ -135,4 +135,70 @@ public class TomlConfigStoreTests
         // When / Then
         await Should.ThrowAsync<OperationCanceledException>(() => store.LoadAsync(cts.Token));
     }
+
+    /// <summary>
+    /// A terminator on a transport that ends messages itself has no effect,
+    /// so loading a device that sets one warns (ADR 0055 §5).
+    /// </summary>
+    [Fact]
+    public async Task LoadAsync_DeviceWithAnIgnoredTerminator_Warns()
+    {
+        // Given
+        var toml = """
+            [[devices]]
+            name = "scope"
+            resource = "TCPIP0::host::hislip0::INSTR"
+            timeout_ms = 3000
+            read_termination = "\r"
+
+            [[devices]]
+            name = "psu"
+            resource = "TCPIP0::host::5025::SOCKET"
+            timeout_ms = 3000
+            read_termination = "\r"
+            """;
+        var fs = new MockFileSystem(
+            new Dictionary<string, MockFileData> { [ConfigPath] = new MockFileData(toml) }
+        );
+        var logger = new RecordingLogger<TomlConfigStore>();
+        var store = new TomlConfigStore(fs, ConfigPath, logger);
+
+        // When
+        var result = await store.LoadAsync(CancellationToken.None);
+
+        // Then
+        result.ShouldBeOk();
+        var warning = logger.Entries.ShouldHaveSingleItem();
+        warning.Level.ShouldBe(Microsoft.Extensions.Logging.LogLevel.Warning);
+        warning.Message.ShouldContain("scope");
+    }
+
+    /// <summary>
+    /// A long-running server loads the configuration for every request, so
+    /// a device is warned about once per store.
+    /// </summary>
+    [Fact]
+    public async Task LoadAsync_Again_DoesNotRepeatTheWarning()
+    {
+        // Given
+        var toml = """
+            [[devices]]
+            name = "scope"
+            resource = "TCPIP0::host::hislip0::INSTR"
+            timeout_ms = 3000
+            read_termination = "\r"
+            """;
+        var fs = new MockFileSystem(
+            new Dictionary<string, MockFileData> { [ConfigPath] = new MockFileData(toml) }
+        );
+        var logger = new RecordingLogger<TomlConfigStore>();
+        var store = new TomlConfigStore(fs, ConfigPath, logger);
+
+        // When
+        (await store.LoadAsync(CancellationToken.None)).ShouldBeOk();
+        (await store.LoadAsync(CancellationToken.None)).ShouldBeOk();
+
+        // Then
+        logger.Entries.ShouldHaveSingleItem();
+    }
 }

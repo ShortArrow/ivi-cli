@@ -11,8 +11,9 @@ public sealed record AsrlBoardRegistration
 
     /// <summary>
     /// The port name, such as <c>/dev/ttyUSB0</c> or <c>COM3</c>; never empty,
-    /// never only digits and never containing <c>::</c>, so that
-    /// <c>ASRL&lt;port&gt;::INSTR</c> names it.
+    /// never only digits, never containing <c>::</c> and never starting or
+    /// ending with whitespace, so that <c>ASRL&lt;port&gt;::INSTR</c> names it
+    /// and no second spelling of a port slips past the duplicate check.
     /// </summary>
     public string Port { get; }
 
@@ -25,7 +26,11 @@ public sealed record AsrlBoardRegistration
     /// <summary>Validates and constructs a registration.</summary>
     /// <returns>The registration, or <see cref="InvalidAsrlBoardRegistration"/>.</returns>
     public static Result<AsrlBoardRegistration, ConfigError> From(int board, string port) =>
-        board < 0 || port.Length == 0 || port.All(char.IsAsciiDigit) || port.Contains("::")
+        board < 0
+        || port.Length == 0
+        || port.Trim() != port
+        || port.All(char.IsAsciiDigit)
+        || port.Contains("::")
             ? Result.Failure<AsrlBoardRegistration, ConfigError>(
                 new InvalidAsrlBoardRegistration(board, port)
             )

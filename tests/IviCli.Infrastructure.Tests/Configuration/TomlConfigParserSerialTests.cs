@@ -135,6 +135,34 @@ public class TomlConfigParserSerialTests
     }
 
     [Theory]
+    [InlineData("1", SerialStopBits.One)]
+    [InlineData("1.0", SerialStopBits.One)]
+    [InlineData("1.5", SerialStopBits.OnePointFive)]
+    [InlineData("15e-1", SerialStopBits.OnePointFive)]
+    [InlineData("2", SerialStopBits.Two)]
+    [InlineData("2.0", SerialStopBits.Two)]
+    public void Parse_StopBitsAsIntegerOrFloat_ReadsTheValue(string value, SerialStopBits expected)
+    {
+        // Given
+        var toml = $"""
+            [[devices]]
+            name = "dmm"
+            resource = "ASRL1::INSTR"
+            timeout_ms = 3000
+
+            [devices.serial]
+            stop_bits = {value}
+            baud = 19200
+            """;
+
+        // When
+        var result = TomlConfigParser.Parse(toml);
+
+        // Then
+        result.ShouldBeOk().Devices[0].Serial!.StopBits.ShouldBe(expected);
+    }
+
+    [Theory]
     [InlineData("parity = \"sometimes\"")]
     [InlineData("stop_bits = 3")]
     [InlineData("data_bits = 9")]

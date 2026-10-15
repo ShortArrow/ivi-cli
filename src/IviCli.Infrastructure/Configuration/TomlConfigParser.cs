@@ -789,7 +789,10 @@ public static class TomlConfigParser
         }
         if (serial.TryGetValue(ParityField, out var parityValue))
         {
-            if (parityValue is not string p || ParseParity(p) is not { } parsedParity)
+            if (
+                parityValue is not string p
+                || SerialSettingNames.ParseParity(p) is not { } parsedParity
+            )
             {
                 return FailSerial(
                     $"{ParityField} of '{deviceName}' must be none, odd, even, mark or space"
@@ -807,7 +810,10 @@ public static class TomlConfigParser
         }
         if (serial.TryGetValue(FlowControlField, out var flowValue))
         {
-            if (flowValue is not string f || ParseFlowControl(f) is not { } parsedFlow)
+            if (
+                flowValue is not string f
+                || SerialSettingNames.ParseFlowControl(f) is not { } parsedFlow
+            )
             {
                 return FailSerial(
                     $"{FlowControlField} of '{deviceName}' must be none, xon_xoff or rts_cts"
@@ -829,32 +835,15 @@ public static class TomlConfigParser
         };
     }
 
-    private static SerialParity? ParseParity(string raw) =>
-        raw switch
-        {
-            "none" => SerialParity.None,
-            "odd" => SerialParity.Odd,
-            "even" => SerialParity.Even,
-            "mark" => SerialParity.Mark,
-            "space" => SerialParity.Space,
-            _ => null,
-        };
-
+    /// <summary>
+    /// The stop bits a TOML number names: <c>1</c>, <c>1.5</c> or <c>2</c>,
+    /// written as an integer or a float.
+    /// </summary>
     private static SerialStopBits? ParseStopBits(object raw) =>
         raw switch
         {
-            1L or 1.0 => SerialStopBits.One,
-            1.5 => SerialStopBits.OnePointFive,
-            2L or 2.0 => SerialStopBits.Two,
-            _ => null,
-        };
-
-    private static SerialFlowControl? ParseFlowControl(string raw) =>
-        raw switch
-        {
-            "none" => SerialFlowControl.None,
-            "xon_xoff" => SerialFlowControl.XonXoff,
-            "rts_cts" => SerialFlowControl.RtsCts,
+            long l => SerialSettingNames.ParseStopBits(l.ToString(CultureInfo.InvariantCulture)),
+            double d => SerialSettingNames.ParseStopBits(d.ToString(CultureInfo.InvariantCulture)),
             _ => null,
         };
 
@@ -873,49 +862,26 @@ public static class TomlConfigParser
         }
         if (serial.Parity != defaults.Parity)
         {
-            builder.AppendLine(inv, $"{ParityField} = {Quote(FormatParity(serial.Parity))}");
+            builder.AppendLine(
+                inv,
+                $"{ParityField} = {Quote(SerialSettingNames.Format(serial.Parity))}"
+            );
         }
         if (serial.StopBits != defaults.StopBits)
         {
-            builder.AppendLine(inv, $"{StopBitsField} = {FormatStopBits(serial.StopBits)}");
+            builder.AppendLine(
+                inv,
+                $"{StopBitsField} = {SerialSettingNames.Format(serial.StopBits)}"
+            );
         }
         if (serial.FlowControl != defaults.FlowControl)
         {
             builder.AppendLine(
                 inv,
-                $"{FlowControlField} = {Quote(FormatFlowControl(serial.FlowControl))}"
+                $"{FlowControlField} = {Quote(SerialSettingNames.Format(serial.FlowControl))}"
             );
         }
     }
-
-    private static string FormatParity(SerialParity parity) =>
-        parity switch
-        {
-            SerialParity.None => "none",
-            SerialParity.Odd => "odd",
-            SerialParity.Even => "even",
-            SerialParity.Mark => "mark",
-            SerialParity.Space => "space",
-            _ => throw new ArgumentOutOfRangeException(nameof(parity), parity, null),
-        };
-
-    private static string FormatStopBits(SerialStopBits stopBits) =>
-        stopBits switch
-        {
-            SerialStopBits.One => "1",
-            SerialStopBits.OnePointFive => "1.5",
-            SerialStopBits.Two => "2",
-            _ => throw new ArgumentOutOfRangeException(nameof(stopBits), stopBits, null),
-        };
-
-    private static string FormatFlowControl(SerialFlowControl flowControl) =>
-        flowControl switch
-        {
-            SerialFlowControl.None => "none",
-            SerialFlowControl.XonXoff => "xon_xoff",
-            SerialFlowControl.RtsCts => "rts_cts",
-            _ => throw new ArgumentOutOfRangeException(nameof(flowControl), flowControl, null),
-        };
 
     private static Result<AsrlBoardRegistration, ConfigStoreError> ParseAsrlBoard(TomlTable row)
     {
