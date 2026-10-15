@@ -36,6 +36,12 @@ All notable changes to ivi-cli are documented here. Format roughly follows
 
 ### Fixed
 
+- **A command that reads `config.toml` while another saves it sees the
+  whole file.** Saving deleted the file before moving the new one into
+  place, so a read in between found no file and went on with an empty
+  configuration, or failed. The new file now replaces the old one in one
+  step, and a read lets it do so.
+
 - **Saving `config.toml` keeps Windows paths readable.** ivicli wrote
   strings back without escaping them, so a backslash in a TLS
   certificate path or the audit log path, or a quote in a telemetry
