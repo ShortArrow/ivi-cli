@@ -20,6 +20,7 @@
     <PackageVersion Include="IviFoundation.Visa" Version="8.0.2" />
     <PackageVersion Include="Microsoft.NET.ILLink.Tasks" Version="10.0.12" />
     <PackageVersion Include="Tomlyn" Version="2.10.1" />
+    <PackageVersion Include="System.IO.Ports" Version="10.0.12" />
     <PackageVersion Include="Microsoft.Extensions.Hosting" Version="10.0.12" />
     <PackageVersion Include="Microsoft.Extensions.Logging" Version="10.0.12" />
     <PackageVersion Include="System.CommandLine" Version="2.0.12" />

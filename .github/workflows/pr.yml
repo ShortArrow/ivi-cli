@@ -218,6 +218,11 @@ jobs:
       - name: Build
         run: dotnet build --no-restore --configuration Release
 
+      # The Serial backend's tests stand a socat pseudo-terminal pair in
+      # for a serial port (ADR 0055 §11); without socat they are skipped.
+      - name: Install socat
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq socat
+
       - name: Conformance document against the tests' Spec traits
         run: |
           set -euo pipefail
