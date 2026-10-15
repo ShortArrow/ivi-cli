@@ -216,7 +216,7 @@ public class LocalBackendTimeoutTests
     {
         var device = Dev(300);
         var (backend, _, session) = Build(device);
-        session.TimeOutAfter = TimeSpan.FromMilliseconds(300);
+        session.AnswerAfter = System.Threading.Timeout.InfiniteTimeSpan;
         (await backend.OpenAsync(device, TestContext.Current.CancellationToken)).ShouldBeOk();
 
         var result = await backend.QueryAsync(
@@ -232,17 +232,18 @@ public class LocalBackendTimeoutTests
     }
 
     /// <summary>
-    /// Pins a deviation: the VISA session keeps the I/O timeout it was
-    /// opened with, so a timeout that one operation carries, such as a
-    /// VXI-11 gateway client's <c>io_timeout</c>, never reaches VISA.
+    /// Pins a deviation (#266): the VISA session keeps the I/O timeout it
+    /// was opened with, so VISA cuts short an operation that carries a
+    /// longer timeout, such as a VXI-11 gateway client's <c>io_timeout</c>.
     /// </summary>
     [Fact]
     [Spec(Standard.Vxi11, "B.4.3")]
-    public async Task An_operation_carrying_another_timeout_leaves_the_session_with_the_one_it_was_opened_with()
+    public async Task An_operation_carrying_a_longer_timeout_still_times_out_at_the_sessions()
     {
         var opened = Dev(300);
-        var (backend, factory, session) = Build(opened);
+        var (backend, _, session) = Build(opened);
         session.QueryResponses["*IDN?"] = "ACME,PSU,0,1.0";
+        session.AnswerAfter = TimeSpan.FromSeconds(1);
         (await backend.OpenAsync(opened, TestContext.Current.CancellationToken)).ShouldBeOk();
 
         var result = await backend.QueryAsync(
@@ -251,8 +252,33 @@ public class LocalBackendTimeoutTests
             TestContext.Current.CancellationToken
         );
 
-        result.ShouldBeOk();
-        factory.LastIoTimeout.ShouldBe(TimeSpan.FromMilliseconds(300));
+        result
+            .ShouldBeOfType<Result<string, BackendError>.Error>()
+            .Err.ShouldBeOfType<TransportTimeout>()
+            .Elapsed.ShouldBe(TimeSpan.FromMilliseconds(300));
+    }
+
+    /// <summary>
+    /// Pins a deviation (#266): an operation that carries a shorter timeout
+    /// than the session's still gets an answer that arrives after it.
+    /// </summary>
+    [Fact]
+    [Spec(Standard.Vxi11, "B.4.3")]
+    public async Task An_operation_carrying_a_shorter_timeout_still_gets_a_late_answer()
+    {
+        var opened = Dev(5000);
+        var (backend, _, session) = Build(opened);
+        session.QueryResponses["*IDN?"] = "ACME,PSU,0,1.0";
+        session.AnswerAfter = TimeSpan.FromSeconds(1);
+        (await backend.OpenAsync(opened, TestContext.Current.CancellationToken)).ShouldBeOk();
+
+        var result = await backend.QueryAsync(
+            Dev(300),
+            ScpiQuery.From("*IDN?").ShouldBeOk(),
+            TestContext.Current.CancellationToken
+        );
+
+        result.ShouldBeOk().ShouldBe("ACME,PSU,0,1.0");
     }
 
     [Fact]
@@ -291,6 +317,7 @@ internal sealed class FakeVisaSessionFactory : IVisaSessionFactory
                 new LocalVisaOpenFailure(key, "not configured in fake", null)
             );
         }
+        session.IoTimeout = ioTimeout;
         return Result.Success<IVisaSessionHandle, LocalVisaError>(session);
     }
 }
@@ -307,8 +334,18 @@ internal sealed class FakeVisaSession : IVisaSessionHandle
     public string? ReadResponse { get; set; }
     public bool Disposed { get; private set; }
 
-    /// <summary>Makes every query report a VISA timeout after this long.</summary>
-    public TimeSpan? TimeOutAfter { get; set; }
+    /// <summary>
+    /// The session's I/O timeout (<c>VI_ATTR_TMO_VALUE</c>), which the
+    /// factory sets when it opens the session.
+    /// </summary>
+    public TimeSpan IoTimeout { get; set; }
+
+    /// <summary>
+    /// How long the instrument takes to answer a query. Like VISA, the
+    /// session reports a timeout instead when that is longer than
+    /// <see cref="IoTimeout"/>.
+    /// </summary>
+    public TimeSpan AnswerAfter { get; set; }
 
     /// <summary>Makes <see cref="EnableServiceRequests"/> report an IO failure.</summary>
     public bool FailServiceRequestEnable { get; set; }
@@ -328,9 +365,9 @@ internal sealed class FakeVisaSession : IVisaSessionHandle
     public Result<string, LocalVisaError> Query(string text)
     {
         Writes.Add(text);
-        if (TimeOutAfter is { } elapsed)
+        if (AnswerAfter == System.Threading.Timeout.InfiniteTimeSpan || AnswerAfter > IoTimeout)
         {
-            return Result.Failure<string, LocalVisaError>(new LocalVisaTimeout(elapsed, null));
+            return Result.Failure<string, LocalVisaError>(new LocalVisaTimeout(IoTimeout, null));
         }
         if (!QueryResponses.TryGetValue(text, out var response))
         {
