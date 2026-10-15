@@ -61,17 +61,30 @@ public sealed class SerialBackend : IIviBackend, IEnforcesDeviceTimeout
                 ct
             );
         }
-        catch (UnauthorizedAccessException ex)
+        catch (UnauthorizedAccessException)
         {
             return Result.Failure<Unit, BackendError>(
-                new TransportInUse(device.Name, device.Resource, ex)
+                new TransportInUse(device.Name, device.Resource)
+            );
+        }
+        catch (ArgumentException ex)
+            when (ex.ParamName is { } setting
+                && !setting.Equals("portName", StringComparison.OrdinalIgnoreCase)
+            )
+        {
+            // The driver refused a setting, which the exception names
+            // (ADR 0055 §4); its message is left out as it may carry the port.
+            return Result.Failure<Unit, BackendError>(
+                new TransportDisconnected(
+                    $"opening {device.Resource.ToLogString()} failed: the serial driver refused {setting}"
+                )
             );
         }
         catch (Exception ex)
             when (ex is IOException or ArgumentException or InvalidOperationException)
         {
             return Result.Failure<Unit, BackendError>(
-                new TransportDisconnected($"open failed: {ex.Message}", ex)
+                new TransportDisconnected(Failure("opening", device, ex))
             );
         }
 
@@ -168,16 +181,27 @@ public sealed class SerialBackend : IIviBackend, IEnforcesDeviceTimeout
         {
             return Result.Success<T, BackendError>(await Task.Run(() => operation(line), ct));
         }
-        catch (TimeoutException ex)
+        catch (TimeoutException)
         {
-            return Result.Failure<T, BackendError>(new TransportTimeout(device.Timeout.Value, ex));
+            return Result.Failure<T, BackendError>(new TransportTimeout(device.Timeout.Value));
         }
         catch (Exception ex)
             when (ex is IOException or InvalidOperationException or UnauthorizedAccessException)
         {
             return Result.Failure<T, BackendError>(
-                new TransportDisconnected($"serial line failed: {ex.Message}", ex)
+                new TransportDisconnected(Failure("using", device, ex))
             );
         }
     }
+
+    /// <summary>
+    /// A failure reason that names the resource masked and the exception by
+    /// type and code: a port exception's message, like the exception itself,
+    /// can carry the port's full name, which logs mask (ADR 0055 §1).
+    /// </summary>
+    private static string Failure(string action, Device device, Exception ex) =>
+        string.Create(
+            System.Globalization.CultureInfo.InvariantCulture,
+            $"{action} {device.Resource.ToLogString()} failed ({ex.GetType().Name}, 0x{ex.HResult:X8})"
+        );
 }

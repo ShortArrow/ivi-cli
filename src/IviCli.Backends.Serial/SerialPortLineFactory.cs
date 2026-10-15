@@ -9,6 +9,9 @@ public sealed class SerialPortLineFactory : ISerialLineFactory
 {
     private const string WindowsDevicePrefix = @"\\.\";
 
+    /// <summary>EBUSY, which Linux and macOS give for a port opened for exclusive use.</summary>
+    private const int Busy = 16;
+
     /// <inheritdoc/>
     public ISerialLine Open(string port, SerialSettings settings, TimeSpan timeout)
     {
@@ -17,7 +20,15 @@ public sealed class SerialPortLineFactory : ISerialLineFactory
         {
             Configure(serialPort, port, settings, timeout);
             serialPort.Open();
+            AssertDtr(serialPort);
             return new SerialPortLine(serialPort);
+        }
+        catch (IOException ex) when (!OperatingSystem.IsWindows() && ex.HResult == Busy)
+        {
+            // SerialPort opens a port for exclusive use, so a second open of
+            // a port ivi-cli or another program holds that way fails busy.
+            serialPort.Dispose();
+            throw new UnauthorizedAccessException("the port is in use", ex);
         }
         catch
         {
@@ -27,10 +38,25 @@ public sealed class SerialPortLineFactory : ISerialLineFactory
     }
 
     /// <summary>
-    /// Sets <paramref name="serialPort"/> up for <paramref name="port"/>:
-    /// the serial settings, <paramref name="timeout"/> for reads and writes,
-    /// DTR asserted as VISA does by default, and Latin-1 text so every byte
-    /// passes unchanged (ADR 0055 §4, §8).
+    /// Asserts DTR, as VISA does by default (ADR 0055 §4), once the port is
+    /// open. <c>SerialPort</c> fails its open when asked for DTR on a port
+    /// with no modem lines, such as a pseudo-terminal, so DTR is raised
+    /// here instead, and a port that has no DTR to raise keeps working.
+    /// </summary>
+    private static void AssertDtr(SerialPort serialPort)
+    {
+        try
+        {
+            serialPort.DtrEnable = true;
+        }
+        catch (IOException) { }
+    }
+
+    /// <summary>
+    /// Sets <paramref name="serialPort"/> up for <paramref name="port"/>
+    /// before it is opened: the serial settings, <paramref name="timeout"/>
+    /// for reads and writes, and Latin-1 text so every byte passes unchanged
+    /// (ADR 0055 §4, §8).
     /// </summary>
     public static void Configure(
         SerialPort serialPort,
@@ -76,7 +102,6 @@ public sealed class SerialPortLineFactory : ISerialLineFactory
         var milliseconds = (int)timeout.TotalMilliseconds;
         serialPort.ReadTimeout = milliseconds;
         serialPort.WriteTimeout = milliseconds;
-        serialPort.DtrEnable = true;
         serialPort.Encoding = Encoding.Latin1;
     }
 

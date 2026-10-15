@@ -105,6 +105,50 @@ public sealed class SerialBackendTests
             .Reason.ShouldContain("StopBits");
     }
 
+    /// <summary>
+    /// A port exception's message, like the exception, can carry the port's
+    /// full name, which carries the adapter's serial number; logs mask it
+    /// (ADR 0055 §1), so neither reaches the error.
+    /// </summary>
+    [Theory]
+    [InlineData("io")]
+    [InlineData("access")]
+    [InlineData("port-name")]
+    public async Task A_failed_open_never_carries_the_port_name(string kind)
+    {
+        const string Secret = "/dev/serial/by-id/usb-FTDI_FT232R_A1B2C3-if00-port0";
+        var factory = new FakeLineFactory
+        {
+            OpenFails = kind switch
+            {
+                "io" => new IOException($"Could not find file '{Secret}'"),
+                "access" => new UnauthorizedAccessException($"Access to '{Secret}' is denied"),
+#pragma warning disable CA2208 // Mimics SerialPort, which names its own portName parameter.
+                _ => new ArgumentException($"The port name ({Secret}) is invalid", "portName"),
+#pragma warning restore CA2208
+            },
+        };
+
+        var result = await new SerialBackend(factory).OpenAsync(Dev($"ASRL{Secret}::INSTR"), Ct);
+
+        var error = result.ShouldBeError();
+        error.Cause.ShouldBeNull();
+        string.Join(" ", error.LogArgs).ShouldNotContain("A1B2C3");
+    }
+
+    [Fact]
+    public async Task A_line_failure_never_carries_the_port_name()
+    {
+        var (backend, line) = await Opened(Dev());
+        line.ReadFails = new IOException("read failed on /dev/serial/by-id/usb-FTDI_A1B2C3");
+
+        var result = await backend.ReadAsync(Dev(), Ct);
+
+        var error = result.ShouldBeError().ShouldBeOfType<TransportDisconnected>();
+        error.Cause.ShouldBeNull();
+        error.Reason.ShouldNotContain("A1B2C3");
+    }
+
     [Theory]
     [InlineData(null, "OUTP ON\n")]
     [InlineData("\r", "OUTP ON\r")]

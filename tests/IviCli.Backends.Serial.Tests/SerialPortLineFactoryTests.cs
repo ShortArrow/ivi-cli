@@ -90,13 +90,9 @@ public sealed class SerialPortLineFactoryTests
         port.Handshake.ShouldBe(expected);
     }
 
-    /// <summary>
-    /// DTR is asserted, as VISA does by default, so an instrument that needs
-    /// it behaves alike on both backends (ADR 0055 §4). Text is Latin-1, so
-    /// every byte reaches the reply unchanged.
-    /// </summary>
+    /// <summary>Text is Latin-1, so every byte reaches the reply unchanged.</summary>
     [Fact]
-    public void DTR_is_asserted_and_text_is_Latin1()
+    public void Text_is_Latin1()
     {
         using var port = new SerialPort();
 
@@ -107,7 +103,6 @@ public sealed class SerialPortLineFactoryTests
             TimeSpan.FromSeconds(1)
         );
 
-        port.DtrEnable.ShouldBeTrue();
         port.Encoding.ShouldBe(Encoding.Latin1);
     }
 
