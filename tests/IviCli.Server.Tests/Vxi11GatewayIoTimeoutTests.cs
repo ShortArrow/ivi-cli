@@ -30,6 +30,7 @@ public sealed class Vxi11GatewayIoTimeoutTests
     private static readonly TimeSpan Long = TimeSpan.FromSeconds(30);
 
     [Fact]
+    [Spec(Standard.Vxi11, "RULE B.6.19")]
     public async Task A_query_past_the_clients_io_timeout_ends_with_a_timeout()
     {
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
@@ -52,6 +53,8 @@ public sealed class Vxi11GatewayIoTimeoutTests
     }
 
     [Fact]
+    [Spec(Standard.Vxi11, "B.4.3")]
+    [Spec(Standard.Adr, "0053 §5")]
     public async Task A_query_within_the_clients_io_timeout_is_answered_past_the_device_timeout()
     {
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
@@ -72,6 +75,7 @@ public sealed class Vxi11GatewayIoTimeoutTests
     }
 
     [Fact]
+    [Spec(Standard.Vxi11, "RULE B.6.19")]
     public async Task A_write_past_the_clients_io_timeout_ends_with_a_timeout()
     {
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
@@ -98,6 +102,7 @@ public sealed class Vxi11GatewayIoTimeoutTests
     /// place instead of failing every call at once.
     /// </summary>
     [Fact]
+    [Spec(Standard.Adr, "0053 §5")]
     public async Task A_zero_io_timeout_falls_back_to_the_device_timeout()
     {
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
@@ -118,6 +123,7 @@ public sealed class Vxi11GatewayIoTimeoutTests
     }
 
     [Fact]
+    [Spec(Standard.Vxi11, "RULE B.6.44")]
     public async Task A_trigger_past_the_clients_io_timeout_ends_with_a_timeout()
     {
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));

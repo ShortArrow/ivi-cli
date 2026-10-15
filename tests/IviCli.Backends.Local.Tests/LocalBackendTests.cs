@@ -77,6 +77,7 @@ public class LocalBackendTests
     }
 
     [Fact]
+    [Spec(Standard.Visa, "§6.1.4")]
     public async Task TriggerAsync_writes_TRG_to_the_session()
     {
         var factory = new FakeVisaSessionFactory();
@@ -192,6 +193,8 @@ public class LocalBackendTimeoutTests
     [Theory]
     [InlineData(300, 5000)]
     [InlineData(8000, 8000)]
+    [Spec(Standard.Visa, "§5.1.2")]
+    [Spec(Standard.Adr, "0053 §4")]
     public async Task The_session_gets_the_device_timeout_for_IO_and_at_least_five_seconds_to_open(
         int deviceTimeoutMs,
         int expectedOpenMs
@@ -207,6 +210,9 @@ public class LocalBackendTimeoutTests
     }
 
     [Fact]
+    [Spec(Standard.Visa, "§6.1.1")]
+    [Spec(Standard.Visa, "§6.1.4")]
+    [Spec(Standard.Adr, "0053 §3")]
     public async Task A_VISA_timeout_is_reported_as_TransportTimeout()
     {
         var device = Dev(300);
@@ -226,7 +232,32 @@ public class LocalBackendTimeoutTests
             .Elapsed.ShouldBe(TimeSpan.FromMilliseconds(300));
     }
 
+    /// <summary>
+    /// Pins a deviation: the VISA session keeps the I/O timeout it was
+    /// opened with, so a timeout that one operation carries, such as a
+    /// VXI-11 gateway client's <c>io_timeout</c>, never reaches VISA.
+    /// </summary>
     [Fact]
+    [Spec(Standard.Vxi11, "B.4.3")]
+    public async Task An_operation_carrying_another_timeout_leaves_the_session_with_the_one_it_was_opened_with()
+    {
+        var opened = Dev(300);
+        var (backend, factory, session) = Build(opened);
+        session.QueryResponses["*IDN?"] = "ACME,PSU,0,1.0";
+        (await backend.OpenAsync(opened, TestContext.Current.CancellationToken)).ShouldBeOk();
+
+        var result = await backend.QueryAsync(
+            Dev(5000),
+            ScpiQuery.From("*IDN?").ShouldBeOk(),
+            TestContext.Current.CancellationToken
+        );
+
+        result.ShouldBeOk();
+        factory.LastIoTimeout.ShouldBe(TimeSpan.FromMilliseconds(300));
+    }
+
+    [Fact]
+    [Spec(Standard.Adr, "0053 §2")]
     public void The_local_backend_enforces_the_device_timeout_itself() =>
         new LocalBackend(
             new FakeVisaSessionFactory()

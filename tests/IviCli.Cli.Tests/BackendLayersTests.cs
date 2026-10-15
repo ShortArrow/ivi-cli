@@ -31,6 +31,7 @@ public sealed class BackendLayersTests
 
     [Theory]
     [MemberData(nameof(PoolEnabled))]
+    [Spec(Standard.Adr, "0053 §1")]
     public async Task A_query_to_a_silent_built_in_backend_times_out(bool poolEnabled)
     {
         var factory = BackendLayers.Compose(
@@ -61,6 +62,7 @@ public sealed class BackendLayersTests
     }
 
     [Fact]
+    [Spec(Standard.Adr, "0053 §1")]
     public async Task A_query_to_a_silent_plugin_backend_times_out()
     {
         var factory = BackendLayers.Compose(

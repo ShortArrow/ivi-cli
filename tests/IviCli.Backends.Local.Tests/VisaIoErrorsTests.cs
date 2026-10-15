@@ -1,5 +1,6 @@
 using Ivi.Visa;
 using IviCli.Backends.Local;
+using IviCli.TestKit;
 using Shouldly;
 
 namespace IviCli.Backends.Local.Tests;
@@ -13,6 +14,8 @@ public sealed class VisaIoErrorsTests
     private static readonly TimeSpan IoTimeout = TimeSpan.FromMilliseconds(1500);
 
     [Fact]
+    [Spec(Standard.Visa, "§6.1.1")]
+    [Spec(Standard.Visa, "§6.1.4")]
     public void An_IOTimeoutException_is_a_timeout()
     {
         var ex = new IOTimeoutException(0, []);
@@ -24,6 +27,8 @@ public sealed class VisaIoErrorsTests
     }
 
     [Fact]
+    [Spec(Standard.Visa, "§6.1.1")]
+    [Spec(Standard.Visa, "§6.1.4")]
     public void A_native_VI_ERROR_TMO_is_a_timeout()
     {
         var ex = new NativeVisaException(NativeErrorCode.Timeout);
