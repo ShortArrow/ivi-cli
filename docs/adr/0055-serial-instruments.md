@@ -7,22 +7,23 @@
 
 ivi-cli cannot reach an instrument on a serial line. `VisaResource`
 parses TCPIP, TCPIP SOCKET, USB and GPIB, so `visa add` rejects an
-`ASRL…::INSTR` resource, and `DefaultBackendFactory` sends any resource it
-does not recognise to the Fake backend.
+`ASRL…::INSTR` resource, and `DefaultBackendFactory` sends any resource
+case it does not name to the Fake backend.
 
 A serial instrument is reached two ways in practice. A VISA runtime opens
 `ASRL1::INSTR` and decides itself which port board 1 is; NI-VISA maps
 `ASRL1` to `COM1` on Windows, and the mapping on Linux differs between
 runtimes and is often absent. Without a runtime, the port is opened by
-name, `/dev/ttyUSB0` or `COM3`. Many hosts ivi-cli runs on, Linux on arm64
-among them, have no VISA runtime at all.
+name, `/dev/ttyUSB0` or `COM3`. Many hosts ivi-cli runs on have no VISA
+runtime.
 
 A serial line also lacks what the network and USB transports carry: it
 has no message end of its own, no status byte, no service requests and no
-device clear, and it carries settings (baud rate, parity) that a TCP
-connection does not.
+device clear, and it carries settings, such as the baud rate and parity,
+that a TCP connection does not.
 
-#239 records the requirements and the test plan this ADR answers.
+#239 records the requirements and the test plan this ADR answers. Where
+this ADR departs from #239, the Alternatives say why.
 
 ## Decision
 
@@ -32,7 +33,9 @@ connection does not.
 
 - `AsrlPort(string Port)`: `ASRL/dev/ttyUSB0::INSTR`, `ASRLCOM3::INSTR`. The
   text between `ASRL` and `::INSTR` names the port.
-- `AsrlBoard(int Board)`: `ASRL1::INSTR`. The text is digits only.
+- `AsrlBoard(int Board)`: `ASRL1::INSTR`. The text is digits only, and
+  `ASRL::INSTR` is board 0, as an empty board is for the other resource
+  kinds. A port whose name is only digits therefore cannot be named.
 
 Each round-trips through its canonical text, and the class is always
 `INSTR`. The port name is masked in logs, as a host name or a USB serial
@@ -43,11 +46,14 @@ number is (ADR 0017), because a stable name such as
 
 | Resource | Opened by |
 | --- | --- |
+| either, with a mock scenario bound to the device, or with `IVICLI_MOCK_ONLY` set | the Fake backend, as for SOCKET, USB and GPIB |
 | `AsrlPort` | the Serial backend, with the named port |
 | `AsrlBoard`, board registered (§3) | the Serial backend, with the registered port |
 | `AsrlBoard`, board not registered | the Local backend, through the VISA runtime |
-| `AsrlBoard`, neither registered nor a VISA runtime | none: opening fails with a message that shows the `visa asrl add` line |
-| either, with a mock scenario bound to the device | the Fake backend, as for the other transports |
+
+The first row that matches wins. When an unregistered board cannot be
+opened, because there is no VISA runtime or the runtime does not know the
+board, the error shows the `visa asrl add` line that registers it.
 
 The Serial backend is a new `IviCli.Backends.Serial` on `System.IO.Ports`,
 with no VISA runtime. There is no built-in mapping from board numbers to
@@ -55,8 +61,9 @@ ports: the mapping differs between operating systems and runtimes, and a
 guessed port that happens to exist would talk to the wrong instrument.
 
 `DefaultBackendFactory` names every resource case it handles and returns
-`UnsupportedTransport` for any other, so a resource kind without a backend
-fails instead of reaching the Fake backend silently.
+`UnsupportedTransport` for a case it does not name, instead of the Fake
+backend. A case it names but whose backend is not registered still falls
+back to the Fake backend, which is how `IVICLI_MOCK_ONLY` works.
 
 ### 3. Board numbers are registered per machine
 
@@ -73,9 +80,13 @@ port = "/dev/ttyUSB0"
 `visa asrl remove <board>` manage it.
 
 - Registering a board twice, or one port under two boards, is an error; to
-  move a board, remove it first.
+  move a board, remove it first. Ports are compared by the file they
+  resolve to, so a `/dev/serial/by-id/` link and the `/dev/ttyUSB0` it
+  points at are the same port.
 - A port that does not exist yet is accepted with a warning, since a USB
   adapter appears only while plugged in.
+- The table is read when a board is opened, not when ivi-cli starts, so a
+  running gateway sees a board registered after it started.
 - `visa scan` lists the serial ports and, for one no board names, the
   `visa asrl add` line that would register it.
 
@@ -97,38 +108,49 @@ flow_control = "none"  # none | xon_xoff | rts_cts
 - A `[devices.serial]` table on a device that is not ASRL is a
   configuration error.
 - The Serial backend applies them as `SerialPort` properties, and the
-  Local backend as `ISerialSession` attributes.
+  Local backend as `ISerialSession` attributes. A value the platform's
+  serial driver cannot set fails the open with a message that names it.
+- Both backends assert DTR while the port is open, as VISA does by
+  default.
 - `visa add` takes them as options.
 
 They live on the device rather than in the resource text because VISA's
 resource syntax has no place for them, and a VISA runtime reads them as
 session attributes too.
 
-### 5. Termination is a device setting for every transport
+### 5. Termination is a device setting
 
-Every device gains `read_termination` and `write_termination`, defaulting to
-`"\n"`, the terminator every backend writes and reads today.
+Every device may set `read_termination` and `write_termination`, each one
+or two characters, such as `"\n"`, `"\r"` or `"\r\n"`.
 
+- Unset, every backend behaves as it does today: writes end with `"\n"`,
+  and a read ends at LF, CR or CRLF.
+- Set, a read ends at exactly that sequence, and writes end with it.
 - They apply where the transport has no message end of its own: SOCKET and
-  serial, whether opened by the Serial backend or through VISA.
-- HiSLIP, VXI-11 and USBTMC end messages with END, so there the settings
-  are ignored, and a device that sets them gets a warning when it is
-  added or loaded.
+  serial, whether opened directly or through VISA. Through VISA, the last
+  character of `read_termination` is the termination character, and a
+  preceding `"\r"` is removed from the reply.
+- HiSLIP, VXI-11 and USBTMC end messages with END, and GPIB with EOI, so
+  there the settings are ignored, and a device that sets them gets a
+  warning when it is added or loaded.
 
 ### 6. What a serial line does not have
 
-- Reading the status byte, the service-request stream and device clear
-  return `BackendOperationNotSupported` (ADR 0041), on either backend.
 - Trigger writes `*TRG`.
-- A gateway that exposes a serial device answers those requests the way
-  its protocol reports an unsupported operation.
+- The service-request stream ends at once, as for any backend without
+  service requests (ADR 0041 §1).
+- The backend port has no status-byte read or device clear. The gateways
+  answer those requests themselves today; for a device on a serial line
+  they report the operation unsupported, the way each protocol reports
+  one.
 
 ### 7. A serial port is exclusive
 
 - Opening a port that another process or session already holds fails with
-  `TransportInUse`, which names the port.
-- The pool (ADR 0038) closes a serial session when it is released instead
-  of holding it idle, so another program can open the port between uses.
+  a new `BackendError`, `TransportInUse`, which names the port.
+- The pool (ADR 0038) holds a serial session as it holds any other, until
+  it has been idle for the pool's idle timeout. Meanwhile no other program
+  can open the port.
 - Two devices that name the same port are two pool entries (ADR 0038 §2);
   while one holds the port, the other's open fails as above.
 
@@ -137,16 +159,20 @@ Every device gains `read_termination` and `write_termination`, defaulting to
 The Serial backend sets the port's read and write timeouts to the device
 timeout and implements `IEnforcesDeviceTimeout`, so ADR 0053 applies as it
 does to VXI-11 and VISA: its own timeout error arrives first, and the
-decorator is the backstop. A port that timed out is closed and reopened
-before the next operation (ADR 0053 §3), which discards a reply that
-arrives late on a line that has no request identifiers.
+decorator is the backstop. Its blocking port calls run off the caller's
+thread, so the decorator can abandon one that does not return.
+
+A line has no request identifiers, so a reply that arrives after its
+request timed out could be read as the answer to the next one. The port is
+closed and reopened after a timeout (ADR 0053 §3), and the input buffer is
+discarded before each write, which narrows that window; neither closes it.
 
 ### 9. Packaging
 
 `System.IO.Ports` comes from NuGet with native shims for each runtime
 identifier, so THIRD-PARTY-NOTICES lists them. The shims load only when a
 port is opened, so the release smoke test opens a pseudo-terminal on each
-Linux build.
+Linux and macOS build, including the NativeAOT and single-file ones.
 
 ### 10. Surfaces
 
@@ -162,10 +188,13 @@ Each step is a pull request that leaves `main` releasable:
 2. The `visa asrl` commands and the `visa add` options.
 3. The Serial backend, tested over a socat pseudo-terminal pair in Linux
    CI.
-4. Backend selection, including the factory's catch-all, and the Local
-   backend's serial attributes.
-5. The surfaces of §10, `visa scan`, and the documentation (README, PRD and
-   its mirror, ADRs 0003, 0010, 0017, 0038 and 0049, the CHANGELOG).
+4. Backend selection, including the factory's catch-all, the Local
+   backend's serial attributes, and the gateways' answers for a serial
+   device.
+5. The surfaces of §10, `visa scan`, and the documentation: README, PRD
+   and its mirror, ADRs 0003, 0010, 0017, 0038 and 0049, the CHANGELOG, and
+   `docs/conformance.md`, whose timeout entries say a late reply is never
+   read, which §8 does not hold for a serial line.
 6. The CDC-ACM run in the nightly NI-VISA job and the release smoke test.
 
 ## Alternatives
@@ -174,21 +203,29 @@ Each step is a pull request that leaves `main` releasable:
   `/dev/ttyS0`). Matches NI-VISA on Windows, but USB adapters get
   unpredictable names on Linux, and a wrong guess reaches the wrong
   instrument instead of failing.
-- **VISA only.** One backend fewer, but no serial support on hosts without
-  a runtime, which includes most Linux and every arm64 host.
+- **VISA only.** One backend fewer, but no serial support on a host
+  without a runtime.
 - **Serial settings in the resource text**, `ASRL1::INSTR?baud=19200`. Not
   VISA syntax: no other VISA program could read the resource.
-- **A fixed terminator per backend.** Today's behaviour; an instrument that
-  ends its replies with `\r` cannot be used.
+- **A strict `"\n"` default for termination**, as #239 proposed. Today a
+  SOCKET or VISA read ends at CR too, so an instrument that replies with
+  `"\r"` works now and would stop working until its device set the
+  terminator.
+- **Closing a serial session when the pool releases it**, as #239
+  proposed, so another program can open the port between uses. On Linux
+  closing a port drops DTR, which resets some instruments, such as
+  microcontroller boards, on every use, and each use pays for opening the
+  port.
 
 ## Consequences
 
-- A resource kind with no backend now fails with `UnsupportedTransport`
+- A resource case with no backend now fails with `UnsupportedTransport`
   instead of answering from the Fake backend.
-- A configuration with `[[asrl]]` or `[devices.serial]` cannot be read by
-  an older ivi-cli.
-- The pool holds no idle serial session, so each use of a serial device
-  pays for opening the port.
+- A configuration with `[[asrl]]`, `[devices.serial]` or a termination
+  field cannot be read by an older ivi-cli.
+- While the pool holds a serial port, other programs on the machine cannot
+  open it; a shorter pool idle timeout gives it back sooner.
+- DTR/DSR handshaking is not offered: `SerialPort` has no such mode.
 - The serial settings are checked against what the port object reports
   and in the nightly CDC-ACM run; a pseudo-terminal has no baud rate or
   parity to check them against.
