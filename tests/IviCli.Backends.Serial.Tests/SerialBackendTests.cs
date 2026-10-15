@@ -231,6 +231,7 @@ public sealed class SerialBackendTests
         );
 
         var opening = backend.OpenAsync(Dev(), giveUp.Token);
+        factory.OpenStarted.Wait(TestContext.Current.CancellationToken);
         await giveUp.CancelAsync();
         await Should.ThrowAsync<OperationCanceledException>(() => opening);
         release.Set();
@@ -436,8 +437,12 @@ public sealed class SerialBackendTests
         /// <summary>Holds an open until set, as a slow driver might.</summary>
         public ManualResetEventSlim? OpenBlocksUntil { get; init; }
 
+        /// <summary>Set once an open has begun.</summary>
+        public ManualResetEventSlim OpenStarted { get; } = new();
+
         public ISerialLine Open(string port, SerialSettings settings, TimeSpan timeout)
         {
+            OpenStarted.Set();
             OpenBlocksUntil?.Wait();
             if (OpenFails is not null)
             {
