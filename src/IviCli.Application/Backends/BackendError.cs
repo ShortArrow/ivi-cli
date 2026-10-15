@@ -91,14 +91,14 @@ public sealed record TransportInUse(
 
 /// <summary>
 /// An <c>ASRL&lt;board&gt;::INSTR</c> device whose board the machine's
-/// <c>[[asrl]]</c> table does not register could not be opened through VISA
-/// either, because there is no VISA runtime or it does not know the board
-/// (ADR 0055 §2).
+/// <c>[[asrl]]</c> table does not register has no port VISA can open
+/// either, because there is no VISA runtime or the runtime does not know
+/// the board (ADR 0055 §2).
 /// </summary>
 /// <param name="Device">The device.</param>
 /// <param name="Board">The board number.</param>
-/// <param name="VisaError">What VISA reported, when a VISA runtime tried.</param>
-public sealed record AsrlBoardUnavailable(DeviceName Device, int Board, BackendError? VisaError)
+/// <param name="Reason">Why VISA could not open it, free of any port name.</param>
+public sealed record AsrlBoardUnavailable(DeviceName Device, int Board, string Reason)
     : BackendError
 {
     /// <inheritdoc/>
@@ -106,10 +106,41 @@ public sealed record AsrlBoardUnavailable(DeviceName Device, int Board, BackendE
 
     /// <inheritdoc/>
     public override string Message =>
-        "ASRL board {Board} of {Device} is not registered and VISA could not open it; register its port with: ivicli visa asrl add {Board} <port>";
+        "ASRL board {Board} of {Device} is not registered, and {Reason}; register its port with: ivicli visa asrl add {Board} <port>";
 
     /// <inheritdoc/>
-    public override IReadOnlyList<object?> LogArgs => new object?[] { Board, Device, Board };
+    public override IReadOnlyList<object?> LogArgs =>
+        new object?[] { Board, Device, Reason, Board };
+}
+
+/// <summary>No VISA runtime is installed, so VISA cannot open the resource.</summary>
+/// <param name="Detail">What the runtime check found.</param>
+public sealed record VisaRuntimeMissing(string Detail) : BackendError
+{
+    /// <inheritdoc/>
+    public override LogSeverity Severity => LogSeverity.Error;
+
+    /// <inheritdoc/>
+    public override string Message => "VISA runtime not available: {Detail}";
+
+    /// <inheritdoc/>
+    public override IReadOnlyList<object?> LogArgs => new object?[] { Detail };
+}
+
+/// <summary>The VISA runtime does not know the resource.</summary>
+/// <param name="Device">The device.</param>
+/// <param name="Resource">The device's resource, masked in logs.</param>
+public sealed record ResourceNotFound(DeviceName Device, VisaResource Resource) : BackendError
+{
+    /// <inheritdoc/>
+    public override LogSeverity Severity => LogSeverity.Error;
+
+    /// <inheritdoc/>
+    public override string Message => "VISA does not know {Resource} of {Device}";
+
+    /// <inheritdoc/>
+    public override IReadOnlyList<object?> LogArgs =>
+        new object?[] { Resource.ToLogString(), Device };
 }
 
 /// <summary>The instrument did not respond to the request.</summary>

@@ -71,15 +71,24 @@ public sealed class AsrlBoardBackend : IIviBackend, IEnforcesDeviceTimeout
         if (_visa is null)
         {
             return Result.Failure<Unit, BackendError>(
-                new AsrlBoardUnavailable(device.Name, board, VisaError: null)
+                new AsrlBoardUnavailable(device.Name, board, "no VISA runtime can open it")
             );
         }
         var throughVisa = await _visa.OpenAsync(device, ct);
-        return throughVisa is Result<Unit, BackendError>.Error { Err: var visaError }
-            ? Result.Failure<Unit, BackendError>(
-                new AsrlBoardUnavailable(device.Name, board, visaError)
-            )
-            : Opened(device, _visa, throughVisa);
+        return throughVisa switch
+        {
+            Result<Unit, BackendError>.Error { Err: VisaRuntimeMissing } => Result.Failure<
+                Unit,
+                BackendError
+            >(new AsrlBoardUnavailable(device.Name, board, "no VISA runtime is installed")),
+            Result<Unit, BackendError>.Error { Err: ResourceNotFound } => Result.Failure<
+                Unit,
+                BackendError
+            >(new AsrlBoardUnavailable(device.Name, board, "VISA does not know the board")),
+            // Any other failure, such as a port another program holds, is
+            // passed on: registering the board would not help.
+            _ => Opened(device, _visa, throughVisa),
+        };
     }
 
     /// <inheritdoc/>

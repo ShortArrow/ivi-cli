@@ -62,10 +62,20 @@ public sealed class AsrlBoardBackendTests
         serial.Opened.ShouldBeEmpty();
     }
 
-    [Fact]
-    public async Task An_unregistered_board_VISA_cannot_open_points_at_visa_asrl_add()
+    /// <summary>
+    /// The hint to register the board is for a board VISA has no port for:
+    /// one it does not know, or no runtime at all (ADR 0055 §2).
+    /// </summary>
+    [Theory]
+    [InlineData("not-found")]
+    [InlineData("no-runtime")]
+    public async Task An_unregistered_board_VISA_has_no_port_for_points_at_visa_asrl_add(string why)
     {
-        var visa = new RecordingBackend { OpenFails = new TransportDisconnected("no runtime") };
+        BackendError visaError =
+            why == "not-found"
+                ? new ResourceNotFound(Board1.Name, Board1.Resource)
+                : new VisaRuntimeMissing("no visaConfMgr");
+        var visa = new RecordingBackend { OpenFails = visaError };
         var backend = new AsrlBoardBackend(new FakeConfigStore(), new RecordingBackend(), visa);
 
         var result = await backend.OpenAsync(Board1, Ct);
@@ -73,6 +83,85 @@ public sealed class AsrlBoardBackendTests
         var error = result.ShouldBeError().ShouldBeOfType<AsrlBoardUnavailable>();
         error.Board.ShouldBe(1);
         error.Message.ShouldContain("visa asrl add");
+        error.Reason.ShouldNotBeNullOrWhiteSpace();
+    }
+
+    /// <summary>
+    /// Any other VISA failure, such as a port another program holds, is
+    /// passed on: registering the board would not help (ADR 0055 §7).
+    /// </summary>
+    [Fact]
+    public async Task Another_VISA_failure_on_an_unregistered_board_is_passed_on()
+    {
+        var busy = new TransportInUse(Board1.Name, Board1.Resource);
+        var visa = new RecordingBackend { OpenFails = busy };
+        var backend = new AsrlBoardBackend(new FakeConfigStore(), new RecordingBackend(), visa);
+
+        var result = await backend.OpenAsync(Board1, Ct);
+
+        result.ShouldBeError().ShouldBe(busy);
+    }
+
+    [Fact]
+    public async Task Operations_after_a_VISA_open_go_to_VISA()
+    {
+        var serial = new RecordingBackend();
+        var visa = new RecordingBackend();
+        var backend = new AsrlBoardBackend(new FakeConfigStore(), serial, visa);
+        (await backend.OpenAsync(Board1, Ct)).ShouldBeOk();
+
+        (await backend.ReadAsync(Board1, Ct)).ShouldBeOk();
+        (await backend.TriggerAsync(Board1, Ct)).ShouldBeOk();
+
+        visa.Calls.ShouldBe(["open", "read", "trigger"]);
+        serial.Calls.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task A_closed_device_has_no_backend_until_it_opens_again()
+    {
+        var backend = new AsrlBoardBackend(
+            Registered(1, "/dev/ttyUSB0"),
+            new RecordingBackend(),
+            null
+        );
+        (await backend.OpenAsync(Board1, Ct)).ShouldBeOk();
+        (await backend.CloseAsync(Board1, Ct)).ShouldBeOk();
+
+        var result = await backend.WriteAsync(Board1, ScpiCommand.From("*RST").ShouldBeOk(), Ct);
+
+        result.ShouldBeError().ShouldBeOfType<TransportDisconnected>();
+    }
+
+    [Fact]
+    public async Task Service_requests_come_from_the_backend_that_opened_the_device()
+    {
+        var visa = new RecordingBackend
+        {
+            Requests = [new ServiceRequest(Board1.Name, 0x40, DateTimeOffset.UnixEpoch)],
+        };
+        var backend = new AsrlBoardBackend(new FakeConfigStore(), new RecordingBackend(), visa);
+        (await backend.OpenAsync(Board1, Ct)).ShouldBeOk();
+
+        var received = new List<ServiceRequest>();
+        await foreach (var request in backend.ServiceRequestStream(Board1, Ct))
+        {
+            received.Add(request);
+        }
+
+        received.ShouldHaveSingleItem().StatusByte.ShouldBe((byte)0x40);
+    }
+
+    [Fact]
+    public async Task A_board_table_that_cannot_be_read_fails_the_open()
+    {
+        var store = new FakeConfigStore();
+        store.FailNextLoadWith("disk gone");
+        var backend = new AsrlBoardBackend(store, new RecordingBackend(), new RecordingBackend());
+
+        var result = await backend.OpenAsync(Board1, Ct);
+
+        result.ShouldBeError().ShouldBeOfType<TransportDisconnected>();
     }
 
     [Fact]
@@ -153,6 +242,7 @@ public sealed class AsrlBoardBackendTests
         public List<Device> Opened { get; } = [];
         public List<string> Calls { get; } = [];
         public BackendError? OpenFails { get; init; }
+        public IReadOnlyList<ServiceRequest> Requests { get; init; } = [];
 
         public Task<Result<Unit, BackendError>> OpenAsync(Device device, CancellationToken ct)
         {
@@ -199,7 +289,10 @@ public sealed class AsrlBoardBackendTests
         )
         {
             await Task.CompletedTask;
-            yield break;
+            foreach (var request in Requests)
+            {
+                yield return request;
+            }
         }
 
         private Task<Result<Unit, BackendError>> Done(string call)

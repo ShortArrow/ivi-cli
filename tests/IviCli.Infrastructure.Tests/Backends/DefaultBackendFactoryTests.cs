@@ -157,7 +157,9 @@ public sealed class DefaultBackendFactoryTests
     public void A_serial_resource_with_an_active_scenario_reaches_the_mock(string resource)
     {
         var factory = new DefaultBackendFactory(
-            new ScenarioAwareMarkerBackend("fallback", hasActiveScenario: true)
+            new ScenarioAwareMarkerBackend("fallback", hasActiveScenario: true),
+            serialBackend: new MarkerBackend("serial"),
+            asrlBoardBackend: new MarkerBackend("board")
         );
 
         var picked = (ScenarioAwareMarkerBackend)
