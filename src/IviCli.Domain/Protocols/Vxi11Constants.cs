@@ -111,6 +111,12 @@ public static class Vxi11Constants
     /// <summary>VXI-11 error code: I/O error.</summary>
     public const int Vxi11IoError = 17;
 
+    /// <summary>
+    /// Device_Flags bit asking the server to wait up to <c>lock_timeout</c>
+    /// for a lock another link holds, instead of failing at once.
+    /// </summary>
+    public const int WaitLockFlag = 0x01;
+
     /// <summary>device_write flag bit signalling end of message.</summary>
     public const int WriteEndFlag = 0x08;
 
