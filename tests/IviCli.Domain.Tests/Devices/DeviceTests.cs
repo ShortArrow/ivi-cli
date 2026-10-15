@@ -92,4 +92,32 @@ public class DeviceTests
         updated.Name.ShouldBe(original.Name);
         updated.Resource.ShouldBe(original.Resource);
     }
+
+    /// <summary>
+    /// VISA's defaults have one representation, <see langword="null"/>, so a
+    /// device that spells them out equals one that leaves them out.
+    /// </summary>
+    [Fact]
+    public void Serial_DefaultSettings_AreStoredAsNone()
+    {
+        // Given
+        var spelled = new Device(
+            Name("dmm"),
+            Resource("ASRL1::INSTR"),
+            T(3000),
+            Serial: SerialSettings.Default
+        );
+        var omitted = new Device(Name("dmm"), Resource("ASRL1::INSTR"), T(3000));
+
+        // When
+        var changed = omitted with
+        {
+            Serial = SerialSettings.Default,
+        };
+
+        // Then
+        spelled.Serial.ShouldBeNull();
+        changed.Serial.ShouldBeNull();
+        spelled.ShouldBe(omitted);
+    }
 }

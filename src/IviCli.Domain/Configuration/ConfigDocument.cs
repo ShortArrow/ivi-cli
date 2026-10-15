@@ -22,6 +22,7 @@ public sealed record ConfigDocument
             devices: ImmutableArray<Device>.Empty,
             servers: ImmutableArray<Server>.Empty,
             routes: ImmutableArray<Route>.Empty,
+            asrlBoards: ImmutableArray<AsrlBoardRegistration>.Empty,
             defaults: Defaults.None,
             pool: PoolConfig.Default,
             api: ApiConfig.Default,
@@ -38,6 +39,9 @@ public sealed record ConfigDocument
 
     /// <summary>The configured server-to-device routes.</summary>
     public ImmutableArray<Route> Routes { get; }
+
+    /// <summary>The <c>[[asrl]]</c> board registrations (ADR 0055 §3).</summary>
+    public ImmutableArray<AsrlBoardRegistration> AsrlBoards { get; }
 
     /// <summary>The <c>[defaults]</c> section.</summary>
     public Defaults Defaults { get; }
@@ -61,6 +65,7 @@ public sealed record ConfigDocument
         ImmutableArray<Device> devices,
         ImmutableArray<Server> servers,
         ImmutableArray<Route> routes,
+        ImmutableArray<AsrlBoardRegistration> asrlBoards,
         Defaults defaults,
         PoolConfig pool,
         ApiConfig api,
@@ -72,6 +77,7 @@ public sealed record ConfigDocument
         Devices = devices;
         Servers = servers;
         Routes = routes;
+        AsrlBoards = asrlBoards;
         Defaults = defaults;
         Pool = pool;
         Api = api;
@@ -91,7 +97,8 @@ public sealed record ConfigDocument
         && Plugins == other.Plugins
         && Devices.SequenceEqual(other.Devices)
         && Servers.SequenceEqual(other.Servers)
-        && Routes.SequenceEqual(other.Routes);
+        && Routes.SequenceEqual(other.Routes)
+        && AsrlBoards.SequenceEqual(other.AsrlBoards);
 
     /// <inheritdoc/>
     public override int GetHashCode()
@@ -114,6 +121,10 @@ public sealed record ConfigDocument
         foreach (var r in Routes)
         {
             hash.Add(r);
+        }
+        foreach (var a in AsrlBoards)
+        {
+            hash.Add(a);
         }
         return hash.ToHashCode();
     }
@@ -155,6 +166,12 @@ public sealed record ConfigDocument
         {
             return Result.Failure<ConfigDocument, ConfigError>(
                 new DuplicateDeviceName(device.Name)
+            );
+        }
+        if (device.Serial is not null && !device.IsSerial)
+        {
+            return Result.Failure<ConfigDocument, ConfigError>(
+                new SerialSettingsOnNonSerialDevice(device.Name)
             );
         }
         return Result.Success<ConfigDocument, ConfigError>(With(devices: Devices.Add(device)));
@@ -294,10 +311,61 @@ public sealed record ConfigDocument
         return Result.Success<ConfigDocument, ConfigError>(With(routes: Routes.Remove(existing)));
     }
 
+    // -------- ASRL boards -------------------------------------------------
+
+    /// <summary>Finds a board registration, or returns <see langword="null"/>.</summary>
+    public AsrlBoardRegistration? FindAsrlBoard(int board)
+    {
+        foreach (var registration in AsrlBoards)
+        {
+            if (registration.Board == board)
+            {
+                return registration;
+            }
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// Registers a board. A board or a port already registered is an error;
+    /// ports are compared as written here, and the caller compares the files
+    /// they resolve to.
+    /// </summary>
+    public Result<ConfigDocument, ConfigError> AddAsrlBoard(AsrlBoardRegistration registration)
+    {
+        if (FindAsrlBoard(registration.Board) is not null)
+        {
+            return Result.Failure<ConfigDocument, ConfigError>(
+                new DuplicateAsrlBoard(registration.Board)
+            );
+        }
+        foreach (var existing in AsrlBoards)
+        {
+            if (existing.Port == registration.Port)
+            {
+                return Result.Failure<ConfigDocument, ConfigError>(
+                    new DuplicateAsrlPort(registration.Port, existing.Board)
+                );
+            }
+        }
+        return Result.Success<ConfigDocument, ConfigError>(
+            With(asrlBoards: AsrlBoards.Add(registration))
+        );
+    }
+
+    /// <summary>Removes a board registration.</summary>
+    public Result<ConfigDocument, ConfigError> RemoveAsrlBoard(int board) =>
+        FindAsrlBoard(board) is { } existing
+            ? Result.Success<ConfigDocument, ConfigError>(
+                With(asrlBoards: AsrlBoards.Remove(existing))
+            )
+            : Result.Failure<ConfigDocument, ConfigError>(new AsrlBoardNotFound(board));
+
     private ConfigDocument With(
         ImmutableArray<Device>? devices = null,
         ImmutableArray<Server>? servers = null,
         ImmutableArray<Route>? routes = null,
+        ImmutableArray<AsrlBoardRegistration>? asrlBoards = null,
         Defaults? defaults = null,
         PoolConfig? pool = null,
         ApiConfig? api = null,
@@ -309,6 +377,7 @@ public sealed record ConfigDocument
             devices ?? Devices,
             servers ?? Servers,
             routes ?? Routes,
+            asrlBoards ?? AsrlBoards,
             defaults ?? Defaults,
             pool ?? Pool,
             api ?? Api,

@@ -68,7 +68,7 @@ public sealed class DefaultBackendFactory : IBackendFactory
         var hasActiveScenario =
             _fallbackBackend is IScenarioAwareBackend probe && probe.HasActiveScenarioFor(device);
 
-        var backend = device.Resource switch
+        IIviBackend? backend = device.Resource switch
         {
             VisaResource.Tcpip t when LooksLikeHislip(t) => _hislipBackend ?? _fallbackBackend,
             VisaResource.Tcpip t when LooksLikeVxi11(t) && hasActiveScenario => _fallbackBackend,
@@ -81,6 +81,11 @@ public sealed class DefaultBackendFactory : IBackendFactory
             VisaResource.Usb => _localBackend ?? _fallbackBackend,
             VisaResource.Gpib when hasActiveScenario => _fallbackBackend,
             VisaResource.Gpib => _localBackend ?? _fallbackBackend,
+            VisaResource.AsrlBoard or VisaResource.AsrlPort when hasActiveScenario =>
+                _fallbackBackend,
+            // No backend opens a serial resource yet (ADR 0055 §11), so it
+            // fails rather than answering from the Fake backend.
+            VisaResource.AsrlBoard or VisaResource.AsrlPort => null,
             _ => _fallbackBackend,
         };
 

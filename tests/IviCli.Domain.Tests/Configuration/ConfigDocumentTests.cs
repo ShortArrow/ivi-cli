@@ -10,6 +10,10 @@ public class ConfigDocumentTests
 {
     private static DeviceName Name(string raw) => DeviceName.From(raw).ShouldBeOk();
 
+    private static readonly SerialSettings Baud19200 = SerialSettings
+        .From(19200, 8, SerialParity.None, SerialStopBits.One, SerialFlowControl.None)
+        .ShouldBeOk();
+
     private static Device Dev(
         string name,
         string resource = "TCPIP0::host::inst0::INSTR",
@@ -45,6 +49,41 @@ public class ConfigDocumentTests
         var updated = result.ShouldBeOk();
         updated.Devices.Length.ShouldBe(1);
         updated.Devices[0].ShouldBe(device);
+    }
+
+    [Fact]
+    public void AddDevice_SerialSettingsOnASerialDevice_AppendsDevice()
+    {
+        // Given
+        var device = Dev("dmm", resource: "ASRL1::INSTR") with
+        {
+            Serial = Baud19200,
+        };
+
+        // When
+        var result = ConfigDocument.Empty.AddDevice(device);
+
+        // Then
+        result.ShouldBeOk().Devices[0].Serial.ShouldBe(Baud19200);
+    }
+
+    [Fact]
+    public void AddDevice_SerialSettingsOnANetworkDevice_ReturnsSerialSettingsOnNonSerialDevice()
+    {
+        // Given
+        var device = Dev("psu1") with
+        {
+            Serial = Baud19200,
+        };
+
+        // When
+        var result = ConfigDocument.Empty.AddDevice(device);
+
+        // Then
+        result
+            .ShouldBeError()
+            .ShouldBeOfType<SerialSettingsOnNonSerialDevice>()
+            .Name.ShouldBe(Name("psu1"));
     }
 
     [Fact]

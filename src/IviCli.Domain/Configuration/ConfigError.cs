@@ -38,6 +38,83 @@ public sealed record DuplicateDeviceName(DeviceName Name) : ConfigError
 }
 
 /// <summary>
+/// A device that is not on a serial line carried serial settings (ADR 0055 §4).
+/// </summary>
+/// <param name="Name">The device.</param>
+public sealed record SerialSettingsOnNonSerialDevice(DeviceName Name) : ConfigError
+{
+    /// <inheritdoc/>
+    public override LogSeverity Severity => LogSeverity.Warning;
+
+    /// <inheritdoc/>
+    public override string Message => "device {Name} has serial settings but is not an ASRL device";
+
+    /// <inheritdoc/>
+    public override IReadOnlyList<object?> LogArgs => new object?[] { Name };
+}
+
+/// <summary>
+/// An <c>[[asrl]]</c> row had a negative board or a port name that an ASRL
+/// resource cannot carry: empty, only digits, or containing <c>::</c>.
+/// </summary>
+/// <param name="Board">The board number given.</param>
+/// <param name="Port">The port name given.</param>
+public sealed record InvalidAsrlBoardRegistration(int Board, string Port) : ConfigError
+{
+    /// <inheritdoc/>
+    public override LogSeverity Severity => LogSeverity.Warning;
+
+    /// <inheritdoc/>
+    public override string Message => "invalid ASRL board {Board} for port {Port}";
+
+    /// <inheritdoc/>
+    public override IReadOnlyList<object?> LogArgs => new object?[] { Board, Port };
+}
+
+/// <summary>A board number was registered twice (ADR 0055 §3).</summary>
+/// <param name="Board">The board number.</param>
+public sealed record DuplicateAsrlBoard(int Board) : ConfigError
+{
+    /// <inheritdoc/>
+    public override LogSeverity Severity => LogSeverity.Warning;
+
+    /// <inheritdoc/>
+    public override string Message => "ASRL board {Board} is already registered";
+
+    /// <inheritdoc/>
+    public override IReadOnlyList<object?> LogArgs => new object?[] { Board };
+}
+
+/// <summary>A port was registered under a second board (ADR 0055 §3).</summary>
+/// <param name="Port">The port.</param>
+/// <param name="Board">The board it is already registered under.</param>
+public sealed record DuplicateAsrlPort(string Port, int Board) : ConfigError
+{
+    /// <inheritdoc/>
+    public override LogSeverity Severity => LogSeverity.Warning;
+
+    /// <inheritdoc/>
+    public override string Message => "port {Port} is already registered as ASRL board {Board}";
+
+    /// <inheritdoc/>
+    public override IReadOnlyList<object?> LogArgs => new object?[] { Port, Board };
+}
+
+/// <summary>An operation referenced a board number that is not registered.</summary>
+/// <param name="Board">The board number.</param>
+public sealed record AsrlBoardNotFound(int Board) : ConfigError
+{
+    /// <inheritdoc/>
+    public override LogSeverity Severity => LogSeverity.Warning;
+
+    /// <inheritdoc/>
+    public override string Message => "ASRL board {Board} is not registered";
+
+    /// <inheritdoc/>
+    public override IReadOnlyList<object?> LogArgs => new object?[] { Board };
+}
+
+/// <summary>
 /// An operation referenced a device name that does not exist in the configuration.
 /// </summary>
 /// <param name="Name">The missing device name.</param>
