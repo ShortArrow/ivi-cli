@@ -18,6 +18,12 @@ All notable changes to ivi-cli are documented here. Format roughly follows
 
 ### Fixed
 
+- **Saving `config.toml` keeps Windows paths readable.** ivicli wrote
+  strings back without escaping them, so a backslash in a TLS
+  certificate path or the audit log path, or a quote in a telemetry
+  service name, left a file that the next command could not read. Every
+  string is now written as an escaped TOML string.
+
 - **A device's `timeout_ms` bounds every operation.** It bounded none:
   the VISA backend timed out after 5 seconds whatever it said, the VXI-11
   client sent a fixed 5-second `io_timeout`, and HiSLIP and SOCKET waited
