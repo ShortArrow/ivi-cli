@@ -8,13 +8,17 @@ All notable changes to ivi-cli are documented here. Format roughly follows
 
 ### Added
 
-- **`config.toml` reads serial devices, though nothing opens them yet.**
-  An `ASRL1::INSTR` or `ASRL/dev/ttyUSB0::INSTR` resource, a
-  `[devices.serial]` table, `read_termination` and `write_termination`,
-  and an `[[asrl]]` table of board numbers are accepted and written back
-  (ADR 0055). Opening such a device fails as an unsupported transport
-  until the serial backend lands; it never answers from the mock, even
-  under `IVICLI_MOCK_ONLY`. No backend applies the terminators yet.
+- **Serial instruments, with or without a VISA runtime.** An
+  `ASRL/dev/ttyUSB0::INSTR` or `ASRLCOM3::INSTR` device opens its port
+  directly with `System.IO.Ports`, using the device's `[devices.serial]`
+  settings and terminators. An `ASRL1::INSTR` device opens the port its
+  board is registered for in the `[[asrl]]` table, or goes through a VISA
+  runtime when the board is not registered; when neither can open it, the
+  error shows the `visa asrl add` line that registers it (ADR 0055). A
+  port another program holds is reported as in use. Under
+  `IVICLI_MOCK_ONLY` a serial device answers from the mock, as every other
+  device does. Serial settings and terminators do not yet reach a device
+  opened through VISA.
 
 - **`visa asrl add`, `list` and `remove` register serial board numbers.**
   `ivicli visa asrl add 1 /dev/ttyUSB0` records which port `ASRL1::INSTR`

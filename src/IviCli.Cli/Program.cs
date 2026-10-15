@@ -6,6 +6,7 @@ using IviCli.Backends.Fake;
 using IviCli.Backends.HiSlip;
 using IviCli.Backends.Local;
 using IviCli.Backends.Lxi;
+using IviCli.Backends.Serial;
 using IviCli.Backends.Socket;
 using IviCli.Backends.Vxi11;
 using IviCli.Cli.Commands;
@@ -168,6 +169,7 @@ internal static class Program
             services.AddIviCliBackendsHiSlip();
             services.AddIviCliBackendsVxi11();
             services.AddIviCliBackendsLocal();
+            services.AddIviCliBackendsSerial();
 
             // Discovery scanners (ADR 0008, Batch W). Registered as
             // additional IBackendScanner implementations alongside the
@@ -269,19 +271,34 @@ internal static class Program
                         bootstrapConfig.Telemetry.Enabled
                         && bootstrapConfig.Telemetry.HiSlipPropagationEnabled;
                 }
+                var localBackend = mockOnly
+                    ? null
+                    : sp.GetRequiredService<IviCli.Backends.Local.LocalBackend>();
+                var serialBackend = mockOnly
+                    ? null
+                    : sp.GetRequiredService<IviCli.Backends.Serial.SerialBackend>();
                 IviCli.Application.Backends.IBackendFactory factory =
                     new IviCli.Infrastructure.Backends.DefaultBackendFactory(
                         fallbackBackend: fallback,
-                        localBackend: mockOnly
-                            ? null
-                            : sp.GetRequiredService<IviCli.Backends.Local.LocalBackend>(),
+                        localBackend: localBackend,
                         hislipBackend: hislipBackend,
                         socketBackend: mockOnly
                             ? null
                             : sp.GetRequiredService<IviCli.Backends.Socket.SocketBackend>(),
                         vxi11Backend: mockOnly
                             ? null
-                            : sp.GetRequiredService<IviCli.Backends.Vxi11.Vxi11Backend>()
+                            : sp.GetRequiredService<IviCli.Backends.Vxi11.Vxi11Backend>(),
+                        serialBackend: serialBackend,
+                        // ASRL<board>::INSTR: a board the [[asrl]] table registers
+                        // opens on the serial backend, any other through VISA
+                        // (ADR 0055 §2, §3).
+                        asrlBoardBackend: serialBackend is null
+                            ? null
+                            : new IviCli.Infrastructure.Backends.AsrlBoardBackend(
+                                sp.GetRequiredService<IviCli.Application.Configuration.IConfigStore>(),
+                                serialBackend,
+                                localBackend
+                            )
                     );
 
                 // Capture wraps the layered factory so logical Open/Close

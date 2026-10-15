@@ -169,6 +169,21 @@ public sealed class SerialPortLineFactoryTests
         }
     }
 
+    /// <summary>
+    /// On Windows a missing port fails the open with a file-not-found error
+    /// whose message names the port; it says so in words that do not.
+    /// </summary>
+    [Fact]
+    public void A_missing_port_on_Windows_says_it_does_not_exist()
+    {
+        var failure = new FileNotFoundException("The port 'COM250' does not exist.");
+
+        SerialPortLineFactory
+            .Translate(failure, windows: true)
+            .ShouldBeOfType<SerialLineUnavailableException>()
+            .Message.ShouldBe("the port does not exist");
+    }
+
     [Fact]
     public void A_failed_open_on_Windows_is_left_as_it_is()
     {

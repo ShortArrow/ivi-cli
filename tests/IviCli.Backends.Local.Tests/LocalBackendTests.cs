@@ -41,7 +41,7 @@ public class LocalBackendTests
     }
 
     [Fact]
-    public async Task Runtime_missing_maps_to_a_reason_without_template_placeholders()
+    public async Task A_missing_runtime_is_reported_as_such()
     {
         // Given a factory reporting the runtime as missing
         var factory = new FakeVisaSessionFactory { ReturnRuntimeMissing = true };
@@ -50,11 +50,49 @@ public class LocalBackendTests
         // When the open fails
         var result = await backend.OpenAsync(Dev("psu"), TestContext.Current.CancellationToken);
 
-        // Then the mapped reason is rendered text, never a raw {Placeholder}
-        var err = ((Result<Unit, BackendError>.Error)result).Err;
-        var reason = err.ShouldBeOfType<TransportDisconnected>().Reason;
-        reason.ShouldNotContain("{");
-        reason.ShouldContain("VISA runtime not available");
+        // Then the error says the runtime is missing, with the runtime's detail
+        result
+            .ShouldBeError()
+            .ShouldBeOfType<VisaRuntimeMissing>()
+            .Detail.ShouldBe("VISA runtime absent (test)");
+    }
+
+    /// <summary>
+    /// A resource the runtime does not know is told apart from other
+    /// failures, so an ASRL board VISA has no port for can point at
+    /// <c>visa asrl add</c> (ADR 0055 §2).
+    /// </summary>
+    [Theory]
+    [InlineData(Ivi.Visa.NativeErrorCode.ResourceNotFound)]
+    [InlineData(Ivi.Visa.NativeErrorCode.InvalidResourceName)]
+    public async Task A_resource_the_runtime_does_not_know_is_not_found(int status)
+    {
+        var factory = new FakeVisaSessionFactory
+        {
+            OpenFailsWith = new Ivi.Visa.NativeVisaException(status),
+        };
+        var backend = new LocalBackend(factory);
+
+        var result = await backend.OpenAsync(Dev("dmm"), TestContext.Current.CancellationToken);
+
+        result.ShouldBeError().ShouldBeOfType<ResourceNotFound>().Device.Value.ShouldBe("dmm");
+    }
+
+    /// <summary>A resource another session holds is in use, as on the serial backend (ADR 0055 §7).</summary>
+    [Theory]
+    [InlineData(Ivi.Visa.NativeErrorCode.ResourceBusy)]
+    [InlineData(Ivi.Visa.NativeErrorCode.ResourceLocked)]
+    public async Task A_busy_resource_is_in_use(int status)
+    {
+        var factory = new FakeVisaSessionFactory
+        {
+            OpenFailsWith = new Ivi.Visa.NativeVisaException(status),
+        };
+        var backend = new LocalBackend(factory);
+
+        var result = await backend.OpenAsync(Dev("dmm"), TestContext.Current.CancellationToken);
+
+        result.ShouldBeError().ShouldBeOfType<TransportInUse>();
     }
 
     [Fact]
@@ -323,6 +361,9 @@ internal sealed class FakeVisaSessionFactory : IVisaSessionFactory
 {
     public ConcurrentDictionary<string, FakeVisaSession> Sessions { get; } = new();
     public bool ReturnRuntimeMissing { get; set; }
+
+    /// <summary>Makes every open fail as the runtime does, with this exception inside.</summary>
+    public Exception? OpenFailsWith { get; set; }
     public TimeSpan? LastOpenTimeout { get; private set; }
     public TimeSpan? LastIoTimeout { get; private set; }
 
@@ -341,6 +382,12 @@ internal sealed class FakeVisaSessionFactory : IVisaSessionFactory
             );
         }
         var key = VisaResourceFormatter.Format(resource);
+        if (OpenFailsWith is not null)
+        {
+            return Result.Failure<IVisaSessionHandle, LocalVisaError>(
+                new LocalVisaOpenFailure(key, OpenFailsWith.Message, OpenFailsWith)
+            );
+        }
         if (!Sessions.TryGetValue(key, out var session))
         {
             return Result.Failure<IVisaSessionHandle, LocalVisaError>(

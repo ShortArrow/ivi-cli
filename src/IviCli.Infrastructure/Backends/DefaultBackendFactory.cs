@@ -10,9 +10,10 @@ namespace IviCli.Infrastructure.Backends;
 /// implementation based on its VISA resource variant (per ADR 0010 §4).
 /// </summary>
 /// <remarks>
-/// Phase 1 ships only the Fake Backend. Real Backends (Local NI-VISA,
-/// HiSLIP, Socket, Replay) register themselves with the factory as they
-/// land; the resolution table below grows correspondingly.
+/// Every resource kind is named in the table below: HiSLIP, VXI-11, SOCKET,
+/// VISA for the other TCPIP, USB and GPIB resources, and the serial
+/// backends for ASRL (ADR 0055 §2). A kind no case names fails with
+/// <see cref="UnsupportedTransport"/> rather than reaching the Fake backend.
 /// </remarks>
 public sealed class DefaultBackendFactory : IBackendFactory
 {
@@ -20,19 +21,34 @@ public sealed class DefaultBackendFactory : IBackendFactory
     private readonly IIviBackend? _hislipBackend;
     private readonly IIviBackend? _socketBackend;
     private readonly IIviBackend? _vxi11Backend;
+    private readonly IIviBackend? _serialBackend;
+    private readonly IIviBackend? _asrlBoardBackend;
     private readonly IIviBackend _fallbackBackend;
 
     /// <summary>
     /// Creates a factory with the supplied per-transport implementations.
-    /// Any transport without a registration falls through to
-    /// <paramref name="fallbackBackend"/> (typically the Fake Backend).
+    /// A transport the factory names but has no registration for falls
+    /// through to <paramref name="fallbackBackend"/> (typically the Fake
+    /// Backend), which is how <c>IVICLI_MOCK_ONLY</c> works.
     /// </summary>
+    /// <param name="fallbackBackend">The backend for a transport with no registration.</param>
+    /// <param name="localBackend">The VISA runtime backend.</param>
+    /// <param name="hislipBackend">The HiSLIP client backend.</param>
+    /// <param name="socketBackend">The raw SOCKET client backend.</param>
+    /// <param name="vxi11Backend">The VXI-11 client backend.</param>
+    /// <param name="serialBackend">The backend that opens a serial port by name (ADR 0055 §2).</param>
+    /// <param name="asrlBoardBackend">
+    /// The backend that looks an <c>ASRL&lt;board&gt;::INSTR</c> board up in the
+    /// machine's <c>[[asrl]]</c> table (ADR 0055 §3).
+    /// </param>
     public DefaultBackendFactory(
         IIviBackend fallbackBackend,
         IIviBackend? localBackend = null,
         IIviBackend? hislipBackend = null,
         IIviBackend? socketBackend = null,
-        IIviBackend? vxi11Backend = null
+        IIviBackend? vxi11Backend = null,
+        IIviBackend? serialBackend = null,
+        IIviBackend? asrlBoardBackend = null
     )
     {
         _fallbackBackend = fallbackBackend;
@@ -40,6 +56,8 @@ public sealed class DefaultBackendFactory : IBackendFactory
         _hislipBackend = hislipBackend;
         _socketBackend = socketBackend;
         _vxi11Backend = vxi11Backend;
+        _serialBackend = serialBackend;
+        _asrlBoardBackend = asrlBoardBackend;
     }
 
     /// <inheritdoc/>
@@ -83,10 +101,11 @@ public sealed class DefaultBackendFactory : IBackendFactory
             VisaResource.Gpib => _localBackend ?? _fallbackBackend,
             VisaResource.AsrlBoard or VisaResource.AsrlPort when hasActiveScenario =>
                 _fallbackBackend,
-            // No backend opens a serial resource yet (ADR 0055 §11), so it
-            // fails rather than answering from the Fake backend.
-            VisaResource.AsrlBoard or VisaResource.AsrlPort => null,
-            _ => _fallbackBackend,
+            VisaResource.AsrlPort => _serialBackend ?? _fallbackBackend,
+            VisaResource.AsrlBoard => _asrlBoardBackend ?? _fallbackBackend,
+            // A resource kind no case names has no backend; it fails rather
+            // than answering from the Fake backend (ADR 0055 §2).
+            _ => null,
         };
 
         return backend is null

@@ -114,22 +114,41 @@ public sealed class DefaultBackendFactoryTests
     }
 
     /// <summary>
-    /// No backend opens a serial resource yet, so it fails instead of
-    /// answering from the Fake backend (ADR 0055 §2).
+    /// A port name opens on the Serial backend, and a board number on the
+    /// backend that looks the board up (ADR 0055 §2).
+    /// </summary>
+    [Theory]
+    [InlineData("ASRL/dev/ttyUSB0::INSTR", "serial")]
+    [InlineData("ASRLCOM3::INSTR", "serial")]
+    [InlineData("ASRL1::INSTR", "board")]
+    public void A_serial_resource_selects_its_backend(string resource, string expected)
+    {
+        var factory = new DefaultBackendFactory(
+            new MarkerBackend("fallback"),
+            localBackend: new MarkerBackend("local"),
+            serialBackend: new MarkerBackend("serial"),
+            asrlBoardBackend: new MarkerBackend("board")
+        );
+
+        var picked = (MarkerBackend)factory.CreateFor(BuildDevice(resource)).ShouldBeOk();
+
+        picked.Tag.ShouldBe(expected);
+    }
+
+    /// <summary>
+    /// <c>IVICLI_MOCK_ONLY</c> registers no transport backend, so a serial
+    /// device answers from the mock like every other kind (ADR 0055 §2).
     /// </summary>
     [Theory]
     [InlineData("ASRL1::INSTR")]
     [InlineData("ASRL/dev/ttyUSB0::INSTR")]
-    public void A_serial_resource_is_an_unsupported_transport(string resource)
+    public void A_serial_resource_with_no_serial_backend_reaches_the_mock(string resource)
     {
-        var factory = new DefaultBackendFactory(
-            new MarkerBackend("fallback"),
-            localBackend: new MarkerBackend("local")
-        );
+        var factory = new DefaultBackendFactory(new MarkerBackend("fallback"));
 
-        var result = factory.CreateFor(BuildDevice(resource));
+        var picked = (MarkerBackend)factory.CreateFor(BuildDevice(resource)).ShouldBeOk();
 
-        result.ShouldBeError().ShouldBeOfType<UnsupportedTransport>();
+        picked.Tag.ShouldBe("fallback");
     }
 
     [Theory]
@@ -138,7 +157,9 @@ public sealed class DefaultBackendFactoryTests
     public void A_serial_resource_with_an_active_scenario_reaches_the_mock(string resource)
     {
         var factory = new DefaultBackendFactory(
-            new ScenarioAwareMarkerBackend("fallback", hasActiveScenario: true)
+            new ScenarioAwareMarkerBackend("fallback", hasActiveScenario: true),
+            serialBackend: new MarkerBackend("serial"),
+            asrlBoardBackend: new MarkerBackend("board")
         );
 
         var picked = (ScenarioAwareMarkerBackend)

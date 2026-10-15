@@ -1,4 +1,5 @@
 using System.Threading.Channels;
+using Ivi.Visa;
 using IviCli.Application.Backends;
 using IviCli.Domain;
 using IviCli.Domain.Devices;
@@ -42,7 +43,7 @@ public sealed class LocalBackend : IIviBackend, IEnforcesDeviceTimeout
         if (openResult is not Result<IVisaSessionHandle, LocalVisaError>.Ok { Value: var handle })
         {
             var err = ((Result<IVisaSessionHandle, LocalVisaError>.Error)openResult).Err;
-            return Task.FromResult(Fail(err));
+            return Task.FromResult(Result.Failure<Unit, BackendError>(MapOpenError(err, device)));
         }
         lock (_gate)
         {
@@ -267,6 +268,28 @@ public sealed class LocalBackend : IIviBackend, IEnforcesDeviceTimeout
 
     private static Result<string, BackendError> FailString(LocalVisaError err) =>
         Result.Failure<string, BackendError>(MapError(err));
+
+    /// <summary>
+    /// Maps a failed open, telling apart what a caller can act on: no
+    /// runtime, a resource the runtime does not know, and a resource another
+    /// session holds (ADR 0055 §2, §7).
+    /// </summary>
+    private static BackendError MapOpenError(LocalVisaError err, Device device) =>
+        err switch
+        {
+            LocalVisaRuntimeMissing m => new VisaRuntimeMissing(m.Detail),
+            LocalVisaOpenFailure { Cause: NativeVisaException { ErrorCode: var status } }
+                when status
+                    is NativeErrorCode.ResourceNotFound
+                        or NativeErrorCode.InvalidResourceName => new ResourceNotFound(
+                device.Name,
+                device.Resource
+            ),
+            LocalVisaOpenFailure { Cause: NativeVisaException { ErrorCode: var status } }
+                when status is NativeErrorCode.ResourceBusy or NativeErrorCode.ResourceLocked =>
+                new TransportInUse(device.Name, device.Resource),
+            _ => MapError(err),
+        };
 
     private static BackendError MapError(LocalVisaError err) =>
         err switch
