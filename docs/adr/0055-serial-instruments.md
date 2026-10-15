@@ -18,12 +18,15 @@ name, `/dev/ttyUSB0` or `COM3`. Many hosts ivi-cli runs on have no VISA
 runtime.
 
 A serial line also lacks what the network and USB transports carry: it
-has no message end of its own, no status byte, no service requests and no
-device clear, and it carries settings, such as the baud rate and parity,
-that a TCP connection does not.
+has no message end of its own and no service requests, and it carries
+settings, such as the baud rate and parity, that a TCP connection does
+not.
 
 #239 records the requirements and the test plan this ADR answers. Where
-this ADR departs from #239, the Alternatives say why.
+this ADR departs from #239, the Alternatives say why. It also settles
+points #239 left open: how a port is compared (§3), DTR (§4), the allowed
+terminators (§5), how a late reply is handled (§8), and which further
+documents change (§11).
 
 ## Decision
 
@@ -85,10 +88,15 @@ port = "/dev/ttyUSB0"
   points at are the same port.
 - A port that does not exist yet is accepted with a warning, since a USB
   adapter appears only while plugged in.
-- The table is read when a board is opened, not when ivi-cli starts, so a
-  running gateway sees a board registered after it started.
 - `visa scan` lists the serial ports and, for one no board names, the
   `visa asrl add` line that would register it.
+
+The factory reads its configuration once, at start, so an `AsrlBoard`
+device gets a backend that reads the table from the configuration store
+when it opens the session and then hands the session to the Serial or the
+Local backend. A running gateway therefore sees a board registered after
+it started, from the next open; a session the pool already holds keeps the
+backend it was opened with until it is closed.
 
 ### 4. Serial settings are device properties
 
@@ -110,8 +118,10 @@ flow_control = "none"  # none | xon_xoff | rts_cts
 - The Serial backend applies them as `SerialPort` properties, and the
   Local backend as `ISerialSession` attributes. A value the platform's
   serial driver cannot set fails the open with a message that names it.
-- Both backends assert DTR while the port is open, as VISA does by
-  default.
+- Both backends assert DTR while the port is open: the Serial backend
+  through `SerialPort.DtrEnable`, the Local backend through
+  `VI_ATTR_ASRL_DTR_STATE`. An instrument that needs DTR to talk then
+  behaves the same on both.
 - `visa add` takes them as options.
 
 They live on the device rather than in the resource text because VISA's
@@ -121,33 +131,42 @@ session attributes too.
 ### 5. Termination is a device setting
 
 Every device may set `read_termination` and `write_termination`, each one
-or two characters, such as `"\n"`, `"\r"` or `"\r\n"`.
+of `"\n"`, `"\r"` or `"\r\n"`.
 
-- Unset, every backend behaves as it does today: writes end with `"\n"`,
-  and a read ends at LF, CR or CRLF.
-- Set, a read ends at exactly that sequence, and writes end with it.
 - They apply where the transport has no message end of its own: SOCKET and
-  serial, whether opened directly or through VISA. Through VISA, the last
-  character of `read_termination` is the termination character, and a
-  preceding `"\r"` is removed from the reply.
+  serial, whether opened by the Serial backend or through VISA.
 - HiSLIP, VXI-11 and USBTMC end messages with END, and GPIB with EOI, so
   there the settings are ignored, and a device that sets them gets a
   warning when it is added or loaded.
+- Unset, nothing changes from today. Writes end with `"\n"`. A SOCKET read
+  ends at LF, CR or CRLF; a read through VISA ends at LF or END, with a
+  trailing CR removed. The Serial backend, which is new, reads as VISA
+  does, so a serial device behaves the same on both paths.
+- Set, writes end with `write_termination`. The Serial and SOCKET backends
+  end a read at exactly `read_termination`. VISA ends a read at one
+  character, the last of `read_termination`, so with `"\r\n"` a reply that
+  ends in a bare LF also ends the read; the preceding CR is removed when
+  it is there. The Local backend then reads up to that character itself
+  rather than through a line read.
 
 ### 6. What a serial line does not have
 
 - Trigger writes `*TRG`.
 - The service-request stream ends at once, as for any backend without
   service requests (ADR 0041 §1).
-- The backend port has no status-byte read or device clear. The gateways
-  answer those requests themselves today; for a device on a serial line
-  they report the operation unsupported, the way each protocol reports
-  one.
+- Nothing changes in the gateways. `IIviBackend` has no status-byte read or
+  device clear: a gateway answers device clear by clearing its own
+  buffers, and the USB488 status byte from the service requests it has
+  seen, for every backend. A serial device raises none, so its status byte
+  never shows RQS.
 
 ### 7. A serial port is exclusive
 
-- Opening a port that another process or session already holds fails with
-  a new `BackendError`, `TransportInUse`, which names the port.
+- Opening a port that the operating system reports as busy fails with a
+  new `BackendError`, `TransportInUse`, which names the port. Whether a
+  port another program already has open is reported as busy depends on
+  the platform and that program: Windows always does, while on Linux and
+  macOS only a port opened for exclusive use is.
 - The pool (ADR 0038) holds a serial session as it holds a HiSLIP, VXI-11,
   SOCKET or VISA one: after release it stays open until it has been idle
   for `[pool] idle_timeout`, 60 seconds by default, or is evicted to stay
@@ -165,16 +184,17 @@ decorator is the backstop. Its blocking port calls run off the caller's
 thread, so the decorator can abandon one that does not return.
 
 A line has no request identifiers, so a reply that arrives after its
-request timed out could be read as the answer to the next one. The port is
-closed and reopened after a timeout (ADR 0053 §3), and the input buffer is
-discarded before each write, which narrows that window; neither closes it.
+request timed out could be read as the answer to the next one. Closing and
+reopening the port after a timeout (ADR 0053 §3) discards what had already
+arrived; a reply that arrives after the reopen is still read as the next
+answer.
 
 ### 9. Packaging
 
 `System.IO.Ports` comes from NuGet with native shims for each runtime
 identifier, so THIRD-PARTY-NOTICES lists them. The shims load only when a
-port is opened, so the release smoke test opens a pseudo-terminal on each
-Linux and macOS build, including the NativeAOT and single-file ones.
+port is opened, so the release smoke test opens a pseudo-terminal with
+each Linux and macOS build and with the NativeAOT image.
 
 ### 10. Surfaces
 
@@ -190,9 +210,9 @@ Each step is a pull request that leaves `main` releasable:
 2. The `visa asrl` commands and the `visa add` options.
 3. The Serial backend, tested over a socat pseudo-terminal pair in Linux
    CI.
-4. Backend selection, including the factory's catch-all, the Local
-   backend's serial attributes, and the gateways' answers for a serial
-   device.
+4. Backend selection, including the factory's catch-all and the board
+   lookup at open, and the Local backend's serial attributes and
+   termination.
 5. The surfaces of §10, `visa scan`, and the documentation: README, PRD
    and its mirror, ADRs 0003, 0010, 0017, 0038 and 0049, the CHANGELOG, and
    `docs/conformance.md`, whose timeout entries say a late reply is never
@@ -209,15 +229,23 @@ Each step is a pull request that leaves `main` releasable:
   without a runtime.
 - **Serial settings in the resource text**, `ASRL1::INSTR?baud=19200`. Not
   VISA syntax: no other VISA program could read the resource.
-- **A strict `"\n"` default for termination**, as #239 proposed. Today a
-  SOCKET or VISA read ends at CR too, so an instrument that replies with
-  `"\r"` works now and would stop working until its device set the
+- **A strict `"\n"` default for termination**, as #239 proposed. A SOCKET
+  read ends at CR today, so an instrument that replies with `"\r"` over
+  SOCKET works now and would stop working until its device set the
   terminator.
 - **Closing a serial session when the pool releases it**, as #239
   proposed, so another program can open the port between uses. On Linux
   closing a port drops DTR, which resets some instruments, such as
   microcontroller boards, on every use, and each use pays for opening the
   port.
+- **Reporting the status byte, service requests and device clear as
+  `BackendOperationNotSupported`**, as #239 proposed. The backend port has
+  no status-byte read or device clear to report it from, and the gateways
+  already answer both without the backend.
+- **Discarding the input buffer before each write**, to narrow the window
+  for a late reply further. A client that writes two queries before
+  reading the first answer would lose that answer, which works over
+  SOCKET today.
 
 ## Consequences
 
@@ -227,6 +255,7 @@ Each step is a pull request that leaves `main` releasable:
   field cannot be read by an older ivi-cli.
 - While the pool holds a serial port, other programs on the machine cannot
   open it; a shorter pool idle timeout gives it back sooner.
+- A late reply on a serial line can still be read as the next answer.
 - DTR/DSR handshaking is not offered: `SerialPort` has no such mode.
 - The serial settings are checked against what the port object reports
   and in the nightly CDC-ACM run; a pseudo-terminal has no baud rate or
