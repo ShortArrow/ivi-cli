@@ -50,7 +50,16 @@ public sealed class TomlConfigStore : IConfigStore
         string text;
         try
         {
-            text = await _fs.File.ReadAllTextAsync(_path, ct);
+            // Sharing delete lets a save replace the file while it is read,
+            // which Windows otherwise refuses.
+            using var stream = _fs.FileStream.New(
+                _path,
+                FileMode.Open,
+                FileAccess.Read,
+                FileShare.ReadWrite | FileShare.Delete
+            );
+            using var reader = new StreamReader(stream);
+            text = await reader.ReadToEndAsync(ct);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
@@ -105,24 +114,56 @@ public sealed class TomlConfigStore : IConfigStore
             }
         }
 
-        // Atomic write: stage to a sibling temp file, then move into place.
-        var tempPath = _path + ".tmp";
+        // Atomic write: stage to a sibling temp file of its own, then replace
+        // the file in one step, so a load never finds it missing; a missing
+        // file loads as an empty configuration.
+        var tempPath = $"{_path}.{Guid.NewGuid():N}.tmp";
         try
         {
             await _fs.File.WriteAllTextAsync(tempPath, serialized, ct);
-            if (_fs.File.Exists(_path))
-            {
-                _fs.File.Delete(_path);
-            }
-            _fs.File.Move(tempPath, _path);
+            await ReplaceAsync(tempPath, ct);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
+            DeleteQuietly(tempPath);
             return Result.Failure<Unit, ConfigStoreError>(
                 new ConfigStoreWriteFailure($"write failed at {_path}", ex)
             );
         }
 
         return Result.Success<Unit, ConfigStoreError>(Unit.Value);
+    }
+
+    /// <summary>Removes a temp file a failed save left, if it can.</summary>
+    private void DeleteQuietly(string tempPath)
+    {
+        try
+        {
+            _fs.File.Delete(tempPath);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
+    }
+
+    /// <summary>
+    /// Moves <paramref name="tempPath"/> over the configuration file, trying
+    /// again briefly while another program, such as an editor, holds the file
+    /// open without letting it be replaced.
+    /// </summary>
+    private async Task ReplaceAsync(string tempPath, CancellationToken ct)
+    {
+        const int Attempts = 10;
+        for (var attempt = 1; ; attempt++)
+        {
+            try
+            {
+                _fs.File.Move(tempPath, _path, overwrite: true);
+                return;
+            }
+            catch (Exception ex)
+                when (attempt < Attempts && ex is IOException or UnauthorizedAccessException)
+            {
+                await Task.Delay(TimeSpan.FromMilliseconds(10 * attempt), ct);
+            }
+        }
     }
 }
