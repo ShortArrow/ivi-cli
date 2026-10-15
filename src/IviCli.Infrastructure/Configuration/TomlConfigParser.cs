@@ -344,7 +344,7 @@ public static class TomlConfigParser
         if (document.Defaults.Device is { } defaultDevice)
         {
             builder.AppendLine(inv, $"[{DefaultsTable}]");
-            builder.AppendLine(inv, $"{DeviceField} = \"{defaultDevice.Value}\"");
+            builder.AppendLine(inv, $"{DeviceField} = {Quote(defaultDevice.Value)}");
             builder.AppendLine();
         }
 
@@ -357,7 +357,7 @@ public static class TomlConfigParser
             );
             builder.AppendLine(
                 inv,
-                $"{PoolIdleTimeoutField} = \"{FormatDuration(document.Pool.IdleTimeout)}\""
+                $"{PoolIdleTimeoutField} = {Quote(FormatDuration(document.Pool.IdleTimeout))}"
             );
             builder.AppendLine(inv, $"{PoolMaxDevicesField} = {document.Pool.MaxDevices}");
             builder.AppendLine();
@@ -370,15 +370,15 @@ public static class TomlConfigParser
             builder.AppendLine(inv, $"{TlsEnabledField} = {(tls.Enabled ? "true" : "false")}");
             if (tls.CertPath is not null)
             {
-                builder.AppendLine(inv, $"{TlsCertPathField} = \"{tls.CertPath}\"");
+                builder.AppendLine(inv, $"{TlsCertPathField} = {Quote(tls.CertPath)}");
             }
             if (tls.KeyPath is not null)
             {
-                builder.AppendLine(inv, $"{TlsKeyPathField} = \"{tls.KeyPath}\"");
+                builder.AppendLine(inv, $"{TlsKeyPathField} = {Quote(tls.KeyPath)}");
             }
             if (tls.PasswordEnv is not null)
             {
-                builder.AppendLine(inv, $"{TlsPasswordEnvField} = \"{tls.PasswordEnv}\"");
+                builder.AppendLine(inv, $"{TlsPasswordEnvField} = {Quote(tls.PasswordEnv)}");
             }
             if (tls.SelfSigned)
             {
@@ -390,7 +390,7 @@ public static class TomlConfigParser
             }
             if (tls.ClientCaPath is not null)
             {
-                builder.AppendLine(inv, $"{TlsClientCaPathField} = \"{tls.ClientCaPath}\"");
+                builder.AppendLine(inv, $"{TlsClientCaPathField} = {Quote(tls.ClientCaPath)}");
             }
             builder.AppendLine();
         }
@@ -402,9 +402,9 @@ public static class TomlConfigParser
             builder.AppendLine(inv, $"{TelemetryEnabledField} = {(t.Enabled ? "true" : "false")}");
             if (t.OtlpEndpoint is not null)
             {
-                builder.AppendLine(inv, $"{TelemetryOtlpEndpointField} = \"{t.OtlpEndpoint}\"");
+                builder.AppendLine(inv, $"{TelemetryOtlpEndpointField} = {Quote(t.OtlpEndpoint)}");
             }
-            builder.AppendLine(inv, $"{TelemetryServiceNameField} = \"{t.ServiceName}\"");
+            builder.AppendLine(inv, $"{TelemetryServiceNameField} = {Quote(t.ServiceName)}");
             builder.AppendLine(
                 inv,
                 $"{TelemetryTracesEnabledField} = {(t.TracesEnabled ? "true" : "false")}"
@@ -427,7 +427,7 @@ public static class TomlConfigParser
             builder.AppendLine(inv, $"{AuditEnabledField} = {(a.Enabled ? "true" : "false")}");
             if (a.Path is not null)
             {
-                builder.AppendLine(inv, $"{AuditPathField} = \"{a.Path}\"");
+                builder.AppendLine(inv, $"{AuditPathField} = {Quote(a.Path)}");
             }
             builder.AppendLine();
         }
@@ -439,7 +439,7 @@ public static class TomlConfigParser
             builder.AppendLine(inv, $"{PluginsEnabledField} = {(p.Enabled ? "true" : "false")}");
             if (!p.Allowed.IsDefaultOrEmpty)
             {
-                var entries = string.Join(", ", p.Allowed.Select(n => $"\"{n}\""));
+                var entries = string.Join(", ", p.Allowed.Select(Quote));
                 builder.AppendLine(inv, $"{PluginsAllowedField} = [{entries}]");
             }
             builder.AppendLine();
@@ -448,7 +448,7 @@ public static class TomlConfigParser
         foreach (var device in document.Devices)
         {
             builder.AppendLine(inv, $"[[{DevicesArray}]]");
-            builder.AppendLine(inv, $"{NameField} = \"{device.Name.Value}\"");
+            builder.AppendLine(inv, $"{NameField} = {Quote(device.Name.Value)}");
             builder.AppendLine(inv, $"{ResourceField} = {Quote(FormatResource(device.Resource))}");
             builder.AppendLine(inv, $"{TimeoutMillisecondsField} = {device.Timeout.Milliseconds}");
             if (device.ReadTermination is { } readTermination)
@@ -482,9 +482,9 @@ public static class TomlConfigParser
         foreach (var server in document.Servers)
         {
             builder.AppendLine(inv, $"[[{ServersArray}]]");
-            builder.AppendLine(inv, $"{NameField} = \"{server.Name.Value}\"");
-            builder.AppendLine(inv, $"{TypeField} = \"{FormatServerType(server.Type)}\"");
-            builder.AppendLine(inv, $"{BindField} = \"{server.Bind.Value}\"");
+            builder.AppendLine(inv, $"{NameField} = {Quote(server.Name.Value)}");
+            builder.AppendLine(inv, $"{TypeField} = {Quote(FormatServerType(server.Type))}");
+            builder.AppendLine(inv, $"{BindField} = {Quote(server.Bind.Value)}");
             builder.AppendLine(inv, $"{PortField} = {server.Port.Value}");
             builder.AppendLine();
         }
@@ -492,9 +492,9 @@ public static class TomlConfigParser
         foreach (var route in document.Routes)
         {
             builder.AppendLine(inv, $"[[{RoutesArray}]]");
-            builder.AppendLine(inv, $"{ServerField} = \"{route.ServerName.Value}\"");
-            builder.AppendLine(inv, $"{EndpointField} = \"{route.Endpoint.Value}\"");
-            builder.AppendLine(inv, $"{DeviceField} = \"{route.DeviceName.Value}\"");
+            builder.AppendLine(inv, $"{ServerField} = {Quote(route.ServerName.Value)}");
+            builder.AppendLine(inv, $"{EndpointField} = {Quote(route.Endpoint.Value)}");
+            builder.AppendLine(inv, $"{DeviceField} = {Quote(route.DeviceName.Value)}");
             // Written only when it is a choice. Every configuration file
             // that predates the field parses to the default, so emitting
             // it unconditionally would rewrite documents that did not
@@ -503,7 +503,7 @@ public static class TomlConfigParser
             {
                 builder.AppendLine(
                     inv,
-                    $"{ProfileField} = \"{FormatExportProfile(route.Profile)}\""
+                    $"{ProfileField} = {Quote(FormatExportProfile(route.Profile))}"
                 );
             }
             builder.AppendLine();
