@@ -4,11 +4,11 @@
 
 ivi-cli が実装している規格と、ivi-cli の振る舞いの関係を、領域ごとにまとめます。各項目は、次の 3 種類のどれかです。
 
-- **準拠**：規格が振る舞いを定めていて、ivi-cli はそのとおりに動きます。該当する節を示します。
-- **逸脱**：規格が振る舞いを定めていて、ivi-cli は違う動きをします。追跡している Issue を示します。
-- **ivi-cli の定め**：規格が何も定めていないので、ivi-cli が決めました。理由を記録した ADR を示します。
+- **準拠**：規格が振る舞いを定めていて、ivi-cli はそのとおりに動きます。Spec 列に、その条項を示します。
+- **逸脱**：規格が振る舞いを定めていて、ivi-cli は違う動きをします。追跡している Issue を示し、Spec 列に、外れている条項を示します。
+- **ivi-cli の定め**：規格が何も定めていないので、ivi-cli が決めました。Spec 列に、理由を記録した ADR の節を示します。
 
-どの項目にも、その振る舞いを固定しているテストを示します。テストで固定されていない振る舞いは、テストを足すまでここには載せません。
+Spec 列に挙げた条項には、`[Spec(Standard.Vxi11, "RULE B.6.19")]` の形で、少なくとも 1 つのテストが印を付けています。テストが印を付けた条項は、すべてここに挙げます。CI がこの両方を確かめます（[ADR 0054](adr/0054-spec-traceability.md)）。テストで固定されていない振る舞いは、テストを足すまでここには載せません。1 つの条項のテストは、`dotnet test -- --filter-trait "Spec=VXI-11 RULE B.6.19"` で実行できます。
 
 > この文書は生きた文書です。いまの振る舞いを書き、コードと同じ PR で更新します。英語版の `conformance.md` も同時に更新します。
 
@@ -24,66 +24,57 @@ ivi-cli が実装している規格と、ivi-cli の振る舞いの関係を、�
 
 ### すべてのバックエンド
 
-| 種類 | 振る舞い | テスト |
+| 種類 | 振る舞い | Spec |
 | --- | --- | --- |
-| ivi-cli の定め | 書き込み・問い合わせ・読み取り・トリガは、`timeout_ms` を過ぎると `TransportTimeout` で失敗します。組み込みのバックエンドでもプラグインのバックエンドでも、セッションプールの有無にかかわらず同じです。 | [DeviceTimeoutBackendFactoryTests][dt]、[ClientTimeoutTests][ct]、[BackendLayersTests][bl] |
-| ivi-cli の定め | タイムアウトのあとは、ivi-cli の期限が切れた場合でも、バックエンドが自分でタイムアウトを報告した場合でも、セッションを閉じて、次の操作の前に開き直します。遅れて届いた応答を、あとの要求への答えとして読まないためです。閉じる処理も、操作に許した時間を超えたら打ち切ります。 | [DeviceTimeoutBackendFactoryTests][dt] |
-| ivi-cli の定め | セッションを開く処理には、`timeout_ms` と 5 秒の長いほうをかけてよいとします。自分でタイムアウトを守るバックエンドには、これに下記の猶予が加わります。 | [DeviceTimeoutBackendFactoryTests][dt] |
-| ivi-cli の定め | 自分でタイムアウトを守るバックエンド（VXI-11 と VISA）には、ivi-cli が操作を打ち切る前に、`timeout_ms` に加えて 1 秒の猶予を与えます。バックエンド自身のタイムアウトのエラーが先に届くようにするためです。 | [DeviceTimeoutBackendFactoryTests][dt]、[Vxi11BackendTests][vt]、[LocalBackendTimeoutTests][lt] |
-| ivi-cli の定め | 呼び出し側によるキャンセルは、タイムアウトではなくキャンセルとして伝えます。 | [DeviceTimeoutBackendFactoryTests][dt] |
-| ivi-cli の定め | サービスリクエストの受信には期限を付けません。タイムアウトのあとにセッションを開き直しても受信は続き、セッションの持ち主がセッションを閉じると終わります。持ち主は呼び出し側で、セッションプールが有効なときはプールです。 | [DeviceTimeoutBackendFactoryTests][dt] |
+| ivi-cli の定め | 書き込み・問い合わせ・読み取り・トリガは、`timeout_ms` を過ぎると `TransportTimeout` で失敗します。組み込みのバックエンドでもプラグインのバックエンドでも、セッションプールの有無にかかわらず同じです。 | ADR 0053 §1 |
+| ivi-cli の定め | タイムアウトのあとは、ivi-cli の期限が切れた場合でも、バックエンドが自分でタイムアウトを報告した場合でも、セッションを閉じて、次の操作の前に開き直します。遅れて届いた応答を、あとの要求への答えとして読まないためです。閉じる処理も、操作に許した時間を超えたら打ち切ります。 | ADR 0053 §3 |
+| ivi-cli の定め | セッションを開く処理には、`timeout_ms` と 5 秒の長いほうをかけてよいとします。自分でタイムアウトを守るバックエンドには、これに下記の猶予が加わります。 | ADR 0053 §4 |
+| ivi-cli の定め | 自分でタイムアウトを守るバックエンド（VXI-11 と VISA）には、ivi-cli が操作を打ち切る前に、`timeout_ms` に加えて 1 秒の猶予を与えます。バックエンド自身のタイムアウトのエラーが先に届くようにするためです。 | ADR 0053 §2 |
+| ivi-cli の定め | 呼び出し側によるキャンセルは、タイムアウトではなくキャンセルとして伝えます。 | ADR 0053 §1 |
+| ivi-cli の定め | サービスリクエストの受信には期限を付けません。タイムアウトのあとにセッションを開き直しても受信は続き、セッションの持ち主がセッションを閉じると終わります。持ち主は呼び出し側で、セッションプールが有効なときはプールです。 | ADR 0053 §1, ADR 0053 §3 |
 
 ivi-cli は操作をキャンセルすることで打ち切ります。そのため、キャンセルに応じないバックエンドは打ち切れません。Local バックエンド（下記）や、キャンセルトークンを無視するプラグインのバックエンドがこれに当たります。
 
 ### VISA ランタイム（Local バックエンド）
 
-| 種類 | 振る舞い | テスト |
+| 種類 | 振る舞い | Spec |
 | --- | --- | --- |
-| 準拠 | セッションの `VI_ATTR_TMO_VALUE`（操作が待つ最小の時間、ミリ秒）に `timeout_ms` を設定します（VPP-4.3 §5.1.2）。 | [LocalBackendTimeoutTests][lt] |
-| 準拠 | ランタイムが報告するタイムアウト、つまり `viRead` や `viWrite` が返す `VI_ERROR_TMO`（VPP-4.3 §6.1.1、§6.1.4）は、`TransportTimeout` として伝えます。トリガは `*TRG` を `viWrite` で送ります。 | [VisaIoErrorsTests][ve]、[LocalBackendTimeoutTests][lt] |
-| ivi-cli の定め | `viOpen` のタイムアウトには、`timeout_ms` と 5 秒の長いほうを渡します。VPP-4.3 はこのタイムアウトをロックの取得に使い（§4.3.3.2、RULE 4.3.18）、VISA の実装がセッションを開く処理にも使うことを許していますが、求めてはいません（PERMISSION 4.3.2）。そのため、開く処理に期限が付くかどうかは、入っているランタイムによります。 | [LocalBackendTimeoutTests][lt] |
-| ivi-cli の定め | `VI_ERROR_TMO` のあとはセッションを開き直します（上記）。VPP-4.3 は、タイムアウト後のセッションの状態について何も定めておらず、デバイスクリアも求めていません。 | [DeviceTimeoutBackendFactoryTests][dt] |
+| 準拠 | セッションの `VI_ATTR_TMO_VALUE`（操作が待つ最小の時間、ミリ秒）に `timeout_ms` を設定します。 | VPP-4.3 §5.1.2 |
+| 準拠 | ランタイムが報告するタイムアウト、つまり `viRead` や `viWrite` が返す `VI_ERROR_TMO` は、`TransportTimeout` として伝えます。トリガは `*TRG` を `viWrite` で送ります。 | VPP-4.3 §6.1.1, VPP-4.3 §6.1.4 |
+| ivi-cli の定め | `viOpen` のタイムアウトには、`timeout_ms` と 5 秒の長いほうを渡します。VPP-4.3 はこのタイムアウトをロックの取得に使い（§4.3.3.2、RULE 4.3.18）、VISA の実装がセッションを開く処理にも使うことを許していますが、求めてはいません（PERMISSION 4.3.2）。そのため、開く処理に期限が付くかどうかは、入っているランタイムによります。 | ADR 0053 §4 |
+| ivi-cli の定め | `VI_ERROR_TMO` のあとはセッションを開き直します（上記）。VPP-4.3 は、タイムアウト後のセッションの状態について何も定めておらず、デバイスクリアも求めていません。 | ADR 0053 §3 |
 
 Local バックエンドは VISA ランタイムを同期的に呼び出すので、ivi-cli は実行中の VISA の呼び出しを打ち切れません。呼び出しを終わらせるのは、ランタイム自身のタイムアウトだけです。
 
 ### VXI-11 クライアント
 
-| 種類 | 振る舞い | テスト |
+| 種類 | 振る舞い | Spec |
 | --- | --- | --- |
-| 準拠 | `device_write`・`device_read`・`device_trigger` の `io_timeout`（B.5.4）として `timeout_ms` を送ります。この期限はサーバーが守ります（RULE B.6.19、B.6.27、B.6.44）。 | [Vxi11BackendTests][vt] |
-| 準拠 | サーバーが応答しないときのために、クライアント自身もタイムアウトを持ちます（RULE B.4.4）。 | [DeviceTimeoutBackendFactoryTests][dt]、[Vxi11BackendTests][vt] |
-| ivi-cli の定め | クライアント自身のタイムアウトは、操作全体に対して `io_timeout` に 1 秒を足した長さです。`lock_timeout` には 0 を送ります。VXI-11 は、呼び出しごとのクライアントのタイムアウトを `io_timeout` と `lock_timeout` の和より長くすることを勧めています（OBSERVATION B.4.6）。問い合わせは `device_write` のあとに 1 回以上の `device_read` が続くので、あとの呼び出しは、その呼び出しの `io_timeout` を待たずに打ち切られることがあります。 | [DeviceTimeoutBackendFactoryTests][dt]、[Vxi11BackendTests][vt] |
-| 準拠 | サーバーが返すエラー 15 は、`TransportTimeout` として伝えます（RULE B.6.19、B.6.27、B.6.44）。 | [ClientTimeoutTests][ct] |
-| ivi-cli の定め | タイムアウトのあとはリンクを破棄し、次の操作の前に作り直します。VXI-11 は、エラー 15 のあとのリンクの状態を定めていません。遅れて届いた応答はクライアントが捨てることを想定しており（OBSERVATION B.4.7）、リンクを作り直せば確実に捨てられます。 | [DeviceTimeoutBackendFactoryTests][dt] |
+| 準拠 | `device_write`・`device_read`・`device_trigger` の `io_timeout` として `timeout_ms` を送ります。この期限はサーバーが守ります（RULE B.6.19、B.6.27、B.6.44）。 | VXI-11 B.5.4 |
+| 準拠 | サーバーが応答しないときのために、クライアント自身もタイムアウトを持ちます。 | VXI-11 RULE B.4.4 |
+| ivi-cli の定め | クライアント自身のタイムアウトは、操作全体に対して `io_timeout` に 1 秒を足した長さです。`lock_timeout` には 0 を送ります。VXI-11 は、呼び出しごとのクライアントのタイムアウトを `io_timeout` と `lock_timeout` の和より長くすることを勧めています（OBSERVATION B.4.6）。問い合わせは `device_write` のあとに 1 回以上の `device_read` が続くので、あとの呼び出しは、その呼び出しの `io_timeout` を待たずに打ち切られることがあります。 | ADR 0053 §2 |
+| 準拠 | サーバーが返すエラー 15 は、`TransportTimeout` として伝えます。 | VXI-11 RULE B.6.19, VXI-11 RULE B.6.27, VXI-11 RULE B.6.44 |
+| ivi-cli の定め | タイムアウトのあとはリンクを破棄し、次の操作の前に作り直します。VXI-11 は、エラー 15 のあとのリンクの状態を定めていません。遅れて届いた応答はクライアントが捨てることを想定しており（OBSERVATION B.4.7）、リンクを作り直せば確実に捨てられます。 | ADR 0053 §3 |
 
 ### VXI-11 ゲートウェイ
 
-| 種類 | 振る舞い | テスト |
+| 種類 | 振る舞い | Spec |
 | --- | --- | --- |
-| 準拠 | ゲートウェイの後ろの機器が書き込みでタイムアウトしたら、クライアントにエラー 15 を返します（RULE B.6.19）。 | [ClientTimeoutTests][ct] |
-| 準拠 | `device_write` と `device_trigger` には、転送先のデバイスの `timeout_ms` ではなく、クライアントが送った `io_timeout` を使います。少なくともその時間は待ち、それを超えた呼び出しはエラー 15 で終えます（B.4.3、RULE B.6.19、B.6.44）。 | [Vxi11GatewayIoTimeoutTests][gt] |
-| ivi-cli の定め | 問い合わせは、それを運ぶ `device_write` の間に実行します。そのため機器の応答の期限はその呼び出しの `io_timeout` で、`device_read` はためておいた応答をすぐに返します。1 時間を超える `io_timeout` は、VISA の「無限」も含めて 1 時間として扱います。ivi-cli が受け付けるデバイスの timeout の上限です。`io_timeout` が 0 のときは、転送先のデバイスの `timeout_ms` を使います。中継する呼び出しが一瞬で終わることはないためです。呼び出しがタイムアウトしたあとは、機器へのセッションを、クライアントのではなくデバイス自身の `timeout_ms` で開き直します。 | [Vxi11GatewayIoTimeoutTests][gt]、[TimeoutTests][tt]、[DeviceTimeoutBackendFactoryTests][dt] |
-| ivi-cli の定め | `lock_timeout` は使いません。ゲートウェイは `device_lock` を実装しておらず、ロックを待つ呼び出しがないためです。 | — |
-| 逸脱 | ローカルのバックエンドの後ろでは、長い場合も短い場合も、デバイスの `timeout_ms` だけが効きます。VISA のセッションは開いたときの I/O タイムアウトのままなので、それより長い `io_timeout` は VISA にエラー 15 で打ち切られます。また VISA の呼び出しは途中で止められないので、短い `io_timeout` を過ぎてから届いた応答も成功として返ります。 | — |
+| 準拠 | ゲートウェイの後ろの機器が書き込みでタイムアウトしたら、クライアントにエラー 15 を返します。 | VXI-11 RULE B.6.19 |
+| 準拠 | `device_write` と `device_trigger` には、転送先のデバイスの `timeout_ms` ではなく、クライアントが送った `io_timeout` を使います。少なくともその時間は待ち、それを超えた呼び出しはエラー 15 で終えます。 | VXI-11 B.4.3, VXI-11 RULE B.6.19, VXI-11 RULE B.6.44 |
+| ivi-cli の定め | 問い合わせは、それを運ぶ `device_write` の間に実行します。そのため機器の応答の期限はその呼び出しの `io_timeout` で、`device_read` はためておいた応答をすぐに返します。1 時間を超える `io_timeout` は、VISA の「無限」も含めて 1 時間として扱います。ivi-cli が受け付けるデバイスの timeout の上限です。`io_timeout` が 0 のときは、転送先のデバイスの `timeout_ms` を使います。中継する呼び出しが一瞬で終わることはないためです。呼び出しがタイムアウトしたあとは、機器へのセッションを、クライアントのではなくデバイス自身の `timeout_ms` で開き直します。 | ADR 0053 §5 |
+| ivi-cli の定め | `lock_timeout` は使いません。ゲートウェイは `device_lock` を実装しておらず、ロックを待つ呼び出しがないためです。 | ADR 0053 §5 |
+| 逸脱 | ローカルのバックエンドの後ろでは、長い場合も短い場合も、デバイスの `timeout_ms` だけが効きます。VISA のセッションは開いたときの I/O タイムアウトのままなので、それより長い `io_timeout` は VISA にエラー 15 で打ち切られます。また VISA の呼び出しは途中で止められないので、短い `io_timeout` を過ぎてから届いた応答も成功として返ります。[#266](https://github.com/ShortArrow/ivi-cli/issues/266) で追跡しています。 | VXI-11 B.4.3 |
 
 ### HiSLIP クライアント
 
-| 種類 | 振る舞い | テスト |
+| 種類 | 振る舞い | Spec |
 | --- | --- | --- |
-| ivi-cli の定め | `timeout_ms` で各操作に期限を付けます。IVI-6.1 にはクライアントの読み書きのタイムアウトがなく、期限が定められているのはロックの待ち時間だけです（§2.6、§6.5）。 | [ClientTimeoutTests][ct] |
-| ivi-cli の定め | タイムアウトのあとは、デバイスクリア（§6.12）で同期を取り直すのではなく、接続を閉じて、次の操作の前に開き直します。接続を閉じると、その接続が持っていたロックは解放されます（§2.6）。 | [DeviceTimeoutBackendFactoryTests][dt] |
+| ivi-cli の定め | `timeout_ms` で各操作に期限を付けます。IVI-6.1 にはクライアントの読み書きのタイムアウトがなく、期限が定められているのはロックの待ち時間だけです（§2.6、§6.5）。 | ADR 0053 §1 |
+| ivi-cli の定め | タイムアウトのあとは、デバイスクリア（§6.12）で同期を取り直すのではなく、接続を閉じて、次の操作の前に開き直します。接続を閉じると、その接続が持っていたロックは解放されます（§2.6）。 | ADR 0053 §3 |
 
 ### SOCKET クライアント
 
-| 種類 | 振る舞い | テスト |
+| 種類 | 振る舞い | Spec |
 | --- | --- | --- |
-| ivi-cli の定め | 生の SOCKET 接続を扱う規格はありません。`timeout_ms` で各操作に期限を付け、タイムアウトのあとは接続を開き直します。 | [ClientTimeoutTests][ct] |
-
-[dt]: ../tests/IviCli.Application.Tests/Backends/DeviceTimeoutBackendFactoryTests.cs
-[ct]: ../tests/IviCli.Server.Tests/ClientTimeoutTests.cs
-[gt]: ../tests/IviCli.Server.Tests/Vxi11GatewayIoTimeoutTests.cs
-[tt]: ../tests/IviCli.Domain.Tests/TimeoutTests.cs
-[bl]: ../tests/IviCli.Cli.Tests/BackendLayersTests.cs
-[lt]: ../tests/IviCli.Backends.Local.Tests/LocalBackendTests.cs
-[ve]: ../tests/IviCli.Backends.Local.Tests/VisaIoErrorsTests.cs
-[vt]: ../tests/IviCli.Backends.Vxi11.Tests/Vxi11BackendTests.cs
+| ivi-cli の定め | 生の SOCKET 接続を扱う規格はありません。`timeout_ms` で各操作に期限を付け、タイムアウトのあとは接続を開き直します。 | ADR 0053 §1, ADR 0053 §3 |

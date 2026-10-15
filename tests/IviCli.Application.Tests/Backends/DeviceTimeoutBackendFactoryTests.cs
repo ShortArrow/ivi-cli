@@ -37,6 +37,7 @@ public sealed class DeviceTimeoutBackendFactoryTests
     }
 
     [Fact]
+    [Spec(Standard.Adr, "0053 §1")]
     public async Task A_query_that_outlasts_the_device_timeout_fails_with_TransportTimeout()
     {
         var device = Dev(300);
@@ -56,6 +57,7 @@ public sealed class DeviceTimeoutBackendFactoryTests
     }
 
     [Fact]
+    [Spec(Standard.Adr, "0053 §3")]
     public async Task A_timed_out_session_is_closed_and_reopened_before_the_next_operation()
     {
         var device = Dev(300);
@@ -83,6 +85,8 @@ public sealed class DeviceTimeoutBackendFactoryTests
     /// was first opened with.
     /// </summary>
     [Fact]
+    [Spec(Standard.Adr, "0053 §3")]
+    [Spec(Standard.Adr, "0053 §5")]
     public async Task A_session_reopened_after_a_timeout_keeps_the_timeout_it_was_opened_with()
     {
         var device = Dev(3000);
@@ -105,6 +109,7 @@ public sealed class DeviceTimeoutBackendFactoryTests
     }
 
     [Fact]
+    [Spec(Standard.Adr, "0053 §3")]
     public async Task Closing_a_timed_out_session_is_bounded_too()
     {
         var device = Dev(300);
@@ -125,6 +130,7 @@ public sealed class DeviceTimeoutBackendFactoryTests
     }
 
     [Fact]
+    [Spec(Standard.Adr, "0053 §1")]
     public async Task A_caller_cancellation_is_not_reported_as_a_timeout()
     {
         var device = Dev(300);
@@ -140,6 +146,7 @@ public sealed class DeviceTimeoutBackendFactoryTests
     }
 
     [Fact]
+    [Spec(Standard.Adr, "0053 §1")]
     public async Task An_operation_that_finishes_in_time_returns_the_backends_result()
     {
         var device = Dev(300);
@@ -156,6 +163,7 @@ public sealed class DeviceTimeoutBackendFactoryTests
     }
 
     [Fact]
+    [Spec(Standard.Adr, "0053 §1")]
     public async Task A_write_that_outlasts_the_device_timeout_fails_with_TransportTimeout()
     {
         var device = Dev(300);
@@ -175,6 +183,7 @@ public sealed class DeviceTimeoutBackendFactoryTests
     }
 
     [Fact]
+    [Spec(Standard.Adr, "0053 §2")]
     public async Task A_backend_that_enforces_the_timeout_itself_gets_a_second_of_grace()
     {
         var device = Dev(300);
@@ -192,6 +201,7 @@ public sealed class DeviceTimeoutBackendFactoryTests
     }
 
     [Fact]
+    [Spec(Standard.Adr, "0053 §4")]
     public async Task Opening_waits_at_least_five_seconds_even_with_a_shorter_device_timeout()
     {
         var device = Dev(300);
@@ -209,6 +219,7 @@ public sealed class DeviceTimeoutBackendFactoryTests
     }
 
     [Fact]
+    [Spec(Standard.Adr, "0053 §4")]
     public async Task Opening_waits_for_the_device_timeout_when_it_is_longer_than_five_seconds()
     {
         var device = Dev(8000);
@@ -226,6 +237,7 @@ public sealed class DeviceTimeoutBackendFactoryTests
     }
 
     [Fact]
+    [Spec(Standard.Adr, "0053 §1")]
     public async Task A_read_that_outlasts_the_device_timeout_fails_with_TransportTimeout()
     {
         var device = Dev(300);
@@ -241,6 +253,7 @@ public sealed class DeviceTimeoutBackendFactoryTests
     }
 
     [Fact]
+    [Spec(Standard.Adr, "0053 §1")]
     public async Task A_trigger_that_outlasts_the_device_timeout_fails_with_TransportTimeout()
     {
         var device = Dev(300);
@@ -256,6 +269,7 @@ public sealed class DeviceTimeoutBackendFactoryTests
     }
 
     [Fact]
+    [Spec(Standard.Adr, "0053 §3")]
     public async Task A_timeout_the_backend_reports_itself_also_reopens_the_session()
     {
         var device = Dev(300);
@@ -281,6 +295,7 @@ public sealed class DeviceTimeoutBackendFactoryTests
     }
 
     [Fact]
+    [Spec(Standard.Adr, "0053 §3")]
     public async Task A_failure_other_than_a_timeout_keeps_the_session()
     {
         var device = Dev(300);
@@ -299,6 +314,8 @@ public sealed class DeviceTimeoutBackendFactoryTests
     }
 
     [Fact]
+    [Spec(Standard.Adr, "0053 §1")]
+    [Spec(Standard.Adr, "0053 §3")]
     public async Task Service_requests_keep_arriving_after_a_timed_out_session_is_reopened()
     {
         var device = Dev(300);
@@ -326,6 +343,7 @@ public sealed class DeviceTimeoutBackendFactoryTests
     }
 
     [Fact]
+    [Spec(Standard.Adr, "0053 §3")]
     public async Task Service_requests_survive_a_drop_whose_close_is_slow()
     {
         var device = Dev(300);
@@ -347,6 +365,7 @@ public sealed class DeviceTimeoutBackendFactoryTests
     }
 
     [Fact]
+    [Spec(Standard.Adr, "0053 §3")]
     public async Task Service_requests_end_when_the_caller_closes_the_session()
     {
         var device = Dev(300);
@@ -363,6 +382,7 @@ public sealed class DeviceTimeoutBackendFactoryTests
     }
 
     [Fact]
+    [Spec(Standard.Adr, "0053 §3")]
     public async Task Service_requests_end_when_the_caller_closes_a_session_that_timed_out()
     {
         var device = Dev(300);

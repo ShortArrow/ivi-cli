@@ -39,6 +39,7 @@ public class TimeoutTests
     [InlineData(0u, 0)]
     [InlineData(2_000u, 2_000)]
     [InlineData(3_600_000u, 3_600_000)]
+    [Spec(Standard.Adr, "0053 §5")]
     public void AtMostMilliseconds_WithinMaximum_KeepsTheDuration(uint milliseconds, int expected)
     {
         // Given / When
@@ -51,6 +52,7 @@ public class TimeoutTests
     [Theory]
     [InlineData(3_600_001u)]
     [InlineData(uint.MaxValue)]
+    [Spec(Standard.Adr, "0053 §5")]
     public void AtMostMilliseconds_PastMaximum_ReturnsMaximum(uint milliseconds)
     {
         // Given / When

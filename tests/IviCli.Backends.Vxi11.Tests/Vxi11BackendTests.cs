@@ -177,6 +177,8 @@ public sealed class Vxi11BackendTests
     }
 
     [Fact]
+    [Spec(Standard.Vxi11, "B.5.4")]
+    [Spec(Standard.Adr, "0053 §2")]
     public async Task Write_read_and_trigger_send_the_device_timeout_as_io_timeout_and_no_lock_timeout()
     {
         var ioTimeouts = new List<uint>();
@@ -233,6 +235,55 @@ public sealed class Vxi11BackendTests
     }
 
     [Fact]
+    [Spec(Standard.Vxi11, "RULE B.6.27")]
+    public async Task A_read_the_server_ends_with_error_15_is_a_timeout()
+    {
+        await using var stub = await StubServer.StartAsync(programmer: session =>
+        {
+            AckCreateLink(session);
+            AckInterruptSetup(session);
+            var read = session.ReadCall();
+            session.WriteReply(
+                read.Xid,
+                writer =>
+                {
+                    writer.WriteInt32(Vxi11IoTimeout);
+                    writer.WriteInt32(0);
+                    writer.WriteOpaque([]);
+                }
+            );
+        });
+        var backend = new Vxi11Backend(stub.Port);
+        var device = BuildDevice();
+        (await backend.OpenAsync(device, TestContext.Current.CancellationToken)).ShouldBeOk();
+
+        var result = await backend.ReadAsync(device, TestContext.Current.CancellationToken);
+
+        result.ShouldBeError().ShouldBeOfType<TransportTimeout>();
+    }
+
+    [Fact]
+    [Spec(Standard.Vxi11, "RULE B.6.44")]
+    public async Task A_trigger_the_server_ends_with_error_15_is_a_timeout()
+    {
+        await using var stub = await StubServer.StartAsync(programmer: session =>
+        {
+            AckCreateLink(session);
+            AckInterruptSetup(session);
+            var trigger = session.ReadCall();
+            session.WriteReply(trigger.Xid, writer => writer.WriteInt32(Vxi11IoTimeout));
+        });
+        var backend = new Vxi11Backend(stub.Port);
+        var device = BuildDevice();
+        (await backend.OpenAsync(device, TestContext.Current.CancellationToken)).ShouldBeOk();
+
+        var result = await backend.TriggerAsync(device, TestContext.Current.CancellationToken);
+
+        result.ShouldBeError().ShouldBeOfType<TransportTimeout>();
+    }
+
+    [Fact]
+    [Spec(Standard.Adr, "0053 §3")]
     public async Task A_close_cut_short_still_releases_the_connection()
     {
         await using var stub = await StubServer.StartAsync(programmer: session =>
@@ -275,6 +326,8 @@ public sealed class Vxi11BackendTests
     }
 
     [Fact]
+    [Spec(Standard.Vxi11, "RULE B.4.4")]
+    [Spec(Standard.Adr, "0053 §2")]
     public void The_VXI11_backend_enforces_the_device_timeout_itself() =>
         new Vxi11Backend(12345).ShouldBeAssignableTo<IEnforcesDeviceTimeout>();
 

@@ -39,6 +39,7 @@ public sealed class ClientTimeoutTests
 
     [Theory]
     [MemberData(nameof(Transports))]
+    [Spec(Standard.Adr, "0053 §1")]
     public async Task A_query_to_a_silent_instrument_times_out_after_the_device_timeout(
         ServerType transport
     )
@@ -81,6 +82,7 @@ public sealed class ClientTimeoutTests
     /// client as <see cref="TransportTimeout"/>, not as a lost connection.
     /// </summary>
     [Fact]
+    [Spec(Standard.Vxi11, "RULE B.6.19")]
     public async Task A_timeout_behind_the_VXI11_gateway_reaches_the_client_as_a_timeout()
     {
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
