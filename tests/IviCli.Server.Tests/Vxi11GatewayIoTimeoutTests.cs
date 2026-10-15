@@ -1,9 +1,12 @@
+using System.Net;
+using System.Net.Sockets;
 using System.Runtime.CompilerServices;
 using IviCli.Application.Backends;
 using IviCli.Backends.Vxi11;
 using IviCli.Domain;
 using IviCli.Domain.Configuration;
 using IviCli.Domain.Devices;
+using IviCli.Domain.Protocols;
 using IviCli.Domain.Scpi;
 using IviCli.Domain.Servers;
 using IviCli.Domain.Visa;
@@ -11,6 +14,9 @@ using IviCli.Server.Vxi11;
 using IviCli.TestKit;
 using Microsoft.Extensions.Logging.Abstractions;
 using Shouldly;
+using static IviCli.Domain.Protocols.Vxi11Constants;
+using static IviCli.Server.Tests.Vxi11Rpc;
+using RecordFraming = IviCli.Server.Vxi11.Vxi11RecordFraming;
 
 namespace IviCli.Server.Tests;
 
@@ -142,6 +148,113 @@ public sealed class Vxi11GatewayIoTimeoutTests
     }
 
     /// <summary>
+    /// A long <c>lock_timeout</c> with the waitlock flag set does not extend
+    /// a call past its <c>io_timeout</c>: the gateway implements no
+    /// <c>device_lock</c>, so no call waits for a lock.
+    /// </summary>
+    [Fact]
+    [Spec(Standard.Adr, "0053 §5")]
+    public async Task A_long_lock_timeout_does_not_extend_a_call_past_its_io_timeout()
+    {
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        await using var bench = Bench.Start(
+            new Instrument(answerAfter: System.Threading.Timeout.InfiniteTimeSpan),
+            gatewayDeviceTimeout: Long,
+            ioTimeout: Short,
+            cts.Token
+        );
+
+        using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cts.Token);
+        deadline.CancelAfter(TimeSpan.FromSeconds(5));
+
+        var error = await RawWriteAsync(
+            bench.Port,
+            ioTimeoutMs: 300,
+            lockTimeoutMs: 60_000,
+            deadline.Token
+        );
+
+        error.ShouldBe(Vxi11IoTimeout);
+    }
+
+    /// <summary>
+    /// A short <c>lock_timeout</c> with the waitlock flag set does not cut a
+    /// call short of its <c>io_timeout</c>.
+    /// </summary>
+    [Fact]
+    [Spec(Standard.Adr, "0053 §5")]
+    public async Task A_short_lock_timeout_does_not_cut_a_call_short_of_its_io_timeout()
+    {
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        await using var bench = Bench.Start(
+            new Instrument(answerAfter: Short),
+            gatewayDeviceTimeout: Long,
+            ioTimeout: Long,
+            cts.Token
+        );
+
+        var error = await RawWriteAsync(
+            bench.Port,
+            ioTimeoutMs: 5_000,
+            lockTimeoutMs: 1,
+            cts.Token
+        );
+
+        error.ShouldBe(Vxi11NoError);
+    }
+
+    /// <summary>
+    /// Links to the gateway on <paramref name="port"/> and sends one
+    /// <c>device_write</c> with the waitlock flag and the given timeouts.
+    /// </summary>
+    /// <returns>The error code of the <c>device_write</c> reply.</returns>
+    private static async Task<int> RawWriteAsync(
+        int port,
+        uint ioTimeoutMs,
+        uint lockTimeoutMs,
+        CancellationToken ct
+    )
+    {
+        using var tcp = new TcpClient();
+        await tcp.ConnectAsync(IPAddress.Loopback, port, ct);
+        using var stream = tcp.GetStream();
+        var create = BuildRpcCall(
+            xid: 1,
+            program: CoreProgram,
+            version: CoreVersion,
+            procedure: ProcCreateLink,
+            body: writer =>
+            {
+                writer.WriteInt32(2); // clientId
+                writer.WriteUInt32(0); // lockDevice
+                writer.WriteUInt32(0); // lock_timeout
+                writer.WriteString("inst0");
+            }
+        );
+        await RecordFraming.WriteRecordAsync(stream, create, ct);
+        var created = SkipReplyHeader(await RecordFraming.ReadRecordAsync(stream, ct));
+        created.ReadInt32().ShouldBe(Vxi11NoError);
+        var lid = created.ReadInt32();
+
+        var write = BuildRpcCall(
+            xid: 2,
+            program: CoreProgram,
+            version: CoreVersion,
+            procedure: ProcDeviceWrite,
+            body: writer =>
+            {
+                writer.WriteInt32(lid);
+                writer.WriteUInt32(ioTimeoutMs);
+                writer.WriteUInt32(lockTimeoutMs);
+                writer.WriteInt32(WaitLockFlag | WriteEndFlag);
+                writer.WriteOpaque("*RST\n"u8.ToArray());
+            }
+        );
+        await RecordFraming.WriteRecordAsync(stream, write, ct);
+        return SkipReplyHeader(await RecordFraming.ReadRecordAsync(stream, ct)).ReadInt32();
+    }
+
+    /// <summary>
     /// A gateway routed to <paramref name="instrument"/> and a client linked
     /// to it, both on loopback.
     /// </summary>
@@ -150,9 +263,16 @@ public sealed class Vxi11GatewayIoTimeoutTests
         private readonly CancellationTokenSource _stop;
         private readonly Task _run;
 
-        private Bench(Vxi11Backend client, Device device, CancellationTokenSource stop, Task run)
+        private Bench(
+            Vxi11Backend client,
+            Device device,
+            int port,
+            CancellationTokenSource stop,
+            Task run
+        )
         {
             Client = client;
+            Port = port;
             Device = device;
             _stop = stop;
             _run = run;
@@ -160,6 +280,9 @@ public sealed class Vxi11GatewayIoTimeoutTests
 
         public Vxi11Backend Client { get; }
         public Device Device { get; }
+
+        /// <summary>The gateway's loopback port, for a client of the test's own.</summary>
+        public int Port { get; }
 
         public static Bench Start(
             IIviBackend instrument,
@@ -191,7 +314,7 @@ public sealed class Vxi11GatewayIoTimeoutTests
                 Timeout.From(ioTimeout).ShouldBeOk()
             );
             client.OpenAsync(device, ct).GetAwaiter().GetResult().ShouldBeOk();
-            return new Bench(client, device, stop, run);
+            return new Bench(client, device, port, stop, run);
         }
 
         public async ValueTask DisposeAsync()
@@ -220,7 +343,7 @@ public sealed class Vxi11GatewayIoTimeoutTests
                 ServerName.From("srv").ShouldBeOk(),
                 ServerType.Vxi11,
                 IpAddress.From("127.0.0.1").ShouldBeOk(),
-                Port.From(LoopbackGateway.FreePort()).ShouldBeOk()
+                IviCli.Domain.Servers.Port.From(LoopbackGateway.FreePort()).ShouldBeOk()
             );
             var config = ConfigDocument
                 .Empty.AddDevice(device)

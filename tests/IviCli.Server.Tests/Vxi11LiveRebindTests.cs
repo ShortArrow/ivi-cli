@@ -16,6 +16,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Shouldly;
 using Xunit;
 using static IviCli.Domain.Protocols.Vxi11Constants;
+using static IviCli.Server.Tests.Vxi11Rpc;
 
 namespace IviCli.Server.Tests;
 
@@ -190,59 +191,5 @@ public sealed class Vxi11LiveRebindTests
             .AddRoute(route)
             .ShouldBeOk();
         return (srv, config, port);
-    }
-
-    private static byte[] BuildRpcCall(
-        uint xid,
-        uint program,
-        uint version,
-        uint procedure,
-        Action<Vxi11XdrCodec.XdrWriter> body
-    )
-    {
-        var writer = new Vxi11XdrCodec.XdrWriter();
-        writer.WriteUInt32(xid);
-        writer.WriteUInt32(0); // CALL
-        writer.WriteUInt32(2); // rpcvers
-        writer.WriteUInt32(program);
-        writer.WriteUInt32(version);
-        writer.WriteUInt32(procedure);
-        writer.WriteUInt32(0); // cred flavor (AUTH_NONE)
-        writer.WriteOpaque([]); // cred body
-        writer.WriteUInt32(0); // verf flavor (AUTH_NONE)
-        writer.WriteOpaque([]); // verf body
-        body(writer);
-        return writer.ToArray();
-    }
-
-    private static Vxi11XdrCodec.XdrReader SkipReplyHeader(byte[] reply)
-    {
-        var reader = new Vxi11XdrCodec.XdrReader(reply);
-        _ = reader.ReadUInt32(); // xid
-        _ = reader.ReadUInt32(); // mtype
-        _ = reader.ReadUInt32(); // reply_stat
-        _ = reader.ReadUInt32(); // verf flavor
-        _ = reader.ReadOpaque(); // verf body
-        _ = reader.ReadUInt32(); // accept_stat
-        return reader;
-    }
-
-    private static async Task WaitForListenerAsync(int port, CancellationToken ct)
-    {
-        for (var i = 0; i < 50; i++)
-        {
-            ct.ThrowIfCancellationRequested();
-            try
-            {
-                using var probe = new TcpClient();
-                await probe.ConnectAsync(IPAddress.Loopback, port, ct);
-                return;
-            }
-            catch (SocketException)
-            {
-                await Task.Delay(50, ct);
-            }
-        }
-        throw new TimeoutException($"VXI-11 gateway did not bind to port {port}");
     }
 }
