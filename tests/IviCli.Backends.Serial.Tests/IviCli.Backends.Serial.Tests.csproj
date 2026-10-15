@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <RootNamespace>IviCli.Backends.Serial.Tests</RootNamespace>
+    <AssemblyName>IviCli.Backends.Serial.Tests</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\IviCli.Backends.Serial\IviCli.Backends.Serial.csproj" />
+    <ProjectReference Include="..\IviCli.TestKit\IviCli.TestKit.csproj" />
+  </ItemGroup>
+</Project>

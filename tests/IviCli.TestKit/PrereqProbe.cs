@@ -40,6 +40,13 @@ public static class PrereqProbe
     public static bool HasUsbMock => _usbMock.Value;
 
     /// <summary>
+    /// True on Linux and macOS when <c>socat -V</c> exits 0. The Serial
+    /// backend's tests (ADR 0055 §11) use it to make a pseudo-terminal pair
+    /// that stands in for a serial port.
+    /// </summary>
+    public static bool HasSocat => _socat.Value;
+
+    /// <summary>
     /// Returns the names of every prerequisite in <paramref name="names"/>
     /// that is currently missing. Returns an empty array when all are
     /// satisfied. The order of the returned names matches the input.
@@ -65,10 +72,15 @@ public static class PrereqProbe
             "pyvisa" => HasPyVisa,
             "ni-visa" => HasNiVisa,
             "usb-mock" => HasUsbMock,
+            "socat" => HasSocat,
             _ => false,
         };
 
     private static readonly Lazy<bool> _python = new(() => Probe(PythonExecutable, "--version"));
+
+    private static readonly Lazy<bool> _socat = new(() =>
+        !OperatingSystem.IsWindows() && Probe("socat", "-V")
+    );
 
     private static readonly Lazy<bool> _pyvisa = new(() =>
         _python.Value && Probe(PythonExecutable, "-c", "import pyvisa")

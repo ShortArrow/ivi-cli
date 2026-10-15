@@ -62,6 +62,33 @@ public sealed record TransportDisconnected(string Reason, Exception? InnerExcept
     public override Exception? Cause => InnerException;
 }
 
+/// <summary>
+/// The port is held by another program or session, so it cannot be opened
+/// (ADR 0055 §7).
+/// </summary>
+/// <param name="Device">The device whose port is busy.</param>
+/// <param name="Resource">The device's resource, masked in logs.</param>
+/// <param name="InnerException">Optional adapter-captured exception, for diagnostic logs only.</param>
+public sealed record TransportInUse(
+    DeviceName Device,
+    VisaResource Resource,
+    Exception? InnerException = null
+) : BackendError
+{
+    /// <inheritdoc/>
+    public override LogSeverity Severity => LogSeverity.Error;
+
+    /// <inheritdoc/>
+    public override string Message => "the port of {Device} ({Resource}) is in use";
+
+    /// <inheritdoc/>
+    public override IReadOnlyList<object?> LogArgs =>
+        new object?[] { Device, Resource.ToLogString() };
+
+    /// <inheritdoc/>
+    public override Exception? Cause => InnerException;
+}
+
 /// <summary>The instrument did not respond to the request.</summary>
 /// <param name="Resource">The VISA resource of the silent device.</param>
 public sealed record DeviceNotResponding(VisaResource Resource) : BackendError
