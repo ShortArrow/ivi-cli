@@ -89,6 +89,29 @@ public sealed record TransportInUse(
     public override Exception? Cause => InnerException;
 }
 
+/// <summary>
+/// An <c>ASRL&lt;board&gt;::INSTR</c> device whose board the machine's
+/// <c>[[asrl]]</c> table does not register could not be opened through VISA
+/// either, because there is no VISA runtime or it does not know the board
+/// (ADR 0055 §2).
+/// </summary>
+/// <param name="Device">The device.</param>
+/// <param name="Board">The board number.</param>
+/// <param name="VisaError">What VISA reported, when a VISA runtime tried.</param>
+public sealed record AsrlBoardUnavailable(DeviceName Device, int Board, BackendError? VisaError)
+    : BackendError
+{
+    /// <inheritdoc/>
+    public override LogSeverity Severity => LogSeverity.Error;
+
+    /// <inheritdoc/>
+    public override string Message =>
+        "ASRL board {Board} of {Device} is not registered and VISA could not open it; register its port with: ivicli visa asrl add {Board} <port>";
+
+    /// <inheritdoc/>
+    public override IReadOnlyList<object?> LogArgs => new object?[] { Board, Device, Board };
+}
+
 /// <summary>The instrument did not respond to the request.</summary>
 /// <param name="Resource">The VISA resource of the silent device.</param>
 public sealed record DeviceNotResponding(VisaResource Resource) : BackendError

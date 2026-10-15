@@ -129,6 +129,7 @@ none of them is redistributed modified.
 - `NETStandard.Library`
 - `System.CommandLine`
 - `System.Diagnostics.EventLog`
+- `System.IO.Ports`
 - `Spectre.Console` — Copyright (c) Patrik Svensson, Phil Scott, Nils Andresen,
   Cédric Luthi
 - `Spectre.Console.Ansi` — Copyright (c) Patrik Svensson, Phil Scott, Nils
@@ -140,12 +141,31 @@ none of them is redistributed modified.
 - `Testably.Abstractions.FileSystem.Interface` — Copyright (c) 2024-2026
   Testably
 - `Tmds.LibC` — Copyright (c) Tom Deseyn
+- `runtime.native.System.IO.Ports`
+- `runtime.android-arm.runtime.native.System.IO.Ports`
+- `runtime.android-arm64.runtime.native.System.IO.Ports`
+- `runtime.android-x64.runtime.native.System.IO.Ports`
+- `runtime.android-x86.runtime.native.System.IO.Ports`
+- `runtime.linux-arm.runtime.native.System.IO.Ports`
+- `runtime.linux-arm64.runtime.native.System.IO.Ports`
+- `runtime.linux-bionic-arm64.runtime.native.System.IO.Ports`
+- `runtime.linux-bionic-x64.runtime.native.System.IO.Ports`
+- `runtime.linux-musl-arm.runtime.native.System.IO.Ports`
+- `runtime.linux-musl-arm64.runtime.native.System.IO.Ports`
+- `runtime.linux-musl-x64.runtime.native.System.IO.Ports`
+- `runtime.linux-x64.runtime.native.System.IO.Ports`
+- `runtime.maccatalyst-arm64.runtime.native.System.IO.Ports`
+- `runtime.maccatalyst-x64.runtime.native.System.IO.Ports`
+- `runtime.osx-arm64.runtime.native.System.IO.Ports`
+- `runtime.osx-x64.runtime.native.System.IO.Ports`
 
 Entries above carrying no copyright line of their own are © Microsoft
 Corporation. All rights reserved. Two of those — `Microsoft.NETCore.Platforms`
 and `NETStandard.Library` — contribute no file to any distribution; they are
 listed because they sit in the dependency closure the check reads, and
-attributing them costs nothing.
+attributing them costs nothing. Each `runtime.<platform>.runtime.native.System.IO.Ports`
+package carries the native library `System.IO.Ports` needs on one platform,
+and a distribution contains only the one for its own.
 
 The MIT License, which applies to each work above with that entry's own
 copyright notice substituted:

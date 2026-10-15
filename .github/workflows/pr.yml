@@ -105,7 +105,7 @@ jobs:
                  | select(.value.type != "Project") | .key' \
             src/IviCli.Cli/packages.lock.json | tr -d '\r' \
             | grep -vx 'Microsoft.NET.ILLink.Tasks' | sort -u > /tmp/shipped.txt
-          sed -n 's/^- `\([A-Za-z0-9_.]*\)`.*/\1/p' THIRD-PARTY-NOTICES.md \
+          sed -n 's/^- `\([A-Za-z0-9_.-]*\)`.*/\1/p' THIRD-PARTY-NOTICES.md \
             | tr -d '\r' | sort -u > /tmp/attributed.txt
           missing="$(comm -23 /tmp/shipped.txt /tmp/attributed.txt)"
           stale="$(comm -13 /tmp/shipped.txt /tmp/attributed.txt)"

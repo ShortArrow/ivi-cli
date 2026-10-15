@@ -41,12 +41,19 @@ public sealed class SerialPortLineFactory : ISerialLineFactory
     /// the errno in the inner exception: a missing port and one the user may
     /// not open become <see cref="SerialLineUnavailableException"/>, and the
     /// rest, a busy port among them, stay access denied, which the backend
-    /// reports as in use. On Windows, access denied already means in use.
+    /// reports as in use. On Windows, access denied already means in use,
+    /// and a missing port is a file-not-found error whose message names it.
     /// </summary>
     public static Exception Translate(Exception failure, bool windows)
     {
         ArgumentNullException.ThrowIfNull(failure);
-        if (windows || failure is not UnauthorizedAccessException { InnerException: { } inner })
+        if (windows)
+        {
+            return failure is FileNotFoundException
+                ? new SerialLineUnavailableException("the port does not exist", failure)
+                : failure;
+        }
+        if (failure is not UnauthorizedAccessException { InnerException: { } inner })
         {
             return failure;
         }
