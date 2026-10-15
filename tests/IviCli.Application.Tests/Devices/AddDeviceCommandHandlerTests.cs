@@ -27,8 +27,8 @@ public class AddDeviceCommandHandlerTests
         var result = await handler.HandleAsync(ValidCommand(), CancellationToken.None);
 
         // Then
-        var name = result.ShouldBeOk();
-        name.Value.ShouldBe(ValidName);
+        var device = result.ShouldBeOk();
+        device.Name.Value.ShouldBe(ValidName);
 
         var saved = (await store.LoadAsync(CancellationToken.None)).ShouldBeOk();
         saved.Devices.Length.ShouldBe(1);

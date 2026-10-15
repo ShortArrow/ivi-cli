@@ -38,8 +38,12 @@ public static class ExitCodeMapper
             // Application-layer wrappers around storage failures.
             AddDeviceStorageFailure or ListDevicesStorageFailure => ConfigurationError,
             // Usage / argument-validation errors from a Command.
-            AddDeviceInvalidName or AddDeviceInvalidResource or AddDeviceInvalidTimeout =>
-                UsageError,
+            AddDeviceInvalidName
+            or AddDeviceInvalidResource
+            or AddDeviceInvalidTimeout
+            or AddDeviceInvalidSerialSetting
+            or AddDeviceSerialOnNonSerial
+            or AddDeviceInvalidTermination => UsageError,
             // Device-side issues (name taken, not found).
             AddDeviceNameTaken => DeviceError,
             // Direct storage errors (when surfaced without a command wrapper).

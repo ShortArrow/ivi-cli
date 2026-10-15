@@ -16,6 +16,20 @@ All notable changes to ivi-cli are documented here. Format roughly follows
   until the serial backend lands; it never answers from the mock, even
   under `IVICLI_MOCK_ONLY`. No backend applies the terminators yet.
 
+- **`visa asrl add`, `list` and `remove` register serial board numbers.**
+  `ivicli visa asrl add 1 /dev/ttyUSB0` records which port `ASRL1::INSTR`
+  means on this machine. A board or a port can be registered once; a
+  `/dev/serial/by-id/` link and the port it points at, or `COM3` and
+  `com3`, count as one port. A port that is not plugged in is registered
+  with a warning. `visa asrl list --json` emits the table as JSON.
+
+- **`visa add` takes serial settings and terminators.** `--baud`,
+  `--data-bits`, `--parity`, `--stop-bits` and `--flow-control` set up an
+  ASRL device's line, and `--read-termination` and `--write-termination`
+  take `lf`, `cr` or `crlf`. A terminator on a HiSLIP, VXI-11, USBTMC or
+  GPIB device, whose transport ends messages itself, is saved with a
+  warning, and loading `config.toml` warns about it again.
+
 ### Fixed
 
 - **Saving `config.toml` keeps Windows paths readable.** ivicli wrote

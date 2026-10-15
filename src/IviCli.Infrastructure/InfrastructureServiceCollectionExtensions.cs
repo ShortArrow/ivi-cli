@@ -18,6 +18,7 @@ using IviCli.Infrastructure.Mock;
 using IviCli.Infrastructure.Servers;
 using IviCli.Infrastructure.Session;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 namespace IviCli.Infrastructure;
 
@@ -51,7 +52,8 @@ public static class InfrastructureServiceCollectionExtensions
         ));
         services.AddSingleton<IConfigStore>(sp => new TomlConfigStore(
             sp.GetRequiredService<IFileSystem>(),
-            configPath
+            configPath,
+            sp.GetService<ILogger<TomlConfigStore>>()
         ));
         services.AddSingleton<ISessionStore>(sp => new JsonSessionStore(
             sp.GetRequiredService<IFileSystem>(),

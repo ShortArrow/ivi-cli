@@ -100,3 +100,47 @@ public sealed record AddDeviceStorageFailure(ConfigStoreError Inner) : AddDevice
     /// <inheritdoc/>
     public override Exception? Cause => Inner.Cause;
 }
+
+/// <summary>A serial option had a value outside what ADR 0055 §4 allows.</summary>
+/// <param name="Field">The setting, as <c>config.toml</c> names it, such as <c>parity</c>.</param>
+/// <param name="Raw">The value as supplied.</param>
+public sealed record AddDeviceInvalidSerialSetting(string Field, string Raw) : AddDeviceError
+{
+    /// <inheritdoc/>
+    public override LogSeverity Severity => LogSeverity.Warning;
+
+    /// <inheritdoc/>
+    public override string Message => "invalid serial setting {Field}: {Raw}";
+
+    /// <inheritdoc/>
+    public override IReadOnlyList<object?> LogArgs => new object?[] { Field, Raw };
+}
+
+/// <summary>Serial options were given for a device that is not on a serial line.</summary>
+/// <param name="Name">The device.</param>
+public sealed record AddDeviceSerialOnNonSerial(DeviceName Name) : AddDeviceError
+{
+    /// <inheritdoc/>
+    public override LogSeverity Severity => LogSeverity.Warning;
+
+    /// <inheritdoc/>
+    public override string Message =>
+        "serial settings given for {Name}, which is not an ASRL device";
+
+    /// <inheritdoc/>
+    public override IReadOnlyList<object?> LogArgs => new object?[] { Name };
+}
+
+/// <summary>A terminator was not LF, CR or CRLF.</summary>
+/// <param name="Raw">The terminator as supplied.</param>
+public sealed record AddDeviceInvalidTermination(string Raw) : AddDeviceError
+{
+    /// <inheritdoc/>
+    public override LogSeverity Severity => LogSeverity.Warning;
+
+    /// <inheritdoc/>
+    public override string Message => "invalid termination: {Raw}";
+
+    /// <inheritdoc/>
+    public override IReadOnlyList<object?> LogArgs => new object?[] { Raw };
+}
