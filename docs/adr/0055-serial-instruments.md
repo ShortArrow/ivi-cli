@@ -148,9 +148,11 @@ or two characters, such as `"\n"`, `"\r"` or `"\r\n"`.
 
 - Opening a port that another process or session already holds fails with
   a new `BackendError`, `TransportInUse`, which names the port.
-- The pool (ADR 0038) holds a serial session as it holds any other, until
-  it has been idle for the pool's idle timeout. Meanwhile no other program
-  can open the port.
+- The pool (ADR 0038) holds a serial session as it holds a HiSLIP, VXI-11,
+  SOCKET or VISA one: after release it stays open until it has been idle
+  for `[pool] idle_timeout`, 60 seconds by default, or is evicted to stay
+  under `max_devices` (ADR 0038 §4). Meanwhile no other program can open
+  the port.
 - Two devices that name the same port are two pool entries (ADR 0038 §2);
   while one holds the port, the other's open fails as above.
 
