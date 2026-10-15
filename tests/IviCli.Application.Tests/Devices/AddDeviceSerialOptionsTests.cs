@@ -37,8 +37,14 @@ public sealed class AddDeviceSerialOptionsTests
         (await Saved(store)).Serial.ShouldBe(expected);
     }
 
-    [Fact]
-    public async Task Serial_options_on_a_network_device_fail()
+    /// <summary>
+    /// Includes VISA's default baud rate, which the stored settings drop, so
+    /// only the handler's own check can refuse it.
+    /// </summary>
+    [Theory]
+    [InlineData(19200)]
+    [InlineData(9600)]
+    public async Task Serial_options_on_a_network_device_fail(int baud)
     {
         // Given
         var store = new FakeConfigStore();
@@ -48,7 +54,7 @@ public sealed class AddDeviceSerialOptionsTests
         var result = await handler.HandleAsync(
             new AddDeviceCommand("psu", "TCPIP0::host::5025::SOCKET", 3000)
             {
-                Serial = new SerialOptions(Baud: 19200),
+                Serial = new SerialOptions(Baud: baud),
             },
             TestContext.Current.CancellationToken
         );

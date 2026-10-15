@@ -15,6 +15,7 @@ namespace IviCli.Cli.Tests.Commands;
 /// exercised the way an operator uses it: parse a command line, run it,
 /// and read the rule back out of the scenario it wrote.
 /// </summary>
+[Collection(ConsoleRedirection.Name)]
 public sealed class MockRuleCommandSrqTests
 {
     private static readonly ScenarioName Demo = ScenarioName.From("demo").ShouldBeOk();

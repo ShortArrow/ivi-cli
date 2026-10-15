@@ -53,7 +53,7 @@ public sealed class SystemSerialPorts : ISerialPorts
         {
             return file.ResolveLinkTarget(returnFinalTarget: true)?.FullName ?? file.FullName;
         }
-        catch (IOException)
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
             return file.FullName;
         }

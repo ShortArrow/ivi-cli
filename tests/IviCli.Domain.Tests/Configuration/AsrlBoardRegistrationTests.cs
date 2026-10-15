@@ -31,6 +31,8 @@ public class AsrlBoardRegistrationTests
     [InlineData(1, "")] // empty port
     [InlineData(1, "3")] // digits only would name a board
     [InlineData(1, "/dev/tty::USB0")] // the resource separator
+    [InlineData(1, " COM7")] // surrounding whitespace would make a second name for COM7
+    [InlineData(1, "COM7 ")]
     public void From_Invalid_ReturnsInvalidAsrlBoardRegistration(int board, string port)
     {
         // When

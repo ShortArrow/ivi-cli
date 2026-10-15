@@ -18,13 +18,17 @@ public sealed class TomlConfigStore : IConfigStore
     private readonly IFileSystem _fs;
     private readonly string _path;
     private readonly ILogger _logger;
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, byte> _warned = new(
+        StringComparer.Ordinal
+    );
 
     /// <summary>Creates a new TomlConfigStore at the supplied file-system path.</summary>
     /// <param name="fs">File-system abstraction (per ADR 0010 §9.1).</param>
     /// <param name="path">Absolute path to the <c>config.toml</c> file.</param>
     /// <param name="logger">
     /// Receives a warning for each loaded device whose terminator has no
-    /// effect (ADR 0055 §5).
+    /// effect (ADR 0055 §5), once per device for the life of the store, since
+    /// a long-running server loads the configuration for every request.
     /// </param>
     public TomlConfigStore(IFileSystem fs, string path, ILogger<TomlConfigStore>? logger = null)
     {
@@ -67,7 +71,7 @@ public sealed class TomlConfigStore : IConfigStore
     {
         foreach (var device in config.Devices)
         {
-            if (device.IgnoresTermination)
+            if (device.IgnoresTermination && _warned.TryAdd(device.Name.Value, 0))
             {
                 _logger.LogWarning(
                     "device {Device} sets a terminator, which its transport ignores: HiSLIP, VXI-11, USBTMC and GPIB end messages themselves",

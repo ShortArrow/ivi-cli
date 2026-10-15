@@ -172,4 +172,33 @@ public class TomlConfigStoreTests
         warning.Level.ShouldBe(Microsoft.Extensions.Logging.LogLevel.Warning);
         warning.Message.ShouldContain("scope");
     }
+
+    /// <summary>
+    /// A long-running server loads the configuration for every request, so
+    /// a device is warned about once per store.
+    /// </summary>
+    [Fact]
+    public async Task LoadAsync_Again_DoesNotRepeatTheWarning()
+    {
+        // Given
+        var toml = """
+            [[devices]]
+            name = "scope"
+            resource = "TCPIP0::host::hislip0::INSTR"
+            timeout_ms = 3000
+            read_termination = "\r"
+            """;
+        var fs = new MockFileSystem(
+            new Dictionary<string, MockFileData> { [ConfigPath] = new MockFileData(toml) }
+        );
+        var logger = new RecordingLogger<TomlConfigStore>();
+        var store = new TomlConfigStore(fs, ConfigPath, logger);
+
+        // When
+        (await store.LoadAsync(CancellationToken.None)).ShouldBeOk();
+        (await store.LoadAsync(CancellationToken.None)).ShouldBeOk();
+
+        // Then
+        logger.Entries.ShouldHaveSingleItem();
+    }
 }
