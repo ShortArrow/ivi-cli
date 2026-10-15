@@ -43,6 +43,20 @@ public sealed record Device(
     Termination? WriteTermination = null
 )
 {
+    /// <summary>
+    /// The serial line's settings, or <see langword="null"/> for VISA's
+    /// defaults; <see cref="SerialSettings.Default"/> is stored as
+    /// <see langword="null"/>, so the defaults have one representation.
+    /// </summary>
+    public SerialSettings? Serial
+    {
+        get;
+        init => field = WithoutDefaults(value);
+    } = WithoutDefaults(Serial);
+
     /// <summary>Whether the device is on a serial line, that is, has an ASRL resource.</summary>
     public bool IsSerial => Resource is VisaResource.AsrlBoard or VisaResource.AsrlPort;
+
+    private static SerialSettings? WithoutDefaults(SerialSettings? settings) =>
+        settings == SerialSettings.Default ? null : settings;
 }

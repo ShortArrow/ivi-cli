@@ -13,7 +13,8 @@ All notable changes to ivi-cli are documented here. Format roughly follows
   `[devices.serial]` table, `read_termination` and `write_termination`,
   and an `[[asrl]]` table of board numbers are accepted and written back
   (ADR 0055). Opening such a device fails as an unsupported transport
-  until the serial backend lands; it never answers from the mock.
+  until the serial backend lands; it never answers from the mock, even
+  under `IVICLI_MOCK_ONLY`. No backend applies the terminators yet.
 
 ### Fixed
 

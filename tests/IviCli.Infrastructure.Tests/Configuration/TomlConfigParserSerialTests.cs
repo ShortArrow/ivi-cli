@@ -255,6 +255,9 @@ public class TomlConfigParserSerialTests
     [Theory]
     [InlineData("ASRL\\\\.\\COM10::INSTR")]
     [InlineData("ASRL/dev/serial/by-id/usb-FTDI \"quoted\"::INSTR")]
+    [InlineData("ASRLa\u0001b::INSTR")]
+    [InlineData("ASRLx\u007Fy::INSTR")]
+    [InlineData("ASRLtab\there::INSTR")]
     public void Serialize_PortNameNeedingEscapes_RoundTrips(string resource)
     {
         // Given
@@ -300,5 +303,6 @@ public class TomlConfigParserSerialTests
 
         // Then
         toml.ShouldNotContain("[devices.serial]");
+        TomlConfigParser.Parse(toml).ShouldBeOk().ShouldBe(config);
     }
 }
