@@ -35,7 +35,20 @@ All notable changes to ivi-cli are documented here. Format roughly follows
   GPIB device, whose transport ends messages itself, is saved with a
   warning, and loading `config.toml` warns about it again.
 
+- **`visa list`, the API and `visa scan` show serial devices.** `visa list`
+  adds a serial device's line, such as `9600 8-N-1`, and the terminators a
+  device sets; `visa list --json` and `GET /v1/devices` add them as
+  `serial`, `read_termination` and `write_termination` (`readTermination`
+  and `writeTermination` in the API), named as in `config.toml`. `visa
+  scan` lists the machine's serial ports with the board that names each,
+  or the `visa asrl add` line that would register it, and `visa scan --add`
+  registers them by port name.
+
 ### Fixed
+
+- **`visa list --json` and `visa scan --json` escape what they print.** A
+  resource, an `*IDN?` answer or a note with a backslash, a quote or a
+  control character made the JSON unreadable.
 
 - **Management API errors carry their text.** The `message` of a
   `backend_failure` response, and of the WebSocket error event, had its

@@ -38,12 +38,59 @@ public sealed class VisaScanCommandTests
     }
 
     [Theory]
+    [InlineData("ASRL/dev/ttyUSB0::INSTR", "ttyusb0")]
+    [InlineData("ASRLCOM3::INSTR", "com3")]
+    [InlineData("ASRL/dev/serial/by-id/usb-FTDI_A1-if00::INSTR", "usb_ftdi_a1_if00")]
+    [InlineData("ASRL/dev/0x1::INSTR", "asrl_0x1")]
+    [InlineData("ASRL1::INSTR", "asrl1")]
+    public void DeriveAlias_ASRL_uses_the_last_part_of_the_port(string raw, string expected)
+    {
+        var resource = VisaResource.Parse(raw).ShouldBeOk();
+        VisaScanCommand.DeriveAlias(resource).ShouldBe(expected);
+    }
+
+    [Fact]
+    public void RenderHuman_shows_a_serial_port_with_its_registration_line()
+    {
+        var scan = ScanOf(
+            Discovered("ASRLCOM3::INSTR", detail: "register with: ivicli visa asrl add 1 COM3")
+        );
+
+        VisaScanCommand
+            .RenderHuman(scan)
+            .ShouldBe(["[1] ASRLCOM3::INSTR   (register with: ivicli visa asrl add 1 COM3)"]);
+    }
+
+    [Fact]
+    public void RenderJson_escapes_the_resource_the_idn_and_the_detail()
+    {
+        var scan = ScanOf(
+            Discovered(@"ASRL\\.\COM10::INSTR", "ACME \"X\",1", "line\tbreak"),
+            Discovered("GPIB0::17::INSTR")
+        );
+
+        VisaScanCommand
+            .RenderJson(scan)
+            .ShouldBe(
+                """
+                {"discovered":[{"index":1,"resource":"ASRL\\\\.\\COM10::INSTR","idn":"ACME \"X\",1","detail":"line\tbreak"},{"index":2,"resource":"GPIB0::17::INSTR","idn":null,"detail":null}]}
+
+                """
+            );
+    }
+
+    [Theory]
     [InlineData("TCPIP0::192.168.1.10::hislip0::INSTR")]
     [InlineData("TCPIP0::psu-lab.local::inst0::INSTR")]
     [InlineData("TCPIP0::10.0.0.5::5025::SOCKET")]
     [InlineData("USB0::0x0b3e::0x1049::DN001677::INSTR")]
     [InlineData("USB0::0x1234::0x5678::ABC-987::0::INSTR")]
     [InlineData("GPIB0::17::INSTR")]
+    [InlineData("ASRL/dev/ttyUSB0::INSTR")]
+    [InlineData("ASRLCOM3::INSTR")]
+    [InlineData("ASRL1::INSTR")]
+    [InlineData("ASRL/dev/serial/by-id/usb-FTDI_A1-if00::INSTR")]
+    [InlineData("ASRL/dev/0x1::INSTR")]
     public void DeriveAlias_always_yields_a_registrable_device_name(string raw)
     {
         // Given a discovered resource of any supported shape

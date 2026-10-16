@@ -1,6 +1,9 @@
 using System.Collections.Immutable;
 using System.CommandLine;
 using System.Globalization;
+using System.Text;
+using System.Text.Encodings.Web;
+using System.Text.Json;
 using IviCli.Application.Backends;
 using IviCli.Application.Devices;
 using IviCli.Application.Logging;
@@ -159,6 +162,7 @@ public static class VisaScanCommand
     /// <item>TCPIP host portion lowercased, underscored.</item>
     /// <item>USB serial number.</item>
     /// <item>GPIB primary address.</item>
+    /// <item>The last part of a serial port's name, or the ASRL board number.</item>
     /// </list>
     /// The alias is intentionally deterministic so re-running <c>scan --add</c>
     /// produces the same name and the second attempt cleanly skips.
@@ -170,8 +174,20 @@ public static class VisaScanCommand
             VisaResource.TcpipSocket s => $"{HostAlias(s.Host)}_{s.Port}",
             VisaResource.Usb u => $"usb_{Sanitize(u.SerialNumber)}",
             VisaResource.Gpib g => $"gpib_{g.PrimaryAddress}",
+            VisaResource.AsrlPort p => PortAlias(p.Port),
+            VisaResource.AsrlBoard b => $"asrl{b.Board}",
             _ => "device",
         };
+
+    // The last part of a port's path, which starts with a letter for the
+    // usual names (ttyUSB0, COM3); anything else is prefixed like a numeric host.
+    private static string PortAlias(string port)
+    {
+        var sanitized = Sanitize(port[(port.LastIndexOfAny(['/', '\\']) + 1)..]);
+        return sanitized.Length > 0 && char.IsAsciiLetterLower(sanitized[0])
+            ? sanitized
+            : $"asrl_{sanitized}".TrimEnd('_');
+    }
 
     // A DeviceName must start with a lowercase letter, which a numeric
     // host (an IP address) cannot supply on its own.
@@ -206,28 +222,9 @@ public static class VisaScanCommand
 
     private static int Success(ScanResult scan, bool emitJson)
     {
-        var inv = CultureInfo.InvariantCulture;
         if (emitJson)
         {
-            Console.Write("{\"discovered\":[");
-            for (var i = 0; i < scan.Resources.Length; i++)
-            {
-                if (i > 0)
-                {
-                    Console.Write(",");
-                }
-                var r = scan.Resources[i];
-                var resourceString = FormatResource(r.Resource);
-                var idnJson = r.Idn is null ? "null" : $"\"{Escape(r.Idn)}\"";
-                var detailJson = r.Detail is null ? "null" : $"\"{Escape(r.Detail)}\"";
-                Console.Write(
-                    string.Create(
-                        inv,
-                        $"{{\"index\":{i + 1},\"resource\":\"{resourceString}\",\"idn\":{idnJson},\"detail\":{detailJson}}}"
-                    )
-                );
-            }
-            Console.WriteLine("]}");
+            Console.Write(RenderJson(scan));
         }
         else
         {
@@ -237,6 +234,39 @@ public static class VisaScanCommand
             }
         }
         return ExitCodeMapper.Success;
+    }
+
+    /// <summary>
+    /// Renders the scan as the JSON emitted with <c>--json</c>:
+    /// <c>{"discovered":[{"index":1,"resource":"…","idn":null,"detail":null}]}</c>,
+    /// numbered in discovery order. Text other than ASCII is written as is.
+    /// </summary>
+    public static string RenderJson(ScanResult scan)
+    {
+        using var stream = new MemoryStream();
+        using (
+            var json = new Utf8JsonWriter(
+                stream,
+                new JsonWriterOptions { Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping }
+            )
+        )
+        {
+            json.WriteStartObject();
+            json.WriteStartArray("discovered");
+            for (var i = 0; i < scan.Resources.Length; i++)
+            {
+                var r = scan.Resources[i];
+                json.WriteStartObject();
+                json.WriteNumber("index", i + 1);
+                json.WriteString("resource", FormatResource(r.Resource));
+                json.WriteString("idn", r.Idn);
+                json.WriteString("detail", r.Detail);
+                json.WriteEndObject();
+            }
+            json.WriteEndArray();
+            json.WriteEndObject();
+        }
+        return Encoding.UTF8.GetString(stream.ToArray()) + "\n";
     }
 
     /// <summary>
@@ -302,8 +332,4 @@ public static class VisaScanCommand
         Console.Error.WriteLine("error: scan failed.");
         return ExitCodeMapper.TransportError;
     }
-
-    private static string Escape(string raw) =>
-        raw.Replace("\\", "\\\\", StringComparison.Ordinal)
-            .Replace("\"", "\\\"", StringComparison.Ordinal);
 }
