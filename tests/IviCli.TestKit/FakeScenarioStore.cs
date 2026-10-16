@@ -19,6 +19,12 @@ public sealed class FakeScenarioStore : IScenarioStore
     /// <summary>Creates an empty store.</summary>
     public FakeScenarioStore() { }
 
+    private ScenarioStoreError? _nextListFailure;
+
+    /// <summary>Arrange that the next <see cref="ListAsync"/> call fails with <see cref="ScenarioStoreParseFailure"/>.</summary>
+    public void FailNextListWith(string reason) =>
+        _nextListFailure = new ScenarioStoreParseFailure(reason);
+
     /// <summary>Creates a store seeded with the supplied scenarios.</summary>
     public FakeScenarioStore(IEnumerable<MockScenario> seed)
     {
@@ -34,6 +40,13 @@ public sealed class FakeScenarioStore : IScenarioStore
     )
     {
         ct.ThrowIfCancellationRequested();
+        if (_nextListFailure is { } failure)
+        {
+            _nextListFailure = null;
+            return Task.FromResult(
+                Result.Failure<ImmutableArray<ScenarioName>, ScenarioStoreError>(failure)
+            );
+        }
         var names = _scenarios
             .Values.Select(s => s.Name)
             .OrderBy(n => n.Value, StringComparer.Ordinal)

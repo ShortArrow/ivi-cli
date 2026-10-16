@@ -58,6 +58,12 @@ poll an instrument at high frequency.
 ### 3. Error envelope
 
 Every non-2xx response carries `{ "error": { "code": "<stable>", "message": "<text>" } }`.
+For `backend_failure` the message is the backend's error with its values
+filled in, such as `transport disconnected: connect failed: Connection
+refused`; a caller that may send SCPI to the device needs it to tell why
+the device did not answer. The store failures and `internal_error` carry a
+fixed message instead, since a store's reason can name a path on the
+server. The WebSocket error event of ADR 0035 carries the same messages.
 
 | Outcome | Status | Code |
 | --- | --- | --- |

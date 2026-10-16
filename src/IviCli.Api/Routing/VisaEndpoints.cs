@@ -1,6 +1,7 @@
 using IviCli.Api.Contracts;
 using IviCli.Api.Mapping;
 using IviCli.Application.Devices;
+using IviCli.Application.Logging;
 using IviCli.Domain;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
@@ -92,17 +93,17 @@ public static class VisaEndpoints
             QueryDeviceTransportFailure t => ApiMapping.ProblemJson(
                 StatusCodes.Status502BadGateway,
                 "backend_failure",
-                t.Inner.Message
+                IviErrorMessages.Render(t.Inner)
             ),
             QueryDeviceConfigFailure or QueryDeviceSessionFailure => ApiMapping.ProblemJson(
                 StatusCodes.Status503ServiceUnavailable,
                 "config_store_failure",
-                error.Message
+                ApiMapping.ConfigStoreFailureMessage
             ),
             _ => ApiMapping.ProblemJson(
                 StatusCodes.Status500InternalServerError,
                 "internal_error",
-                error.Message
+                ApiMapping.InternalErrorMessage
             ),
         };
 
@@ -123,17 +124,17 @@ public static class VisaEndpoints
             WriteDeviceTransportFailure t => ApiMapping.ProblemJson(
                 StatusCodes.Status502BadGateway,
                 "backend_failure",
-                t.Inner.Message
+                IviErrorMessages.Render(t.Inner)
             ),
             WriteDeviceConfigFailure or WriteDeviceSessionFailure => ApiMapping.ProblemJson(
                 StatusCodes.Status503ServiceUnavailable,
                 "config_store_failure",
-                error.Message
+                ApiMapping.ConfigStoreFailureMessage
             ),
             _ => ApiMapping.ProblemJson(
                 StatusCodes.Status500InternalServerError,
                 "internal_error",
-                error.Message
+                ApiMapping.InternalErrorMessage
             ),
         };
 }

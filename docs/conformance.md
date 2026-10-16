@@ -42,9 +42,9 @@ below was chosen is in [ADR 0053](adr/0053-device-timeout.md).
 | Kind | Behaviour | Spec |
 | --- | --- | --- |
 | ivi-cli defines | Write, query, read and trigger fail with `TransportTimeout` once `timeout_ms` has passed. This holds for every backend, built in or from a plugin, with or without the session pool. | ADR 0053 §1 |
-| ivi-cli defines | After a timeout, whether ivi-cli's deadline passed or the backend reported the timeout itself, the session is closed and reopened before the next operation, so a late reply is never read as the answer to a later request. Closing is abandoned if it takes longer than the operation was allowed. | ADR 0053 §3 |
+| ivi-cli defines | After a timeout, whether ivi-cli's deadline passed or the backend reported the timeout itself, the session is closed and reopened before the next operation, so a late reply is never read as the answer to a later request, except on a serial line (below). Closing is abandoned if it takes longer than the operation was allowed. | ADR 0053 §3 |
 | ivi-cli defines | Opening a session may take the longer of `timeout_ms` and 5 seconds, plus the grace below for a backend that enforces the timeout itself. | ADR 0053 §4 |
-| ivi-cli defines | A backend that enforces the timeout itself (VXI-11, VISA) gets one second beyond `timeout_ms` before ivi-cli abandons the operation, so its own timeout error arrives first. | ADR 0053 §2 |
+| ivi-cli defines | A backend that enforces the timeout itself (VXI-11, VISA, serial) gets one second beyond `timeout_ms` before ivi-cli abandons the operation, so its own timeout error arrives first. | ADR 0053 §2 |
 | ivi-cli defines | A cancellation from the caller is reported as a cancellation, not as a timeout. | ADR 0053 §1 |
 | ivi-cli defines | The service-request stream has no deadline. It carries on across a session that was reopened after a timeout, and ends when the session is closed by its owner: the caller, or the session pool when the pool is enabled. | ADR 0053 §1, ADR 0053 §3 |
 
@@ -96,3 +96,13 @@ abandon a VISA call in progress: only the runtime's own timeouts end one.
 | Kind | Behaviour | Spec |
 | --- | --- | --- |
 | ivi-cli defines | No standard covers a raw SOCKET connection. `timeout_ms` bounds each operation, and the connection is reopened after a timeout. | ADR 0053 §1, ADR 0053 §3 |
+
+### Serial line (Serial backend)
+
+Why each rule below was chosen is in
+[ADR 0055](adr/0055-serial-instruments.md).
+
+| Kind | Behaviour | Spec |
+| --- | --- | --- |
+| ivi-cli defines | No standard covers a serial line. The port's read and write timeouts are `timeout_ms`, and a timeout the port reports is `TransportTimeout`. A port call that does not return is abandoned once `timeout_ms` and the grace above have passed. | ADR 0055 §8 |
+| ivi-cli defines | A line carries no request identifiers, so a reply that arrives after the port was reopened following a timeout is read as the answer to the next request. | ADR 0055 §8 |

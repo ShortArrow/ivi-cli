@@ -181,6 +181,7 @@ internal static class Program
             services.AddIviCliVxi11Scanner();
             services.AddIviCliSocketScanner();
             services.AddIviCliLocalUsbScanner();
+            services.AddIviCliSerialScanner();
             // Dynamic-completion plumbing for the `__complete` verb.
             services.AddSingleton<IviCli.Cli.Completion.CompletionRegistry>();
             services.AddSingleton<

@@ -29,7 +29,7 @@ public static class ServerEndpoints
             Result<ServerListing, ListServersError>.Error err => ApiMapping.ProblemJson(
                 StatusCodes.Status503ServiceUnavailable,
                 "config_store_failure",
-                err.Err.Message
+                ApiMapping.ConfigStoreFailureMessage
             ),
             _ => Results.StatusCode(StatusCodes.Status500InternalServerError),
         };

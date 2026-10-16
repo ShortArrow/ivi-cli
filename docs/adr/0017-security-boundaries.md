@@ -62,6 +62,7 @@ Examples:
 - `VisaResource.Tcpip("192.168.0.10", "inst0").ToLogString()` → `TCPIP0::***::INSTR`
 - `IdnResponse.ToLogString()` → masks the serial-number portion
 - `VisaResource.Usb(...).ToLogString()` → masks the serial portion
+- `VisaResource.AsrlPort(...).ToLogString()` → `ASRL***::INSTR`, since a stable port name such as `/dev/serial/by-id/usb-FTDI_…` carries the adapter's serial number (ADR 0055 §1)
 
 Rules:
 

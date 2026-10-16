@@ -31,7 +31,8 @@ public interface IBackendScanner
 /// when the scanner cannot or chose not to probe.
 /// </param>
 /// <param name="Detail">
-/// Optional human-readable diagnostic shown only under <c>--verbose</c> (e.g. the VXI-11
-/// Device Core port resolved via the portmapper); <see langword="null"/> when there is none.
+/// Optional human-readable note shown beside the resource, such as the VXI-11 Device Core
+/// port resolved via the portmapper under <c>--verbose</c>, or the board that names a serial
+/// port; <see langword="null"/> when there is none.
 /// </param>
 public sealed record DiscoveredResource(VisaResource Resource, string? Idn, string? Detail = null);

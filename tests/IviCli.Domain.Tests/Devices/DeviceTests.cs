@@ -176,4 +176,35 @@ public class DeviceTests
         // When / Then
         device.UsesTermination.ShouldBe(uses);
     }
+
+    [Theory]
+    [InlineData("TCPIP0::host::inst0::INSTR")]
+    [InlineData("TCPIP0::host::5025::SOCKET")]
+    public void SerialLine_IsNullOffASerialLine(string resource)
+    {
+        new Device(Name("d"), Resource(resource), T(3000)).SerialLine.ShouldBeNull();
+    }
+
+    [Fact]
+    public void SerialLine_IsVisasDefaultsWhenTheDeviceSetsNone()
+    {
+        new Device(Name("d"), Resource("ASRL1::INSTR"), T(3000)).SerialLine.ShouldBe(
+            SerialSettings.Default
+        );
+    }
+
+    [Fact]
+    public void SerialLine_IsTheDevicesSettings()
+    {
+        // Given
+        var settings = SerialSettings
+            .From(19200, 7, SerialParity.Even, SerialStopBits.Two, SerialFlowControl.RtsCts)
+            .ShouldBeOk();
+
+        // When
+        var device = new Device(Name("d"), Resource("ASRLCOM3::INSTR"), T(3000), settings);
+
+        // Then
+        device.SerialLine.ShouldBe(settings);
+    }
 }

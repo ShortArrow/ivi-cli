@@ -1,8 +1,10 @@
 using System.Diagnostics;
 using System.Net.WebSockets;
 using System.Text;
+using IviCli.Api.Mapping;
 using IviCli.Application.Configuration;
 using IviCli.Application.Devices;
+using IviCli.Application.Logging;
 using IviCli.Domain;
 using IviCli.Domain.Configuration;
 using IviCli.Domain.Devices;
@@ -161,13 +163,16 @@ public static class VisaWebSocketEndpoint
         {
             // Graceful shutdown.
         }
-        catch (Exception ex)
+        catch (Exception)
         {
             try
             {
                 await SendAsync(
                     socket,
-                    new VisaWebSocketEvent.Error(VisaWebSocketErrorCodes.InternalError, ex.Message),
+                    new VisaWebSocketEvent.Error(
+                        VisaWebSocketErrorCodes.InternalError,
+                        ApiMapping.InternalErrorMessage
+                    ),
                     CancellationToken.None
                 );
                 await socket.CloseAsync(
@@ -241,13 +246,16 @@ public static class VisaWebSocketEndpoint
                 ),
             QueryDeviceTransportFailure t => new VisaWebSocketEvent.Error(
                 VisaWebSocketErrorCodes.BackendFailure,
-                t.Inner.Message
+                IviErrorMessages.Render(t.Inner)
             ),
             QueryDeviceConfigFailure or QueryDeviceSessionFailure => new VisaWebSocketEvent.Error(
                 VisaWebSocketErrorCodes.ConfigStoreFailure,
-                error.Message
+                ApiMapping.ConfigStoreFailureMessage
             ),
-            _ => new VisaWebSocketEvent.Error(VisaWebSocketErrorCodes.InternalError, error.Message),
+            _ => new VisaWebSocketEvent.Error(
+                VisaWebSocketErrorCodes.InternalError,
+                ApiMapping.InternalErrorMessage
+            ),
         };
 
     private static VisaWebSocketEvent MapWriteError(WriteDeviceError error) =>
@@ -264,13 +272,16 @@ public static class VisaWebSocketEndpoint
                 ),
             WriteDeviceTransportFailure t => new VisaWebSocketEvent.Error(
                 VisaWebSocketErrorCodes.BackendFailure,
-                t.Inner.Message
+                IviErrorMessages.Render(t.Inner)
             ),
             WriteDeviceConfigFailure or WriteDeviceSessionFailure => new VisaWebSocketEvent.Error(
                 VisaWebSocketErrorCodes.ConfigStoreFailure,
-                error.Message
+                ApiMapping.ConfigStoreFailureMessage
             ),
-            _ => new VisaWebSocketEvent.Error(VisaWebSocketErrorCodes.InternalError, error.Message),
+            _ => new VisaWebSocketEvent.Error(
+                VisaWebSocketErrorCodes.InternalError,
+                ApiMapping.InternalErrorMessage
+            ),
         };
 
     private static Task SendAsync(WebSocket socket, VisaWebSocketEvent ev, CancellationToken ct)

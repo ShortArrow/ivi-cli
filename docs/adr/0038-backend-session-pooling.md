@@ -54,6 +54,9 @@ This trades a small amount of resource-sharing (no automatic
 connection reuse across two names for the same physical
 instrument) for predictable per-device semantics. Operators who
 want shared physical sessions register the same device name once.
+A serial port opens only once, so of two device names for the same
+port, the one opened second fails with `TransportInUse` while the
+first holds the port (ADR 0055 §7).
 
 ### 3. Concurrency: cap = 1 per device
 
@@ -85,7 +88,8 @@ Two simultaneous limits:
   released entry survives this long before the pool closes the
   underlying backend session. Background `ITimer` fires at
   `idle_timeout / 2` and sweeps; every `LeaseAsync` also runs a
-  lazy sweep.
+  lazy sweep. Until then a serial session keeps its port, so no
+  other program on the machine can open it (ADR 0055 §7).
 - **MaxDevices** (default `16`, configurable; `0` = unlimited):
   before inserting a new entry, the pool LRU-evicts the
   least-recently-used **idle** entry. Currently-leased entries are

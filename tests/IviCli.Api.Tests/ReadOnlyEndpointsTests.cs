@@ -51,6 +51,113 @@ public sealed class ReadOnlyEndpointsTests
         listing.Devices[0].Name.ShouldBe("psu1");
     }
 
+    /// <summary>
+    /// A store failure answers with a fixed message, never the store's own
+    /// reason, which can name a path on the server (ADR 0034 §3).
+    /// </summary>
+    [Theory]
+    [InlineData("GET", "/v1/devices")]
+    [InlineData("GET", "/v1/devices/psu1/status")]
+    [InlineData("GET", "/v1/servers")]
+    [InlineData("POST", "/v1/devices/psu1/query")]
+    [InlineData("POST", "/v1/devices/psu1/write")]
+    public async Task A_config_store_failure_leaves_the_stores_reason_out(
+        string method,
+        string path
+    )
+    {
+        var store = new FakeConfigStore(ConfigDocument.Empty.AddDevice(Dev("psu1")).ShouldBeOk());
+        store.FailNextLoadWith("/home/someone/.config/ivicli/config.toml is gone");
+        await using var host = await ApiTestHost.StartAsync(
+            ConfigDocument.Empty,
+            configStore: store
+        );
+
+        var resp = await host.Client.SendAsync(
+            new HttpRequestMessage(new HttpMethod(method), path)
+            {
+                Content = method == "POST" ? JsonContent.Create(new ScpiRequestDto("*IDN?")) : null,
+            },
+            TestContext.Current.CancellationToken
+        );
+
+        resp.StatusCode.ShouldBe(HttpStatusCode.ServiceUnavailable);
+        var error = await resp.Content.ReadFromJsonAsync<ErrorDto>(
+            cancellationToken: TestContext.Current.CancellationToken
+        );
+        error!.Error.Code.ShouldBe("config_store_failure");
+        error.Error.Message.ShouldBe("the configuration or session store could not be used");
+    }
+
+    [Fact]
+    public async Task A_scenario_store_failure_leaves_the_stores_reason_out()
+    {
+        var scenarios = new FakeScenarioStore();
+        scenarios.FailNextListWith("/home/someone/.config/ivicli/scenarios is unreadable");
+        await using var host = await ApiTestHost.StartAsync(
+            ConfigDocument.Empty,
+            scenarioStore: scenarios
+        );
+
+        var resp = await host.Client.GetAsync(
+            "/v1/scenarios",
+            TestContext.Current.CancellationToken
+        );
+
+        resp.StatusCode.ShouldBe(HttpStatusCode.ServiceUnavailable);
+        var error = await resp.Content.ReadFromJsonAsync<ErrorDto>(
+            cancellationToken: TestContext.Current.CancellationToken
+        );
+        error!.Error.Code.ShouldBe("scenario_store_failure");
+        error.Error.Message.ShouldBe("the scenario store could not be used");
+    }
+
+    [Fact]
+    public async Task GET_devices_shows_the_serial_line_and_the_terminators_that_are_set()
+    {
+        var serial = new Device(
+            DeviceName.From("dmm").ShouldBeOk(),
+            VisaResource.Parse("ASRL1::INSTR").ShouldBeOk(),
+            Timeout.FromMilliseconds(2000).ShouldBeOk(),
+            SerialSettings
+                .From(
+                    19200,
+                    7,
+                    SerialParity.Even,
+                    SerialStopBits.OnePointFive,
+                    SerialFlowControl.RtsCts
+                )
+                .ShouldBeOk(),
+            ReadTermination: Termination.Cr,
+            WriteTermination: Termination.CrLf
+        );
+        var doc = ConfigDocument
+            .Empty.AddDevice(serial)
+            .ShouldBeOk()
+            .AddDevice(Dev("psu1"))
+            .ShouldBeOk();
+        await using var host = await ApiTestHost.StartAsync(doc);
+
+        var body = await host.Client.GetStringAsync(
+            "/v1/devices",
+            TestContext.Current.CancellationToken
+        );
+
+        using var json = System.Text.Json.JsonDocument.Parse(body);
+        var devices = json.RootElement.GetProperty("devices");
+        devices[0]
+            .GetProperty("serial")
+            .GetRawText()
+            .ShouldBe(
+                """{"baud":19200,"dataBits":7,"parity":"even","stopBits":1.5,"flowControl":"rts_cts"}"""
+            );
+        devices[0].GetProperty("readTermination").GetString().ShouldBe("\r");
+        devices[0].GetProperty("writeTermination").GetString().ShouldBe("\r\n");
+        devices[1].TryGetProperty("serial", out _).ShouldBeFalse();
+        devices[1].TryGetProperty("readTermination", out _).ShouldBeFalse();
+        devices[1].TryGetProperty("writeTermination", out _).ShouldBeFalse();
+    }
+
     [Fact]
     public async Task GET_device_status_returns_online_when_backend_responds()
     {

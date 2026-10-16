@@ -55,7 +55,7 @@ public interface IBackendFactory
 }
 ```
 
-- `DefaultBackendFactory` (in `IviCli.Infrastructure`) inspects the device's `VisaResource` and dispatches to the matching Backend (`Local`, `HiSlip`, `Socket`, `Fake`, `Replay`).
+- `DefaultBackendFactory` (in `IviCli.Infrastructure`) inspects the device's `VisaResource` and dispatches to the matching Backend (`Local`, `HiSlip`, `Vxi11`, `Socket`, `Serial`, `Fake`, `Replay`). An `ASRL1::INSTR` device gets a backend that looks its board up when it opens and hands the session to `Serial` or `Local` (ADR 0055 §3). A resource case the factory does not name fails with `UnsupportedTransport`; a case it names whose backend is not registered falls back to `Fake`, which is how `IVICLI_MOCK_ONLY` works (ADR 0055 §2).
 - Each Backend assembly registers its own concrete `IIviBackend` instance into the container; the factory composes them.
 - Tests substitute the factory or substitute individual `IIviBackend` registrations as needed (see §9).
 
@@ -98,6 +98,7 @@ services
     .AddIviCliApplication()
     .AddIviCliInfrastructure(config)
     .AddIviCliBackendsLocal()
+    .AddIviCliBackendsSerial()
     .AddIviCliBackendsFake()
     .AddIviCliCli();
 ```

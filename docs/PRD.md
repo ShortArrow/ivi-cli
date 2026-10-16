@@ -111,6 +111,7 @@ LocalVisaBackend
 HiSlipBackend
 Vxi11Backend
 SocketBackend
+SerialBackend
 FakeBackend
 ReplayBackend
 ```
@@ -163,6 +164,13 @@ USB instruments are enumerated through the installed VISA runtime (the
 VISA.NET shared components plus an implementation); on a machine without
 one, USB entries are simply absent from the results.
 
+Serial ports are listed as `ASRL<port>::INSTR`, each with the board that
+names it or, for a port no board names, the `visa asrl add` line that would
+register it. `--add` registers them by port name. The ports are the ones the
+operating system lists; `visa scan` neither opens them nor sends anything, so
+an entry does not mean an instrument answers there. `visa query` on the
+registered device checks that.
+
 Example output:
 
 ```text
@@ -173,6 +181,8 @@ Example output:
 
 [2] 192.168.0.110
       TCPIP0::192.168.0.110::1394::SOCKET
+
+[3] ASRL/dev/ttyUSB0::INSTR   (register with: ivicli visa asrl add 1 /dev/ttyUSB0)
 ```
 
 ---
@@ -182,9 +192,31 @@ Example output:
 ```bash
 ivicli visa add psu1 TCPIP0::192.168.0.10::inst0::INSTR
 ivicli visa add 1 psu1
+ivicli visa add dmm1 ASRL/dev/ttyUSB0::INSTR --baud 19200 --read-termination cr
 ```
 
 Registers an alias from a VISA resource or a scan index.
+
+A serial device takes its line's settings as `--baud`, `--data-bits`,
+`--parity`, `--stop-bits` and `--flow-control`; VISA's 9600 8-N-1 without
+flow control applies to what it leaves out. Any device takes
+`--read-termination` and `--write-termination` (`lf`, `cr` or `crlf`),
+which apply to SOCKET and serial devices, whose transports have no message
+end of their own.
+
+---
+
+### visa asrl
+
+```bash
+ivicli visa asrl add 1 /dev/ttyUSB0
+ivicli visa asrl list --json
+ivicli visa asrl remove 1
+```
+
+Records which port a serial board number such as `ASRL1::INSTR` means on
+this machine. An `ASRL1::INSTR` device whose board is not registered is
+opened through the VISA runtime, if there is one.
 
 ---
 
@@ -194,7 +226,8 @@ Registers an alias from a VISA resource or a scan index.
 ivicli visa list
 ```
 
-Lists registered VISA targets.
+Lists registered VISA targets, with a serial device's line settings and
+the terminators a device sets.
 
 ---
 
@@ -656,6 +689,20 @@ name = "scope1"
 resource = "USB0::0x0699::...::INSTR"
 timeout_ms = 5000
 
+[[devices]]
+name = "dmm1"
+resource = "ASRL1::INSTR"
+timeout_ms = 2000
+read_termination = "\r"
+write_termination = "\r\n"
+
+[devices.serial]
+baud = 19200
+
+[[asrl]]
+board = 1
+port = "/dev/ttyUSB0"
+
 [[servers]]
 name = "local"
 type = "local"
@@ -718,6 +765,7 @@ Intended for CI / AI Agents.
                  ├─ HiSlipBackend
                  ├─ Vxi11Backend
                  ├─ SocketBackend
+                 ├─ SerialBackend
                  ├─ FakeBackend
                  └─ ReplayBackend
                         ↓
@@ -790,6 +838,7 @@ LocalVisaBackend
 HiSlipBackend
 Vxi11Backend
 SocketBackend
+SerialBackend
 FakeBackend
 ReplayBackend
 ```

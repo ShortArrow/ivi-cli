@@ -2,6 +2,7 @@ using System.Net.WebSockets;
 using System.Text;
 using System.Text.Json;
 using IviCli.Api.WebSockets;
+using IviCli.Application.Backends;
 using IviCli.Backends.Fake;
 using IviCli.Domain;
 using IviCli.Domain.Configuration;
@@ -74,6 +75,63 @@ public sealed class VisaWebSocketEndpointTests
 
         reply.RootElement.GetProperty("event").GetString().ShouldBe("ack");
         reply.RootElement.GetProperty("scpi").GetString().ShouldBe("OUTP ON");
+    }
+
+    [Theory]
+    [InlineData("{\"op\":\"query\",\"scpi\":\"*IDN?\"}")]
+    [InlineData("{\"op\":\"write\",\"scpi\":\"OUTP ON\"}")]
+    public async Task A_backend_failure_emits_the_error_rendered(string frame)
+    {
+        var doc = ConfigDocument.Empty.AddDevice(Dev("psu1")).ShouldBeOk();
+        var backend = new FakeBackend();
+        backend.FailNextOpen(
+            DeviceName.From("psu1").ShouldBeOk(),
+            new TransportDisconnected("peer closed")
+        );
+        await using var host = await ApiTestHost.StartAsync(doc, backend);
+        var ws = host.Server.CreateWebSocketClient();
+        using var socket = await ws.ConnectAsync(
+            new Uri("ws://localhost/v1/devices/psu1/visa"),
+            TestContext.Current.CancellationToken
+        );
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+
+        await SendAsync(socket, frame, cts.Token);
+        using var reply = await ReceiveAsync(socket, cts.Token);
+
+        reply.RootElement.GetProperty("code").GetString().ShouldBe("backend_failure");
+        reply
+            .RootElement.GetProperty("message")
+            .GetString()
+            .ShouldBe("transport disconnected: peer closed");
+    }
+
+    [Theory]
+    [InlineData("{\"op\":\"query\",\"scpi\":\"*IDN?\"}")]
+    [InlineData("{\"op\":\"write\",\"scpi\":\"OUTP ON\"}")]
+    public async Task A_config_store_failure_leaves_the_stores_reason_out(string frame)
+    {
+        var store = new FakeConfigStore(ConfigDocument.Empty.AddDevice(Dev("psu1")).ShouldBeOk());
+        await using var host = await ApiTestHost.StartAsync(
+            ConfigDocument.Empty,
+            configStore: store
+        );
+        var ws = host.Server.CreateWebSocketClient();
+        using var socket = await ws.ConnectAsync(
+            new Uri("ws://localhost/v1/devices/psu1/visa"),
+            TestContext.Current.CancellationToken
+        );
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+        store.FailNextLoadWith("/home/someone/.config/ivicli/config.toml is gone");
+
+        await SendAsync(socket, frame, cts.Token);
+        using var reply = await ReceiveAsync(socket, cts.Token);
+
+        reply.RootElement.GetProperty("code").GetString().ShouldBe("config_store_failure");
+        reply
+            .RootElement.GetProperty("message")
+            .GetString()
+            .ShouldBe("the configuration or session store could not be used");
     }
 
     [Fact]

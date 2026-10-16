@@ -29,7 +29,7 @@ public static class ScenarioEndpoints
             Result<ScenarioListing, ListScenariosError>.Error err => ApiMapping.ProblemJson(
                 StatusCodes.Status503ServiceUnavailable,
                 "scenario_store_failure",
-                err.Err.Message
+                ApiMapping.ScenarioStoreFailureMessage
             ),
             _ => Results.StatusCode(StatusCodes.Status500InternalServerError),
         };
