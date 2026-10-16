@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Text;
+using System.Text.Encodings.Web;
 using System.Text.Json;
 using IviCli.Application.Devices;
 using IviCli.Domain.Devices;
@@ -57,12 +58,18 @@ public static class DeviceListingFormatter
     /// stable; the snapshot test in <c>IviCli.Cli.Tests</c> locks it. A
     /// serial device adds <c>serial</c>, the settings its line opens with,
     /// and a device adds each terminator it sets, all named as in
-    /// <c>config.toml</c>.
+    /// <c>config.toml</c>. Only quotes, backslashes and control characters
+    /// are escaped; other text is written as it is.
     /// </summary>
     public static string FormatJson(DeviceListing listing)
     {
         using var stream = new MemoryStream();
-        using (var json = new Utf8JsonWriter(stream))
+        using (
+            var json = new Utf8JsonWriter(
+                stream,
+                new JsonWriterOptions { Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping }
+            )
+        )
         {
             json.WriteStartObject();
             json.WriteStartArray("devices");

@@ -15,9 +15,11 @@ namespace IviCli.Backends.Serial;
 /// system lists as <c>ASRL&lt;port&gt;::INSTR</c>, in port-name order, with
 /// the board that names it or, for a port no board names, the
 /// <c>visa asrl add</c> line that registers it under a free board number.
-/// Each such port gets a different number, so the lines can be run one
-/// after another. A port whose name is only digits cannot be named by an
-/// ASRL resource and is left out.
+/// Board numbers are suggested from 1, as VISA numbers serial boards, and
+/// skip every board the <c>[[asrl]]</c> table or a device's resource
+/// already uses; each such port gets a different number, so the lines can
+/// be run one after another. A port no board could be registered under,
+/// such as one named only by digits, is left out.
 /// </summary>
 public sealed class SerialPortScanner : IBackendScanner
 {
@@ -47,15 +49,24 @@ public sealed class SerialPortScanner : IBackendScanner
         CancellationToken ct
     )
     {
-        var boards = await _config.LoadAsync(ct) is Result<ConfigDocument, ConfigStoreError>.Ok ok
-            ? ok.Value.AsrlBoards
-            : (ImmutableArray<AsrlBoardRegistration>?)null;
+        var config = await _config.LoadAsync(ct) is Result<ConfigDocument, ConfigStoreError>.Ok ok
+            ? ok.Value
+            : null;
+        var boards = config?.AsrlBoards;
         var boardOf = new Dictionary<string, int>(StringComparer.Ordinal);
         foreach (var registration in boards ?? [])
         {
             boardOf.TryAdd(_ports.Resolve(registration.Port), registration.Board);
         }
-        var taken = boards?.Select(b => b.Board).ToHashSet() ?? [];
+        var taken = (boards ?? [])
+            .Select(b => b.Board)
+            .Concat(
+                (config?.Devices ?? [])
+                    .Select(d => d.Resource)
+                    .OfType<VisaResource.AsrlBoard>()
+                    .Select(b => b.Board)
+            )
+            .ToHashSet();
         var nextFree = 1;
 
         string Register(string port)
@@ -71,14 +82,20 @@ public sealed class SerialPortScanner : IBackendScanner
         }
 
         var discovered = ImmutableArray.CreateBuilder<DiscoveredResource>();
-        foreach (var port in _portNames().Order(StringComparer.Ordinal))
+        foreach (
+            var port in _portNames()
+                .Order(StringComparer.OrdinalIgnoreCase)
+                .ThenBy(p => p, StringComparer.Ordinal)
+        )
         {
             if (
-                VisaResource.Parse($"ASRL{port}::INSTR")
-                is not Result<VisaResource, VisaResourceError>.Ok
-                {
-                    Value: VisaResource.AsrlPort resource
-                }
+                AsrlBoardRegistration.From(0, port)
+                    is not Result<AsrlBoardRegistration, ConfigError>.Ok
+                || VisaResource.Parse($"ASRL{port}::INSTR")
+                    is not Result<VisaResource, VisaResourceError>.Ok
+                    {
+                        Value: VisaResource.AsrlPort resource
+                    }
             )
             {
                 continue;

@@ -8,6 +8,7 @@ using IviCli.Application.Backends;
 using IviCli.Application.Devices;
 using IviCli.Application.Logging;
 using IviCli.Domain;
+using IviCli.Domain.Devices;
 using IviCli.Domain.Visa;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -168,16 +169,22 @@ public static class VisaScanCommand
     /// produces the same name and the second attempt cleanly skips.
     /// </summary>
     public static string DeriveAlias(VisaResource resource) =>
-        resource switch
-        {
-            VisaResource.Tcpip t => HostAlias(t.Host),
-            VisaResource.TcpipSocket s => $"{HostAlias(s.Host)}_{s.Port}",
-            VisaResource.Usb u => $"usb_{Sanitize(u.SerialNumber)}",
-            VisaResource.Gpib g => $"gpib_{g.PrimaryAddress}",
-            VisaResource.AsrlPort p => PortAlias(p.Port),
-            VisaResource.AsrlBoard b => $"asrl{b.Board}",
-            _ => "device",
-        };
+        FitDeviceName(
+            resource switch
+            {
+                VisaResource.Tcpip t => HostAlias(t.Host),
+                VisaResource.TcpipSocket s => $"{HostAlias(s.Host)}_{s.Port}",
+                VisaResource.Usb u => $"usb_{Sanitize(u.SerialNumber)}",
+                VisaResource.Gpib g => $"gpib_{g.PrimaryAddress}",
+                VisaResource.AsrlPort p => PortAlias(p.Port),
+                VisaResource.AsrlBoard b => $"asrl{b.Board}",
+                _ => "device",
+            }
+        );
+
+    // A DeviceName is at most DeviceName.MaxLength characters.
+    private static string FitDeviceName(string alias) =>
+        alias.Length <= DeviceName.MaxLength ? alias : alias[..DeviceName.MaxLength].TrimEnd('_');
 
     // The last part of a port's path, which starts with a letter for the
     // usual names (ttyUSB0, COM3); anything else is prefixed like a numeric host.
@@ -287,7 +294,7 @@ public static class VisaScanCommand
         var lines = new List<string>();
         var groups = scan
             .Resources.GroupBy(GroupKey, StringComparer.OrdinalIgnoreCase)
-            .OrderBy(g => g.Key, StringComparer.OrdinalIgnoreCase)
+            .OrderBy(g => SortKey(g.First()), StringComparer.OrdinalIgnoreCase)
             .ToList();
         for (var i = 0; i < groups.Count; i++)
         {
@@ -318,6 +325,14 @@ public static class VisaScanCommand
     /// TCPIP-family resources (so a device's VXI-11 / HiSLIP / SCPI-RAW access
     /// paths list together), otherwise the resource string itself.
     /// </summary>
+    /// <summary>
+    /// Orders the groups: by group key, except that a serial port sorts by
+    /// its port name, so <c>COM10</c> comes before <c>COM100</c> as the
+    /// scanner numbered them.
+    /// </summary>
+    private static string SortKey(DiscoveredResource r) =>
+        r.Resource is VisaResource.AsrlPort p ? $"ASRL{p.Port}" : GroupKey(r);
+
     private static string GroupKey(DiscoveredResource r) =>
         r.Resource switch
         {

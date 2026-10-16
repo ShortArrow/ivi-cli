@@ -50,6 +50,31 @@ public sealed class VisaScanCommandTests
     }
 
     [Fact]
+    public void DeriveAlias_fits_a_long_port_name_into_a_device_name()
+    {
+        var resource = VisaResource.Parse($"ASRL/dev/{new string('a', 70)}::INSTR").ShouldBeOk();
+
+        var alias = VisaScanCommand.DeriveAlias(resource);
+
+        Domain.Devices.DeviceName.From(alias).ShouldBeOk();
+        alias.ShouldBe(new string('a', 64));
+    }
+
+    [Fact]
+    public void RenderHuman_lists_serial_ports_in_port_name_order()
+    {
+        var scan = ScanOf(
+            Discovered("ASRLCOM13::INSTR"),
+            Discovered("ASRLCOM100::INSTR"),
+            Discovered("ASRLCOM10::INSTR")
+        );
+
+        VisaScanCommand
+            .RenderHuman(scan)
+            .ShouldBe(["[1] ASRLCOM10::INSTR", "[2] ASRLCOM100::INSTR", "[3] ASRLCOM13::INSTR"]);
+    }
+
+    [Fact]
     public void RenderHuman_shows_a_serial_port_with_its_registration_line()
     {
         var scan = ScanOf(

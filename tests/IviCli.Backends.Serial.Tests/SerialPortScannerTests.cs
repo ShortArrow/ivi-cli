@@ -4,6 +4,7 @@ using IviCli.Application.Devices;
 using IviCli.Backends.Serial;
 using IviCli.Domain;
 using IviCli.Domain.Configuration;
+using IviCli.Domain.Devices;
 using IviCli.Domain.Visa;
 using IviCli.TestKit;
 using Shouldly;
@@ -44,6 +45,18 @@ public sealed class SerialPortScannerTests
     }
 
     [Fact]
+    public async Task A_port_listed_under_another_name_is_matched_to_its_board()
+    {
+        var config = Boards((3, "COM3"));
+        var ports = new LinkedPorts().Link("com3", "COM3");
+        var scanner = Scanner(config, ["com3"], ports);
+
+        var found = await ScanAsync(scanner);
+
+        found.ShouldBe([("ASRLcom3::INSTR", "board 3")]);
+    }
+
+    [Fact]
     public async Task A_board_whose_port_is_absent_keeps_its_number()
     {
         var config = Boards((1, "/dev/ttyUSB9"));
@@ -52,6 +65,35 @@ public sealed class SerialPortScannerTests
         var found = await ScanAsync(scanner);
 
         found.ShouldBe([("ASRLCOM3::INSTR", "register with: ivicli visa asrl add 2 COM3")]);
+    }
+
+    [Fact]
+    public async Task A_board_a_device_already_uses_is_not_suggested()
+    {
+        var doc = ConfigDocument
+            .Empty.AddDevice(
+                new Device(
+                    DeviceName.From("dmm").ShouldBeOk(),
+                    VisaResource.Parse("ASRL1::INSTR").ShouldBeOk(),
+                    Timeout.FromMilliseconds(2000).ShouldBeOk()
+                )
+            )
+            .ShouldBeOk();
+        var scanner = Scanner(new FakeConfigStore(doc), ["COM3"]);
+
+        var found = await ScanAsync(scanner);
+
+        found.ShouldBe([("ASRLCOM3::INSTR", "register with: ivicli visa asrl add 2 COM3")]);
+    }
+
+    [Fact]
+    public async Task A_port_name_a_board_cannot_be_registered_under_is_left_out()
+    {
+        var scanner = Scanner(new FakeConfigStore(ConfigDocument.Empty), [" COM4", "COM3"]);
+
+        var found = await ScanAsync(scanner);
+
+        found.ShouldBe([("ASRLCOM3::INSTR", "register with: ivicli visa asrl add 1 COM3")]);
     }
 
     [Fact]

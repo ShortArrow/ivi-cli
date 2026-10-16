@@ -97,4 +97,25 @@ public sealed class DeviceListingFormatterTests
             .FormatHuman(listing)
             .ShouldBe("  sock\tTCPIP0::host::5025::SOCKET\t3000ms\twrite=\\n\n");
     }
+
+    [Fact]
+    public void FormatJson_writes_text_other_than_ASCII_and_symbols_as_they_are()
+    {
+        var listing = new DeviceListing(
+            [
+                Dev("a", "TCPIP0::keisoku-é.local::inst0::INSTR", 3000),
+                Dev("b", "USB0::0x1234::0x5678::A+B&C'D::INSTR", 3000),
+            ],
+            DefaultDevice: null
+        );
+
+        DeviceListingFormatter
+            .FormatJson(listing)
+            .ShouldBe(
+                """
+                {"devices":[{"name":"a","resource":"TCPIP0::keisoku-é.local::inst0::INSTR","timeout_ms":3000},{"name":"b","resource":"USB0::0x1234::0x5678::A+B&C'D::INSTR","timeout_ms":3000}],"default":null}
+
+                """
+            );
+    }
 }
