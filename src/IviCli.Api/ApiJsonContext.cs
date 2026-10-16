@@ -17,6 +17,7 @@ public sealed record HealthzDto(string Status);
 [JsonSerializable(typeof(ErrorDto))]
 [JsonSerializable(typeof(HealthzDto))]
 [JsonSerializable(typeof(DeviceDto))]
+[JsonSerializable(typeof(SerialLineDto))]
 [JsonSerializable(typeof(DeviceListingDto))]
 [JsonSerializable(typeof(DeviceStatusDto))]
 [JsonSerializable(typeof(ServerDto))]

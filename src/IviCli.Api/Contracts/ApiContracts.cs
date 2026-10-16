@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Text.Json.Serialization;
 
 namespace IviCli.Api.Contracts;
 
@@ -13,8 +14,36 @@ public static class ApiContracts
     // sibling record below.
 }
 
-/// <summary>Wraps a single device's static metadata for list / status responses.</summary>
-public sealed record DeviceDto(string Name, string Resource, int TimeoutMs);
+/// <summary>
+/// Wraps a single device's static metadata for list / status responses.
+/// <c>serial</c> appears only for a serial device, and each terminator only
+/// when the device sets it (ADR 0055 §10).
+/// </summary>
+public sealed record DeviceDto(
+    string Name,
+    string Resource,
+    int TimeoutMs,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        SerialLineDto? Serial = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        string? ReadTermination = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        string? WriteTermination = null
+);
+
+/// <summary>
+/// The settings a serial device's line opens with, named as in
+/// <c>config.toml</c> (ADR 0055 §4): parity <c>none</c>, <c>odd</c>,
+/// <c>even</c>, <c>mark</c> or <c>space</c>; stop bits 1, 1.5 or 2; flow
+/// control <c>none</c>, <c>xon_xoff</c> or <c>rts_cts</c>.
+/// </summary>
+public sealed record SerialLineDto(
+    int Baud,
+    int DataBits,
+    string Parity,
+    double StopBits,
+    string FlowControl
+);
 
 /// <summary>Response body for <c>GET /v1/devices</c>.</summary>
 public sealed record DeviceListingDto(IReadOnlyList<DeviceDto> Devices, string? Default);

@@ -72,6 +72,52 @@ public sealed class ReadOnlyEndpointsTests
     }
 
     [Fact]
+    public async Task GET_devices_shows_the_serial_line_and_the_terminators_that_are_set()
+    {
+        var serial = new Device(
+            DeviceName.From("dmm").ShouldBeOk(),
+            VisaResource.Parse("ASRL1::INSTR").ShouldBeOk(),
+            Timeout.FromMilliseconds(2000).ShouldBeOk(),
+            SerialSettings
+                .From(
+                    19200,
+                    7,
+                    SerialParity.Even,
+                    SerialStopBits.OnePointFive,
+                    SerialFlowControl.RtsCts
+                )
+                .ShouldBeOk(),
+            ReadTermination: Termination.Cr,
+            WriteTermination: Termination.CrLf
+        );
+        var doc = ConfigDocument
+            .Empty.AddDevice(serial)
+            .ShouldBeOk()
+            .AddDevice(Dev("psu1"))
+            .ShouldBeOk();
+        await using var host = await ApiTestHost.StartAsync(doc);
+
+        var body = await host.Client.GetStringAsync(
+            "/v1/devices",
+            TestContext.Current.CancellationToken
+        );
+
+        using var json = System.Text.Json.JsonDocument.Parse(body);
+        var devices = json.RootElement.GetProperty("devices");
+        devices[0]
+            .GetProperty("serial")
+            .GetRawText()
+            .ShouldBe(
+                """{"baud":19200,"dataBits":7,"parity":"even","stopBits":1.5,"flowControl":"rts_cts"}"""
+            );
+        devices[0].GetProperty("readTermination").GetString().ShouldBe("\r");
+        devices[0].GetProperty("writeTermination").GetString().ShouldBe("\r\n");
+        devices[1].TryGetProperty("serial", out _).ShouldBeFalse();
+        devices[1].TryGetProperty("readTermination", out _).ShouldBeFalse();
+        devices[1].TryGetProperty("writeTermination", out _).ShouldBeFalse();
+    }
+
+    [Fact]
     public async Task GET_device_status_returns_online_when_backend_responds()
     {
         var doc = ConfigDocument.Empty.AddDevice(Dev("psu1")).ShouldBeOk();

@@ -1,6 +1,8 @@
 using System.Globalization;
 using System.Text;
+using System.Text.Json;
 using IviCli.Application.Devices;
+using IviCli.Domain.Devices;
 
 namespace IviCli.Cli.Commands;
 
@@ -34,6 +36,16 @@ public static class DeviceListingFormatter
             builder.Append(d.Resource.ToCanonical());
             builder.Append('\t');
             builder.Append(d.Timeout.ToString());
+            if (d.SerialLine is { } line)
+            {
+                builder.Append('\t');
+                builder.Append(FormatLine(line));
+            }
+            if (FormatTerminators(d) is { Length: > 0 } terminators)
+            {
+                builder.Append('\t');
+                builder.Append(terminators);
+            }
             builder.Append('\n');
         }
         return builder.ToString();
@@ -42,35 +54,101 @@ public static class DeviceListingFormatter
     /// <summary>
     /// Renders the listing as the JSON contract emitted on stdout when
     /// <c>--json</c> is passed. The shape is intentionally compact and
-    /// stable; the snapshot test in <c>IviCli.Cli.Tests</c> locks it.
+    /// stable; the snapshot test in <c>IviCli.Cli.Tests</c> locks it. A
+    /// serial device adds <c>serial</c>, the settings its line opens with,
+    /// and a device adds each terminator it sets, all named as in
+    /// <c>config.toml</c>.
     /// </summary>
     public static string FormatJson(DeviceListing listing)
     {
-        var inv = CultureInfo.InvariantCulture;
-        var builder = new StringBuilder();
-        builder.Append("{\"devices\":[");
-        for (var i = 0; i < listing.Devices.Length; i++)
+        using var stream = new MemoryStream();
+        using (var json = new Utf8JsonWriter(stream))
         {
-            if (i > 0)
+            json.WriteStartObject();
+            json.WriteStartArray("devices");
+            foreach (var d in listing.Devices)
             {
-                builder.Append(',');
+                WriteDevice(json, d);
             }
-            var d = listing.Devices[i];
-            builder.Append(
-                inv,
-                $"{{\"name\":\"{d.Name.Value}\",\"resource\":\"{d.Resource.ToCanonical()}\",\"timeout_ms\":{d.Timeout.Milliseconds}}}"
-            );
+            json.WriteEndArray();
+            if (listing.DefaultDevice is { } def)
+            {
+                json.WriteString("default", def.Value);
+            }
+            else
+            {
+                json.WriteNull("default");
+            }
+            json.WriteEndObject();
         }
-        builder.Append("],\"default\":");
-        if (listing.DefaultDevice is { } def)
-        {
-            builder.Append(inv, $"\"{def.Value}\"");
-        }
-        else
-        {
-            builder.Append("null");
-        }
-        builder.Append("}\n");
-        return builder.ToString();
+        return Encoding.UTF8.GetString(stream.ToArray()) + "\n";
     }
+
+    private static void WriteDevice(Utf8JsonWriter json, Device device)
+    {
+        json.WriteStartObject();
+        json.WriteString("name", device.Name.Value);
+        json.WriteString("resource", device.Resource.ToCanonical());
+        json.WriteNumber("timeout_ms", device.Timeout.Milliseconds);
+        if (device.SerialLine is { } line)
+        {
+            json.WriteStartObject("serial");
+            json.WriteNumber("baud", line.Baud);
+            json.WriteNumber("data_bits", line.DataBits);
+            json.WriteString("parity", SerialSettingNames.Format(line.Parity));
+            json.WritePropertyName("stop_bits");
+            json.WriteRawValue(SerialSettingNames.Format(line.StopBits));
+            json.WriteString("flow_control", SerialSettingNames.Format(line.FlowControl));
+            json.WriteEndObject();
+        }
+        if (device.ReadTermination is { } read)
+        {
+            json.WriteString("read_termination", read.Value);
+        }
+        if (device.WriteTermination is { } write)
+        {
+            json.WriteString("write_termination", write.Value);
+        }
+        json.WriteEndObject();
+    }
+
+    /// <summary>The line as <c>9600 8-N-1</c>, with the flow control after it unless none.</summary>
+    private static string FormatLine(SerialSettings line)
+    {
+        var parity = line.Parity switch
+        {
+            SerialParity.Odd => 'O',
+            SerialParity.Even => 'E',
+            SerialParity.Mark => 'M',
+            SerialParity.Space => 'S',
+            _ => 'N',
+        };
+        var text = string.Create(
+            CultureInfo.InvariantCulture,
+            $"{line.Baud} {line.DataBits}-{parity}-{SerialSettingNames.Format(line.StopBits)}"
+        );
+        return line.FlowControl == SerialFlowControl.None
+            ? text
+            : $"{text} {SerialSettingNames.Format(line.FlowControl)}";
+    }
+
+    /// <summary>The terminators the device sets, as <c>read=\r write=\r\n</c>.</summary>
+    private static string FormatTerminators(Device device)
+    {
+        var parts = new List<string>(2);
+        if (device.ReadTermination is { } read)
+        {
+            parts.Add($"read={Escape(read)}");
+        }
+        if (device.WriteTermination is { } write)
+        {
+            parts.Add($"write={Escape(write)}");
+        }
+        return string.Join(' ', parts);
+    }
+
+    private static string Escape(Termination termination) =>
+        termination
+            .Value.Replace("\r", @"\r", StringComparison.Ordinal)
+            .Replace("\n", @"\n", StringComparison.Ordinal);
 }

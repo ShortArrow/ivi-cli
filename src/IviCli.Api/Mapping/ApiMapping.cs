@@ -35,7 +35,29 @@ public static class ApiMapping
 
     /// <summary>Maps a <see cref="Device"/> to its API DTO.</summary>
     public static DeviceDto ToDto(this Device device) =>
-        new(device.Name.Value, FormatResource(device.Resource), device.Timeout.Milliseconds);
+        new(
+            device.Name.Value,
+            FormatResource(device.Resource),
+            device.Timeout.Milliseconds,
+            device.SerialLine?.ToDto(),
+            device.ReadTermination?.Value,
+            device.WriteTermination?.Value
+        );
+
+    /// <summary>Maps a serial line's settings to their API DTO.</summary>
+    public static SerialLineDto ToDto(this SerialSettings line) =>
+        new(
+            line.Baud,
+            line.DataBits,
+            SerialSettingNames.Format(line.Parity),
+            line.StopBits switch
+            {
+                SerialStopBits.OnePointFive => 1.5,
+                SerialStopBits.Two => 2,
+                _ => 1,
+            },
+            SerialSettingNames.Format(line.FlowControl)
+        );
 
     /// <summary>Maps a <see cref="DeviceListing"/> to its API DTO.</summary>
     public static DeviceListingDto ToDto(this DeviceListing listing) =>
