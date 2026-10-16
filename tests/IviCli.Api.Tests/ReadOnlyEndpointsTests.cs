@@ -52,6 +52,26 @@ public sealed class ReadOnlyEndpointsTests
     }
 
     [Fact]
+    public async Task GET_devices_returns_503_with_the_store_error_rendered()
+    {
+        var store = new FakeConfigStore(ConfigDocument.Empty);
+        store.FailNextLoadWith("disk gone");
+        await using var host = await ApiTestHost.StartAsync(
+            ConfigDocument.Empty,
+            configStore: store
+        );
+
+        var resp = await host.Client.GetAsync("/v1/devices", TestContext.Current.CancellationToken);
+
+        resp.StatusCode.ShouldBe(HttpStatusCode.ServiceUnavailable);
+        var error = await resp.Content.ReadFromJsonAsync<ErrorDto>(
+            cancellationToken: TestContext.Current.CancellationToken
+        );
+        error!.Error.Code.ShouldBe("config_store_failure");
+        error.Error.Message.ShouldBe("config store read failed: disk gone");
+    }
+
+    [Fact]
     public async Task GET_device_status_returns_online_when_backend_responds()
     {
         var doc = ConfigDocument.Empty.AddDevice(Dev("psu1")).ShouldBeOk();

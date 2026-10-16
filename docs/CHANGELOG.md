@@ -37,6 +37,11 @@ All notable changes to ivi-cli are documented here. Format roughly follows
 
 ### Fixed
 
+- **Management API errors carry their text.** The `message` of an error
+  response, and of a WebSocket error event, had its values left as
+  placeholders, such as `transport disconnected: {Reason}`; it now reads
+  `transport disconnected: peer closed`, masked as in the logs.
+
 - **A command that reads `config.toml` while another saves it sees the
   whole file.** Saving deleted the file before moving the new one into
   place, so a read in between found no file and went on with an empty

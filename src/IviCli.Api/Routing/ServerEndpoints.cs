@@ -1,4 +1,5 @@
 using IviCli.Api.Mapping;
+using IviCli.Application.Logging;
 using IviCli.Application.Servers;
 using IviCli.Domain;
 using Microsoft.AspNetCore.Builder;
@@ -29,7 +30,7 @@ public static class ServerEndpoints
             Result<ServerListing, ListServersError>.Error err => ApiMapping.ProblemJson(
                 StatusCodes.Status503ServiceUnavailable,
                 "config_store_failure",
-                err.Err.Message
+                IviErrorMessages.Render(err.Err)
             ),
             _ => Results.StatusCode(StatusCodes.Status500InternalServerError),
         };

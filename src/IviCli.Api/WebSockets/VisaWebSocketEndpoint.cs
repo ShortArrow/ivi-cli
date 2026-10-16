@@ -3,6 +3,7 @@ using System.Net.WebSockets;
 using System.Text;
 using IviCli.Application.Configuration;
 using IviCli.Application.Devices;
+using IviCli.Application.Logging;
 using IviCli.Domain;
 using IviCli.Domain.Configuration;
 using IviCli.Domain.Devices;
@@ -241,13 +242,16 @@ public static class VisaWebSocketEndpoint
                 ),
             QueryDeviceTransportFailure t => new VisaWebSocketEvent.Error(
                 VisaWebSocketErrorCodes.BackendFailure,
-                t.Inner.Message
+                IviErrorMessages.Render(t.Inner)
             ),
             QueryDeviceConfigFailure or QueryDeviceSessionFailure => new VisaWebSocketEvent.Error(
                 VisaWebSocketErrorCodes.ConfigStoreFailure,
-                error.Message
+                IviErrorMessages.Render(error)
             ),
-            _ => new VisaWebSocketEvent.Error(VisaWebSocketErrorCodes.InternalError, error.Message),
+            _ => new VisaWebSocketEvent.Error(
+                VisaWebSocketErrorCodes.InternalError,
+                IviErrorMessages.Render(error)
+            ),
         };
 
     private static VisaWebSocketEvent MapWriteError(WriteDeviceError error) =>
@@ -264,13 +268,16 @@ public static class VisaWebSocketEndpoint
                 ),
             WriteDeviceTransportFailure t => new VisaWebSocketEvent.Error(
                 VisaWebSocketErrorCodes.BackendFailure,
-                t.Inner.Message
+                IviErrorMessages.Render(t.Inner)
             ),
             WriteDeviceConfigFailure or WriteDeviceSessionFailure => new VisaWebSocketEvent.Error(
                 VisaWebSocketErrorCodes.ConfigStoreFailure,
-                error.Message
+                IviErrorMessages.Render(error)
             ),
-            _ => new VisaWebSocketEvent.Error(VisaWebSocketErrorCodes.InternalError, error.Message),
+            _ => new VisaWebSocketEvent.Error(
+                VisaWebSocketErrorCodes.InternalError,
+                IviErrorMessages.Render(error)
+            ),
         };
 
     private static Task SendAsync(WebSocket socket, VisaWebSocketEvent ev, CancellationToken ct)

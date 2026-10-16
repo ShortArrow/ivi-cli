@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
 using IviCli.Api.Contracts;
+using IviCli.Application.Backends;
 using IviCli.Backends.Fake;
 using IviCli.Domain;
 using IviCli.Domain.Configuration;
@@ -115,5 +116,55 @@ public sealed class VisaEndpointsTests
             cancellationToken: TestContext.Current.CancellationToken
         );
         error!.Error.Code.ShouldBe("device_not_found");
+    }
+
+    [Fact]
+    public async Task POST_query_returns_502_with_the_backend_error_rendered()
+    {
+        var doc = ConfigDocument.Empty.AddDevice(Dev("psu1")).ShouldBeOk();
+        var backend = new FakeBackend();
+        backend.FailQuery(
+            DeviceName.From("psu1").ShouldBeOk(),
+            "*IDN?",
+            new TransportDisconnected("peer closed")
+        );
+        await using var host = await ApiTestHost.StartAsync(doc, backend);
+
+        var resp = await host.Client.PostAsJsonAsync(
+            "/v1/devices/psu1/query",
+            new ScpiRequestDto("*IDN?"),
+            cancellationToken: TestContext.Current.CancellationToken
+        );
+
+        resp.StatusCode.ShouldBe(HttpStatusCode.BadGateway);
+        var error = await resp.Content.ReadFromJsonAsync<ErrorDto>(
+            cancellationToken: TestContext.Current.CancellationToken
+        );
+        error!.Error.Code.ShouldBe("backend_failure");
+        error.Error.Message.ShouldBe("transport disconnected: peer closed");
+    }
+
+    [Fact]
+    public async Task POST_write_returns_502_with_the_backend_error_rendered()
+    {
+        var doc = ConfigDocument.Empty.AddDevice(Dev("psu1")).ShouldBeOk();
+        var backend = new FakeBackend();
+        backend.FailNextOpen(
+            DeviceName.From("psu1").ShouldBeOk(),
+            new TransportDisconnected("peer closed")
+        );
+        await using var host = await ApiTestHost.StartAsync(doc, backend);
+
+        var resp = await host.Client.PostAsJsonAsync(
+            "/v1/devices/psu1/write",
+            new ScpiRequestDto("OUTP ON"),
+            cancellationToken: TestContext.Current.CancellationToken
+        );
+
+        resp.StatusCode.ShouldBe(HttpStatusCode.BadGateway);
+        var error = await resp.Content.ReadFromJsonAsync<ErrorDto>(
+            cancellationToken: TestContext.Current.CancellationToken
+        );
+        error!.Error.Message.ShouldBe("transport disconnected: peer closed");
     }
 }

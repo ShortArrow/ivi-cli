@@ -1,4 +1,5 @@
 using IviCli.Api.Mapping;
+using IviCli.Application.Logging;
 using IviCli.Application.Mock;
 using IviCli.Domain;
 using Microsoft.AspNetCore.Builder;
@@ -29,7 +30,7 @@ public static class ScenarioEndpoints
             Result<ScenarioListing, ListScenariosError>.Error err => ApiMapping.ProblemJson(
                 StatusCodes.Status503ServiceUnavailable,
                 "scenario_store_failure",
-                err.Err.Message
+                IviErrorMessages.Render(err.Err)
             ),
             _ => Results.StatusCode(StatusCodes.Status500InternalServerError),
         };

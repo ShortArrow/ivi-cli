@@ -53,7 +53,8 @@ internal sealed class ApiTestHost : IAsyncDisposable
         FakeApiTokenStore? tokenStore = null,
         ApiAuthenticationOptions? authOptions = null,
         PoolConfig? poolConfig = null,
-        IviCli.Application.Audit.IAuditLog? auditLog = null
+        IviCli.Application.Audit.IAuditLog? auditLog = null,
+        FakeConfigStore? configStore = null
     )
     {
         var resolvedAuthOptions =
@@ -65,7 +66,7 @@ internal sealed class ApiTestHost : IAsyncDisposable
             web.ConfigureServices(services =>
             {
                 services.AddRouting();
-                services.AddSingleton<IConfigStore>(new FakeConfigStore(config));
+                services.AddSingleton<IConfigStore>(configStore ?? new FakeConfigStore(config));
                 services.AddSingleton<ISessionStore>(new FakeSessionStore());
                 services.AddSingleton<IScenarioStore>(new FakeScenarioStore(scenarios ?? []));
                 services.AddSingleton<IApiTokenStore>(tokenStore ?? new FakeApiTokenStore());

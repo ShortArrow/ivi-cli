@@ -58,6 +58,9 @@ poll an instrument at high frequency.
 ### 3. Error envelope
 
 Every non-2xx response carries `{ "error": { "code": "<stable>", "message": "<text>" } }`.
+The message is the error's text with its values filled in as a log line
+shows them, so a host name or a port name in it is masked (ADR 0017). The
+WebSocket error event of ADR 0035 carries the same text.
 
 | Outcome | Status | Code |
 | --- | --- | --- |
