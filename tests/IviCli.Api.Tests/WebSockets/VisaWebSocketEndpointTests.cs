@@ -106,6 +106,34 @@ public sealed class VisaWebSocketEndpointTests
             .ShouldBe("transport disconnected: peer closed");
     }
 
+    [Theory]
+    [InlineData("{\"op\":\"query\",\"scpi\":\"*IDN?\"}")]
+    [InlineData("{\"op\":\"write\",\"scpi\":\"OUTP ON\"}")]
+    public async Task A_config_store_failure_leaves_the_stores_reason_out(string frame)
+    {
+        var store = new FakeConfigStore(ConfigDocument.Empty.AddDevice(Dev("psu1")).ShouldBeOk());
+        await using var host = await ApiTestHost.StartAsync(
+            ConfigDocument.Empty,
+            configStore: store
+        );
+        var ws = host.Server.CreateWebSocketClient();
+        using var socket = await ws.ConnectAsync(
+            new Uri("ws://localhost/v1/devices/psu1/visa"),
+            TestContext.Current.CancellationToken
+        );
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+        store.FailNextLoadWith("/home/someone/.config/ivicli/config.toml is gone");
+
+        await SendAsync(socket, frame, cts.Token);
+        using var reply = await ReceiveAsync(socket, cts.Token);
+
+        reply.RootElement.GetProperty("code").GetString().ShouldBe("config_store_failure");
+        reply
+            .RootElement.GetProperty("message")
+            .GetString()
+            .ShouldBe("the configuration or session store could not be used");
+    }
+
     [Fact]
     public async Task Malformed_frame_emits_protocol_error_event_and_keeps_socket_open()
     {

@@ -163,13 +163,16 @@ public static class VisaWebSocketEndpoint
         {
             // Graceful shutdown.
         }
-        catch (Exception ex)
+        catch (Exception)
         {
             try
             {
                 await SendAsync(
                     socket,
-                    new VisaWebSocketEvent.Error(VisaWebSocketErrorCodes.InternalError, ex.Message),
+                    new VisaWebSocketEvent.Error(
+                        VisaWebSocketErrorCodes.InternalError,
+                        ApiMapping.InternalErrorMessage
+                    ),
                     CancellationToken.None
                 );
                 await socket.CloseAsync(

@@ -51,17 +51,35 @@ public sealed class ReadOnlyEndpointsTests
         listing.Devices[0].Name.ShouldBe("psu1");
     }
 
-    [Fact]
-    public async Task GET_devices_returns_503_with_the_store_error_rendered()
+    /// <summary>
+    /// A store failure answers with a fixed message, never the store's own
+    /// reason, which can name a path on the server (ADR 0034 §3).
+    /// </summary>
+    [Theory]
+    [InlineData("GET", "/v1/devices")]
+    [InlineData("GET", "/v1/devices/psu1/status")]
+    [InlineData("GET", "/v1/servers")]
+    [InlineData("POST", "/v1/devices/psu1/query")]
+    [InlineData("POST", "/v1/devices/psu1/write")]
+    public async Task A_config_store_failure_leaves_the_stores_reason_out(
+        string method,
+        string path
+    )
     {
-        var store = new FakeConfigStore(ConfigDocument.Empty);
-        store.FailNextLoadWith("disk gone");
+        var store = new FakeConfigStore(ConfigDocument.Empty.AddDevice(Dev("psu1")).ShouldBeOk());
+        store.FailNextLoadWith("/home/someone/.config/ivicli/config.toml is gone");
         await using var host = await ApiTestHost.StartAsync(
             ConfigDocument.Empty,
             configStore: store
         );
 
-        var resp = await host.Client.GetAsync("/v1/devices", TestContext.Current.CancellationToken);
+        var resp = await host.Client.SendAsync(
+            new HttpRequestMessage(new HttpMethod(method), path)
+            {
+                Content = method == "POST" ? JsonContent.Create(new ScpiRequestDto("*IDN?")) : null,
+            },
+            TestContext.Current.CancellationToken
+        );
 
         resp.StatusCode.ShouldBe(HttpStatusCode.ServiceUnavailable);
         var error = await resp.Content.ReadFromJsonAsync<ErrorDto>(
@@ -69,6 +87,29 @@ public sealed class ReadOnlyEndpointsTests
         );
         error!.Error.Code.ShouldBe("config_store_failure");
         error.Error.Message.ShouldBe("the configuration or session store could not be used");
+    }
+
+    [Fact]
+    public async Task A_scenario_store_failure_leaves_the_stores_reason_out()
+    {
+        var scenarios = new FakeScenarioStore();
+        scenarios.FailNextListWith("/home/someone/.config/ivicli/scenarios is unreadable");
+        await using var host = await ApiTestHost.StartAsync(
+            ConfigDocument.Empty,
+            scenarioStore: scenarios
+        );
+
+        var resp = await host.Client.GetAsync(
+            "/v1/scenarios",
+            TestContext.Current.CancellationToken
+        );
+
+        resp.StatusCode.ShouldBe(HttpStatusCode.ServiceUnavailable);
+        var error = await resp.Content.ReadFromJsonAsync<ErrorDto>(
+            cancellationToken: TestContext.Current.CancellationToken
+        );
+        error!.Error.Code.ShouldBe("scenario_store_failure");
+        error.Error.Message.ShouldBe("the scenario store could not be used");
     }
 
     [Fact]
