@@ -12,13 +12,13 @@
 
 - **状態保持型・VISA ネイティブな CLI**
   - **シェルのカレントディレクトリのような「現在の機器」.** `ivicli visa add psu1 <resource>` で alias を一度登録し、`ivicli visa use psu1` で *現在の機器* に設定すれば、以降の `visa query` / `write` / `script` は対象指定が一切不要です（VISA リソースはもちろん alias すら書かなくてよい）。
-  - **VISA 互換.** 標準的な `TCPIP::` / `USB::` / `GPIB::` のリソース文字列を独自構文なしで扱います。`USB::` にはインストール済みの VISA runtime が必要です。
+  - **VISA 互換.** 標準的な `TCPIP::` / `USB::` / `GPIB::` / `ASRL::` のリソース文字列を独自構文なしで扱います。`USB::` にはインストール済みの VISA runtime が必要です。リソースでシリアルポートを名指しするとき (`ASRL/dev/ttyUSB0::INSTR`、`ASRLCOM3::INSTR`) は不要で、`ASRL1::INSTR` がこのマシンのどのポートかは `visa asrl add` で登録します。
   - **自動化指向.** stdout はデータ (`--json` 含む)、stderr はログ専用。終了コードは POSIX 慣習に従い、bash / zsh / PowerShell の補完をサポートします。
 - **発見と可視化**
   - **自動 discovery.** `ivicli visa scan` で LAN 上の機器を LXI mDNS / DNS-SD + VXI-11 portmapper broadcast で発見、`--add` を付ければそのまま `visa add` でまとめて登録します。
   - **IVI Configuration Store の中身を覗く.** `ivicli driver list` / `ivicli logical list` で `IviConfigurationStore.xml` を読み、インストール済み IVI ドライバ / 論理名を列挙。「機器とは通信できるけどドライバが合ってない」系のデバッグを Configuration Server GUI を開かずに片付けられます。
 - **バックエンドとゲートウェイ**
-  - **複数バックエンド.** Local NI-VISA / HiSLIP / VXI-11 / raw TCP SOCKET / Fake (プログラム可能 + scenario 再生) / Replay (厳密な決定論的再生) を単一の `IIviBackend` port 越しに提供します。
+  - **複数バックエンド.** Local NI-VISA / HiSLIP / VXI-11 / raw TCP SOCKET / シリアルポート / Fake (プログラム可能 + scenario 再生) / Replay (厳密な決定論的再生) を単一の `IIviBackend` port 越しに提供します。
   - **ゲートウェイサーバ.** ローカル計測器を HiSLIP (`TCPIP::host::hislip0::INSTR`) または raw socket で公開し、リモートの PyVISA / NI-VISA クライアントから駆動できます。
 - **ハードウェアなしでテスト**
   - **モック計測器を動かす.** `Fake` backend は *scenario*（`query → response` ルールの集合。ルールにはサービスリクエストで返すステータスバイトも書ける）に従って SCPI に応答するので、`ivicli`（または自作の VISA アプリ）を実機なしのスタンドインと対話させられます。
@@ -110,7 +110,7 @@ VISA 計測器を操作するアプリを開発していて、実機を用意せ
 
 | グループ | 動詞 | 用途 |
 | --- | --- | --- |
-| `visa` | `add` `remove` `list` `use` `current` `scan` `query` `write` `read` `status` `script` `monitor` `watch` `lint` | 計測器の管理と通信 |
+| `visa` | `add` `remove` `list` `use` `current` `scan` `query` `write` `read` `status` `script` `monitor` `watch` `lint` + `asrl add` / `asrl list` / `asrl remove` | 計測器の管理と通信 |
 | `mock scenario` | `list` `create` `remove` `show` `activate` `deactivate` `record` `import` + `scene add` / `scene remove` | モックデバイス用シナリオの編集と記録 |
 | `mock received` | `<device>` | デバイスが受信した SCPI 書き込みを `IVICLI_CAPTURE` トラフィックログから確認 |
 | `server` | `add` `remove` `list` `route add` / `route remove` / `route list` `start` `stop` `status` `log` | ゲートウェイサーバのライフサイクル |
@@ -151,7 +151,7 @@ ivicli completion powershell | Out-String | Invoke-Expression
 
 ```mermaid
 flowchart LR
-    u["you / CI"] -->|"VISA — NI-VISA / HiSLIP / VXI-11 / SOCKET"| c["ivicli"] --> i["計測器 (LAN, USB/GPIB)"]
+    u["you / CI"] -->|"VISA — NI-VISA / HiSLIP / VXI-11 / SOCKET"| c["ivicli"] --> i["計測器 (LAN, USB/GPIB, シリアル)"]
 ```
 
 **2 · ハードウェアなしでテスト**

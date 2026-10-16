@@ -130,6 +130,8 @@ observation layers, each served by tooling that already exists:
   USBTMC remains the default and a route that says nothing keeps it.
   (Raw-TCP terminals already reach the mock today through the SOCKET
   gateway; the CDC-ACM profile exists for tools that only speak COM.)
+  ivi-cli reaches the COM port, or the `/dev/ttyACM*` a Linux host
+  creates, as a serial device such as `ASRLCOM5::INSTR` (ADR 0055).
 
   What travels over a CDC export is a byte stream, so the framing is
   the SOCKET gateway's: a line ends at a newline, a blank line is

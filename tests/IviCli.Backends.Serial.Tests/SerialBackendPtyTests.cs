@@ -104,6 +104,7 @@ public sealed class SerialBackendPtyTests
             .Reason.ShouldContain("does not exist");
     }
 
+    [Spec(Standard.Adr, "0055 §8")]
     [Requires("socat", Timeout = 10000)]
     public async Task A_silent_instrument_times_out_after_the_device_timeout()
     {
@@ -120,6 +121,36 @@ public sealed class SerialBackendPtyTests
         result.ShouldBeError().ShouldBeOfType<TransportTimeout>();
         watch.Elapsed.ShouldBeGreaterThanOrEqualTo(TimeSpan.FromMilliseconds(250));
         watch.Elapsed.ShouldBeLessThan(TimeSpan.FromSeconds(3));
+        await backend.CloseAsync(device, CancellationToken.None);
+    }
+
+    /// <summary>
+    /// A line carries no request identifiers, so a reply the instrument
+    /// sends after the port was reopened following a timeout is read as the
+    /// answer to the next request (ADR 0055 §8).
+    /// </summary>
+    [Spec(Standard.Adr, "0055 §8")]
+    [Requires("socat", Timeout = 10000)]
+    public async Task A_reply_after_the_reopen_is_read_as_the_next_answer()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await using var pty = await PtyPair.StartAsync(ct);
+        using var instrument = pty.Instrument();
+        var device = Dev(pty.Port, timeoutMs: 300);
+        var backend = new SerialBackend(new SerialPortLineFactory());
+        (await backend.OpenAsync(device, ct)).ShouldBeOk();
+        (await backend.QueryAsync(device, ScpiQuery.From("A?").ShouldBeOk(), ct))
+            .ShouldBeError()
+            .ShouldBeOfType<TransportTimeout>();
+        instrument.ReadLine().ShouldBe("A?");
+        (await backend.CloseAsync(device, ct)).ShouldBeOk();
+        (await backend.OpenAsync(device, ct)).ShouldBeOk();
+
+        instrument.Write("late\n");
+        var result = await backend.QueryAsync(device, ScpiQuery.From("B?").ShouldBeOk(), ct);
+
+        result.ShouldBeOk().ShouldBe("late");
+        instrument.ReadLine().ShouldBe("B?");
         await backend.CloseAsync(device, CancellationToken.None);
     }
 

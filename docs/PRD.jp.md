@@ -116,6 +116,7 @@ LocalVisaBackend
 HiSlipBackend
 Vxi11Backend
 SocketBackend
+SerialBackend
 FakeBackend
 ReplayBackend
 ```
@@ -167,6 +168,10 @@ USB 計測器はインストール済みの VISA runtime（VISA.NET 共有コン
 その実装）を通じて列挙する。runtime が無い環境では USB のエントリは単に
 結果に現れない。
 
+シリアルポートは `ASRL<port>::INSTR` として並び、それを名指すボード番号か、
+どのボードも名指していないポートには登録用の `visa asrl add` の行が付く。
+`--add` はポート名の形で登録する。
+
 表示例：
 
 ```text
@@ -177,6 +182,8 @@ USB 計測器はインストール済みの VISA runtime（VISA.NET 共有コン
 
 [2] 192.168.0.110
       TCPIP0::192.168.0.110::1394::SOCKET
+
+[3] ASRL/dev/ttyUSB0::INSTR   (register with: ivicli visa asrl add 1 /dev/ttyUSB0)
 ```
 
 ---
@@ -186,9 +193,30 @@ USB 計測器はインストール済みの VISA runtime（VISA.NET 共有コン
 ```bash
 ivicli visa add psu1 TCPIP0::192.168.0.10::inst0::INSTR
 ivicli visa add 1 psu1
+ivicli visa add dmm1 ASRL/dev/ttyUSB0::INSTR --baud 19200 --read-termination cr
 ```
 
 VISA resource または scan index から alias を登録する。
+
+シリアルデバイスは回線の設定を `--baud`、`--data-bits`、`--parity`、
+`--stop-bits`、`--flow-control` で受け取り、省いた項目には VISA の既定値
+（9600 8-N-1、フロー制御なし）が使われる。どのデバイスも
+`--read-termination` と `--write-termination`（`lf`、`cr`、`crlf`）を
+受け取り、これらはメッセージの終わりを持たない SOCKET とシリアルで効く。
+
+---
+
+### visa asrl
+
+```bash
+ivicli visa asrl add 1 /dev/ttyUSB0
+ivicli visa asrl list --json
+ivicli visa asrl remove 1
+```
+
+`ASRL1::INSTR` のようなシリアルのボード番号が、このマシンのどのポートを
+指すかを登録する。ボードが未登録の `ASRL1::INSTR` デバイスは、VISA runtime
+があればそれを通じて開く。
 
 ---
 
@@ -198,7 +226,8 @@ VISA resource または scan index から alias を登録する。
 ivicli visa list
 ```
 
-登録済み VISA target 一覧を表示する。
+登録済み VISA target 一覧を表示する。シリアルデバイスは回線の設定も、
+終端文字を設定したデバイスはその終端文字も表示する。
 
 ---
 
@@ -661,6 +690,20 @@ name = "scope1"
 resource = "USB0::0x0699::...::INSTR"
 timeout_ms = 5000
 
+[[devices]]
+name = "dmm1"
+resource = "ASRL1::INSTR"
+timeout_ms = 2000
+read_termination = "\r"
+write_termination = "\r\n"
+
+[devices.serial]
+baud = 19200
+
+[[asrl]]
+board = 1
+port = "/dev/ttyUSB0"
+
 [[servers]]
 name = "local"
 type = "local"
@@ -723,6 +766,7 @@ CI / AI Agent 向け。
                  ├─ HiSlipBackend
                  ├─ Vxi11Backend
                  ├─ SocketBackend
+                 ├─ SerialBackend
                  ├─ FakeBackend
                  └─ ReplayBackend
                         ↓
@@ -795,6 +839,7 @@ LocalVisaBackend
 HiSlipBackend
 Vxi11Backend
 SocketBackend
+SerialBackend
 FakeBackend
 ReplayBackend
 ```

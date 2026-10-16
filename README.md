@@ -14,13 +14,13 @@
 
 - **Stateful, VISA-native CLI**
   - **A current device, like a shell's working directory.** `ivicli visa add psu1 <resource>` registers an alias once; `ivicli visa use psu1` makes it *the current device*, so every later `visa query` / `write` / `script` needs no target at all — no VISA resource, not even the alias.
-  - **VISA-compatible.** Parses standard `TCPIP::`, `USB::`, `GPIB::` resource strings without proprietary syntax. `USB::` needs an installed VISA runtime.
+  - **VISA-compatible.** Parses standard `TCPIP::`, `USB::`, `GPIB::` and `ASRL::` resource strings without proprietary syntax. `USB::` needs an installed VISA runtime; a serial port named in the resource (`ASRL/dev/ttyUSB0::INSTR`, `ASRLCOM3::INSTR`) does not, and `visa asrl add` says which port `ASRL1::INSTR` means on this machine.
   - **Automation-friendly.** Stdout carries data (including `--json`); stderr carries logs. Exit codes are POSIX-conventional. Shell completion ships for bash / zsh / PowerShell.
 - **Discover & inspect**
   - **Auto-discovery.** `ivicli visa scan` walks the LAN via LXI mDNS / DNS-SD + VXI-11 portmapper broadcast and lists every responder; `--add` registers them all in one shot.
   - **IVI Configuration Store introspection.** `ivicli driver list` / `ivicli logical list` parse `IviConfigurationStore.xml` to enumerate installed IVI drivers and logical names — debugging "instrument talks but driver mismatched" without opening the Configuration Server GUI.
 - **Backends & gateways**
-  - **Multiple backends.** Local NI-VISA, HiSLIP, VXI-11, raw TCP SOCKET, Fake (programmable + scenario playback), Replay (strict deterministic playback) — all behind a single `IIviBackend` port.
+  - **Multiple backends.** Local NI-VISA, HiSLIP, VXI-11, raw TCP SOCKET, serial port, Fake (programmable + scenario playback), Replay (strict deterministic playback) — all behind a single `IIviBackend` port.
   - **Gateway servers.** Expose a local instrument over HiSLIP (`TCPIP::host::hislip0::INSTR`) or raw socket so remote PyVISA / NI-VISA clients can drive it without redeploying the test.
 - **Test without hardware**
   - **Run a mock instrument.** The `Fake` backend answers SCPI from a *scenario* — a scripted set of `query → response` rules, with a status byte a rule can raise a service request with — so `ivicli` (or your own VISA app) can talk to a stand-in with zero bench time.
@@ -111,7 +111,7 @@ Building an app that drives a VISA instrument and want to test it without the ha
 
 | Group | Verbs | Purpose |
 | --- | --- | --- |
-| `visa` | `add` `remove` `list` `use` `current` `scan` `query` `write` `read` `status` `script` `monitor` `watch` `lint` | Manage and talk to instruments |
+| `visa` | `add` `remove` `list` `use` `current` `scan` `query` `write` `read` `status` `script` `monitor` `watch` `lint` + `asrl add` / `asrl list` / `asrl remove` | Manage and talk to instruments |
 | `mock scenario` | `list` `create` `remove` `show` `activate` `deactivate` `record` `import` + `scene add` / `scene remove` | Author and capture mock-device scenarios |
 | `mock received` | `<device>` | Confirm which SCPI writes a device received, read back from an `IVICLI_CAPTURE` traffic log |
 | `server` | `add` `remove` `list` `route add` / `route remove` / `route list` `start` `stop` `status` `log` | Gateway-server lifecycle |
@@ -152,7 +152,7 @@ Once installed, `<Tab>` expands subcommands, options, and runtime identifiers (d
 
 ```mermaid
 flowchart LR
-    u["you / CI"] -->|"VISA — NI-VISA / HiSLIP / VXI-11 / SOCKET"| c["ivicli"] --> i["instrument (LAN, USB/GPIB)"]
+    u["you / CI"] -->|"VISA — NI-VISA / HiSLIP / VXI-11 / SOCKET"| c["ivicli"] --> i["instrument (LAN, USB/GPIB, serial)"]
 ```
 
 **2 · Test without hardware**

@@ -24,6 +24,7 @@ public sealed class SerialBackendTests
 
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
 
+    [Spec(Standard.Adr, "0055 §8")]
     [Fact]
     public async Task Opening_hands_the_port_settings_and_device_timeout_to_the_line()
     {
@@ -183,6 +184,7 @@ public sealed class SerialBackendTests
     /// the timeout decorator, which needs the call off the caller's thread
     /// and the wait to honour cancellation (ADR 0055 §8).
     /// </summary>
+    [Spec(Standard.Adr, "0055 §8")]
     [Fact(Timeout = 10000)]
     public async Task A_read_that_never_returns_is_abandoned_at_the_device_timeout()
     {
@@ -326,6 +328,7 @@ public sealed class SerialBackendTests
         line.ReadUpTo.ShouldBe([terminator]);
     }
 
+    [Spec(Standard.Adr, "0055 §8")]
     [Fact]
     public async Task A_read_the_line_times_out_on_is_a_transport_timeout()
     {
@@ -340,6 +343,7 @@ public sealed class SerialBackendTests
             .Elapsed.ShouldBe(TimeSpan.FromMilliseconds(300));
     }
 
+    [Spec(Standard.Adr, "0055 §8")]
     [Fact]
     public async Task A_write_the_line_times_out_on_is_a_transport_timeout()
     {
@@ -409,6 +413,8 @@ public sealed class SerialBackendTests
         ).ShouldBeError();
     }
 
+    [Spec(Standard.Adr, "0053 §2")]
+    [Spec(Standard.Adr, "0055 §8")]
     [Fact]
     public void The_serial_backend_enforces_the_device_timeout_itself() =>
         new SerialBackend(new FakeLineFactory()).ShouldBeAssignableTo<IEnforcesDeviceTimeout>();
