@@ -46,6 +46,12 @@ All notable changes to ivi-cli are documented here. Format roughly follows
 
 ### Fixed
 
+- **`visa scan` says when a local address is a duplicate.** On Windows, an
+  address another host on the network also uses could not be probed, and
+  the VXI-11 broadcast showed it only as a socket error with a stack trace
+  under `--verbose`. The broadcast and the `--port` sweep now skip such an
+  address and warn that another host uses it.
+
 - **`visa list --json` and `visa scan --json` escape what they print.** A
   resource, an `*IDN?` answer or a note with a backslash, a quote or a
   control character made the JSON unreadable.
