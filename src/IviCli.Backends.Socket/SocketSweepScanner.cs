@@ -106,6 +106,33 @@ public sealed class SocketSweepScanner : IBackendScanner
         }
     }
 
+    /// <summary>
+    /// Reports a local address the system will not send from. A duplicate is
+    /// a warning, since nothing on that network can be reached until the
+    /// address changes; an address still being checked is only debug detail.
+    /// </summary>
+    private void LogUnusable(UnicastIPAddressInformation addr, NetworkInterface nic)
+    {
+        var state = LocalAddresses.StateOf(addr);
+        if (state == DuplicateAddressDetectionState.Duplicate)
+        {
+            _logger.LogWarning(
+                "SOCKET sweep skips {Address} on {Interface}: another host on the network uses that address",
+                addr.Address,
+                nic.Name
+            );
+        }
+        else
+        {
+            _logger.LogDebug(
+                "SOCKET sweep skips {Address} on {Interface}: the address is {State}",
+                addr.Address,
+                nic.Name,
+                state
+            );
+        }
+    }
+
     private IReadOnlyList<string> ResolveTargets(ScanOptions options)
     {
         if (!string.IsNullOrWhiteSpace(options.Host))
@@ -128,7 +155,7 @@ public sealed class SocketSweepScanner : IBackendScanner
         return EnumerateAutoTargets();
     }
 
-    private static IReadOnlyList<string> EnumerateAutoTargets()
+    private IReadOnlyList<string> EnumerateAutoTargets()
     {
         var hosts = new List<string>();
         var seen = new HashSet<string>(StringComparer.Ordinal);
@@ -160,6 +187,11 @@ public sealed class SocketSweepScanner : IBackendScanner
                     )
                 )
                 {
+                    continue;
+                }
+                if (!LocalAddresses.IsUsable(LocalAddresses.StateOf(addr)))
+                {
+                    LogUnusable(addr, nic);
                     continue;
                 }
                 foreach (

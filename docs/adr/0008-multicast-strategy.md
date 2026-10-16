@@ -78,6 +78,14 @@ on a machine with the instruments on a secondary lab NIC it never
 reaches them. Probing each subnet directly fixes that. Replies are
 de-duplicated by sender IP across all interfaces.
 
+An address the system will not send from is skipped, by the broadcast and
+by the socket sweep alike: one whose duplicate address detection found
+another host using it, or has not finished (`LocalAddresses`). Binding to
+it fails with `AddressNotAvailable`. A duplicate is logged as a warning,
+because no instrument on that network can be reached from the machine
+until the address changes. Only Windows reports the detection state, so
+elsewhere every address is probed and a failed bind stays a debug line.
+
 Wire format follows RFC 1833: AUTH_NONE credentials + verifier
 (flavor = 0, length = 0), big-endian XDR, 28-byte minimum successful
 reply.

@@ -216,7 +216,7 @@ public sealed class Vxi11BroadcastScanner : IBackendScanner
         && mask is not null
         && !mask.Equals(IPAddress.Any);
 
-    private static IReadOnlyList<BroadcastTarget> EnumerateTargets()
+    private IReadOnlyList<BroadcastTarget> EnumerateTargets()
     {
         var targets = new List<BroadcastTarget>();
         foreach (var nic in NetworkInterface.GetAllNetworkInterfaces())
@@ -247,12 +247,44 @@ public sealed class Vxi11BroadcastScanner : IBackendScanner
                 {
                     continue;
                 }
+                if (!LocalAddresses.IsUsable(LocalAddresses.StateOf(addr)))
+                {
+                    LogUnusable(addr, nic);
+                    continue;
+                }
                 targets.Add(
                     new BroadcastTarget(addr.Address, DirectedBroadcast(addr.Address, mask!))
                 );
             }
         }
         return targets;
+    }
+
+    /// <summary>
+    /// Reports a local address the system will not send from. A duplicate is
+    /// a warning, since nothing on that network can be reached until the
+    /// address changes; an address still being checked is only debug detail.
+    /// </summary>
+    private void LogUnusable(UnicastIPAddressInformation addr, NetworkInterface nic)
+    {
+        var state = LocalAddresses.StateOf(addr);
+        if (state == DuplicateAddressDetectionState.Duplicate)
+        {
+            _logger.LogWarning(
+                "VXI-11 broadcast skips {Address} on {Interface}: another host on the network uses that address",
+                addr.Address,
+                nic.Name
+            );
+        }
+        else
+        {
+            _logger.LogDebug(
+                "VXI-11 broadcast skips {Address} on {Interface}: the address is {State}",
+                addr.Address,
+                nic.Name,
+                state
+            );
+        }
     }
 
     private static DiscoveredResource? BuildDiscovered(IPAddress host, int corePort, bool verbose)
