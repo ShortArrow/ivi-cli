@@ -166,7 +166,10 @@ one, USB entries are simply absent from the results.
 
 Serial ports are listed as `ASRL<port>::INSTR`, each with the board that
 names it or, for a port no board names, the `visa asrl add` line that would
-register it. `--add` registers them by port name.
+register it. `--add` registers them by port name. The ports are the ones the
+operating system lists; `visa scan` neither opens them nor sends anything, so
+an entry does not mean an instrument answers there. `visa query` on the
+registered device checks that.
 
 Example output:
 
