@@ -58,6 +58,13 @@ public sealed record Device(
     public bool IsSerial => Resource is VisaResource.AsrlBoard or VisaResource.AsrlPort;
 
     /// <summary>
+    /// The settings the serial line is opened with: <see cref="Serial"/>, or
+    /// <see cref="SerialSettings.Default"/> when the device sets none;
+    /// <see langword="null"/> for a device that is not on a serial line.
+    /// </summary>
+    public SerialSettings? SerialLine => IsSerial ? Serial ?? SerialSettings.Default : null;
+
+    /// <summary>
     /// Whether the terminators apply: SOCKET and serial have no message end
     /// of their own, while HiSLIP, VXI-11, USBTMC and GPIB end messages
     /// themselves (ADR 0055 §5).

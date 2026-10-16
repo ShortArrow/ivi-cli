@@ -213,7 +213,7 @@ public sealed class LocalBackend : IIviBackend, IEnforcesDeviceTimeout
         new(
             openTimeout,
             ioTimeout,
-            device.IsSerial ? device.Serial ?? SerialSettings.Default : null,
+            device.SerialLine,
             device.UsesTermination ? device.ReadTermination : null,
             device.UsesTermination ? device.WriteTermination : null
         );
