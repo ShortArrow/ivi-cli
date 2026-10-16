@@ -89,7 +89,10 @@ port = "/dev/ttyUSB0"
 - A port that does not exist yet is accepted with a warning, since a USB
   adapter appears only while plugged in.
 - `visa scan` lists the serial ports and, for one no board names, the
-  `visa asrl add` line that would register it.
+  `visa asrl add` line that would register it. Each such line takes the
+  lowest board number still free, a different one per port, so the lines
+  can be run one after another. `visa scan --add` registers the ports by
+  name, as `ASRL<port>::INSTR` devices.
 
 The factory reads its configuration once, at start, so an `AsrlBoard`
 device gets a backend that reads the table from the configuration store
