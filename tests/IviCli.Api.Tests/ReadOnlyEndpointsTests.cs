@@ -68,7 +68,7 @@ public sealed class ReadOnlyEndpointsTests
             cancellationToken: TestContext.Current.CancellationToken
         );
         error!.Error.Code.ShouldBe("config_store_failure");
-        error.Error.Message.ShouldBe("config store read failed: disk gone");
+        error.Error.Message.ShouldBe("the configuration or session store could not be used");
     }
 
     [Fact]

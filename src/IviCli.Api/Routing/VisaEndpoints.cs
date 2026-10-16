@@ -98,12 +98,12 @@ public static class VisaEndpoints
             QueryDeviceConfigFailure or QueryDeviceSessionFailure => ApiMapping.ProblemJson(
                 StatusCodes.Status503ServiceUnavailable,
                 "config_store_failure",
-                IviErrorMessages.Render(error)
+                ApiMapping.ConfigStoreFailureMessage
             ),
             _ => ApiMapping.ProblemJson(
                 StatusCodes.Status500InternalServerError,
                 "internal_error",
-                IviErrorMessages.Render(error)
+                ApiMapping.InternalErrorMessage
             ),
         };
 
@@ -129,12 +129,12 @@ public static class VisaEndpoints
             WriteDeviceConfigFailure or WriteDeviceSessionFailure => ApiMapping.ProblemJson(
                 StatusCodes.Status503ServiceUnavailable,
                 "config_store_failure",
-                IviErrorMessages.Render(error)
+                ApiMapping.ConfigStoreFailureMessage
             ),
             _ => ApiMapping.ProblemJson(
                 StatusCodes.Status500InternalServerError,
                 "internal_error",
-                IviErrorMessages.Render(error)
+                ApiMapping.InternalErrorMessage
             ),
         };
 }

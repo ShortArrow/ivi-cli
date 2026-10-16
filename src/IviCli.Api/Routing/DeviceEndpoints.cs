@@ -2,7 +2,6 @@ using IviCli.Api.Contracts;
 using IviCli.Api.Mapping;
 using IviCli.Application.Configuration;
 using IviCli.Application.Devices;
-using IviCli.Application.Logging;
 using IviCli.Domain;
 using IviCli.Domain.Devices;
 using Microsoft.AspNetCore.Builder;
@@ -38,12 +37,12 @@ public static class DeviceEndpoints
                 ? ApiMapping.ProblemJson(
                     StatusCodes.Status503ServiceUnavailable,
                     "config_store_failure",
-                    IviErrorMessages.Render(err.Err)
+                    ApiMapping.ConfigStoreFailureMessage
                 )
                 : ApiMapping.ProblemJson(
                     StatusCodes.Status500InternalServerError,
                     "internal_error",
-                    IviErrorMessages.Render(err.Err)
+                    ApiMapping.InternalErrorMessage
                 ),
             _ => Results.StatusCode(StatusCodes.Status500InternalServerError),
         };
@@ -76,12 +75,12 @@ public static class DeviceEndpoints
             StatusDeviceConfigFailure or StatusDeviceSessionFailure => ApiMapping.ProblemJson(
                 StatusCodes.Status503ServiceUnavailable,
                 "config_store_failure",
-                IviErrorMessages.Render(error)
+                ApiMapping.ConfigStoreFailureMessage
             ),
             _ => ApiMapping.ProblemJson(
                 StatusCodes.Status500InternalServerError,
                 "internal_error",
-                IviErrorMessages.Render(error)
+                ApiMapping.InternalErrorMessage
             ),
         };
 }

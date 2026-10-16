@@ -20,6 +20,19 @@ namespace IviCli.Api.Mapping;
 /// </summary>
 public static class ApiMapping
 {
+    /// <summary>
+    /// The message of a <c>config_store_failure</c>. The store's own reason
+    /// is left out, since it can carry a path on the server.
+    /// </summary>
+    public const string ConfigStoreFailureMessage =
+        "the configuration or session store could not be used";
+
+    /// <summary>The message of a <c>scenario_store_failure</c>, without the store's reason.</summary>
+    public const string ScenarioStoreFailureMessage = "the scenario store could not be used";
+
+    /// <summary>The message of an <c>internal_error</c>, without the error's own text.</summary>
+    public const string InternalErrorMessage = "internal error";
+
     /// <summary>Maps a <see cref="Device"/> to its API DTO.</summary>
     public static DeviceDto ToDto(this Device device) =>
         new(device.Name.Value, FormatResource(device.Resource), device.Timeout.Milliseconds);

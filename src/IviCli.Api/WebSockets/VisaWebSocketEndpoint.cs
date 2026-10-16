@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Net.WebSockets;
 using System.Text;
+using IviCli.Api.Mapping;
 using IviCli.Application.Configuration;
 using IviCli.Application.Devices;
 using IviCli.Application.Logging;
@@ -246,11 +247,11 @@ public static class VisaWebSocketEndpoint
             ),
             QueryDeviceConfigFailure or QueryDeviceSessionFailure => new VisaWebSocketEvent.Error(
                 VisaWebSocketErrorCodes.ConfigStoreFailure,
-                IviErrorMessages.Render(error)
+                ApiMapping.ConfigStoreFailureMessage
             ),
             _ => new VisaWebSocketEvent.Error(
                 VisaWebSocketErrorCodes.InternalError,
-                IviErrorMessages.Render(error)
+                ApiMapping.InternalErrorMessage
             ),
         };
 
@@ -272,11 +273,11 @@ public static class VisaWebSocketEndpoint
             ),
             WriteDeviceConfigFailure or WriteDeviceSessionFailure => new VisaWebSocketEvent.Error(
                 VisaWebSocketErrorCodes.ConfigStoreFailure,
-                IviErrorMessages.Render(error)
+                ApiMapping.ConfigStoreFailureMessage
             ),
             _ => new VisaWebSocketEvent.Error(
                 VisaWebSocketErrorCodes.InternalError,
-                IviErrorMessages.Render(error)
+                ApiMapping.InternalErrorMessage
             ),
         };
 
