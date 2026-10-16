@@ -19,8 +19,7 @@ public sealed class VisaRuntimeAbsenceTests
 
         new VisaSessionFactory().Open(
             resource,
-            TimeSpan.FromMilliseconds(200),
-            TimeSpan.FromMilliseconds(200)
+            new VisaSessionOptions(TimeSpan.FromMilliseconds(200), TimeSpan.FromMilliseconds(200))
         );
         CollectGarbage();
     }

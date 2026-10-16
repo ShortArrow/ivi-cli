@@ -39,7 +39,7 @@ public sealed class LocalBackend : IIviBackend, IEnforcesDeviceTimeout
             ioTimeout > DeviceTimeoutBackendFactory.OpenFloor
                 ? ioTimeout
                 : DeviceTimeoutBackendFactory.OpenFloor;
-        var openResult = _factory.Open(device.Resource, openTimeout, ioTimeout);
+        var openResult = _factory.Open(device.Resource, Options(device, openTimeout, ioTimeout));
         if (openResult is not Result<IVisaSessionHandle, LocalVisaError>.Ok { Value: var handle })
         {
             var err = ((Result<IVisaSessionHandle, LocalVisaError>.Error)openResult).Err;
@@ -200,6 +200,24 @@ public sealed class LocalBackend : IIviBackend, IEnforcesDeviceTimeout
         }
     }
 
+    /// <summary>
+    /// How <paramref name="device"/>'s session is set up: the serial
+    /// settings for a serial device, VISA's defaults when it sets none, and
+    /// the terminators where the transport uses them (ADR 0055 §4, §5).
+    /// </summary>
+    private static VisaSessionOptions Options(
+        Device device,
+        TimeSpan openTimeout,
+        TimeSpan ioTimeout
+    ) =>
+        new(
+            openTimeout,
+            ioTimeout,
+            device.IsSerial ? device.Serial ?? SerialSettings.Default : null,
+            device.UsesTermination ? device.ReadTermination : null,
+            device.UsesTermination ? device.WriteTermination : null
+        );
+
     private IVisaSessionHandle? TryGetHandle(Device device) => TryGetSession(device)?.Handle;
 
     private LocalSession? TryGetSession(Device device)
@@ -271,23 +289,29 @@ public sealed class LocalBackend : IIviBackend, IEnforcesDeviceTimeout
 
     /// <summary>
     /// Maps a failed open, telling apart what a caller can act on: no
-    /// runtime, a resource the runtime does not know, and a resource another
-    /// session holds (ADR 0055 §2, §7).
+    /// runtime, a resource the runtime does not know, a resource another
+    /// session holds, and a serial setting the driver refused (ADR 0055 §2,
+    /// §4, §7).
     /// </summary>
     private static BackendError MapOpenError(LocalVisaError err, Device device) =>
         err switch
         {
             LocalVisaRuntimeMissing m => new VisaRuntimeMissing(m.Detail),
-            LocalVisaOpenFailure { Cause: NativeVisaException { ErrorCode: var status } }
+            LocalVisaOpenFailure { Cause: NativeVisaException { ErrorCode: var status } native }
                 when status
                     is NativeErrorCode.ResourceNotFound
                         or NativeErrorCode.InvalidResourceName => new ResourceNotFound(
                 device.Name,
-                device.Resource
+                device.Resource,
+                native
             ),
-            LocalVisaOpenFailure { Cause: NativeVisaException { ErrorCode: var status } }
+            LocalVisaOpenFailure { Cause: NativeVisaException { ErrorCode: var status } native }
                 when status is NativeErrorCode.ResourceBusy or NativeErrorCode.ResourceLocked =>
-                new TransportInUse(device.Name, device.Resource),
+                new TransportInUse(device.Name, device.Resource, native),
+            LocalVisaSettingRefused r => new TransportDisconnected(
+                $"opening {device.Resource.ToLogString()} failed: the serial driver refused {r.Setting}",
+                r.Inner
+            ),
             _ => MapError(err),
         };
 

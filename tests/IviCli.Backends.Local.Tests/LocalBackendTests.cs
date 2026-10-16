@@ -31,16 +31,6 @@ public class LocalBackendTests
     }
 
     [Fact]
-    public async Task OpenAsync_fails_with_TransportDisconnected_when_runtime_missing()
-    {
-        var factory = new FakeVisaSessionFactory { ReturnRuntimeMissing = true };
-        var backend = new LocalBackend(factory);
-
-        var result = await backend.OpenAsync(Dev("psu"), TestContext.Current.CancellationToken);
-        result.ShouldBeOfType<Result<Unit, BackendError>.Error>();
-    }
-
-    [Fact]
     public async Task A_missing_runtime_is_reported_as_such()
     {
         // Given a factory reporting the runtime as missing
@@ -67,15 +57,15 @@ public class LocalBackendTests
     [InlineData(Ivi.Visa.NativeErrorCode.InvalidResourceName)]
     public async Task A_resource_the_runtime_does_not_know_is_not_found(int status)
     {
-        var factory = new FakeVisaSessionFactory
-        {
-            OpenFailsWith = new Ivi.Visa.NativeVisaException(status),
-        };
+        var native = new Ivi.Visa.NativeVisaException(status);
+        var factory = new FakeVisaSessionFactory { OpenFailsWith = native };
         var backend = new LocalBackend(factory);
 
         var result = await backend.OpenAsync(Dev("dmm"), TestContext.Current.CancellationToken);
 
-        result.ShouldBeError().ShouldBeOfType<ResourceNotFound>().Device.Value.ShouldBe("dmm");
+        var notFound = result.ShouldBeError().ShouldBeOfType<ResourceNotFound>();
+        notFound.Device.Value.ShouldBe("dmm");
+        notFound.Cause.ShouldBeSameAs(native);
     }
 
     /// <summary>A resource another session holds is in use, as on the serial backend (ADR 0055 §7).</summary>
@@ -84,15 +74,152 @@ public class LocalBackendTests
     [InlineData(Ivi.Visa.NativeErrorCode.ResourceLocked)]
     public async Task A_busy_resource_is_in_use(int status)
     {
-        var factory = new FakeVisaSessionFactory
-        {
-            OpenFailsWith = new Ivi.Visa.NativeVisaException(status),
-        };
+        var native = new Ivi.Visa.NativeVisaException(status);
+        var factory = new FakeVisaSessionFactory { OpenFailsWith = native };
         var backend = new LocalBackend(factory);
 
         var result = await backend.OpenAsync(Dev("dmm"), TestContext.Current.CancellationToken);
 
-        result.ShouldBeError().ShouldBeOfType<TransportInUse>();
+        result.ShouldBeError().ShouldBeOfType<TransportInUse>().Cause.ShouldBeSameAs(native);
+    }
+
+    /// <summary>
+    /// A serial device opened through VISA gets its serial settings, VISA's
+    /// defaults when it sets none, so it behaves as on the Serial backend
+    /// whatever defaults the runtime was configured with (ADR 0055 §4).
+    /// </summary>
+    [Fact]
+    public async Task A_serial_device_is_opened_with_its_serial_settings()
+    {
+        var settings = SerialSettings
+            .From(19200, 7, SerialParity.Even, SerialStopBits.Two, SerialFlowControl.RtsCts)
+            .ShouldBeOk();
+        var device = Dev("dmm", Asrl) with { Serial = settings };
+        var factory = Factory(device);
+
+        (
+            await new LocalBackend(factory).OpenAsync(device, TestContext.Current.CancellationToken)
+        ).ShouldBeOk();
+
+        factory.LastOptions!.Serial.ShouldBe(settings);
+    }
+
+    [Fact]
+    public async Task A_serial_device_without_settings_is_opened_with_the_defaults()
+    {
+        var device = Dev("dmm", Asrl);
+        var factory = Factory(device);
+
+        (
+            await new LocalBackend(factory).OpenAsync(device, TestContext.Current.CancellationToken)
+        ).ShouldBeOk();
+
+        factory.LastOptions!.Serial.ShouldBe(SerialSettings.Default);
+    }
+
+    [Fact]
+    public async Task A_device_off_a_serial_line_gets_no_serial_settings()
+    {
+        var device = Dev("dmm");
+        var factory = Factory(device);
+
+        (
+            await new LocalBackend(factory).OpenAsync(device, TestContext.Current.CancellationToken)
+        ).ShouldBeOk();
+
+        factory.LastOptions!.Serial.ShouldBeNull();
+    }
+
+    /// <summary>
+    /// The terminators reach VISA only for SOCKET and serial; elsewhere
+    /// the transport ends messages itself (ADR 0055 §5).
+    /// </summary>
+    [Theory]
+    [InlineData("TCPIP0::host::5025::SOCKET", true)]
+    [InlineData("ASRL1::INSTR", true)]
+    [InlineData("TCPIP0::host::inst0::INSTR", false)]
+    [InlineData("USB0::0x0699::0x0408::C012345::INSTR", false)]
+    [InlineData("GPIB0::5::INSTR", false)]
+    public async Task Terminators_reach_VISA_where_the_transport_uses_them(
+        string resource,
+        bool applied
+    )
+    {
+        var device = Dev("dmm", VisaResource.Parse(resource).ShouldBeOk()) with
+        {
+            ReadTermination = Termination.CrLf,
+            WriteTermination = Termination.Cr,
+        };
+        var factory = Factory(device);
+
+        (
+            await new LocalBackend(factory).OpenAsync(device, TestContext.Current.CancellationToken)
+        ).ShouldBeOk();
+
+        factory.LastOptions!.ReadTermination.ShouldBe(applied ? Termination.CrLf : null);
+        factory.LastOptions.WriteTermination.ShouldBe(applied ? Termination.Cr : null);
+    }
+
+    /// <summary>
+    /// A setting the serial driver refuses fails the open, named by its
+    /// configuration name, as on the Serial backend (ADR 0055 §4).
+    /// </summary>
+    [Fact]
+    public async Task A_refused_serial_setting_fails_the_open_naming_it()
+    {
+        var native = new Ivi.Visa.NativeVisaException(
+            Ivi.Visa.NativeErrorCode.UnsupportedAttributeValue
+        );
+        var factory = new FakeVisaSessionFactory
+        {
+            RefusesSetting = new LocalVisaSettingRefused("baud", native),
+        };
+        var backend = new LocalBackend(factory);
+
+        var result = await backend.OpenAsync(
+            Dev("dmm", Asrl),
+            TestContext.Current.CancellationToken
+        );
+
+        var error = result.ShouldBeError().ShouldBeOfType<TransportDisconnected>();
+        error.Reason.ShouldBe("opening ASRL1::INSTR failed: the serial driver refused baud");
+        error.Cause.ShouldBeSameAs(native);
+    }
+
+    /// <summary>A port's name is masked in the reason, as logs mask it (ADR 0055 §1).</summary>
+    [Fact]
+    public async Task A_refused_serial_setting_masks_the_port()
+    {
+        var factory = new FakeVisaSessionFactory
+        {
+            RefusesSetting = new LocalVisaSettingRefused(
+                "parity",
+                new Ivi.Visa.NativeVisaException(Ivi.Visa.NativeErrorCode.UnsupportedAttributeValue)
+            ),
+        };
+        var port = VisaResource.Parse("ASRL/dev/ttyUSB0::INSTR").ShouldBeOk();
+
+        var result = await new LocalBackend(factory).OpenAsync(
+            Dev("dmm", port),
+            TestContext.Current.CancellationToken
+        );
+
+        result
+            .ShouldBeError()
+            .ShouldBeOfType<TransportDisconnected>()
+            .Reason.ShouldBe(
+                $"opening {port.ToLogString()} failed: the serial driver refused parity"
+            );
+        port.ToLogString().ShouldNotContain("ttyUSB0");
+    }
+
+    private static readonly VisaResource Asrl = VisaResource.Parse("ASRL1::INSTR").ShouldBeOk();
+
+    private static FakeVisaSessionFactory Factory(Device device)
+    {
+        var factory = new FakeVisaSessionFactory();
+        factory.Sessions[VisaResourceFormatter.Format(device.Resource)] = new FakeVisaSession();
+        return factory;
     }
 
     [Fact]
@@ -243,8 +370,8 @@ public class LocalBackendTimeoutTests
 
         (await backend.OpenAsync(device, TestContext.Current.CancellationToken)).ShouldBeOk();
 
-        factory.LastIoTimeout.ShouldBe(TimeSpan.FromMilliseconds(deviceTimeoutMs));
-        factory.LastOpenTimeout.ShouldBe(TimeSpan.FromMilliseconds(expectedOpenMs));
+        factory.LastOptions!.IoTimeout.ShouldBe(TimeSpan.FromMilliseconds(deviceTimeoutMs));
+        factory.LastOptions.OpenTimeout.ShouldBe(TimeSpan.FromMilliseconds(expectedOpenMs));
     }
 
     [Fact]
@@ -364,17 +491,22 @@ internal sealed class FakeVisaSessionFactory : IVisaSessionFactory
 
     /// <summary>Makes every open fail as the runtime does, with this exception inside.</summary>
     public Exception? OpenFailsWith { get; set; }
-    public TimeSpan? LastOpenTimeout { get; private set; }
-    public TimeSpan? LastIoTimeout { get; private set; }
+
+    /// <summary>Makes every open fail as a serial driver refusing a setting does.</summary>
+    public LocalVisaSettingRefused? RefusesSetting { get; set; }
+
+    public VisaSessionOptions? LastOptions { get; private set; }
 
     public Result<IVisaSessionHandle, LocalVisaError> Open(
         VisaResource resource,
-        TimeSpan openTimeout,
-        TimeSpan ioTimeout
+        VisaSessionOptions options
     )
     {
-        LastOpenTimeout = openTimeout;
-        LastIoTimeout = ioTimeout;
+        LastOptions = options;
+        if (RefusesSetting is not null)
+        {
+            return Result.Failure<IVisaSessionHandle, LocalVisaError>(RefusesSetting);
+        }
         if (ReturnRuntimeMissing)
         {
             return Result.Failure<IVisaSessionHandle, LocalVisaError>(
@@ -394,7 +526,7 @@ internal sealed class FakeVisaSessionFactory : IVisaSessionFactory
                 new LocalVisaOpenFailure(key, "not configured in fake", null)
             );
         }
-        session.IoTimeout = ioTimeout;
+        session.IoTimeout = options.IoTimeout;
         return Result.Success<IVisaSessionHandle, LocalVisaError>(session);
     }
 }

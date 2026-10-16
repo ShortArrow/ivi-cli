@@ -155,4 +155,25 @@ public class DeviceTests
         // When / Then
         device.IgnoresTermination.ShouldBeFalse();
     }
+
+    /// <summary>
+    /// Only SOCKET and serial lack a message end of their own, so only
+    /// there do the terminators apply (ADR 0055 §5).
+    /// </summary>
+    [Theory]
+    [InlineData("TCPIP0::host::hislip0::INSTR", false)]
+    [InlineData("TCPIP0::host::inst0::INSTR", false)]
+    [InlineData("USB0::0x0699::0x0408::C012345::INSTR", false)]
+    [InlineData("GPIB0::5::INSTR", false)]
+    [InlineData("TCPIP0::host::5025::SOCKET", true)]
+    [InlineData("ASRL1::INSTR", true)]
+    [InlineData("ASRL/dev/ttyUSB0::INSTR", true)]
+    public void UsesTermination_OnlyWhereTheTransportHasNoMessageEnd(string resource, bool uses)
+    {
+        // Given
+        var device = new Device(Name("d"), Resource(resource), T(3000));
+
+        // When / Then
+        device.UsesTermination.ShouldBe(uses);
+    }
 }

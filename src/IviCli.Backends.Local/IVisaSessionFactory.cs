@@ -1,4 +1,5 @@
 using IviCli.Domain;
+using IviCli.Domain.Devices;
 using IviCli.Domain.Visa;
 
 namespace IviCli.Backends.Local;
@@ -12,18 +13,42 @@ namespace IviCli.Backends.Local;
 public interface IVisaSessionFactory
 {
     /// <summary>
-    /// Opens a VISA session to <paramref name="resource"/>. The handle
-    /// owns the underlying VISA session and must be disposed.
+    /// Opens a VISA session to <paramref name="resource"/> and sets it up
+    /// as <paramref name="options"/> says. The handle owns the underlying
+    /// VISA session and must be disposed.
     /// </summary>
-    /// <param name="resource">The resource to open.</param>
-    /// <param name="openTimeout">How long opening may take (viOpen's timeout).</param>
-    /// <param name="ioTimeout">The session's I/O timeout (VI_ATTR_TMO_VALUE).</param>
+    /// <returns>
+    /// The handle, or <see cref="LocalVisaSettingRefused"/> when the serial
+    /// driver refuses one of the serial settings.
+    /// </returns>
     Result<IVisaSessionHandle, LocalVisaError> Open(
         VisaResource resource,
-        TimeSpan openTimeout,
-        TimeSpan ioTimeout
+        VisaSessionOptions options
     );
 }
+
+/// <summary>How a VISA session is opened and set up.</summary>
+/// <param name="OpenTimeout">How long opening may take (viOpen's timeout).</param>
+/// <param name="IoTimeout">The session's I/O timeout (VI_ATTR_TMO_VALUE).</param>
+/// <param name="Serial">
+/// The serial line's settings, for an ASRL resource only (ADR 0055 §4).
+/// </param>
+/// <param name="ReadTermination">
+/// What ends a reply, for SOCKET and serial only; <see langword="null"/>
+/// reads a line, which ends at LF or END, with a trailing CR removed
+/// (ADR 0055 §5).
+/// </param>
+/// <param name="WriteTermination">
+/// What ends a command, for SOCKET and serial only; <see langword="null"/>
+/// means LF.
+/// </param>
+public sealed record VisaSessionOptions(
+    TimeSpan OpenTimeout,
+    TimeSpan IoTimeout,
+    SerialSettings? Serial = null,
+    Termination? ReadTermination = null,
+    Termination? WriteTermination = null
+);
 
 /// <summary>
 /// A line-oriented VISA session. Implementations wrap an
