@@ -235,6 +235,10 @@ Each step is a pull request that leaves `main` releasable:
    `docs/conformance.md`, whose timeout entries say a late reply is never
    read, which §8 does not hold for a serial line.
 6. The CDC-ACM run in the nightly NI-VISA job and the release smoke test.
+   The nightly job opens the attached CDC-ACM port from ivicli twice, as
+   its board through NI-VISA and as its port name through the Serial
+   backend. The release smoke test queries a pseudo-terminal through each
+   Linux and macOS binary and each container image, NativeAOT included.
 
 ## Alternatives
 
