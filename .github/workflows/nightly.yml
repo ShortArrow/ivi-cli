@@ -79,8 +79,9 @@ jobs:
   # The mock seen through a real VISA stack: NI-VISA queries ivi-cli's
   # HiSLIP, VXI-11 and SOCKET gateways, and the USB mock (ADR 0049) after
   # usbip-win2 attaches it, as a serial port (CDC-ACM) and as a USBTMC
-  # instrument. Hosted Windows runners load usbip-win2's driver without
-  # test signing.
+  # instrument. ivicli then opens the serial port itself, through
+  # NI-VISA and through its own Serial backend. Hosted Windows runners
+  # load usbip-win2's driver without test signing.
   mock-ni-visa:
     name: mock through NI-VISA (windows)
     runs-on: windows-latest
@@ -192,6 +193,11 @@ jobs:
                   except pyvisa.VisaIOError:
                       continue
                   print(res, repr(reply))
+                  # The board and the port NI-VISA gives it, for ivicli's
+                  # Local and Serial backends to open after this.
+                  port = rm.resource_info(res).alias or "COM" + res[4:].split("::")[0]
+                  with open("serial.txt", "w") as f:
+                      f.write(f"{res}\n{port}\n")
                   sys.exit(0 if reply == EXPECTED else 1)
               sys.exit("no serial resource answered *IDN?")
           if mode == "usbtmc":
@@ -211,6 +217,16 @@ jobs:
           Start-Sleep -Seconds 10
           python probe.py serial
           if ($LASTEXITCODE -ne 0) { throw "NI-VISA could not query the CDC-ACM mock" }
+          # The same port through ivicli (ADR 0055 §2): the board, which no
+          # [[asrl]] entry names, opens through NI-VISA in the Local
+          # backend; the port name opens in the Serial backend.
+          $board, $port = Get-Content serial.txt
+          foreach ($d in @(@('cdc-visa', $board), @('cdc-serial', "ASRL${port}::INSTR"))) {
+            & $cli visa add $d[0] $d[1] --read-termination lf --write-termination lf --baud 115200
+            $reply = & $cli visa query $d[0] '*IDN?'
+            "ivicli $($d[1]): $reply"
+            if ($reply -ne $expected) { throw "ivicli did not get the mock's identity over $($d[1])" }
+          }
           & $usbip detach --all
           Start-Sleep -Seconds 4
 

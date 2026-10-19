@@ -1,5 +1,5 @@
 #!/bin/sh
-# HEALTHCHECK + SCPI round-trip smoke against a locally built
+# HEALTHCHECK, SCPI and serial round-trip smoke against a locally built
 # ivi-cli-mock image. Shared by pr-docker-smoke.yml and both
 # release.yml container smoke gates (amd64 + arm64).
 #
@@ -59,5 +59,14 @@ case "$vxi_response" in
     exit 1
     ;;
 esac
+
+# Serial round trip through the image's ivicli (ADR 0055 §11). socat is
+# installed into this throwaway container only; the image stays as built.
+docker exec "$name" sh -c 'apt-get update -qq >/dev/null && apt-get install -y -qq --no-install-recommends socat >/dev/null'
+docker cp "$(dirname "$0")/../.github/scripts/serial-smoke.sh" "$name:/tmp/serial-smoke.sh"
+if ! docker exec "$name" sh /tmp/serial-smoke.sh ivicli; then
+  docker logs "$name"
+  exit 1
+fi
 
 docker rm -f "$name"

@@ -135,6 +135,22 @@ jobs:
               ;;
           esac
 
+      # The same binary opens a serial port: System.IO.Ports carries a
+      # native library on Linux and macOS that the single-file bundle
+      # must extract (ADR 0055 §11). Windows has no pseudo-terminal to
+      # stand in for a port, so its binaries are not run against one.
+      - name: Smoke-run published binary over a serial port
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "$RUNNER_OS" = Linux ]; then
+            sudo apt-get update -qq && sudo apt-get install -y -qq socat
+          else
+            brew install socat
+          fi
+          sh .github/scripts/serial-smoke.sh "./artifacts/${{ matrix.rid }}-selfcontained/ivicli"
+
       - name: Upload binaries
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:

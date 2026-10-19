@@ -1,0 +1,56 @@
+name: tmp-serial-smoke
+
+# Temporary: runs the release job's serial smoke step on this branch.
+# Removed before merge.
+on:
+  push:
+    branches: [ci/serial-smoke]
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    name: serial smoke / ${{ matrix.rid }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            rid: linux-x64
+          - os: ubuntu-24.04-arm
+            rid: linux-arm64
+          - os: macos-15-intel
+            rid: osx-x64
+          - os: macos-latest
+            rid: osx-arm64
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          global-json-file: global.json
+
+      - name: Publish self-contained binary
+        run: |
+          dotnet publish src/IviCli.Cli/IviCli.Cli.csproj \
+            -c Release -r ${{ matrix.rid }} \
+            --self-contained true \
+            -p:PublishSingleFile=true \
+            -p:IncludeNativeLibrariesForSelfExtract=true \
+            -o ./artifacts/${{ matrix.rid }}-selfcontained
+
+      - name: Smoke-run published binary over a serial port
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "$RUNNER_OS" = Linux ]; then
+            sudo apt-get update -qq && sudo apt-get install -y -qq socat
+          else
+            brew install socat
+          fi
+          sh .github/scripts/serial-smoke.sh "./artifacts/${{ matrix.rid }}-selfcontained/ivicli"
