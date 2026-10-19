@@ -49,10 +49,12 @@ AUR yet.
   respectively. ICU is not needed: the CLI runs with invariant
   globalization, without which it aborts at start-up on a machine that
   has no ICU.
-- It also depends on the registry's keyring package, so that a rotated
-  key reaches every machine that has ivicli installed, whichever version
-  it runs. The registry names that package (its ADR 0001 leaves the name
-  open); the dependency is added when it does.
+- It also depends on the registry's keyring package,
+  `shortarrow-archive-keyring`, so that a rotated key reaches every
+  machine that has ivicli installed, whichever version it runs. That
+  package lives only in the registry, so a `.deb` downloaded from a
+  release installs with `apt` once the registry's source is set up, and
+  not on its own.
 - The Debian version is the release version with revision `1`
   (`0.4.0-1`). Packaging changes ship with the next release.
 - Pre-releases get no package. A version containing `-` would sort after
@@ -75,8 +77,10 @@ starts the registry's publishing run is open in its ADR 0001.
 Both `.deb` files are built from a self-contained publish, amd64 on
 `ubuntu-latest` and arm64 on `ubuntu-24.04-arm`. Each runner serves them
 from a throwaway repository signed with a key generated for the run,
-installs `ivicli` with `apt` in fresh `debian:bookworm` and
-`ubuntu:24.04` containers, and runs `ivicli --version`. A missing
+beside a stand-in `shortarrow-archive-keyring` that holds that key,
+installs both with `apt` in fresh `debian:bookworm` and `ubuntu:24.04`
+containers, and runs `ivicli --version` (`packaging/apt/install-test.sh`).
+The package itself is built by `packaging/apt/build-deb.sh`. A missing
 `Depends` entry for a library the runtime loads at start-up shows as a
 binary that does not start in a container that has only what `apt`
 installed. A library loaded only on first use, such as OpenSSL on the

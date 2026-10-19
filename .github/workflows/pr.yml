@@ -131,6 +131,7 @@ jobs:
     outputs:
       code: ${{ steps.filter.outputs.code }}
       docker: ${{ steps.filter.outputs.docker }}
+      apt: ${{ steps.filter.outputs.apt }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -159,6 +160,14 @@ jobs:
             echo "docker=true" >> "$GITHUB_OUTPUT"
           else
             echo "docker=false" >> "$GITHUB_OUTPUT"
+          fi
+          # The .deb install test (ADR 0052 §4) when the packaging, the
+          # workflows that build it, or what decides the published binary
+          # changed.
+          if echo "$changed" | grep -qE '^(packaging/apt/|src/|Directory\.Build\.props$|Directory\.Packages\.props$|global\.json$|\.github/workflows/(pr|release)\.yml$)'; then
+            echo "apt=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "apt=false" >> "$GITHUB_OUTPUT"
           fi
           echo "Changed files:"; echo "$changed"
 
@@ -271,6 +280,51 @@ jobs:
   # first CI coverage; that assertion could only ever run here.
   # win-arm64 runs too: v0.4.0's first tag run died there when the test
   # host crashed on a VISA finalizer that no x64 runner had triggered.
+  deb-install-test:
+    name: deb install test (${{ matrix.arch }})
+    needs: changes
+    if: needs.changes.outputs.apt == 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            rid: linux-x64
+            arch: amd64
+          - os: ubuntu-24.04-arm
+            rid: linux-arm64
+            arch: arm64
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    env:
+      DOTNET_NOLOGO: true
+      DOTNET_CLI_TELEMETRY_OPTOUT: true
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          global-json-file: global.json
+
+      # The same self-contained single-file publish the release job makes.
+      - name: Publish self-contained binary
+        run: |
+          dotnet publish src/IviCli.Cli/IviCli.Cli.csproj \
+            -c Release -r ${{ matrix.rid }} \
+            --self-contained true \
+            -p:PublishSingleFile=true \
+            -p:IncludeNativeLibrariesForSelfExtract=true \
+            -o ./artifacts/selfcontained
+
+      - name: Build the package and install it with apt
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq && sudo apt-get install -y -qq apt-utils
+          version="$(sed -n 's/.*<Version>\(.*\)<\/Version>.*/\1/p' Directory.Build.props | head -1)"
+          sh packaging/apt/build-deb.sh ./artifacts/selfcontained "$version" ${{ matrix.arch }} ./artifacts/deb
+          sh packaging/apt/install-test.sh ./artifacts/deb "$version" ${{ matrix.arch }}
+
   test-windows:
     name: test (${{ matrix.name }})
     needs: changes

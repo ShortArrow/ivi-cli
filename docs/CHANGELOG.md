@@ -6,6 +6,17 @@ All notable changes to ivi-cli are documented here. Format roughly follows
 
 ## [Unreleased]
 
+### Added
+
+- **Debian packages for amd64 and arm64 ship with each release.**
+  `ivicli_<version>-1_<arch>.deb` carries the self-contained build, so it
+  needs no .NET runtime, and installs `/usr/bin/ivicli`. Each one is
+  installed with `apt` in Debian 12 and Ubuntu 24.04 containers before
+  the release is published. They are meant for the APT repository at
+  `pkg.shortarrow.jp`, which is not live yet: a package depends on the
+  repository's `shortarrow-archive-keyring`, so it does not install from
+  the file alone.
+
 ## [0.4.1] — 2026-10-19
 
 ### Added
