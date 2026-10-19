@@ -126,6 +126,31 @@ public sealed class SerialPortLineFactoryTests
     }
 
     /// <summary>
+    /// On Windows <c>SerialPort</c> opens only a name of the form
+    /// <c>COM</c> and a number, after the device prefix is removed; a driver
+    /// can list other names, such as com0com's <c>CNCA0</c>. Elsewhere a
+    /// port is a path, which its name alone cannot rule out.
+    /// </summary>
+    [Theory]
+    [InlineData("COM3", true, true)]
+    [InlineData("com3", true, true)]
+    [InlineData(@"\\.\COM10", true, true)]
+    [InlineData("CNCA0", true, false)]
+    [InlineData("COM#", true, false)]
+    [InlineData("COM", true, false)]
+    [InlineData(@"\\.\CNCA0", true, false)]
+    [InlineData("CNCA0", false, true)]
+    [InlineData("/dev/ttyUSB0", false, true)]
+    public void Only_a_name_SerialPort_can_open_is_openable(
+        string port,
+        bool onWindows,
+        bool openable
+    )
+    {
+        SerialPortLineFactory.CanOpen(port, onWindows).ShouldBe(openable);
+    }
+
+    /// <summary>
     /// A device timeout of 0 means not to wait; <c>SerialPort</c> refuses 0,
     /// so the port gets its shortest timeout, 1 ms.
     /// </summary>

@@ -19,28 +19,36 @@ namespace IviCli.Backends.Serial;
 /// skip every board the <c>[[asrl]]</c> table or a device's resource
 /// already uses; each such port gets a different number, so the lines can
 /// be run one after another. A port no board could be registered under,
-/// such as one named only by digits, is left out.
+/// such as one named only by digits, is left out, and so is one the Serial
+/// backend could not open by its name (<see cref="SerialPortLineFactory.CanOpen"/>);
+/// the scanner opens no port to find out (ADR 0055 §3).
 /// </summary>
 public sealed class SerialPortScanner : IBackendScanner
 {
     private readonly IConfigStore _config;
     private readonly ISerialPorts _ports;
     private readonly Func<IReadOnlyCollection<string>> _portNames;
+    private readonly bool _onWindows;
 
     /// <summary>Lists the ports <see cref="SerialPort.GetPortNames"/> reports.</summary>
     public SerialPortScanner(IConfigStore config, ISerialPorts ports)
-        : this(config, ports, SerialPort.GetPortNames) { }
+        : this(config, ports, SerialPort.GetPortNames, OperatingSystem.IsWindows()) { }
 
-    /// <summary>Lists the ports <paramref name="portNames"/> reports.</summary>
+    /// <summary>
+    /// Lists the ports <paramref name="portNames"/> reports, judging which
+    /// names open as on Windows when <paramref name="onWindows"/> is set.
+    /// </summary>
     public SerialPortScanner(
         IConfigStore config,
         ISerialPorts ports,
-        Func<IReadOnlyCollection<string>> portNames
+        Func<IReadOnlyCollection<string>> portNames,
+        bool onWindows
     )
     {
         _config = config;
         _ports = ports;
         _portNames = portNames;
+        _onWindows = onWindows;
     }
 
     /// <inheritdoc/>
@@ -89,7 +97,8 @@ public sealed class SerialPortScanner : IBackendScanner
         )
         {
             if (
-                AsrlBoardRegistration.From(0, port)
+                !SerialPortLineFactory.CanOpen(port, _onWindows)
+                || AsrlBoardRegistration.From(0, port)
                     is not Result<AsrlBoardRegistration, ConfigError>.Ok
                 || VisaResource.Parse($"ASRL{port}::INSTR")
                     is not Result<VisaResource, VisaResourceError>.Ok
