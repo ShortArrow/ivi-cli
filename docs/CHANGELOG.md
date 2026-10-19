@@ -40,7 +40,7 @@ All notable changes to ivi-cli are documented here. Format roughly follows
   device sets. `visa list --json` adds them as `serial`,
   `read_termination` and `write_termination`, with the names and values of
   `config.toml`, and `GET /v1/devices` as `serial`, `readTermination` and
-  `writeTermination`, in the API's camelCase. `visa scan` lists the machine's serial ports with the board that names each,
+  `writeTermination`, in the API's camelCase. `visa scan` lists the machine's serial ports that the Serial backend can open, with the board that names each,
   or the `visa asrl add` line that would register it, and `visa scan --add`
   registers them by port name.
 

@@ -107,6 +107,20 @@ public sealed class SerialPortScannerTests
     }
 
     [Fact]
+    public async Task On_Windows_a_port_SerialPort_cannot_open_is_left_out()
+    {
+        var scanner = Scanner(
+            new FakeConfigStore(ConfigDocument.Empty),
+            ["CNCA0", "COM#", "COM3"],
+            onWindows: true
+        );
+
+        var found = await ScanAsync(scanner);
+
+        found.ShouldBe([("ASRLCOM3::INSTR", "register with: ivicli visa asrl add 1 COM3")]);
+    }
+
+    [Fact]
     public async Task Ports_are_listed_without_a_board_when_the_configuration_cannot_be_read()
     {
         var config = new FakeConfigStore(ConfigDocument.Empty);
@@ -132,8 +146,9 @@ public sealed class SerialPortScannerTests
     private static SerialPortScanner Scanner(
         FakeConfigStore config,
         string[] present,
-        LinkedPorts? ports = null
-    ) => new(config, ports ?? new LinkedPorts(), () => present);
+        LinkedPorts? ports = null,
+        bool onWindows = false
+    ) => new(config, ports ?? new LinkedPorts(), () => present, onWindows);
 
     private static async Task<(string Resource, string? Detail)[]> ScanAsync(
         SerialPortScanner scanner

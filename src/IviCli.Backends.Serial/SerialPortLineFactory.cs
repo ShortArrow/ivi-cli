@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.IO.Ports;
 using System.Text;
 using IviCli.Domain.Devices;
@@ -84,6 +85,35 @@ public sealed class SerialPortLineFactory : ISerialLineFactory
     }
 
     /// <summary>
+    /// Whether <see cref="SerialPort"/> can open <paramref name="port"/> by
+    /// its name. On Windows it opens only <c>COM</c> followed by a number,
+    /// after a <c>\\.\</c> prefix is removed, though a driver can list
+    /// other names, such as com0com's <c>CNCA0</c>. Elsewhere a port is a
+    /// path, which its name alone cannot rule out.
+    /// </summary>
+    public static bool CanOpen(string port, bool onWindows)
+    {
+        ArgumentNullException.ThrowIfNull(port);
+        if (!onWindows)
+        {
+            return true;
+        }
+        var name = PortName(port);
+        return name.StartsWith("COM", StringComparison.OrdinalIgnoreCase)
+            && uint.TryParse(
+                name.AsSpan(3),
+                NumberStyles.Integer,
+                CultureInfo.CurrentCulture,
+                out _
+            );
+    }
+
+    private static string PortName(string port) =>
+        port.StartsWith(WindowsDevicePrefix, StringComparison.Ordinal)
+            ? port[WindowsDevicePrefix.Length..]
+            : port;
+
+    /// <summary>
     /// Sets <paramref name="serialPort"/> up for <paramref name="port"/>
     /// before it is opened: the serial settings, <paramref name="timeout"/>
     /// for reads and writes, and Latin-1 text so every byte passes unchanged
@@ -98,9 +128,7 @@ public sealed class SerialPortLineFactory : ISerialLineFactory
     {
         ArgumentNullException.ThrowIfNull(serialPort);
         ArgumentNullException.ThrowIfNull(settings);
-        serialPort.PortName = port.StartsWith(WindowsDevicePrefix, StringComparison.Ordinal)
-            ? port[WindowsDevicePrefix.Length..]
-            : port;
+        serialPort.PortName = PortName(port);
         serialPort.BaudRate = settings.Baud;
         serialPort.DataBits = settings.DataBits;
         serialPort.Parity = settings.Parity switch

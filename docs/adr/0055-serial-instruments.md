@@ -99,7 +99,10 @@ port = "/dev/ttyUSB0"
   serial line has no handshake that identifies an instrument and a probe
   at a guessed baud rate could write to whatever is attached, and an open
   port is held from other programs (§7). Whether an instrument answers is
-  left to `visa query` on the registered device.
+  left to `visa query` on the registered device. A name the Serial backend
+  could not open is left out: on Windows `SerialPort` opens only `COM`
+  followed by a number, while a driver such as com0com lists names like
+  `CNCA0`. On Linux and macOS a port is a path, and every listed one stays.
 
 The factory reads its configuration once, at start, so an `AsrlBoard`
 device gets a backend that reads the table from the configuration store
