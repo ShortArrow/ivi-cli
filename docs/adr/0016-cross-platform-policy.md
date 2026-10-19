@@ -44,9 +44,12 @@ the release matrix implies adding its native verification.
 
 Each matrix job builds, runs the unit + architecture test suite, and
 **smoke-runs the published self-contained binary** (`ivicli --version`
-must succeed and report the tag-derived version). A binary that cannot
-start on its target architecture fails the release before anything is
-published.
+must succeed and report the tag-derived version). On Linux and macOS
+the same binary then queries a socat pseudo-terminal through the Serial
+backend (`.github/scripts/serial-smoke.sh`), so a bundle that leaves out
+`System.IO.Ports`' native library fails too; Windows has no
+pseudo-terminal to stand in for a port. A binary that cannot start on
+its target architecture fails the release before anything is published.
 
 The framework-dependent binary is published per-RID but not separately
 smoke-run: it carries the same IL as the self-contained bundle and its
@@ -57,7 +60,9 @@ runtime is supplied by the user.
 The mock container's smoke gate runs **natively on both
 architectures** before the multi-arch push: amd64 in the `docker` job,
 arm64 in `docker-smoke-arm64` on an arm64 runner (shared script
-`docker/smoke-test.sh` — HEALTHCHECK + SCPI round-trip). QEMU
+`docker/smoke-test.sh` — HEALTHCHECK, SCPI round-trips over SOCKET and
+VXI-11, and the serial round trip above, with socat installed into the
+throwaway container only). QEMU
 emulation is deliberately not used for the smoke: emulated .NET is
 slow and flaky, and a native runner exists.
 
