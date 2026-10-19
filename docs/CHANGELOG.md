@@ -6,6 +6,8 @@ All notable changes to ivi-cli are documented here. Format roughly follows
 
 ## [Unreleased]
 
+## [0.4.1] — 2026-10-19
+
 ### Added
 
 - **Serial instruments, with or without a VISA runtime.** An
