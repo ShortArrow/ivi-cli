@@ -157,11 +157,61 @@ jobs:
           name: ivicli-${{ matrix.rid }}
           path: ./artifacts
 
+  # The ivicli Debian packages (ADR 0052), built from the self-contained
+  # binaries and installed with apt in Debian and Ubuntu containers before
+  # anything is published. A pre-release gets none: its version would
+  # sort after the final release in Debian's ordering.
+  deb:
+    name: deb / ${{ matrix.arch }}
+    needs: publish
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            rid: linux-x64
+            arch: amd64
+          - os: ubuntu-24.04-arm
+            rid: linux-arm64
+            arch: arm64
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Download self-contained artifact
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: ivicli-${{ matrix.rid }}
+          path: ./artifacts
+
+      - name: Build the package and install it with apt
+        id: deb
+        run: |
+          set -euo pipefail
+          VERSION="${GITHUB_REF_NAME#v}"
+          case "$VERSION" in
+            *-*) echo "pre-release $VERSION: no package"; exit 0 ;;
+          esac
+          sudo apt-get update -qq && sudo apt-get install -y -qq apt-utils
+          sc="./artifacts/${{ matrix.rid }}-selfcontained"
+          # Artifacts lose the executable bit on upload.
+          chmod +x "$sc/ivicli"
+          sh packaging/apt/build-deb.sh "$sc" "$VERSION" ${{ matrix.arch }} ./deb
+          sh packaging/apt/install-test.sh ./deb "$VERSION" ${{ matrix.arch }}
+
+      - name: Upload package
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: ivicli-deb-${{ matrix.arch }}
+          path: ./deb/*.deb
+          if-no-files-found: ignore
+
   pack:
     name: dotnet tool pack & push
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    needs: publish
+    needs: [publish, deb]
     permissions:
       id-token: write
       contents: read
@@ -248,7 +298,7 @@ jobs:
     name: docker / mock-VISA container
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    needs: [publish, docker-smoke-arm64]
+    needs: [publish, deb, docker-smoke-arm64]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
@@ -424,7 +474,7 @@ jobs:
     name: docker / NativeAOT multi-arch manifest
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    needs: [docker-aot-amd64, docker-aot-arm64]
+    needs: [deb, docker-aot-amd64, docker-aot-arm64]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
@@ -484,7 +534,7 @@ jobs:
     name: github release
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    needs: [publish, pack, docker, docker-aot-manifest]
+    needs: [publish, deb, pack, docker, docker-aot-manifest]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
@@ -534,6 +584,10 @@ jobs:
               (cd "$fx" && zip -qr "../../../release-assets/ivicli-${VERSION}-${rid}-fxdep.zip" . -x '*.xml')
             fi
           done
+          # Debian packages: attached as built (ADR 0052 §3).
+          if compgen -G "./artifacts/ivicli-deb-*/*.deb" > /dev/null; then
+            cp ./artifacts/ivicli-deb-*/*.deb ./release-assets/
+          fi
           # NuGet package: attach as-is (already a single file).
           if compgen -G "./artifacts/ivicli-nupkg/*.nupkg" > /dev/null; then
             cp ./artifacts/ivicli-nupkg/*.nupkg ./release-assets/
