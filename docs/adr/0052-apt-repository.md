@@ -1,7 +1,7 @@
-# 0052. APT repository for Debian and Ubuntu
+# 0052. Debian packages for the APT repository
 
 - Status: Draft
-- Date: 2026-09-29
+- Date: 2026-09-29, revised 2026-10-20
 
 ## Context
 
@@ -11,24 +11,13 @@ if a .NET SDK is present. None of these is updated by the system's own
 package manager, so a Debian or Ubuntu machine keeps whatever version was
 unpacked until someone repeats the steps.
 
-APT reads a repository, not a list of files. `apt update` fetches
-`dists/<suite>/InRelease`, checks its signature against the key the
-source line names, and follows the hashes in it to the `Packages`
-index. Each entry in `Packages` names its `.deb` by a `Filename:` path
-relative to the repository's base URL, and APT checks the file's size
-and SHA-256 against that entry after downloading it.
-
-That rules out GitHub Releases as the repository itself. Release assets
-sit in one flat directory per tag with no index, and a `Filename:` cannot
-name another host or another tag's directory. The `releases/latest/download/`
-URL resolves to the release marked Latest, so a repository based there
-could only ever offer that one version.
-
-Size also matters. The self-contained linux-x64 archive of v0.4.0 is
-47.2 MB and the linux-arm64 one 45.0 MB, so every release adds about
-90 MB of packages before the `.deb` compression is counted. GitHub Pages
-limits a site to 1 GB, which about eleven releases would exceed, and
-Cloudflare Workers static assets refuse any single file over 25 MiB.
+APT needs a signed repository, which GitHub Releases cannot be. That
+repository is shared with ShortArrow's other tools and lives in
+[ShortArrow/pkg](https://github.com/ShortArrow/pkg), served at
+`https://pkg.shortarrow.jp`; its ADR 0001 records how it is laid out,
+signed and published, and why its packages stay GitHub Release assets
+behind a redirect. This ADR covers what ivi-cli provides it: the
+packages, built and tested here and attached to each release.
 
 ## Decision
 
@@ -44,65 +33,7 @@ The container image (ADR 0018) keeps its own role as a mock instrument.
 `packaging/aur` holds AUR build files, but nothing is published to the
 AUR yet.
 
-### 2. Where each part lives
-
-The repository is served at `https://pkg.shortarrow.jp/apt`. The
-`shortarrow.jp` zone is already on Cloudflare.
-
-- The metadata, `dists/`, the keyring file and the keyring package are
-  the static assets of a Cloudflare Worker that has no script. They are
-  small and change on every release and every re-signing (§5). Requests
-  for static assets are free and unlimited, and a request no asset or
-  rule matches gets a 404.
-- The `.deb` files are GitHub Release assets and nothing else. The
-  repository's `pool/<tag>/<file>` path answers with a 302 to
-  `https://github.com/ShortArrow/ivi-cli/releases/download/<tag>/<file>`,
-  set by one rule in the `_redirects` file at the root of the uploaded
-  assets, which the Custom Domain serves at the host's root:
-
-  ```
-  /apt/pool/:tag/:file https://github.com/ShortArrow/ivi-cli/releases/download/:tag/:file 302
-  ```
-
-  A redirect applies whether or not an asset matches, so `pool/` never
-  holds a file of its own.
-
-Cloudflare Pages would serve the same files with the same `_redirects`.
-Workers static assets were chosen because Cloudflare's documentation
-describes Workers as having the broader feature set and offers a
-migration from Pages to Workers, not the reverse.
-
-A package therefore has one copy, in the release that built it, and
-every version stays installable without a size limit. The user's source
-line names only `pkg.shortarrow.jp`, so the files behind it can move
-later without asking anyone to edit it.
-
-Trust rests on the signature alone. A file changed behind the redirect
-fails APT's size or hash check against the signed `Packages`, and the
-redirect target needs no trust of its own.
-
-### 3. Layout
-
-The standard layout, with one suite:
-
-```
-apt/
-├── ivicli-archive-keyring.gpg
-├── keyring/ivicli-archive-keyring_<date>_all.deb
-├── dists/stable/
-│   ├── InRelease
-│   ├── Release
-│   └── main/binary-{amd64,arm64}/Packages(.gz)
-└── pool/<tag>/ivicli_<version>_<arch>.deb   (redirected)
-```
-
-A flat repository (`Packages` and `Release` beside the files, source
-line ending in `./`) would serve one package too. The standard layout
-was chosen because the tools that generate repositories produce it at no
-extra cost, and because it leaves room to add a component or an
-architecture without changing the line every user has already written.
-
-### 4. The package
+### 2. The package
 
 - Named `ivicli`, the command's name. The NuGet package keeps `ivi-cli`,
   the name that ecosystem already knows.
@@ -118,257 +49,74 @@ architecture without changing the line every user has already written.
   respectively. ICU is not needed: the CLI runs with invariant
   globalization, without which it aborts at start-up on a machine that
   has no ICU.
-- It depends on `ivicli-archive-keyring`, a second package from the
-  same repository that holds only the repository's keyring (§5).
-- `ivicli-archive-keyring` is `Architecture: all`, built from the
-  public keys under `packaging/apt/keyring/`, and versioned by the date
-  it was built with a counter (`2026.10.01.1`, then `2026.10.01.2` for a
-  second change that day), independently of ivi-cli. It is rebuilt only
-  when its keys change. A
-  rotation shipped from any release line therefore reaches every
-  machine, whichever ivi-cli version it runs. Being a few kilobytes, the
-  package is served from the site itself under `keyring/`, not through
-  the redirect, and appears in both architectures' `Packages`.
+- It also depends on the registry's keyring package, so that a rotated
+  key reaches every machine that has ivicli installed, whichever version
+  it runs. The registry names that package (its ADR 0001 leaves the name
+  open); the dependency is added when it does.
 - The Debian version is the release version with revision `1`
   (`0.4.0-1`). Packaging changes ship with the next release.
-- Pre-releases never enter the repository. A version containing `-`
-  would sort after the final release in Debian's ordering
-  (`0.4.0-beta.1` > `0.4.0`), so the publishing job refuses one rather
-  than relying on the release channel alone. A maintenance release on an
-  older line (ADR 0022) does enter it: APT picks the highest version,
-  and `0.3.3` sorts below `0.4.0`.
+- Pre-releases get no package. A version containing `-` would sort after
+  the final release in Debian's ordering (`0.4.0-beta.1` > `0.4.0`), and
+  the registry refuses one.
 - A `dotnet tool` install of the same command lives in
   `~/.dotnet/tools`, and whichever directory comes first on `PATH`
   wins. The install guide says how to tell which one runs.
 
-### 5. Signing keys and freshness
+### 3. Building and attaching
 
-- The repository has its own Ed25519 keys, not the maintainer's personal
-  key, so the key that signs every update can be replaced without
-  touching anything else. There are two: a signing key, which expires
-  after three years, and a standby key, kept offline and never used
-  until it is needed.
-- `ivicli-archive-keyring` installs
-  `/usr/share/keyrings/ivicli-archive-keyring.gpg` with the public half
-  of every current key, standby included, the way Debian's own
-  `debian-archive-keyring` does. It is a package of its own so that
-  removing `ivicli` leaves the keyring, and with it the source, working.
-  The install guide's first step downloads the same keyring to the same
-  path, and the source line names it:
+The `.deb` files are built from the `publish` job's self-contained
+artifacts before the GitHub Release is created, so they are attached to
+it and listed in its `SHA256SUMS` with every other asset. The registry
+checks each package against that file before indexing it. How a release
+starts the registry's publishing run is open in its ADR 0001.
 
-  ```
-  deb [signed-by=/usr/share/keyrings/ivicli-archive-keyring.gpg] https://pkg.shortarrow.jp/apt stable main
-  ```
+### 4. The install test
 
-  The guide then installs both packages by name,
-  `apt install ivicli-archive-keyring ivicli`, so APT marks the keyring
-  as installed by hand. Pulled in only as a dependency, it would be
-  marked automatic, and `apt autoremove` after removing `ivicli` would
-  delete it. Installing the keyring package takes the file over, and
-  every upgrade replaces it. Keys change on users' machines through
-  `apt upgrade`, never by hand after the first step. Removing the
-  keyring package itself leaves the source unverifiable until the first
-  step is repeated.
-- Rotation: a release whose keyring adds the next signing key ships at
-  least a year before the current one expires, and `InRelease` is signed
-  by both until it does. A machine that never upgrades in that year
-  stops verifying when the old key expires.
-- Compromise: the standby key becomes the signing key at once, its
-  private half moving into the environment below, and the next keyring
-  drops the compromised key and adds a newly generated standby. The
-  published index may have been altered with the compromised key, so the
-  repository is rebuilt from the GitHub Releases (§6) rather than
-  updated. Clients already trust the
-  standby key, so the replacement reaches them through an ordinary
-  upgrade. Until a machine takes that upgrade, the compromised key still
-  verifies there, and a package the attacker signed in that window,
-  with a keyring of their choosing and maintainer scripts that run as
-  root, cannot be undone by the standby key. A machine that holds or
-  pins the keyring package never receives a new key.
-- The keys and a Cloudflare API token limited to editing Workers
-  scripts on the one account, with that account's ID, are secrets of a
-  GitHub Actions
-  environment, `apt-publish`, which accepts `v*` tags and the `main`
-  branch. From `main`, only the re-signing and withdrawal workflows
-  below name that environment. That is a convention: GitHub restricts
-  an environment by branch and tag, not by workflow file, so anyone who
-  can push a `v*` tag or change a workflow on `main` can reach the
-  keys.
-- `Release` carries `Date` and `Valid-Until`, 90 days after signing. A
-  scheduled workflow re-signs the metadata weekly. Without an expiry, an
-  attacker or a stale mirror could keep serving an old, validly signed
-  index and hide a fix; with it, a client refuses metadata that has not
-  been re-signed for 90 days. If re-signing stops, users see an expired
-  repository rather than a silently stale one. A client whose clock is
-  far off sees the repository as expired or not yet valid, as for any
-  APT source.
+Both `.deb` files are built from a self-contained publish, amd64 on
+`ubuntu-latest` and arm64 on `ubuntu-24.04-arm`. Each runner serves them
+from a throwaway repository signed with a key generated for the run,
+installs `ivicli` with `apt` in fresh `debian:bookworm` and
+`ubuntu:24.04` containers, and runs `ivicli --version`. A missing
+`Depends` entry for a library the runtime loads at start-up shows as a
+binary that does not start in a container that has only what `apt`
+installed. A library loaded only on first use, such as OpenSSL on the
+first TLS connection, and the certificate files of `ca-certificates` are
+not exercised; their entries are reviewed in the pull request that
+changes `Depends`.
 
-### 6. Publishing
+- It runs on pull requests that change `packaging/apt/`, the workflows
+  that build the packages, or what decides the published binary: `src/`,
+  `Directory.Build.props`, `Directory.Packages.props` and `global.json`.
+  No secret is involved, so pull requests from forks run it too.
+- It also runs in `release.yml`, in a job after `publish` that `pack`,
+  `docker` and `release` wait for, so a package that does not install
+  stops the release before NuGet, ghcr.io or the GitHub Release receives
+  anything.
 
-The `ivicli` `.deb` files are built from the `publish` job's
-self-contained artifacts before the GitHub Release is created, so they
-are attached to it and listed in its `SHA256SUMS` with every other
-asset. The keyring package is not a release asset; its hash is in the
-signed `Packages`. A separate
-`apt` job then updates the repository:
-
-1. Skip a pre-release, and fail on a version containing `-`.
-2. Fetch the published site: `InRelease`, `Packages`, and every file the
-   site serves itself, the keyring and its packages. Verify `InRelease`
-   against the keys under `packaging/apt/keyring/`, and every fetched
-   file against its hash in `Packages`. Any failure stops the job; it
-   never signs what it could not verify.
-3. Replace the `ivicli` entries for this upstream version with entries
-   computed from the `.deb` files this run built, for both
-   architectures. The index is keyed by package name and version:
-   re-running a release, or re-creating its tag, rewrites that version's
-   entries instead of leaving hashes of assets that no longer exist.
-4. If the keys under `packaging/apt/keyring/` differ from those in the
-   newest published keyring package, in either direction, build a new
-   keyring package and add it.
-5. Write `Release` with `Date` and `Valid-Until`, sign `InRelease`, and
-   deploy the fetched site with these changes as one new version of the
-   Worker, with `wrangler deploy`. Each version serves the files its
-   upload manifest lists and no others, so a file the job did not carry
-   forward would disappear.
-
-A rebuild input replaces steps 2 and 3: the job builds the index from
-the `.deb` assets of every stable GitHub Release, checked against each
-release's `SHA256SUMS`, and the keyring package from
-`packaging/apt/keyring/`, trusting nothing on the live site. It creates
-the repository the first time, and recovers it after a compromise or a
-failed verification.
-
-A failed `apt` job is retried by re-running that job; the GitHub Release
-it depends on is already in place. Two workflows on `main` touch the
-repository besides it. The weekly re-signing also runs step 4, so a
-keyring change merged to `main` ships within a week without a release,
-or at once when the workflow is run by hand. A manual withdrawal removes
-one `ivicli` version's entries and re-signs; machines that installed a
-withdrawn version keep it, and `apt` offers the highest remaining
-version. All three share one concurrency group with `queue: max`, so no
-two of them read and deploy the site at the same time, and none waiting
-behind another is cancelled. Without `queue: max`, GitHub keeps one
-pending run per group and cancels the older one.
-
-The maintainer creates the Worker and attaches `pkg.shortarrow.jp` to
-it as a Custom Domain once, by hand, before the first publish;
-Cloudflare creates the DNS record and the certificate for it. The
-hostname must not already have a CNAME record, and every path
-on it goes to this Worker. The Worker's `wrangler` configuration, with
-its assets directory, lives in `packaging/apt/`.
-
-### 7. Checks in CI
-
-All of these run on GitHub-hosted runners, which cost nothing for a
-public repository. The install test and the post-publish check read the
-repository and need no key, so they run outside the `apt-publish`
-environment with `contents: read`. The re-signing check runs inside
-the re-signing workflow, which holds the keys, and its issue step needs
-`issues: write`.
-
-- **Install test.** Both `.deb` files are built from a self-contained
-  publish, amd64 on `ubuntu-latest` and arm64 on `ubuntu-24.04-arm`.
-  Each runner serves them from a throwaway repository signed with a key
-  generated for the run, installs `ivicli-archive-keyring` and `ivicli`
-  with `apt` in fresh `debian:bookworm` and `ubuntu:24.04` containers,
-  and runs `ivicli --version`. A missing `Depends` entry for a library
-  the runtime loads at start-up shows as a binary that does not start
-  in a container that has only what `apt` installed. A library loaded
-  only on first use, such as OpenSSL on the first TLS connection, and the
-  certificate files of `ca-certificates` are not exercised; their
-  entries are reviewed in the pull request that changes `Depends`.
-  - It runs on pull requests that change `packaging/apt/`, the
-    workflows that build or publish the packages, or what decides the
-    published binary: `src/`, `Directory.Build.props`,
-    `Directory.Packages.props` and `global.json`. No secret is involved,
-    so pull requests from forks run it too.
-  - It also runs in `release.yml`, in a job after `publish` that
-    `pack`, `docker` and `release` wait for, so a package that does not
-    install stops the release before NuGet, ghcr.io or the GitHub
-    Release receives anything.
-- **After publishing.** For a stable release, once the `apt` job
-  deploys, a job on each architecture follows the install guide against
-  `https://pkg.shortarrow.jp/apt` in the same two containers. It checks
-  that `apt-cache madison ivicli` lists `<version>-1`, installs
-  `ivicli=<version>-1` and checks that `ivicli --version` reports it. It
-  names the version because a maintenance release on an older line is
-  not the highest one, and `apt install ivicli` would pick the newer
-  line (§4). This is the only check that goes through Cloudflare, the
-  `_redirects` rule and GitHub's asset URLs together. A failure leaves
-  the GitHub Release in place and marks the run failed. A failure of
-  Cloudflare, the redirect or the site is fixed and the `apt` job
-  re-run (§6). A defect in the package itself cannot be fixed by a
-  re-run, which uses the workflow and the assets of the tag: the version
-  is withdrawn (§6) and the fix ships with the next release.
-- **Re-signing.** The weekly re-signing ends by fetching the live
-  `InRelease` and checking that its `Date` and `Valid-Until` are the
-  ones just signed, then runs `apt update` against it in a container. A
-  deployment that reports success while the old index is still served
-  fails here; `apt update` alone would accept that index until it
-  expires. A failure of any step opens an issue, or comments on the one
-  already open, and the next successful run closes it. With weekly runs
-  and a 90-day `Valid-Until`, about twelve runs can fail before users
-  see an expired repository, and the issue makes the first failure
-  visible instead of the last.
-  - A run that never starts opens no issue. GitHub disables a scheduled
-    workflow in a public repository after 60 days without activity in
-    the repository, so a quiet period longer than that is the one way
-    re-signing stops silently. The gap is accepted: any push resets the
-    60 days, and after a longer pause the maintainer re-enables the
-    workflow and runs it by hand.
+The check that the published repository serves the package, through
+Cloudflare and GitHub's asset URLs, runs in the registry after it
+publishes.
 
 ## Consequences
 
-- `apt update` and `apt upgrade` deliver new versions, and new keys, to
-  Debian and Ubuntu machines.
-- The release workflow depends on Cloudflare and on the repository
-  keys. If either is unavailable, the GitHub Release still ships, and
-  the repository lags until the `apt` job is re-run.
-- The repository must be re-signed at least every 90 days, by the
-  scheduled workflow, and a new signing key must ship a year before the
-  current one expires.
-- The standby key must be stored offline and separately from the
-  signing key, or it protects nothing.
-- Every install depends on both Cloudflare and GitHub being reachable.
-- An RPM repository, if wanted later, can sit beside `apt/` in the same
-  Worker's assets, with its own redirect rule, since the Custom Domain
-  sends the whole host to this Worker.
+- `apt update` and `apt upgrade` deliver new versions to Debian and
+  Ubuntu machines once the registry indexes them.
+- Every stable release carries two `.deb` files, about 90 MB together
+  before compression, beside the archives they repeat.
+- A release that builds a package which does not install stops before
+  anything is published.
+- Reaching APT users depends on the registry's workflow and keys. If
+  either is unavailable, the GitHub Release still ships with its `.deb`
+  files, and the repository lags until the registry's run is repeated.
 
 ## Verification
 
 On 2026-09-29, in `debian:bookworm` (apt 2.6.1) and `ubuntu:24.04`
-(apt 2.8.3) containers, against a signed repository in the standard
-layout served over HTTPS by a local server:
-
-- `apt update` and `apt install ivicli` succeeded through two chained
-  302 redirects from `pool/`, the shape of a GitHub asset URL.
-- With `pool/` redirected to the real v0.4.0 release asset,
-  `apt-get download` followed GitHub's redirects and saved a file whose
-  SHA-256 matched the asset.
-- A package changed behind the redirect was refused, by size when the
-  length changed and by hash when one byte was flipped at the same
-  length. A `Packages.gz` changed without re-signing was refused by
-  `apt update`.
+(apt 2.8.3) containers, `apt install ivicli` from a signed repository
+installed a package whose `pool/` path redirected twice, the shape of a
+GitHub asset URL, and with `pool/` redirected to the real v0.4.0 release
+asset `apt-get download` saved a file whose SHA-256 matched the asset.
+The registry's ADR 0001 carries the rest of that day's checks.
 
 `dpkg --compare-versions` in `debian:bookworm` gives `0.4.0-beta.1` >
 `0.4.0`, `0.4.0~beta.1` < `0.4.0` and `0.3.3` < `0.4.0`.
-
-In `debian:bookworm`, a keyring placed at
-`/usr/share/keyrings/ivicli-archive-keyring.gpg` by hand was taken over
-by a package that ships the same path: `dpkg -i` replaced it without an
-error, `dpkg -S` then named the package as its owner, and the next
-version of the package replaced it again. An `InRelease` signed by two
-Ed25519 keys verified with a keyring holding only one of them, in both
-containers, and one signed by a key that had expired in the client's
-keyring failed with `EXPKEYSIG`.
-
-Not yet verified: that the Workers static assets `_redirects` rule with
-`:tag` and `:file` placeholders returns the 302 to an external host as
-intended, that a new version stops serving a file its manifest leaves
-out, that files without an extension such as `InRelease` and
-`Packages` are served at their exact paths, and the repository over
-Cloudflare's own certificate. All four are checked on a test site
-before the first publish. The redirect and the
-certificate are then checked again by the post-publish check on every
-stable release (§7).
