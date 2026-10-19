@@ -70,7 +70,6 @@
           "IviCli.Application": "[0.4.0, )"
         }
       }
-    },
-    "net10.0/linux-x64": {}
+    }
   }
 }
