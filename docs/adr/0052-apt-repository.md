@@ -69,8 +69,18 @@ AUR yet.
 The `.deb` files are built from the `publish` job's self-contained
 artifacts before the GitHub Release is created, so they are attached to
 it and listed in its `SHA256SUMS` with every other asset. The registry
-checks each package against that file before indexing it. How a release
-starts the registry's publishing run is open in its ADR 0001.
+checks each package against that file before indexing it.
+
+The registry finds the release itself. An hourly workflow there lists
+the stable releases of the projects it serves and publishes each new
+version, so this repository holds no credential for the registry and
+sends it nothing. A token that could notify it would carry write access
+to the registry's repository, keyring included.
+
+Once a version is published, its `.deb` assets are not replaced by
+different files under the same names. The registry's index records each
+file's size and hash, so `apt` rejects a replaced file until the
+registry publishes that version again.
 
 ### 4. The install test
 
@@ -109,6 +119,8 @@ publishes.
   before compression, beside the archives they repeat.
 - A release that builds a package which does not install stops before
   anything is published.
+- A release reaches APT within about an hour of its GitHub Release,
+  when the registry's next run finds it.
 - Reaching APT users depends on the registry's workflow and keys. If
   either is unavailable, the GitHub Release still ships with its `.deb`
   files, and the repository lags until the registry's run is repeated.
