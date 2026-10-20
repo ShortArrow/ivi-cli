@@ -96,12 +96,13 @@ Additional protection settings:
 - Disallow deletion of `main`.
 - Require linear history (squash merge already enforces this; the setting is belt-and-suspenders).
 
-### 8. Versioning: Nerdbank.GitVersioning (NBGV)
+### 8. Versioning: `<Version>` in `Directory.Build.props`
 
-- `version.json` at the repository root declares the next release's major.minor (e.g. `0.1`).
-- Patch is auto-computed from the git commit height since the `version.json` was last bumped.
-- Tags `v0.1.0`, `v0.1.1`, ... drive the release workflow. NBGV embeds the version into assemblies and into the produced NuGet package metadata.
-- Major / minor bumps happen via PR to `version.json`. The bump PR is the formal "start of a new release window".
+- The version is written by hand as `<Version>` in `Directory.Build.props`, which every project imports. A release starts with a pull request, `chore(release): X.Y.Z`, that sets it, gives `docs/CHANGELOG.md` a `## [X.Y.Z]` section, and updates the project versions recorded in the lock files (`dotnet restore --force-evaluate` rewrites only those lines).
+- A pushed `vX.Y.Z` tag drives `release.yml`. Its first job, `guard`, fails unless the tag equals `<Version>` on the tagged commit and `docs/CHANGELOG.md` has that version's section. The jobs after it publish with `-p:Version` taken from the tag.
+- Every pull request runs `version / CHANGELOG sync`, which fails unless the current `<Version>` has a section in `docs/CHANGELOG.md`. A version number therefore never reaches `main` without its notes.
+- A build from `main` reports the version last set there, with the commit hash appended by the SDK as build metadata (`0.4.0+<sha>` until the next release pull request changes it).
+- This section first chose Nerdbank.GitVersioning, with a `version.json` and a patch computed from the commit height. It was never wired in: no `version.json` was ever committed, and nothing runs the `nbgv` tool that `.config/dotnet-tools.json` still lists.
 
 ### 9. Caching
 
@@ -159,7 +160,7 @@ built-in `GITHUB_TOKEN` with `packages: write` — no PAT required.
 - Required checks make the contract for `main` mergeability auditable and uniform.
 - PR-time gating stays under a few minutes (single-OS, unit + architecture only); nightly carries the slower work.
 - Three artifact forms (self-contained, framework-dependent, `dotnet tool`) cover automation engineers, .NET developers, and container users without compromise.
-- NBGV + tag-driven release decouples release engineering from manual `<Version>` edits.
+- One hand-written `<Version>`, checked against the tag and the CHANGELOG by CI, means a release cannot be published under a number its notes do not name.
 - SHA-pinned actions + locked NuGet restore + Dependabot SHA tracking close the most common supply-chain vectors at minimal cost.
 
 **Cons**
