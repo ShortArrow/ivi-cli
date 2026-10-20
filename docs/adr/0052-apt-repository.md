@@ -71,8 +71,9 @@ it and listed in its `SHA256SUMS` with every other asset. The registry
 checks each package against that file before indexing it.
 
 The registry finds the release itself. An hourly workflow there lists
-the stable releases of the projects it serves and publishes each new
-version, so this repository holds no credential for the registry and
+the stable releases of the projects it serves and starts a publishing
+run for each new version, which publishes once the registry's maintainer
+approves it. This repository holds no credential for the registry and
 sends it nothing. A token that could notify it would carry write access
 to the registry's repository, keyring included.
 
@@ -118,8 +119,9 @@ publishes.
   before compression, beside the archives they repeat.
 - A release that builds a package which does not install stops before
   anything is published.
-- A release reaches APT within about an hour of its GitHub Release,
-  when the registry's next run finds it.
+- A release reaches APT after its GitHub Release only when the
+  registry's maintainer approves the publishing run that the hourly
+  check starts for it.
 - Reaching APT users depends on the registry's workflow and keys. If
   either is unavailable, the GitHub Release still ships with its `.deb`
   files, and the repository lags until the registry's run is repeated.
