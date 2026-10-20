@@ -57,6 +57,19 @@ patch releases never break them. Both surfaces are pinned in CI by
 Verify snapshots and parser tests, so an accidental break fails the
 PR, not the consumer.
 
+The `config.toml` contract covers what a value does as well as how it
+is spelled. A change that makes an unchanged configuration behave
+differently breaks it, as `timeout_ms` did in 0.5.0 when it began to
+stop operations that 0.4.0 let run.
+
+A minor version is cut for a feature large enough to carry one, and
+the breaks waiting for a minor ride along with it; a break on its own
+does not bump the minor. Until that release, a break merged to `main`
+waits in the CHANGELOG's unreleased section under `Changed
+(breaking)`, and `main` cuts no patch release, which would carry it. A
+fix owed to the current minor line meanwhile ships from a maintenance
+branch ([ADR 0022](0022-branching-strategy.md)).
+
 Everything else — human-readable output, log text and levels, the
 Management API shape, exit-message wording, container internals
 (base image, layout), and all .NET APIs of the shipped assemblies —
