@@ -28,10 +28,9 @@ packages, built and tested here and attached to each release.
 | NuGet | .NET users | `dotnet tool install -g ivi-cli` |
 | GitHub Releases | downloading a file by hand, and mise | archives, and from this ADR `.deb` files |
 | APT repository | Debian and Ubuntu | `apt install ivicli` |
+| AUR | Arch Linux | `ivi-cli-bin` or `ivi-cli`, from `packaging/aur` |
 
 The container image (ADR 0018) keeps its own role as a mock instrument.
-`packaging/aur` holds AUR build files, but nothing is published to the
-AUR yet.
 
 ### 2. The package
 

@@ -45,16 +45,15 @@ the smaller download.
 
 ## Arch Linux
 
-The packages are to be published to the AUR as
+Two packages are on the AUR,
 [`ivi-cli-bin`](https://aur.archlinux.org/packages/ivi-cli-bin) and
-[`ivi-cli`](https://aur.archlinux.org/packages/ivi-cli), and are not there
-yet. Their PKGBUILDs are in this repository, and `makepkg` builds and
-installs either one:
+[`ivi-cli`](https://aur.archlinux.org/packages/ivi-cli). An AUR helper
+installs either one, or `makepkg` builds it from the AUR's git repository:
 
 ```sh
-git clone https://github.com/ShortArrow/ivi-cli.git
-cd ivi-cli/packaging/aur/ivi-cli-bin   # prebuilt, carries its own runtime, no .NET needed
-# or: cd ivi-cli/packaging/aur/ivi-cli # built from source against the system .NET
+git clone https://aur.archlinux.org/ivi-cli-bin.git   # prebuilt, carries its own runtime, no .NET needed
+# or: git clone https://aur.archlinux.org/ivi-cli.git # built from source against the system .NET
+cd ivi-cli-bin
 makepkg -si
 ```
 

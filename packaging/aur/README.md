@@ -1,9 +1,11 @@
 # AUR packaging
 
-`ivi-cli-bin/` holds the PKGBUILD to be published to the AUR as
-[`ivi-cli-bin`](https://aur.archlinux.org/packages/ivi-cli-bin). Nothing is
-published there yet; until it is, `makepkg -si` in either directory builds
-and installs the package locally. It repackages
+`ivi-cli-bin/` holds the PKGBUILD published to the AUR as
+[`ivi-cli-bin`](https://aur.archlinux.org/packages/ivi-cli-bin), and
+`ivi-cli/` the one published as
+[`ivi-cli`](https://aur.archlinux.org/packages/ivi-cli). `makepkg -si` in
+either directory also builds and installs the package locally.
+`ivi-cli-bin` repackages
 the self-contained `ivicli-<version>-linux-x64.zip` asset from the matching
 GitHub Release, so the package installs a working `ivicli` on a machine with no
 .NET at all. Releases up to v0.3.1 named that asset
@@ -111,21 +113,24 @@ Pushing needs an AUR account with a registered SSH public key, so it is a
 maintainer action and cannot run from CI — the release workflow deliberately
 stops at uploading assets.
 
-First time, clone the (possibly empty) AUR repo:
+Clone the AUR repo once:
 
 ```sh
 git clone ssh://aur@aur.archlinux.org/ivi-cli-bin.git aur-ivi-cli-bin
 ```
 
-Then, for each release, copy the two files across and push:
+Then, for each release, copy the two files across and push. The AUR accepts
+only its `master` branch, so the push names it:
 
 ```sh
 cp packaging/aur/ivi-cli-bin/{PKGBUILD,.SRCINFO} aur-ivi-cli-bin/
 cd aur-ivi-cli-bin
 git add PKGBUILD .SRCINFO
-git commit -m "upgpkg: ivi-cli-bin 0.4.0-1"
-git push
+git commit -m "upgpkg: ivi-cli-bin 0.5.0beta.1-1"
+git push origin HEAD:master
 ```
+
+`ivi-cli` is published the same way from `ssh://aur@aur.archlinux.org/ivi-cli.git`.
 
 The AUR runs a server-side hook that parses `.SRCINFO`; a push that fails there
 is rejected outright rather than landing half-applied.
