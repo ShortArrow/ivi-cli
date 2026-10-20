@@ -6,18 +6,24 @@ All notable changes to ivi-cli are documented here. Format roughly follows
 
 ## [Unreleased]
 
-### Added
+## [0.5.0-beta.1] — 2026-10-20
 
-- **Debian packages for amd64 and arm64 ship with each release.**
-  `ivicli_<version>-1_<arch>.deb` carries the self-contained build, so it
-  needs no .NET runtime, and installs `/usr/bin/ivicli`. Each one is
-  installed with `apt` in Debian 12 and Ubuntu 24.04 containers before
-  the release is published. They are meant for the APT repository at
-  `pkg.shortarrow.jp`, which is not live yet: a package depends on the
-  repository's `shortarrow-archive-keyring`, so it does not install from
-  the file alone.
+### Changed (breaking)
 
-## [0.4.1] — 2026-10-19
+- **A device's `timeout_ms` bounds every operation.** It bounded none:
+  the VISA backend timed out after 5 seconds whatever it said, the VXI-11
+  client sent a fixed 5-second `io_timeout`, and HiSLIP and SOCKET waited
+  for a silent instrument until the command was cancelled. Now every
+  write, query, read and trigger fails with a timeout once `timeout_ms`
+  has passed, and the next operation reconnects so a late reply is never
+  taken for a later answer. Opening a session gets at least 5 seconds, or
+  `timeout_ms` if that is longer. **A measurement that takes longer than its
+  device's `timeout_ms` now fails where it used to wait, with the
+  configuration unchanged; `visa add` and `visa scan --add` write 3000 ms
+  unless told otherwise. Raise `timeout_ms` for such devices.** The VXI-11 gateway reports
+  an instrument's timeout as VXI-11 error 15. `docs/conformance.md` lists
+  which of these rules come from VISA, VXI-11 and HiSLIP and which ivi-cli
+  defines where they are silent.
 
 ### Added
 
@@ -57,6 +63,16 @@ All notable changes to ivi-cli are documented here. Format roughly follows
   or the `visa asrl add` line that would register it, and `visa scan --add`
   registers them by port name.
 
+- **Debian packages for amd64 and arm64 ship with each stable release,
+  from 0.5.0.** A pre-release such as this one carries none.
+  `ivicli_<version>-1_<arch>.deb` carries the self-contained build, so it
+  needs no .NET runtime, and installs `/usr/bin/ivicli`. Each one is
+  installed with `apt` in Debian 12 and Ubuntu 24.04 containers before
+  the release is published. They are meant for the APT repository at
+  `pkg.shortarrow.jp`, which is not live yet: a package depends on the
+  repository's `shortarrow-archive-keyring`, so it does not install from
+  the file alone.
+
 ### Fixed
 
 - **`visa scan` says when a local address is a duplicate.** On Windows, an
@@ -86,20 +102,6 @@ All notable changes to ivi-cli are documented here. Format roughly follows
   certificate path or the audit log path, or a quote in a telemetry
   service name, left a file that the next command could not read. Every
   string is now written as an escaped TOML string.
-
-- **A device's `timeout_ms` bounds every operation.** It bounded none:
-  the VISA backend timed out after 5 seconds whatever it said, the VXI-11
-  client sent a fixed 5-second `io_timeout`, and HiSLIP and SOCKET waited
-  for a silent instrument until the command was cancelled. Now every
-  write, query, read and trigger fails with a timeout once `timeout_ms`
-  has passed, and the next operation reconnects so a late reply is never
-  taken for a later answer. Opening a session gets at least 5 seconds, or
-  `timeout_ms` if that is longer. **A measurement that takes longer than its
-  device's `timeout_ms` (3000 ms unless set) now fails where it used to
-  wait; raise `timeout_ms` for such devices.** The VXI-11 gateway reports
-  an instrument's timeout as VXI-11 error 15. `docs/conformance.md` lists
-  which of these rules come from VISA, VXI-11 and HiSLIP and which ivi-cli
-  defines where they are silent.
 
 - **The VXI-11 gateway honours the client's `io_timeout`.** It
   bounded each call by the routed device's `timeout_ms` instead, so a

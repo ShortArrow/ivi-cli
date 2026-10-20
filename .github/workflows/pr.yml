@@ -322,6 +322,9 @@ jobs:
           set -euo pipefail
           sudo apt-get update -qq && sudo apt-get install -y -qq apt-utils
           version="$(sed -n 's/.*<Version>\(.*\)<\/Version>.*/\1/p' Directory.Build.props | head -1)"
+          # A pre-release gets no package, so a branch whose version is one
+          # builds the package for the release it leads up to.
+          version="${version%%-*}"
           sh packaging/apt/build-deb.sh ./artifacts/selfcontained "$version" ${{ matrix.arch }} ./artifacts/deb
           sh packaging/apt/install-test.sh ./artifacts/deb "$version" ${{ matrix.arch }}
 
