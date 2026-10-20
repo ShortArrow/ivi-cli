@@ -8,7 +8,11 @@
 # runtime and needs no .NET on the system at all.
 
 pkgname=ivi-cli-bin
-pkgver=0.4.0
+# The release version as tagged upstream. pacman refuses a `-` in pkgver, and
+# without one vercmp still orders 0.5.0beta.1 after 0.4.0 and before
+# 0.5.0beta.2 and 0.5.0, so a stable release upgrades a beta without an epoch.
+_pkgver=0.5.0-beta.1
+pkgver=${_pkgver//-/}
 pkgrel=1
 pkgdesc="Integrated CLI for managing, diagnosing, and operating VISA/IVI instruments (prebuilt binary)"
 arch=('x86_64')
@@ -19,28 +23,25 @@ license=('MIT' 'Apache-2.0')
 # split packages rather than the gcc-libs metapackage, which would drag in ten
 # more runtimes nothing here touches.
 #
-# The rest of the list is invisible to ldd because .NET dlopen()s it, so each
-# entry was established by removing the package and running the CLI:
+# The rest of the list is invisible to ldd because .NET dlopen()s it, so the
+# entry was established by removing the package and running the CLI. ICU is
+# not on it: the CLI runs with invariant globalization and starts without it.
 #
-#   icu      — without it the binary aborts at startup with "Couldn't find a
-#              valid ICU package installed on the system".
 #   openssl  — `ivicli visa scan` and `ivicli api start --tls-self-signed`
 #              load libssl.so.3 / libcrypto.so.3; with openssl removed,
 #              `visa scan` dies on "No usable version of libssl was found".
 #
 # zlib is loaded too, but by libssl rather than by the CLI, so openssl
 # carries it and namcap reports an explicit entry as already satisfied.
-depends=('glibc' 'libgcc' 'libstdc++' 'icu' 'openssl')
-# The binary is executed during build() to emit its own completion scripts.
-makedepends=('icu')
+depends=('glibc' 'libgcc' 'libstdc++' 'openssl')
 provides=('ivi-cli')
 conflicts=('ivi-cli')
 # The single-file bundle appends its payload after the ELF image; stripping
 # rewrites the file and destroys it. Without symbols to split out there is no
 # debug package either, and leaving it on ships an empty /usr/src/debug dir.
 options=('!strip' '!debug')
-source=("$pkgname-$pkgver.zip::$url/releases/download/v$pkgver/ivicli-$pkgver-linux-x64.zip")
-sha256sums=('577a31146202d1dcaabca991534a7cbffba2b52eb691a272ec0a700a5c4a998f')
+source=("$pkgname-$pkgver.zip::$url/releases/download/v$_pkgver/ivicli-$_pkgver-linux-x64.zip")
+sha256sums=('9ed6a68cf920a23f10f2b8b2f483f8da86885b38c4bb925f0a82f86ee091cd10')
 
 build() {
   chmod +x "$srcdir/ivicli"

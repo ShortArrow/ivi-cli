@@ -20,7 +20,11 @@
 # "No frameworks were found".
 
 pkgname=ivi-cli
-pkgver=0.4.0
+# The release version as tagged upstream. pacman refuses a `-` in pkgver, and
+# without one vercmp still orders 0.5.0beta.1 after 0.4.0 and before
+# 0.5.0beta.2 and 0.5.0, so a stable release upgrades a beta without an epoch.
+_pkgver=0.5.0-beta.1
+pkgver=${_pkgver//-/}
 pkgrel=1
 pkgdesc="Integrated CLI for managing, diagnosing, and operating VISA/IVI instruments"
 arch=('x86_64')
@@ -33,11 +37,11 @@ conflicts=('ivi-cli-bin')
 # there are no sources to split out, so a debug package would carry an
 # empty /usr/src/debug and a build-id symlink pointing at nothing.
 options=('!debug')
-source=("$pkgname-$pkgver.tar.gz::$url/archive/refs/tags/v$pkgver.tar.gz")
-sha256sums=('f7bf14544c4aa1d805fbc80cb2021a79a328e2230bbf66c41a4efac6b453c519')
+source=("$pkgname-$pkgver.tar.gz::$url/archive/refs/tags/v$_pkgver.tar.gz")
+sha256sums=('805e39fc2b66bc71d568c7725866e112845d85cbab155c252085569232581dd3')
 
 prepare() {
-  cd "$srcdir/$pkgname-$pkgver"
+  cd "$srcdir/$pkgname-$_pkgver"
 
   # global.json pins the SDK to 10.0.204 with rollForward=latestFeature,
   # which cannot roll down to the 10.0.1xx band Arch ships — the build
@@ -48,7 +52,7 @@ prepare() {
 }
 
 build() {
-  cd "$srcdir/$pkgname-$pkgver"
+  cd "$srcdir/$pkgname-$_pkgver"
 
   # Keep the SDK's writes inside the build directory: NuGet and the CLI
   # otherwise populate $HOME, which makepkg does not own.
@@ -71,7 +75,7 @@ build() {
     --self-contained false \
     -p:RestoreLockedMode=false \
     -p:AllowMissingPrunePackageData=true \
-    -p:Version="$pkgver" \
+    -p:Version="$_pkgver" \
     --output "$srcdir/publish"
 
   # The binary emits its own completions. bash and zsh are what it supports
@@ -92,7 +96,7 @@ build() {
 }
 
 package() {
-  cd "$srcdir/$pkgname-$pkgver"
+  cd "$srcdir/$pkgname-$_pkgver"
 
   # A framework-dependent publish is an apphost next to its managed
   # assemblies, which have to stay together; /usr/lib/$pkgname holds the set

@@ -16,9 +16,10 @@ means the packaging travels with the code it packages.
 
 ## Bumping to a new release
 
-1. Edit `ivi-cli-bin/PKGBUILD`: set `pkgver` to the new version and reset
-   `pkgrel=1`. (`pkgrel` only moves when the packaging changes and the upstream
-   version does not.)
+1. Edit `ivi-cli-bin/PKGBUILD`: set `_pkgver` to the new version as tagged
+   (`0.5.0-beta.1`) and reset `pkgrel=1`. `pkgver` is derived from it with the
+   `-` removed, which pacman refuses. (`pkgrel` only moves when the packaging
+   changes and the upstream version does not.)
 2. Replace `sha256sums`. Every release from v0.3.2 publishes a `SHA256SUMS`
    asset, so the hash can be read from there instead of downloading the zip:
 
@@ -41,19 +42,20 @@ means the packaging travels with the code it packages.
      namcap /home/build/*.pkg.tar.zst'
    ```
 
-   Five `namcap` warnings are expected and can be ignored. The unused
+   Four `namcap` warnings are expected and can be ignored. The unused
    `libdl` / `librt` / `libpthread` links are glibc compatibility stubs the .NET
-   host still records. `icu` and `openssl` look unneeded to `namcap` because it
-   reads the ELF and .NET loads both through `dlopen`; both are in fact
-   mandatory, and the way to check that claim is to remove the package and run
-   the CLI rather than to trust either tool:
+   host still records.
+   `openssl` looks unneeded to `namcap` because it reads the ELF and .NET loads
+   it through `dlopen`; it is in fact mandatory, and the way to check that claim
+   is to remove the package and run the CLI rather than to trust either tool:
 
    ```sh
-   pacman -Rdd icu     && ivicli --version    # Couldn't find a valid ICU package
    pacman -Rdd openssl && ivicli visa scan    # No usable version of libssl was found
    ```
 
-   Anything `namcap` reports beyond those five is new and worth reading.
+   ICU is not a dependency: the CLI runs with invariant globalization, and
+   `ivicli --version` starts with `icu` removed. Anything `namcap` reports
+   beyond those four is new and worth reading.
 4. Regenerate `.SRCINFO` from the edited PKGBUILD and commit both:
 
    ```sh
