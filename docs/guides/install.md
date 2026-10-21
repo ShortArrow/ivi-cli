@@ -10,9 +10,9 @@ want ivi-cli to depend on a .NET installation, or not?
 | [mise](#mise) | no | pinning a version per project |
 | [Container](#container) | no | running the mock instrument, not the CLI |
 
-Arch Linux users can also build a pacman package from
-[the PKGBUILDs in this repository](#arch-linux), for either answer to
-that question.
+Debian and Ubuntu users can also [install it with apt](#debian-and-ubuntu),
+which carries its own runtime, and Arch Linux users
+[from the AUR](#arch-linux), for either answer to that question.
 
 ## Self-contained binary
 
@@ -42,6 +42,37 @@ The other archive per platform, `*-fxdep.zip`, is the
 framework-dependent build. It is smaller and needs .NET installed, so
 reach for it only if you already meet the prerequisite below and want
 the smaller download.
+
+## Debian and Ubuntu
+
+ShortArrow's APT repository at `pkg.shortarrow.jp` carries an `ivicli`
+package for amd64 and arm64 from v0.5.0, with the self-contained binary
+inside, so it needs no .NET. Add the repository's key and source once:
+
+```sh
+sudo curl -fsSL https://pkg.shortarrow.jp/apt/shortarrow-archive-keyring.gpg \
+  -o /usr/share/keyrings/shortarrow-archive-keyring.gpg
+echo "deb [signed-by=/usr/share/keyrings/shortarrow-archive-keyring.gpg] https://pkg.shortarrow.jp/apt stable main" \
+  | sudo tee /etc/apt/sources.list.d/shortarrow.list
+sudo apt update
+sudo apt install shortarrow-archive-keyring ivicli
+```
+
+Naming `shortarrow-archive-keyring` in the install marks it as installed
+by you, so `apt autoremove` keeps it after `ivicli` is removed, and a
+rotated key arrives with `apt upgrade` like any other update. `apt-cache policy ivicli` shows whether the repository
+is in use: its Candidate line should come from
+`https://pkg.shortarrow.jp/apt stable/main`. Each stable release reaches
+the repository a while after its GitHub Release; pre-releases never do.
+
+The `.deb` files are also attached to each stable GitHub Release, but
+they depend on the keyring package, so they install with `apt` only once
+the source above is set up.
+
+If `ivicli` is also installed as a .NET tool, the copy in
+`~/.dotnet/tools` and the package's `/usr/bin/ivicli` both answer to the
+name, and whichever directory comes first on `PATH` runs. `command -v
+ivicli` prints the one your shell picks.
 
 ## Arch Linux
 
