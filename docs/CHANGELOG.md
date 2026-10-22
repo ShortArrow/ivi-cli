@@ -6,7 +6,7 @@ All notable changes to ivi-cli are documented here. Format roughly follows
 
 ## [Unreleased]
 
-## [0.5.0-beta.1] — 2026-10-20
+## [0.5.0] — 2026-10-22
 
 ### Changed (breaking)
 
@@ -63,15 +63,15 @@ All notable changes to ivi-cli are documented here. Format roughly follows
   or the `visa asrl add` line that would register it, and `visa scan --add`
   registers them by port name.
 
-- **Debian packages for amd64 and arm64 ship with each stable release,
-  from 0.5.0.** A pre-release such as this one carries none.
+- **Debian packages for amd64 and arm64 ship with each stable release.**
   `ivicli_<version>-1_<arch>.deb` carries the self-contained build, so it
   needs no .NET runtime, and installs `/usr/bin/ivicli`. Each one is
   installed with `apt` in Debian 12 and Ubuntu 24.04 containers before
-  the release is published. They are meant for the APT repository at
-  `pkg.shortarrow.jp`, which is not live yet: a package depends on the
-  repository's `shortarrow-archive-keyring`, so it does not install from
-  the file alone.
+  the release is published. `apt install ivicli` installs it from the APT
+  repository at `pkg.shortarrow.jp` once the repository has published the
+  release; the install guide shows how to add the repository. A package
+  depends on the repository's `shortarrow-archive-keyring`, so it does not
+  install from the file alone. Pre-releases carry none.
 
 ### Fixed
 
