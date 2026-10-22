@@ -1,5 +1,5 @@
 pkgbase = ivi-cli
-	pkgdesc = Integrated CLI for managing, diagnosing, and operating VISA/IVI instruments
+	pkgdesc = Integrated CLI for VISA/IVI instruments: SCPI over HiSLIP, VXI-11, raw socket, USBTMC and serial
 	pkgver = 0.5.0
 	pkgrel = 1
 	url = https://github.com/ShortArrow/ivi-cli
