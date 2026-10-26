@@ -14,9 +14,11 @@ unpacked until someone repeats the steps.
 APT needs a signed repository, which GitHub Releases cannot be. That
 repository is shared with ShortArrow's other tools and lives in
 [ShortArrow/pkg](https://github.com/ShortArrow/pkg), served at
-`https://pkg.shortarrow.jp`; its ADR 0001 records how it is laid out,
-signed and published, and why its packages stay GitHub Release assets
-behind a redirect. This ADR covers what ivi-cli provides it: the
+`https://pkg.shortarrow.jp`. Its ADRs record how it is laid out and
+why its packages stay GitHub Release assets behind a redirect
+([0001](https://github.com/ShortArrow/pkg/blob/main/docs/adr/0001-package-registry.md)), how it is signed
+([0003](https://github.com/ShortArrow/pkg/blob/main/docs/adr/0003-repository-keys.md)) and how a release is published
+([0005](https://github.com/ShortArrow/pkg/blob/main/docs/adr/0005-publishing.md)). This ADR covers what ivi-cli provides it: the
 packages, built and tested here and attached to each release.
 
 ## Decision
@@ -133,7 +135,8 @@ On 2026-09-29, in `debian:bookworm` (apt 2.6.1) and `ubuntu:24.04`
 installed a package whose `pool/` path redirected twice, the shape of a
 GitHub asset URL, and with `pool/` redirected to the real v0.4.0 release
 asset `apt-get download` saved a file whose SHA-256 matched the asset.
-The registry's ADR 0001 carries the rest of that day's checks.
+The registry's [ADR 0001](https://github.com/ShortArrow/pkg/blob/main/docs/adr/0001-package-registry.md) carries the
+rest of those checks.
 
 `dpkg --compare-versions` in `debian:bookworm` gives `0.4.0-beta.1` >
 `0.4.0`, `0.4.0~beta.1` < `0.4.0` and `0.3.3` < `0.4.0`.
