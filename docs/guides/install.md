@@ -34,9 +34,22 @@ Releases up to v0.3.1 named the same archive
 Releases from v0.3.2 onward also carry a `SHA256SUMS` asset if you want
 to verify the download.
 
-Swap `linux-x64` for `linux-arm64`, `osx-x64`, `osx-arm64`, `win-x64`,
-or `win-arm64`. The `-j` flag extracts the binary alone; the licences and
-third-party notices stay in the archive.
+Swap `linux-x64` for `linux-arm64`, `osx-x64` or `osx-arm64`. The `-j`
+flag extracts the binary alone; the licences and third-party notices stay
+in the archive.
+
+On Windows the binary is `ivicli.exe`. In PowerShell:
+
+```powershell
+$version = "0.5.0"
+Invoke-WebRequest -OutFile ivicli.zip `
+  "https://github.com/ShortArrow/ivi-cli/releases/download/v$version/ivicli-$version-win-x64.zip"
+Expand-Archive ivicli.zip -DestinationPath "$env:LOCALAPPDATA\Programs\ivicli"
+```
+
+Swap `win-x64` for `win-arm64` on Arm, and add
+`%LOCALAPPDATA%\Programs\ivicli` to your `Path`. The licences and
+third-party notices are extracted beside `ivicli.exe`.
 
 The other archive per platform, `*-fxdep.zip`, is the
 framework-dependent build. It is smaller and needs .NET installed, so
