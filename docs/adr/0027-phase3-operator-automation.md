@@ -4,13 +4,12 @@
 
 ## Context
 
-PRD §14 originally enumerated only Phase 1 (single-host VISA CLI) and
-Phase 2 (gateway servers). Once Phase 2 landed (commits `acd1736` …
-`78b1bd9`), the natural next step is operator-facing automation against
-either a local instrument or the gateway. PRD §15 lists several future
-extensions; this ADR picks the minimal subset that turns the CLI from a
-single-shot tool into an automation surface, and locks the design before
-implementation.
+Phase 1 (single-host VISA CLI) and Phase 2 (gateway servers) run one
+command at a time against a local instrument or the gateway. An operator
+who repeats a sequence, watches a reading, or captures traffic for a mock
+needs the CLI to drive either of them over time. PRD §15 lists several
+future extensions; this ADR picks the minimal subset that turns the CLI
+from a single-shot tool into an automation surface.
 
 The four features promoted into Phase 3 — `visa script`, `visa monitor`,
 `mock scenario record`, `server log` — all share a common shape:
@@ -123,12 +122,11 @@ interface. ConfigDocument is frozen.
 - The `IScenarioStore` interface grows by one method
   (`AppendSceneAsync`); existing TOML store implementation is the only
   consumer that needs an update.
-- Once Phase 3 is accepted and implemented, PRD §15 still owns the
-  remaining future extensions; further phases are an open question.
+- PRD §15 owns the future extensions this ADR does not pick.
 
 ## References
 
-- PRD §14 (extended) — Phase 3 added.
+- PRD §14 — the Phase 3 list.
 - ADR 0010 — handler-level CQRS architecture.
 - ADR 0015 — threading model (per-Task fan-out unchanged).
 - ADR 0017 — logging and structured output.
