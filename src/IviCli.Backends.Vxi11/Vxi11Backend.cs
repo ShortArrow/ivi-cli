@@ -22,10 +22,9 @@ namespace IviCli.Backends.Vxi11;
 ///
 /// On open the client first asks the instrument's portmapper at UDP/111
 /// for the dynamically-assigned VXI-11 Core port (a real GETPORT
-/// round-trip — issue #20). When no portmapper answers (e.g. ivi-cli's
-/// own gateway, which co-locates portmapper + Core on a single bind
-/// port and does not answer GETPORT on 111) it falls back to the fixed
-/// port, preserving the gateway pairing.
+/// round-trip — issue #20). When no portmapper answers (e.g. an ivi-cli
+/// gateway whose UDP responder could not bind port 111) it falls back to
+/// the fixed port, preserving the gateway pairing.
 /// </summary>
 public sealed class Vxi11Backend : IIviBackend, IEnforcesDeviceTimeout
 {
