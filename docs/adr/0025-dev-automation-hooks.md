@@ -8,7 +8,7 @@ This ADR defines the **local-side** automation hooks that fire during developmen
 
 Two distinct concerns drive this:
 
-1. **Provide fast feedback** for trivial breakage (formatting drift, build failures, broken tests) before the developer pushes or opens a PR — minimizing wasted CI cycles and avoiding round-trips through GitHub Actions.
+1. **Provide fast feedback** for trivial breakage, such as formatting drift, before the developer pushes or opens a PR — minimizing wasted CI cycles and avoiding round-trips through GitHub Actions.
 2. **Keep AI-driven edits clean.** Claude Code performs file edits as part of its normal workflow, and without an automatic formatter step those edits can drift from the project's style rules.
 
 The real gates that decide whether a change reaches `main` are CI checks and squash merge (ADR 0020, 0022). Local hooks are not the last line of defense — they are a UX layer for catching obvious mistakes early.
@@ -59,12 +59,8 @@ Pre-push runs nothing. Build and `dotnet test --filter "Category!=Integration"` 
 
 Rationale:
 
-- The pre-push build + test duplicated the PR CI gate while diverging from it: a local run has no `--locked-mode` and a different SDK / OS, so a local pass did not imply a CI pass and a local failure was sometimes environmental. CI is the authoritative build / test gate.
-- It added minutes of latency to every non-docs push, and — bypassable with `--no-verify` — was never a hard gate anyway.
-- Keeping it usable had required a docs-only skip script that re-implemented CI's changed-files logic locally; a second copy that could drift. Removing the tests removes the need for the skip.
+- CI is the authoritative build / test gate. A local run has no `--locked-mode` and a different SDK / OS, so a local pass does not imply a CI pass, and a local failure can be environmental.
 - Squash merge means individual commit greenness does not survive to `main`, so there is little value in blocking each local push on the full suite.
-
-The original decision ran `dotnet build` + `dotnet test` on push; it is superseded here.
 
 ### 5. Claude Code PostToolUse hook: auto-format edited C# files
 
@@ -92,7 +88,7 @@ No local `commit-msg` hook is configured.
 
 ### 8. File-type filtering: not needed
 
-No `staged-file-type` filter is required. The only local hook is the pre-commit CSharpier check, which inspects C# and is a no-op on docs-only changes. (An earlier revision briefly ran tests on push behind a docs-only skip script; §4 removed both.)
+No `staged-file-type` filter is required. The only local hook is the pre-commit CSharpier check, which inspects C# and is a no-op on docs-only changes.
 
 ### 9. Branch-aware policy: not adopted
 
@@ -137,7 +133,7 @@ Exact syntax for the Claude Code hook is verified against the current Claude Cod
 
 **Pros**
 
-- Trivial drift (formatting, build breakage, unit-test failure) caught locally; CI cycles are reserved for genuine integration concerns.
+- Formatting drift is caught locally, before it costs a CI run.
 - AI-driven edits stay aligned with project style automatically.
 - Pre-commit and Claude Code hooks remain sub-second thanks to CSharpier's speed.
 - Setup is single-language (.NET only); no Node.js, Python, or Go in the contributor toolchain.
@@ -148,11 +144,15 @@ Exact syntax for the Claude Code hook is verified against the current Claude Cod
 - First-time clone requires `dotnet tool restore` + `dotnet husky install` to enable hooks (documented in CONTRIBUTING when written).
 - Two formatting tools to understand (CSharpier locally vs `dotnet format analyzers` in CI), though their responsibilities are disjoint.
 - `--no-verify` bypass exists; relies on developer discipline rather than enforcement.
-- Pre-push test run may grow slow as the test suite expands; revisiting the filter strategy will eventually be needed.
 
 **Mitigations**
 
 - README will mention the one-time setup once it exists.
 - CONTRIBUTING (when written) will clarify which tool covers which class of changes.
 - CI checks (ADR 0020) enforce the same rules unconditionally on the server side; local bypass cannot reach `main`.
-- Add file-type filtering or scope reduction (e.g. `dotnet test --filter` by affected project) when run time becomes a complaint.
+
+## Alternatives
+
+| Design | Why it is not the design in force |
+| --- | --- |
+| A pre-push hook running `dotnet build` and `dotnet test --filter "Category!=Integration"` | It repeats the PR CI gate without matching it (no `--locked-mode`, a different SDK / OS), adds minutes to every push, and is bypassed with `--no-verify`. Skipping it for docs-only pushes needs a local copy of CI's changed-files logic, which can drift from CI's |
