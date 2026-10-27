@@ -1,7 +1,6 @@
 # 0013. Plugin System
 
 - Status: Accepted
-- Date: 2026-05-28
 
 ## Context
 

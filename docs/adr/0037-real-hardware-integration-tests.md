@@ -1,7 +1,6 @@
 # 0037. Real-hardware integration test gating
 
 - Status: Accepted
-- Date: 2026-05-28
 
 ## Context
 

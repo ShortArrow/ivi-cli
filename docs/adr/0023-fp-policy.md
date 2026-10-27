@@ -1,7 +1,6 @@
 # 0023. Functional Programming Policy
 
 - Status: Accepted
-- Date: 2026-05-20
 
 ## Context
 

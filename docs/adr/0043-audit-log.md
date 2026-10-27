@@ -1,7 +1,6 @@
 # 0043. Append-only audit log
 
 - Status: Accepted
-- Date: 2026-05-28
 
 ## Context
 

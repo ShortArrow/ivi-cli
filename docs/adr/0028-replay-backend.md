@@ -1,7 +1,6 @@
 # 0028. Replay Backend
 
 - Status: Accepted
-- Date: 2026-05-26
 
 ## Context
 

@@ -1,7 +1,6 @@
 # 0016. Cross-Platform Policy
 
 - Status: Accepted
-- Date: 2026-07-24
 
 ## Context
 

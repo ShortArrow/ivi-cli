@@ -1,7 +1,6 @@
 # 0030. TUI Library Choice
 
 - Status: Accepted
-- Date: 2026-05-27
 
 ## Context
 

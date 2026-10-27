@@ -1,7 +1,6 @@
 # 0041. IIviBackend Trigger + ServiceRequest ports
 
 - Status: Accepted
-- Date: 2026-05-28
 
 ## Context
 

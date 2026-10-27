@@ -1,7 +1,6 @@
 # 0007. Network Transport
 
 - Status: Accepted
-- Date: 2026-05-23
 
 ## Context
 

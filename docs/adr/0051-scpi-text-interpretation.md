@@ -1,7 +1,6 @@
 # 0051. How ivi-cli interprets SCPI text
 
 - Status: Accepted
-- Date: 2026-08-25
 
 ## Context
 

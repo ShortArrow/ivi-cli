@@ -1,7 +1,6 @@
 # 0035. VISA-over-WebSocket
 
 - Status: Accepted
-- Date: 2026-05-27
 
 ## Context
 

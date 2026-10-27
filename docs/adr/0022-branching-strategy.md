@@ -1,7 +1,6 @@
 # 0022. Branching Strategy
 
 - Status: Accepted
-- Date: 2026-05-19
 
 ## Context
 

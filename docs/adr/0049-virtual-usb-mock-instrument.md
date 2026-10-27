@@ -1,7 +1,6 @@
 # 0049. Virtual USB Mock Instrument
 
 - Status: Accepted
-- Date: 2026-08-07
 
 ## Context
 

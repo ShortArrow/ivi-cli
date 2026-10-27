@@ -1,7 +1,6 @@
 # 0039. Management API TLS / mTLS
 
 - Status: Accepted
-- Date: 2026-05-28
 
 ## Context
 

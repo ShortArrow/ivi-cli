@@ -1,7 +1,6 @@
 # 0033. Session recording / replay (capture → import → replay)
 
 - Status: Accepted
-- Date: 2026-05-27
 
 ## Context
 

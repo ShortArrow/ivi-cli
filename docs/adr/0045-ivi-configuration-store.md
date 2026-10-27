@@ -1,7 +1,6 @@
 # 0045. IVI Configuration Store integration
 
 - Status: Accepted
-- Date: 2026-05-29
 
 ## Context
 

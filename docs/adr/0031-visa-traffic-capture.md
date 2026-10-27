@@ -1,7 +1,6 @@
 # 0031. VISA Traffic Capture
 
 - Status: Accepted
-- Date: 2026-05-27
 
 ## Context
 

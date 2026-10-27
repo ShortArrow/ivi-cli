@@ -1,7 +1,6 @@
 # 0047. Quality Assurance and Support Scope
 
 - Status: Accepted
-- Date: 2026-07-24
 
 ## Context
 

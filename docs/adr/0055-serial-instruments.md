@@ -1,7 +1,6 @@
 # 0055. Serial instruments (ASRL)
 
 - Status: Accepted
-- Date: 2026-10-15
 
 ## Context
 

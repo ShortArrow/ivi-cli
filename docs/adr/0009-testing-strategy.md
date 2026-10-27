@@ -1,7 +1,6 @@
 # 0009. Testing Strategy
 
 - Status: Accepted
-- Date: 2026-05-20
 
 ## Context
 

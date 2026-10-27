@@ -1,7 +1,6 @@
 # 0048. USB Instrument Support
 
 - Status: Accepted
-- Date: 2026-08-06
 
 ## Context
 

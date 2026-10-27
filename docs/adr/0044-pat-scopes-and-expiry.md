@@ -1,7 +1,6 @@
 # 0044. PAT scopes + token expiry
 
 - Status: Accepted
-- Date: 2026-05-28
 
 ## Context
 
