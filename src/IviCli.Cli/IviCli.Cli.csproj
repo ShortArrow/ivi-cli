@@ -65,6 +65,24 @@
   </ItemGroup>
 
   <!--
+    The ASP.NET Core runtime pack for Windows carries
+    aspnetcorev2_inprocess.dll, the module that hosts an app inside IIS.
+    ivicli serves its API from Kestrel and never loads it, yet a
+    single-file bundle extracts every native library it holds to %TEMP%
+    on each start. The Web SDK's PublishIISAssets=false does not reach
+    this project's bundle, so the file is taken off the publish list
+    here. Hosting ivicli in IIS would need this target removed.
+  -->
+  <Target Name="ExcludeIisModuleFromPublish" AfterTargets="ComputeResolvedFilesToPublishList">
+    <ItemGroup>
+      <ResolvedFileToPublish
+        Remove="@(ResolvedFileToPublish)"
+        Condition="'%(Filename)%(Extension)' == 'aspnetcorev2_inprocess.dll'"
+      />
+    </ItemGroup>
+  </Target>
+
+  <!--
     Mock-only container publish flavor (issue #15; the NativeAOT item ADR
     0018 records as out of scope for the JIT image). Opt in with
     `dotnet publish src/IviCli.Cli -c Release -r linux-x64 -p:MockContainerAot=true`.

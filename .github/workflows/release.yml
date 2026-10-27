@@ -135,6 +135,15 @@ jobs:
               ;;
           esac
 
+      # On Windows the bundle holds no native library that ivicli loads,
+      # so a start that writes one to %TEMP% is shipping a file nobody
+      # uses. Linux and macOS extract System.IO.Ports' native library,
+      # which the serial smoke below needs.
+      - name: Check the Windows binary extracts nothing at start-up
+        if: runner.os == 'Windows'
+        shell: bash
+        run: sh .github/scripts/extract-smoke.sh "./artifacts/${{ matrix.rid }}-selfcontained/ivicli.exe"
+
       # The same binary opens a serial port: System.IO.Ports carries a
       # native library on Linux and macOS that the single-file bundle
       # must extract (ADR 0055 §11). Windows has no pseudo-terminal to
