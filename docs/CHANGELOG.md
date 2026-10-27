@@ -6,6 +6,15 @@ All notable changes to ivi-cli are documented here. Format roughly follows
 
 ## [Unreleased]
 
+### Fixed
+
+- **The Windows binaries no longer write a file to `%TEMP%` each time
+  they start.** Every start, `--version` included, extracted
+  `aspnetcorev2_inprocess.dll`, the module that hosts an app inside IIS,
+  to `%TEMP%\.net\ivicli\`. ivicli serves its API from Kestrel and never
+  loads it, so the release archives leave it out, and the release checks
+  that a Windows start extracts nothing.
+
 ## [0.5.0] — 2026-10-22
 
 ### Changed (breaking)
