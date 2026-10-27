@@ -1,7 +1,6 @@
 # 0003. Architecture Style
 
 - Status: Accepted
-- Date: 2026-05-19
 
 ## Context
 

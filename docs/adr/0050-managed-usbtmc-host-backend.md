@@ -1,7 +1,6 @@
 # 0050. Managed USBTMC host backend
 
 - Status: Accepted
-- Date: 2026-08-20
 
 ## Context
 

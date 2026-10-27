@@ -1,7 +1,6 @@
 # 0017. Security Boundaries
 
 - Status: Accepted
-- Date: 2026-05-21
 
 ## Context
 

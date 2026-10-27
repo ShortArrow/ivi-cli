@@ -53,4 +53,4 @@ Integration テストは `[Trait("Category", "Integration")]` を付与し、PR 
 
 ## ADR
 
-Accepted な意思決定はすべて [`docs/adr/`](adr/) に置きます。ADR は生きたドキュメントとして通常の PR で更新し、本質的な反転がある場合にのみ supersede します。索引ファイルは設けません。
+Accepted な意思決定はすべて [`docs/adr/`](adr/) に置きます。ADR は現に有効な決定を述べます。決定が変わったときは、新しい ADR で supersede せず、通常の PR でその ADR を書き直します。規約は [ADR 0000](adr/0000-adr-policy.md) にあります。

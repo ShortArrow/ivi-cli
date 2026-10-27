@@ -1,7 +1,6 @@
 # 0027. Phase 3 — Operator-Facing Automation
 
 - Status: Accepted
-- Date: 2026-05-23
 
 ## Context
 

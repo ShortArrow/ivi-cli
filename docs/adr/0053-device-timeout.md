@@ -1,7 +1,6 @@
 # 0053. A device's timeout bounds every operation
 
 - Status: Accepted
-- Date: 2026-10-09
 
 ## Context
 

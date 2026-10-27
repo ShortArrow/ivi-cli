@@ -1,7 +1,6 @@
 # 0010. Dependency Injection
 
 - Status: Accepted
-- Date: 2026-05-21
 
 ## Context
 

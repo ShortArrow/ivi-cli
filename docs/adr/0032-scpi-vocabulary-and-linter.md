@@ -1,7 +1,6 @@
 # 0032. SCPI Vocabulary & Script Linter
 
 - Status: Accepted
-- Date: 2026-05-27
 
 ## Context
 

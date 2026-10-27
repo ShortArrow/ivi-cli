@@ -1,7 +1,6 @@
 # 0011. Logging and Tracing
 
 - Status: Accepted
-- Date: 2026-05-21
 
 ## Context
 

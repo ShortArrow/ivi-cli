@@ -1,7 +1,6 @@
 # 0034. Management API (HTTP JSON)
 
 - Status: Accepted
-- Date: 2026-05-27
 
 ## Context
 

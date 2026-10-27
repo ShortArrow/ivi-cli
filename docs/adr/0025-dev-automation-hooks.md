@@ -1,7 +1,6 @@
 # 0025. Local Development Automation Hooks
 
 - Status: Accepted
-- Date: 2026-05-21
 
 ## Context
 

@@ -1,7 +1,6 @@
 # 0042. VXI-11 Interrupt channel (program 395185)
 
 - Status: Accepted
-- Date: 2026-05-28
 
 ## Context
 

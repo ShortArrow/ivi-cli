@@ -53,4 +53,4 @@ What each release verifies, the pre-1.0 compatibility contract, the verified-ins
 
 ## ADRs
 
-Every accepted decision lives under [`docs/adr/`](adr/). They are living documents — extend them in place via normal PRs; supersede only on genuine reversal. No index file is maintained.
+Every accepted decision lives under [`docs/adr/`](adr/). An ADR states the decision in force: when a decision changes, its ADR is rewritten in place through a normal PR, never superseded by a new one. [ADR 0000](adr/0000-adr-policy.md) sets the conventions.

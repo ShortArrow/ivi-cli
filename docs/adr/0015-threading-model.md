@@ -1,7 +1,6 @@
 # 0015. Threading Model
 
 - Status: Accepted
-- Date: 2026-05-23
 
 ## Context
 

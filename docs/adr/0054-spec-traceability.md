@@ -1,7 +1,6 @@
 # 0054. Tests name the clauses they pin, and CI checks them against the conformance document
 
 - Status: Accepted
-- Date: 2026-10-15
 
 ## Context
 

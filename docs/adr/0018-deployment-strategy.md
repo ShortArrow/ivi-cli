@@ -1,7 +1,6 @@
 # 0018. Deployment Strategy
 
 - Status: Accepted
-- Date: 2026-05-29
 
 ## Context
 

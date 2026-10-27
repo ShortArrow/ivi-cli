@@ -1,7 +1,6 @@
 # 0046. Licensing
 
 - Status: Accepted
-- Date: 2026-07-03
 
 ## Context
 

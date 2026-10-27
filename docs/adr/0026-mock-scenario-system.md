@@ -1,7 +1,6 @@
 # 0026. Mock Scenario System
 
 - Status: Accepted
-- Date: 2026-05-22
 
 ## Context
 

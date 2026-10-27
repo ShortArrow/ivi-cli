@@ -1,7 +1,6 @@
 # 0014. Error Handling Policy
 
 - Status: Accepted
-- Date: 2026-05-21
 
 ## Context
 

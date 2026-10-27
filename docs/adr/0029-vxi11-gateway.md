@@ -1,7 +1,6 @@
 # 0029. VXI-11 Gateway
 
 - Status: Accepted
-- Date: 2026-05-27
 
 ## Context
 

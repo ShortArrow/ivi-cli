@@ -1,7 +1,6 @@
 # 0052. Debian packages for the APT repository
 
 - Status: Draft
-- Date: 2026-09-29, revised 2026-10-20
 
 ## Context
 

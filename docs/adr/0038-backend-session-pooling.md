@@ -1,7 +1,6 @@
 # 0038. Backend session pooling
 
 - Status: Accepted
-- Date: 2026-05-28
 
 ## Context
 

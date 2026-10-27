@@ -1,7 +1,6 @@
 # 0020. CI/CD Strategy
 
 - Status: Accepted
-- Date: 2026-05-22
 
 ## Context
 

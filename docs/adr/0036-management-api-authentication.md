@@ -1,7 +1,6 @@
 # 0036. Management API authentication (PAT)
 
 - Status: Accepted
-- Date: 2026-05-28
 
 ## Context
 
