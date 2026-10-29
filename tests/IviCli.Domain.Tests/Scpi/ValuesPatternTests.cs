@@ -27,6 +27,12 @@ public sealed class ValuesPatternTests
     [InlineData("{1..2}", "1.5,1.5", "the response has 2 slots, the pattern 1")]
     [InlineData("1;2", "1", "the response has 1 unit, the pattern 2")]
     [InlineData("1;2,3", "1;2", "unit 2 of the response has 1 slot, the pattern 2")]
+    [InlineData("{0..1}", "0.5;99", "the response has 2 units, the pattern 1")]
+    [InlineData("{0..1};{0..1},{0..1}", "0.5;0.5,9", "slot 3 is 9, not in 0..1")]
+    [InlineData("{0..10}", "(5)", "slot 1 is not a number: (5)")]
+    [InlineData("{0..10}", "$5", "slot 1 is not a number: $5")]
+    [InlineData("{>0}", "#H1F", "slot 1 is not a number: #H1F")]
+    [InlineData("{>0}", "CH#12", "slot 1 is not a number: CH#12")]
     [InlineData("{1..2}", "Infinity", "slot 1 is not a number: Infinity")]
     public void A_response_the_pattern_refuses_is_named_by_its_slot(
         string pattern,
@@ -74,12 +80,29 @@ public sealed class ValuesPatternTests
     [InlineData("{1..y}", "slot 1: y is not a number")]
     [InlineData("{2t:1..2}", "slot 1: 2t is not a slot name")]
     [InlineData("{1..2", "slot 1: { is not closed")]
+    [InlineData("1;2,{9}", "slot 3: expected >, >=, <, <= or a range lo..hi")]
     public void A_malformed_pattern_is_refused_with_the_reason(string pattern, string reason) =>
         ValuesPattern
             .Parse(pattern)
             .ShouldBeError()
             .ShouldBeOfType<InvalidValuesPattern>()
             .Reason.ShouldBe(reason);
+
+    [Fact]
+    public void Numbers_are_read_in_the_invariant_culture_whatever_the_current_one()
+    {
+        var current = System.Globalization.CultureInfo.CurrentCulture;
+        try
+        {
+            System.Globalization.CultureInfo.CurrentCulture = new("de-DE");
+            Parse("{1.2..1.3}").Match("1.25").ShouldBeNull();
+            Parse("{1..2}").Match("1,5").ShouldBe("the response has 2 slots, the pattern 1");
+        }
+        finally
+        {
+            System.Globalization.CultureInfo.CurrentCulture = current;
+        }
+    }
 
     private static ValuesPattern Parse(string pattern) => ValuesPattern.Parse(pattern).ShouldBeOk();
 }

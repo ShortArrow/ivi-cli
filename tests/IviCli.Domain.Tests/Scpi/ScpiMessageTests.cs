@@ -19,6 +19,11 @@ public sealed class ScpiMessageTests
     [InlineData("#13a,b,1", "[#13a,b]|1")]
     [InlineData("1,#0a,b;c", "1|[#0a,b;c]")]
     [InlineData("", "")]
+    [InlineData("5,it's,99", "5|it's|99")]
+    [InlineData("\"a\"\"b,c\",1", "\"a\"\"b,c\"|1")]
+    [InlineData("'it''s, ok',2", "'it''s, ok'|2")]
+    [InlineData("CH#12,99,100", "CH#12|99|100")]
+    [InlineData("#H1F,2", "#H1F|2")]
     public void A_response_splits_into_units_of_elements_outside_strings_and_blocks(
         string response,
         string expected

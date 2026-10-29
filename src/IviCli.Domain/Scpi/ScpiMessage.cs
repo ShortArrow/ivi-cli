@@ -138,8 +138,10 @@ public static class ScpiMessage
     /// <paramref name="text"/> read as a response (ADR 0051 §3): message
     /// units separated by <c>;</c>, each a list of elements separated by
     /// <c>,</c>, outside quoted strings and block data. A response carries
-    /// no header path, so nothing is resolved across units. An element that
-    /// is block data is kept whole, separators included.
+    /// no header path, so nothing is resolved across units. A quoted string
+    /// or block data is recognised only where it starts an element, as IEEE
+    /// 488.2 §8 places it, and is kept whole, separators included; a quote
+    /// or <c>#</c> inside other text is an ordinary character.
     /// </summary>
     public static ImmutableArray<ImmutableArray<ResponseElement>> SplitResponse(string text)
     {
@@ -150,14 +152,15 @@ public static class ScpiMessage
         var i = 0;
         while (i < text.Length)
         {
+            var startsElement = text.AsSpan(start, i - start).IsWhiteSpace();
             switch (text[i])
             {
-                case '"' or '\'':
+                case '"' or '\'' when startsElement:
                     i = AfterQuotedString(text, i);
                     break;
-                case '#':
+                case '#' when startsElement:
                     var after = AfterBlock(text, i);
-                    isBlock |= after > i + 1 && text.AsSpan(start, i - start).IsWhiteSpace();
+                    isBlock = after > i + 1;
                     i = after;
                     break;
                 case ',' or ';':
@@ -206,10 +209,29 @@ public static class ScpiMessage
         return i;
     }
 
+    /// <summary>
+    /// The index after the string opened at <paramref name="open"/>. A
+    /// doubled quote stands for the quote itself (IEEE 488.2 §7.7.5) and
+    /// does not close the string.
+    /// </summary>
     private static int AfterQuotedString(string text, int open)
     {
-        var close = text.IndexOf(text[open], open + 1);
-        return close < 0 ? text.Length : close + 1;
+        var quote = text[open];
+        var i = open + 1;
+        while (true)
+        {
+            var close = text.IndexOf(quote, i);
+            if (close < 0)
+            {
+                return text.Length;
+            }
+            if (close + 1 < text.Length && text[close + 1] == quote)
+            {
+                i = close + 2;
+                continue;
+            }
+            return close + 1;
+        }
     }
 
     private static int AfterBlock(string text, int hash)
