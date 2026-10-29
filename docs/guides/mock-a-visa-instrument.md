@@ -344,6 +344,10 @@ unchanged binding keeps its in-flight scene, so re-running `activate` with the
 same scenario does not reset a state machine the client already advanced. This
 works identically over HiSLIP, raw SOCKET, VXI-11, and a USB/IP export.
 
+For the same reason, a running server does not see edits to the scenario it
+already serves: a rule added to it, or `unmatched = "fail"` written into its
+file, takes effect when the server restarts.
+
 ---
 
 ## Point your app at it

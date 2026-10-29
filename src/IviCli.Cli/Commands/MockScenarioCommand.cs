@@ -267,11 +267,11 @@ public static class MockScenarioCommand
                 "Initial scene name. When set, the scenario starts with that scene (empty, no rules) as its only scene; otherwise the synthetic `default` scene is used.",
         };
 
-        var unmatchedOpt = new Option<string>("--unmatched")
+        var unmatchedOpt = new Option<UnmatchedPolicy>("--unmatched")
         {
             Description =
                 "What a request no rule matches gets: `echo` answers a query with its own text and accepts a write; `fail` fails both.",
-            DefaultValueFactory = _ => "echo",
+            DefaultValueFactory = _ => UnmatchedPolicy.Echo,
         };
         unmatchedOpt.AcceptOnlyFromAmong("echo", "fail");
 
@@ -287,10 +287,7 @@ public static class MockScenarioCommand
                 var name = parseResult.GetRequiredValue(nameArg);
                 var idn = parseResult.GetValue(idnOpt);
                 var initial = parseResult.GetValue(initialOpt);
-                var unmatched =
-                    parseResult.GetValue(unmatchedOpt) == "fail"
-                        ? UnmatchedPolicy.Fail
-                        : UnmatchedPolicy.Echo;
+                var unmatched = parseResult.GetValue(unmatchedOpt);
                 var handler = services.GetRequiredService<CreateScenarioCommandHandler>();
                 var logger = services.GetRequiredService<ILogger<CreateScenarioCommandHandler>>();
 

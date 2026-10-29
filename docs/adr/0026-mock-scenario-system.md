@@ -113,9 +113,10 @@ scenario is loaded:
    - `echo` → `*IDN?` gets the scenario's `idn`, then the
      device-configured IDN, then `FAKE,FAKE,0,1.0`; any other query gets
      its own text back, and a write succeeds.
-   - `fail` → `*IDN?` gets the scenario's `idn` or the device-configured
-     IDN; anything else, query or write, fails with `MockRuleUnmatched`,
-     which names the request and the current scene.
+   - `fail` → `*IDN?` gets the scenario's `idn`, then the
+     device-configured IDN. Every other query or write, and `*IDN?` when
+     neither exists, fails with `MockRuleUnmatched`, which names the
+     request and the current scene.
 
 Scenarios are an *additional* layer over the programmatic DSL, not a
 replacement, so FakeBackend tests that use the DSL behave the same with

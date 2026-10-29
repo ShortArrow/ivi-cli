@@ -1,5 +1,6 @@
 using System.CommandLine;
 using IviCli.Cli.Commands;
+using IviCli.Domain.Mock;
 using Microsoft.Extensions.DependencyInjection;
 using Shouldly;
 
@@ -52,6 +53,22 @@ public sealed class MockCommandTreeTests
 
         // Then
         (errors.Count == 0).ShouldBe(parses);
+    }
+
+    [Theory]
+    [InlineData("mock scenario create my-dmm --unmatched fail", UnmatchedPolicy.Fail)]
+    [InlineData("mock scenario create my-dmm --unmatched echo", UnmatchedPolicy.Echo)]
+    [InlineData("mock scenario create my-dmm", UnmatchedPolicy.Echo)]
+    public void Create_reads_unmatched_as_the_policy(string commandLine, UnmatchedPolicy expected)
+    {
+        // Given
+        var result = Parse(commandLine);
+
+        // When
+        var policy = result.GetValue<UnmatchedPolicy>("--unmatched");
+
+        // Then
+        policy.ShouldBe(expected);
     }
 
     [Theory]

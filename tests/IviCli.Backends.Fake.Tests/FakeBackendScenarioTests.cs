@@ -289,6 +289,55 @@ public class FakeBackendScenarioTests
     }
 
     [Fact]
+    public async Task FailPolicy_ProgrammaticResponse_StillAnswers()
+    {
+        // Given
+        var backend = new FakeBackend().RespondToQuery(DevName(), "MEAS:CURR?", "0.50");
+        backend.ActivateScenario(
+            MakeScenario() with
+            {
+                Unmatched = UnmatchedPolicy.Fail,
+            },
+            DevName()
+        );
+
+        // When
+        var result = await backend.QueryAsync(
+            Dev(),
+            ScpiQuery.From("MEAS:CURR?").ShouldBeOk(),
+            CancellationToken.None
+        );
+
+        // Then
+        result.ShouldBeOk().ShouldBe("0.50");
+    }
+
+    [Fact]
+    public async Task FailPolicy_IdnWithoutScenarioIdn_AnsweredByDeviceConfiguredIdn()
+    {
+        // Given
+        var backend = new FakeBackend().ConfigureDevice(DevName(), "ACME,CONFIGURED,7,1.0");
+        backend.ActivateScenario(
+            MakeScenario() with
+            {
+                IdnDefault = null,
+                Unmatched = UnmatchedPolicy.Fail,
+            },
+            DevName()
+        );
+
+        // When
+        var result = await backend.QueryAsync(
+            Dev(),
+            ScpiQuery.From("*IDN?").ShouldBeOk(),
+            CancellationToken.None
+        );
+
+        // Then
+        result.ShouldBeOk().ShouldBe("ACME,CONFIGURED,7,1.0");
+    }
+
+    [Fact]
     public async Task ActiveScenario_IdnDefault_UsedWhenNoExplicitScene()
     {
         // Given
