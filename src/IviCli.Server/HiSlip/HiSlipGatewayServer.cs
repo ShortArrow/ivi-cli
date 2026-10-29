@@ -3,6 +3,7 @@ using System.Net;
 using System.Net.Sockets;
 using System.Text;
 using IviCli.Application.Backends;
+using IviCli.Application.Logging;
 using IviCli.Application.Servers;
 using IviCli.Domain;
 using IviCli.Domain.Configuration;
@@ -325,6 +326,10 @@ public sealed class HiSlipGatewayServer : IGatewayServer
                             ct
                         );
                         GatewayTelemetry.Complete(message, ok);
+                        if (!ok)
+                        {
+                            break;
+                        }
                     }
                 }
                 else if (header.Type == HiSlipMessageType.Trigger)
@@ -699,6 +704,7 @@ public sealed class HiSlipGatewayServer : IGatewayServer
                 await SendDataEndAsync(stream, responseText, clientMessageId, ct);
                 return true;
             }
+            _logger.LogIviError(((Result<string, BackendError>.Error)resp).Err);
             await SendFatalAsync(stream, "backend query failed", ct);
             return false;
         }
@@ -709,8 +715,13 @@ public sealed class HiSlipGatewayServer : IGatewayServer
             await SendFatalAsync(stream, "invalid SCPI command", ct);
             return false;
         }
-        // No response for a write in SCPI; HiSLIP clients don't expect one either.
-        return (await backend.WriteAsync(device, c, ct)) is Result<Unit, BackendError>.Ok;
+        if (await backend.WriteAsync(device, c, ct) is Result<Unit, BackendError>.Error writeErr)
+        {
+            _logger.LogIviError(writeErr.Err);
+            await SendFatalAsync(stream, "backend write failed", ct);
+            return false;
+        }
+        return true;
     }
 
     private static async Task SendDataEndAsync(

@@ -18,6 +18,15 @@ All notable changes to ivi-cli are documented here. Format roughly follows
 
 ### Fixed
 
+- **The HiSLIP gateway reports a failed write.** When the backend failed
+  a write, a HiSLIP client was told nothing and the write looked
+  successful; it now gets a FatalError, as for a failed query. The
+  gateway closes the connection after every FatalError, including the one
+  for a request that is not valid SCPI, since the client has to
+  initialize again after it. The HiSLIP and VXI-11 gateways also
+  log why a write or query failed, which only the SOCKET and USB/IP
+  gateways did.
+
 - **The mock answers a request whatever its case.** A rule written
   `MEAS:VOLT?` now answers `meas:volt?`, as an instrument does, and the
   built-in `*IDN?` answer responds to `*idn?`; both used to be treated as

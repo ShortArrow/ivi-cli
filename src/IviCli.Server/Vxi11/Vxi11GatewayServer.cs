@@ -3,6 +3,7 @@ using System.Net;
 using System.Net.Sockets;
 using System.Text;
 using IviCli.Application.Backends;
+using IviCli.Application.Logging;
 using IviCli.Application.Servers;
 using IviCli.Domain;
 using IviCli.Domain.Configuration;
@@ -653,6 +654,7 @@ public sealed class Vxi11GatewayServer : IGatewayServer
             else
             {
                 GatewayTelemetry.Complete(message, ok: false);
+                _logger.LogIviError(((Result<string, BackendError>.Error)resp).Err);
                 await WriteWriteReplyAsync(stream, xid, ErrorCodeFor(resp), size: 0, ct);
             }
         }
@@ -673,6 +675,7 @@ public sealed class Vxi11GatewayServer : IGatewayServer
             }
             else
             {
+                _logger.LogIviError(((Result<Unit, BackendError>.Error)wrote).Err);
                 await WriteWriteReplyAsync(stream, xid, ErrorCodeFor(wrote), size: 0, ct);
             }
         }

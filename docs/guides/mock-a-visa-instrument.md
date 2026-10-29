@@ -215,8 +215,8 @@ path:
 | --- | --- | --- |
 | `visa query`, `visa write` | exits non-zero; the log names the request and the scene | the same |
 | SOCKET gateway | the connection closes; the server log names the request and the scene | the same |
-| HiSLIP gateway | the client gets a fatal error | not reported to the client or the log |
-| VXI-11 gateway | the client gets I/O error 17 | the same |
+| HiSLIP gateway | the client gets a fatal error and the connection closes; the server log names the request and the scene | the same |
+| VXI-11 gateway | the client gets I/O error 17; the server log names the request and the scene | the same |
 | USB/IP gateway | no response, so the host's read times out; the server log names the request and the scene | logged only |
 
 ### Quirk profiles
