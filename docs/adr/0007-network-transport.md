@@ -249,6 +249,10 @@ the gateway logs the error at its own severity:
 - HiSLIP: a `FatalError` control message naming the failed operation,
   then connection close.
 
+The HiSLIP gateway closes the connection after every `FatalError` it
+sends on the synchronous channel, a request that is not valid SCPI
+included, because IVI-6.1 has the client initialize again after one.
+
 The control-plane Management API will surface the same `BackendError`
 sum directly when it lands.
 
