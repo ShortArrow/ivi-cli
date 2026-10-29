@@ -93,6 +93,37 @@ public static class ScpiMessage
         return false;
     }
 
+    /// <summary>
+    /// <paramref name="text"/> with every character upper-cased except the
+    /// contents of quoted strings and block data. Headers and character
+    /// parameters are case-insensitive (IEEE 488.2 §7.6.1, SCPI 1999 §6.1),
+    /// while string and block data are taken as sent.
+    /// </summary>
+    public static string FoldCase(string text)
+    {
+        var folded = new System.Text.StringBuilder(text.Length);
+        var i = 0;
+        while (i < text.Length)
+        {
+            var dataEnd = text[i] switch
+            {
+                '"' or '\'' => AfterQuotedString(text, i),
+                '#' => AfterBlock(text, i),
+                _ => i + 1,
+            };
+            if (dataEnd > i + 1)
+            {
+                folded.Append(text, i, dataEnd - i);
+            }
+            else
+            {
+                folded.Append(char.ToUpperInvariant(text[i]));
+            }
+            i = dataEnd;
+        }
+        return folded.ToString();
+    }
+
     private static int NextUnitStart(string text, int i)
     {
         while (i < text.Length)

@@ -156,7 +156,7 @@ respond = "3.271"
 
 | Field (TOML / CLI flag) | Meaning |
 | --- | --- |
-| `match` / `--match` | The exact SCPI line this rule answers. |
+| `match` / `--match` | The SCPI line this rule answers. A leading `:` and the case of everything outside quoted strings and block data are ignored, as an instrument ignores them: `MEAS:VOLT?` answers `meas:volt?` and `:MEAS:VOLT?`. Short and long forms are different lines: `MEASure:VOLTage?` needs its own rule. |
 | `respond` / `--respond` | The response text to return (for a query). |
 | `ack` / `--ack` | Accept a write with no response body. |
 | `fail` / `--fail` (+ `fail_detail` / `--fail-detail`) | Return a SCPI error instead of a normal response. |

@@ -8,6 +8,13 @@ All notable changes to ivi-cli are documented here. Format roughly follows
 
 ### Fixed
 
+- **The mock answers a request whatever its case.** A rule written
+  `MEAS:VOLT?` now answers `meas:volt?`, as an instrument does, and the
+  built-in `*IDN?` answer responds to `*idn?`; both used to be treated as
+  unknown commands and echoed back. Quoted strings and block data still
+  match only as written, and short and long forms remain different
+  commands.
+
 - **The Windows binaries no longer write a file to `%TEMP%` each time
   they start.** Every start, `--version` included, extracted
   `aspnetcorev2_inprocess.dll`, the module that hosts an app inside IIS,
