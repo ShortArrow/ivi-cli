@@ -8,6 +8,14 @@ All notable changes to ivi-cli are documented here. Format roughly follows
 
 ### Added
 
+- **`!values` checks a reading in a script.** `!values {temp:20..30},{rh:40..60}`
+  checks the last query response element by element: a literal, `*` for any
+  element, or a numeric predicate (`>`, `>=`, `<`, `<=`, or an inclusive
+  range `lo..hi`), with `;` separating response units. The first slot that
+  refuses the response stops the script, and the error names the slot, its
+  value and the predicate, then prints the whole response. A response with
+  more or fewer elements than the pattern fails.
+
 - **A mock scenario can fail the requests it has no rule for.** With
   `unmatched = "fail"` in the scenario file, or
   `mock scenario create --unmatched fail`, a query or write that no rule
@@ -17,6 +25,10 @@ All notable changes to ivi-cli are documented here. Format roughly follows
   declared. Scenarios that omit the key behave as before.
 
 ### Fixed
+
+- **`visa script` says which line it could not read and why.** A parse
+  failure printed the error's template, `script line {Line}: {Reason}`,
+  instead of the line number and the reason.
 
 - **The HiSLIP gateway reports a failed write.** When the backend failed
   a write, a HiSLIP client was told nothing and the write looked

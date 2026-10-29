@@ -19,8 +19,8 @@ refuses fails a test that should pass. Nothing anywhere handles a compound
 query. Whether a request expects a response at all is decided by whether the
 line ends in `?` once its terminator is stripped, in `ScpiQuery.From`, the
 script parser and all four gateways. Responses are strings from the backend
-to the terminal and are never interpreted, so a script cannot assert that a
-reading sits in a range without writing a regular expression over digits.
+to the terminal, and only `!values` (§5) reads their structure; a regular
+expression over digits is a poor way to say that a reading sits in a range.
 
 A request to assert numerically on a reading — `25.3,72.1` from a
 temperature/humidity probe, `1.234,-0.567,3.000` from a positioner — is
@@ -105,7 +105,7 @@ limit of a transport that does not know what was asked.
 | --- | --- |
 | Mock rule `match` | literal, case-insensitive (§1) |
 | `!assert <regex>` | regular expression, unchanged |
-| `!values <pattern>` | slots and predicates (§5), new |
+| `!values <pattern>` | slots and predicates (§5) |
 
 `assert` keeps its meaning and gains a `!`, along with every other
 directive, for the reason in §6. The new language arrives as its own
@@ -137,6 +137,15 @@ instrument chose. The IEEE 488.2 special values (`9.9E+37` for infinity,
 them meaning is a separate decision that needs its own syntax, and
 silently mapping them would make a comparison result impossible to
 explain.
+
+Slots are numbered from 1 across the whole response, units included. A
+response matches only when it has as many units as the pattern, and each
+unit as many elements: one element more fails as one fewer does, because a
+pattern that ignored the rest would pass a response it never described. A
+literal is compared exactly, case included, after trimming; §1 folds the
+case of headers a client sends, and a response is data the instrument
+chose. Block data is matched by `*` alone. A predicate reads a finite
+number, so `INF` or `NaN` spelled out is not a number to it.
 
 A failure names the slot, its value and the predicate it failed, and
 prints the whole response after them.
