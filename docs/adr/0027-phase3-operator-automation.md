@@ -40,26 +40,25 @@ backlog.
 
 ### 2. Script File Format
 
-[ADR 0051](0051-scpi-text-interpretation.md) §6 replaces this format
-from 0.4.0: directives take a `!` prefix, comments are `!#`, and every
-other line goes to the instrument verbatim. The unprefixed directives and
-the `#` comments below are what 0.3.x read; 0.3.2 accepts both forms and
-warns on this one.
+A script file is UTF-8 text, read one line at a time; blank lines are
+skipped. A line beginning with `!` is an ivi-cli directive, and every
+other line is SCPI sent to the instrument as written
+([ADR 0051](0051-scpi-text-interpretation.md) §6 gives the reasons):
 
-A script file is UTF-8 text. Each non-blank, non-`#`-prefixed line is
-one directive. Supported directives:
+| Line | Semantics |
+| --- | --- |
+| SCPI with no header ending in `?` | `IIviBackend.WriteAsync` |
+| SCPI with a header ending in `?` (ADR 0051 §7) | `IIviBackend.QueryAsync`, response echoed |
+| `!sleep <ms>` | `Task.Delay(ms, ct)` |
+| `!assert <regex>` | regular expression matched against the last query response |
+| `!values <pattern>` | slots and predicates checked against the last query response (ADR 0051 §5) |
+| `!echo <text>` | `text` written verbatim to stdout |
+| `!#` ... | comment |
 
-| Directive  | Syntax                  | Semantics                          |
-| ---------- | ----------------------- | ---------------------------------- |
-| write      | `<scpi>` (no `?`)       | `IIviBackend.WriteAsync`           |
-| query      | `<scpi>?` (ends with ?) | `IIviBackend.QueryAsync`, echoed   |
-| sleep      | `sleep <ms>`            | `Task.Delay(ms, ct)`               |
-| assert     | `assert <regex>`        | match against last query response  |
-| echo       | `echo <text>`           | write `text` verbatim to stdout    |
-
-A failed `assert` returns a non-zero exit code (per ADR 0011) and stops
-execution. Comments use `#` (line) and `# ...` (trailing). The parser is
-implemented as a pure function in Application; the handler is the only
+Directive keywords are case-insensitive. A failed `!assert` or `!values`
+stops execution with a non-zero exit code (per ADR 0011). A script with a
+line that cannot be parsed is refused before any line runs. The parser
+is implemented as a pure function in Application; the handler is the only
 impure surface (sequence of awaited Backend calls plus stdout).
 
 ### 3. Monitor Output
