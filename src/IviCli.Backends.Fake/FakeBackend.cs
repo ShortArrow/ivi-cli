@@ -88,18 +88,13 @@ public sealed class FakeBackend : IIviBackend, IScenarioAwareBackend
         _bindings.TryGetValue(device, out var b) ? b.CurrentScene : null;
 
     /// <summary>
-    /// Looks up a rule in the active scenario's current scene for
-    /// <paramref name="device"/>, or <see langword="null"/> when no
-    /// binding exists or no rule matches.
+    /// The scenario binding for <paramref name="device"/>, or
+    /// <see langword="null"/> when none is active. A request reads it once,
+    /// so its rule, its policy and the scene it reports come from the same
+    /// binding even while another connection moves the scene.
     /// </summary>
-    private MockRule? FindRuleInCurrentScene(DeviceName device, string scpi)
-    {
-        if (!_bindings.TryGetValue(device, out var binding))
-        {
-            return null;
-        }
-        return binding.Scenario.FindScene(binding.CurrentScene)?.FindByMatch(scpi);
-    }
+    private ActiveBinding? BindingFor(DeviceName device) =>
+        _bindings.TryGetValue(device, out var binding) ? binding : null;
 
     /// <summary>
     /// Applies a rule action's optional transition for
@@ -124,7 +119,15 @@ public sealed class FakeBackend : IIviBackend, IScenarioAwareBackend
         }
     }
 
-    private sealed record ActiveBinding(MockScenario Scenario, SceneName CurrentScene);
+    private sealed record ActiveBinding(MockScenario Scenario, SceneName CurrentScene)
+    {
+        public MockRule? FindRule(string scpi) =>
+            Scenario.FindScene(CurrentScene)?.FindByMatch(scpi);
+
+        public bool FailsUnmatched => Scenario.Unmatched == UnmatchedPolicy.Fail;
+
+        public MockRuleUnmatched Unmatched(string scpi) => new(scpi, CurrentScene);
+    }
 
     /// <summary>
     /// Arranges that the next <see cref="OpenAsync"/> for <paramref name="name"/>
@@ -284,7 +287,8 @@ public sealed class FakeBackend : IIviBackend, IScenarioAwareBackend
         // not the flat rule list — once Transition actions land, the
         // current scene moves at runtime so the same SCPI string may
         // match different rules at different points in the session.
-        var rule = FindRuleInCurrentScene(device.Name, command.Value);
+        var binding = BindingFor(device.Name);
+        var rule = binding?.FindRule(command.Value);
         if (rule is not null)
         {
             // Effect first, then transition: a Fail rule reports its
@@ -308,6 +312,13 @@ public sealed class FakeBackend : IIviBackend, IScenarioAwareBackend
             return Task.FromResult(effect);
         }
 
+        if (binding is { FailsUnmatched: true })
+        {
+            return Task.FromResult(
+                Result.Failure<Unit, BackendError>(binding.Unmatched(command.Value))
+            );
+        }
+
         state.LastWritten = command.Value;
         return Task.FromResult(Result.Success<Unit, BackendError>(Unit.Value));
     }
@@ -325,7 +336,8 @@ public sealed class FakeBackend : IIviBackend, IScenarioAwareBackend
         // Scenario takes precedence. Look up the rule in the active
         // scenario's *current* scene (B0.2-3); same rationale as the
         // WriteAsync path above.
-        var rule = FindRuleInCurrentScene(device.Name, query.Value);
+        var binding = BindingFor(device.Name);
+        var rule = binding?.FindRule(query.Value);
         if (rule is not null)
         {
             var effect = rule.Action switch
@@ -357,18 +369,28 @@ public sealed class FakeBackend : IIviBackend, IScenarioAwareBackend
             return Task.FromResult(Result.Success<string, BackendError>(response));
         }
 
+        var failsUnmatched = binding?.FailsUnmatched ?? false;
+
         // Universal *IDN? fallback: prefer the active scenario's IdnDefault,
-        // then the device-configured IDN, then a generic FAKE response.
+        // then the device-configured IDN, then a generic FAKE response
+        // unless the scenario fails unmatched requests.
         if (query.Value.Equals("*IDN?", StringComparison.OrdinalIgnoreCase))
         {
             var idn =
-                GetActiveScenario(device.Name)?.IdnDefault
+                binding?.Scenario.IdnDefault
                 ?? state.IdnResponse
-                ?? "FAKE,FAKE,0,1.0";
-            return Task.FromResult(Result.Success<string, BackendError>(idn));
+                ?? (failsUnmatched ? null : "FAKE,FAKE,0,1.0");
+            if (idn is not null)
+            {
+                return Task.FromResult(Result.Success<string, BackendError>(idn));
+            }
         }
 
-        return Task.FromResult(Result.Success<string, BackendError>(query.Value));
+        return Task.FromResult(
+            failsUnmatched
+                ? Result.Failure<string, BackendError>(binding!.Unmatched(query.Value))
+                : Result.Success<string, BackendError>(query.Value)
+        );
     }
 
     /// <inheritdoc/>

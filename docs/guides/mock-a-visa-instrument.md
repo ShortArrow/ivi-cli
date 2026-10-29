@@ -100,6 +100,7 @@ You can author it two ways — from the CLI, or by hand-writing a TOML file.
 ```sh
 # 1. Create the scenario with its identity and initial scene.
 ivicli mock scenario create my-dmm --idn 'ACME,DMM-1000,SN42,2.1' --initial idle
+#    Add --unmatched fail to fail requests no rule matches (see below).
 
 # 2. Add rules to a scene. Queries respond; writes acknowledge.
 ivicli mock rule add my-dmm --in idle --match '*IDN?'     --respond 'ACME,DMM-1000,SN42,2.1'
@@ -191,6 +192,32 @@ poll expects.
 > value), and rule sets are per-scene (static metadata like `*IDN?` is
 > repeated in every scene). Both are tracked in issue
 > [#26](https://github.com/ShortArrow/ivi-cli/issues/26).
+
+### Requests no rule matches
+
+By default the mock answers a query that no rule in the current scene
+matches with the query's own text, and accepts such a write. That keeps an
+exploratory session going, but it also lets a test of your app pass on a
+request the scenario never declared. To make those requests fail, put
+`unmatched = "fail"` at the top of the TOML file, or create the scenario
+with `--unmatched fail`:
+
+```toml
+idn = "ACME,DMM-1000,SN42,2.1"
+unmatched = "fail"
+```
+
+Under `fail`, `*IDN?` without a rule is answered by `idn` only, and fails
+when the scenario has none. How the failure reaches your app depends on the
+path:
+
+| Path | Unmatched query | Unmatched write |
+| --- | --- | --- |
+| `visa query`, `visa write` | exits non-zero; the log names the request and the scene | the same |
+| SOCKET gateway | the connection closes; the server log names the request and the scene | the same |
+| HiSLIP gateway | the client gets a fatal error | not reported to the client or the log |
+| VXI-11 gateway | the client gets I/O error 17 | the same |
+| USB/IP gateway | no response, so the host's read times out; the server log names the request and the scene | logged only |
 
 ### Quirk profiles
 
@@ -316,6 +343,10 @@ The next SCPI operation on the open connection sees the new scenario. An
 unchanged binding keeps its in-flight scene, so re-running `activate` with the
 same scenario does not reset a state machine the client already advanced. This
 works identically over HiSLIP, raw SOCKET, VXI-11, and a USB/IP export.
+
+For the same reason, a running server does not see edits to the scenario it
+already serves: a rule added to it, or `unmatched = "fail"` written into its
+file, takes effect when the server restarts.
 
 ---
 

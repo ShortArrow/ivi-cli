@@ -64,6 +64,50 @@ public sealed class CreateScenarioCommandHandlerTests
         loaded.Scenes[0].Rules.Length.ShouldBe(0);
     }
 
+    [Theory]
+    [InlineData(UnmatchedPolicy.Echo)]
+    [InlineData(UnmatchedPolicy.Fail)]
+    public async Task Create_stores_the_unmatched_policy(UnmatchedPolicy policy)
+    {
+        var store = new FakeScenarioStore();
+        var handler = new CreateScenarioCommandHandler(store);
+
+        var result = await handler.HandleAsync(
+            new CreateScenarioCommand("strict", InitialScene: "off", Unmatched: policy),
+            TestContext.Current.CancellationToken
+        );
+        result.ShouldBeOk();
+
+        var loaded = (
+            await store.LoadAsync(
+                ScenarioName.From("strict").ShouldBeOk(),
+                TestContext.Current.CancellationToken
+            )
+        ).ShouldBeOk();
+        loaded.Unmatched.ShouldBe(policy);
+    }
+
+    [Fact]
+    public async Task Create_without_initial_stores_the_unmatched_policy()
+    {
+        var store = new FakeScenarioStore();
+        var handler = new CreateScenarioCommandHandler(store);
+
+        var result = await handler.HandleAsync(
+            new CreateScenarioCommand("strict", Unmatched: UnmatchedPolicy.Fail),
+            TestContext.Current.CancellationToken
+        );
+        result.ShouldBeOk();
+
+        var loaded = (
+            await store.LoadAsync(
+                ScenarioName.From("strict").ShouldBeOk(),
+                TestContext.Current.CancellationToken
+            )
+        ).ShouldBeOk();
+        loaded.Unmatched.ShouldBe(UnmatchedPolicy.Fail);
+    }
+
     [Fact]
     public async Task Create_with_invalid_initial_scene_name_fails_specifically()
     {

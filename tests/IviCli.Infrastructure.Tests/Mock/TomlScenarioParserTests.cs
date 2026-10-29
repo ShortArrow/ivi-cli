@@ -230,6 +230,66 @@ public sealed class TomlScenarioParserTests
         }
     }
 
+    [Theory]
+    [InlineData("unmatched = \"fail\"", UnmatchedPolicy.Fail)]
+    [InlineData("unmatched = \"echo\"", UnmatchedPolicy.Echo)]
+    [InlineData("", UnmatchedPolicy.Echo)]
+    public void Unmatched_loads_the_policy_and_defaults_to_echo(
+        string line,
+        UnmatchedPolicy expected
+    )
+    {
+        var toml = line + "\n";
+        var scenario = TomlScenarioParser
+            .Parse(ScenarioName.From("strict").ShouldBeOk(), toml)
+            .ShouldBeOk();
+
+        scenario.Unmatched.ShouldBe(expected);
+    }
+
+    [Theory]
+    [InlineData("unmatched = \"loud\"")]
+    [InlineData("unmatched = true")]
+    public void Unknown_unmatched_value_surfaces_a_parse_failure(string line)
+    {
+        var err = TomlScenarioParser
+            .Parse(ScenarioName.From("strict").ShouldBeOk(), line + "\n")
+            .ShouldBeError();
+        err.ShouldBeOfType<IviCli.Application.Mock.ScenarioStoreParseFailure>();
+    }
+
+    [Fact]
+    public void Fail_policy_round_trips_through_both_emitted_shapes()
+    {
+        var flat = MockScenario.SingleScene(
+            ScenarioName.From("strict").ShouldBeOk(),
+            idnDefault: null,
+            rules: ImmutableArray.Create(new MockRule("OUTP ON", new RuleAction.Ack()))
+        ) with
+        {
+            Unmatched = UnmatchedPolicy.Fail,
+        };
+        var multi = flat with
+        {
+            InitialScene = SceneName.From("off").ShouldBeOk(),
+            Scenes = ImmutableArray.Create(
+                MockScene.Empty(SceneName.From("off").ShouldBeOk()),
+                MockScene.Empty(SceneName.From("on").ShouldBeOk())
+            ),
+        };
+
+        foreach (var scenario in new[] { flat, multi })
+        {
+            var serialized = TomlScenarioParser.Serialize(scenario);
+            serialized.ShouldContain("unmatched = \"fail\"");
+
+            TomlScenarioParser
+                .Parse(ScenarioName.From("strict").ShouldBeOk(), serialized)
+                .ShouldBeOk()
+                .ShouldBe(scenario);
+        }
+    }
+
     [Fact]
     public void Scenario_without_quirks_serializes_without_the_table()
     {

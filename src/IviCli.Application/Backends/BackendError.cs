@@ -1,5 +1,6 @@
 using IviCli.Domain;
 using IviCli.Domain.Devices;
+using IviCli.Domain.Mock;
 using IviCli.Domain.Visa;
 
 namespace IviCli.Application.Backends;
@@ -223,6 +224,24 @@ public sealed record PoolWaitTimeout(DeviceName Device, TimeSpan Waited) : Backe
 
     /// <inheritdoc/>
     public override IReadOnlyList<object?> LogArgs => new object?[] { Waited, Device };
+}
+
+/// <summary>
+/// No rule in the current scene of a scenario whose unmatched policy is
+/// <c>fail</c> matches the request (ADR 0026 §4).
+/// </summary>
+/// <param name="Scpi">The request as sent.</param>
+/// <param name="Scene">The scene that was current when the request arrived.</param>
+public sealed record MockRuleUnmatched(string Scpi, SceneName Scene) : BackendError
+{
+    /// <inheritdoc/>
+    public override LogSeverity Severity => LogSeverity.Error;
+
+    /// <inheritdoc/>
+    public override string Message => "no mock rule in scene {Scene} matches {Scpi}";
+
+    /// <inheritdoc/>
+    public override IReadOnlyList<object?> LogArgs => new object?[] { Scene.Value, Scpi };
 }
 
 /// <summary>

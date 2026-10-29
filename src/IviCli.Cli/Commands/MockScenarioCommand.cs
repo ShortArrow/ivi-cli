@@ -267,10 +267,19 @@ public static class MockScenarioCommand
                 "Initial scene name. When set, the scenario starts with that scene (empty, no rules) as its only scene; otherwise the synthetic `default` scene is used.",
         };
 
+        var unmatchedOpt = new Option<UnmatchedPolicy>("--unmatched")
+        {
+            Description =
+                "What a request no rule matches gets: `echo` answers a query with its own text and accepts a write; `fail` fails both.",
+            DefaultValueFactory = _ => UnmatchedPolicy.Echo,
+        };
+        unmatchedOpt.AcceptOnlyFromAmong("echo", "fail");
+
         var cmd = new Command("create", "Create an empty scenario.");
         cmd.Arguments.Add(nameArg);
         cmd.Options.Add(idnOpt);
         cmd.Options.Add(initialOpt);
+        cmd.Options.Add(unmatchedOpt);
 
         cmd.SetAction(
             async (parseResult, ct) =>
@@ -278,11 +287,12 @@ public static class MockScenarioCommand
                 var name = parseResult.GetRequiredValue(nameArg);
                 var idn = parseResult.GetValue(idnOpt);
                 var initial = parseResult.GetValue(initialOpt);
+                var unmatched = parseResult.GetValue(unmatchedOpt);
                 var handler = services.GetRequiredService<CreateScenarioCommandHandler>();
                 var logger = services.GetRequiredService<ILogger<CreateScenarioCommandHandler>>();
 
                 var result = await handler.HandleAsync(
-                    new CreateScenarioCommand(name, idn, initial),
+                    new CreateScenarioCommand(name, idn, initial, unmatched),
                     ct
                 );
                 return result switch
@@ -644,6 +654,10 @@ public static class MockScenarioCommand
         if (scenario.IdnDefault is { } idn)
         {
             Console.WriteLine($"idn:     {idn}");
+        }
+        if (scenario.Unmatched == UnmatchedPolicy.Fail)
+        {
+            Console.WriteLine("unmatched: fail");
         }
         Console.WriteLine("scenes:");
         if (scenario.Scenes.Length == 0)

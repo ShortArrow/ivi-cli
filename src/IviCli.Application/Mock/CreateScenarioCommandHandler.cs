@@ -60,12 +60,17 @@ public sealed class CreateScenarioCommandHandler
                 IdnDefault: command.IdnDefault,
                 Scenes: System.Collections.Immutable.ImmutableArray.Create(
                     MockScene.Empty(initialScene)
-                )
+                ),
+                Unmatched: command.Unmatched
             );
         }
         else
         {
-            scenario = MockScenario.Empty(name) with { IdnDefault = command.IdnDefault };
+            scenario = MockScenario.Empty(name) with
+            {
+                IdnDefault = command.IdnDefault,
+                Unmatched = command.Unmatched,
+            };
         }
         var saveResult = await _store.SaveAsync(scenario, overwriteIfExists: false, ct);
         if (saveResult is Result<Unit, ScenarioStoreError>.Ok)
