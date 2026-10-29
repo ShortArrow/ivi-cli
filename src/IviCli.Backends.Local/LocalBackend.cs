@@ -152,10 +152,7 @@ public sealed class LocalBackend : IIviBackend, IEnforcesDeviceTimeout
                 Result.Failure<Unit, BackendError>(new TransportDisconnected("session not open"))
             );
         }
-        // v1 sends the SCPI *TRG common-command through the existing
-        // Write path — works against every IEEE-488.2 instrument. A v2
-        // can switch to IMessageBasedSession.AssertTrigger once the
-        // IVisaSessionHandle port grows a Trigger() method (ADR 0041 §4).
+        // *TRG through Write rather than AssertTrigger (ADR 0041 §5).
         var write = handle.Write("*TRG");
         if (write is Result<Unit, LocalVisaError>.Error err)
         {

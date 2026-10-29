@@ -19,7 +19,7 @@ gateways ([ADR 0018](0018-mock-container.md)) already appear to any VISA
 as `TCPIP::…::INSTR` resources. What no current tier below D can exercise
 is the **USB host-stack path** — and that is exactly where the 2026-08
 bench failures lived: kernel driver binding, per-mechanism event support
-(the CLR handler mechanism NI-VISA rejects on USB, [ADR 0041 §5](0041-trigger-and-srq-ports.md)),
+(the CLR handler mechanism NI-VISA rejects on USB, [ADR 0041 §6](0041-trigger-and-srq-ports.md)),
 and an instrument whose SRQ notification machinery wedges until a power
 cycle. None of that is reproducible without a USB device the host can
 enumerate; all of it should be scriptable instead of rediscovered on a
