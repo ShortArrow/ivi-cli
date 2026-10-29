@@ -39,7 +39,7 @@ public enum LintSeverity
 /// <summary>
 /// Default linter: walks every <c>Write</c> / <c>Query</c> directive and
 /// flags those whose root mnemonic is not in <see cref="ScpiVocabulary"/>.
-/// Sleep / Assert / Echo directives are control flow, not SCPI, and never
+/// Sleep / Assert / Values / Echo directives are control flow, not SCPI, and never
 /// produce findings.
 /// </summary>
 public sealed class DefaultScriptLinter : IScriptLinter

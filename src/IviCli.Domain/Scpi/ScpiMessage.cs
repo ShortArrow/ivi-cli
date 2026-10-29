@@ -1,4 +1,14 @@
+using System.Collections.Immutable;
+
 namespace IviCli.Domain.Scpi;
+
+/// <summary>
+/// One element of a response message unit, trimmed. Block data is kept
+/// whole and marked, because its contents are not structure.
+/// </summary>
+/// <param name="Text">The element's text.</param>
+/// <param name="IsBlock">Whether the element is arbitrary block data.</param>
+public readonly record struct ResponseElement(string Text, bool IsBlock);
 
 /// <summary>
 /// Reads the structure of a SCPI program message (IEEE 488.2 §7): its
@@ -123,6 +133,56 @@ public static class ScpiMessage
         }
         return folded.ToString();
     }
+
+    /// <summary>
+    /// <paramref name="text"/> read as a response (ADR 0051 §3): message
+    /// units separated by <c>;</c>, each a list of elements separated by
+    /// <c>,</c>, outside quoted strings and block data. A response carries
+    /// no header path, so nothing is resolved across units. An element that
+    /// is block data is kept whole, separators included.
+    /// </summary>
+    public static ImmutableArray<ImmutableArray<ResponseElement>> SplitResponse(string text)
+    {
+        var units = ImmutableArray.CreateBuilder<ImmutableArray<ResponseElement>>();
+        var elements = ImmutableArray.CreateBuilder<ResponseElement>();
+        var start = 0;
+        var isBlock = false;
+        var i = 0;
+        while (i < text.Length)
+        {
+            switch (text[i])
+            {
+                case '"' or '\'':
+                    i = AfterQuotedString(text, i);
+                    break;
+                case '#':
+                    var after = AfterBlock(text, i);
+                    isBlock |= after > i + 1 && text.AsSpan(start, i - start).IsWhiteSpace();
+                    i = after;
+                    break;
+                case ',' or ';':
+                    elements.Add(Element(text, start, i, isBlock));
+                    if (text[i] == ';')
+                    {
+                        units.Add(elements.ToImmutable());
+                        elements.Clear();
+                    }
+                    start = i + 1;
+                    isBlock = false;
+                    i++;
+                    break;
+                default:
+                    i++;
+                    break;
+            }
+        }
+        elements.Add(Element(text, start, text.Length, isBlock));
+        units.Add(elements.ToImmutable());
+        return units.ToImmutable();
+    }
+
+    private static ResponseElement Element(string text, int start, int end, bool isBlock) =>
+        new(text[start..end].Trim(), isBlock);
 
     private static int NextUnitStart(string text, int i)
     {

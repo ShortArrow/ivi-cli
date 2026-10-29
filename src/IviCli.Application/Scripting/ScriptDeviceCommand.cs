@@ -137,6 +137,33 @@ public sealed record ScriptDeviceAssertFailure(int Line, string Pattern, string 
     public override IReadOnlyList<object?> LogArgs => new object?[] { Line, Pattern, Actual };
 }
 
+/// <summary>
+/// A <c>!values</c> directive refused the last response, or ran before any
+/// query answered.
+/// </summary>
+/// <param name="Line">The directive's source line.</param>
+/// <param name="Pattern">The pattern as written.</param>
+/// <param name="Reason">Which slot refused the response, and why.</param>
+/// <param name="Actual">The whole response, empty when there was none.</param>
+public sealed record ScriptDeviceValuesFailure(
+    int Line,
+    string Pattern,
+    string Reason,
+    string Actual
+) : ScriptDeviceError
+{
+    /// <inheritdoc/>
+    public override LogSeverity Severity => LogSeverity.Warning;
+
+    /// <inheritdoc/>
+    public override string Message =>
+        "script line {Line}: values {Pattern} failed: {Reason}; response: {Actual}";
+
+    /// <inheritdoc/>
+    public override IReadOnlyList<object?> LogArgs =>
+        new object?[] { Line, Pattern, Reason, Actual };
+}
+
 /// <summary>A summary of executed lines and the response transcript.</summary>
 public sealed record ScriptExecutionReport(int LinesExecuted, IReadOnlyList<string> Output);
 
@@ -330,6 +357,22 @@ public sealed class ScriptDeviceCommandHandler
                                     a.Line,
                                     a.Pattern,
                                     lastResponse ?? "(no prior query)"
+                                )
+                            );
+                        }
+                        break;
+                    case ScpiScriptDirective.Values v:
+                        var refusal = lastResponse is null
+                            ? "no query has answered before this line"
+                            : v.Pattern.Match(lastResponse);
+                        if (refusal is not null)
+                        {
+                            return Result.Failure<ScriptExecutionReport, ScriptDeviceError>(
+                                new ScriptDeviceValuesFailure(
+                                    v.Line,
+                                    v.Source,
+                                    refusal,
+                                    lastResponse ?? string.Empty
                                 )
                             );
                         }

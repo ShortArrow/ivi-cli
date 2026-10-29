@@ -19,7 +19,8 @@ public sealed record ScpiScript(ImmutableArray<ScpiScriptDirective> Directives)
     /// Parses the supplied script source into a structured
     /// <see cref="ScpiScript"/>. Each line is trimmed and blank lines are
     /// skipped. A line beginning with <c>!</c> is an ivi-cli directive read
-    /// whole: <c>!sleep &lt;ms&gt;</c>, <c>!assert &lt;regex&gt;</c> or
+    /// whole: <c>!sleep &lt;ms&gt;</c>, <c>!assert &lt;regex&gt;</c>,
+    /// <c>!values &lt;pattern&gt;</c> (<see cref="ValuesPattern"/>) or
     /// <c>!echo &lt;text&gt;</c> (keywords case-insensitive), and <c>!#</c>
     /// starts a comment line. Every other line, including any <c>#</c> in
     /// it, is SCPI sent to the instrument exactly as written: a
@@ -109,13 +110,34 @@ public sealed record ScpiScript(ImmutableArray<ScpiScriptDirective> Directives)
                 new ScpiScriptDirective.Assert(line, pattern)
             );
         }
+        if (TryReadArgument(body, "values", out var valuesArg))
+        {
+            var source = valuesArg.Trim();
+            return ValuesPattern.Parse(source) switch
+            {
+                Result<ValuesPattern, InvalidValuesPattern>.Ok ok => Result.Success<
+                    ScpiScriptDirective?,
+                    ScpiScriptError
+                >(new ScpiScriptDirective.Values(line, ok.Value, source)),
+                Result<ValuesPattern, InvalidValuesPattern>.Error err => Invalid(
+                    line,
+                    written,
+                    err.Err.Reason
+                ),
+                _ => throw new InvalidOperationException(),
+            };
+        }
         if (TryReadArgument(body, "echo", out var text))
         {
             return Result.Success<ScpiScriptDirective?, ScpiScriptError>(
                 new ScpiScriptDirective.Echo(line, text)
             );
         }
-        return Invalid(line, written, "unknown directive; expected !sleep, !assert, !echo or !#");
+        return Invalid(
+            line,
+            written,
+            "unknown directive; expected !sleep, !assert, !values, !echo or !#"
+        );
     }
 
     /// <summary>
@@ -159,6 +181,13 @@ public abstract record ScpiScriptDirective(int Line)
 
     /// <summary>Regex-match the most recent query response.</summary>
     public sealed record Assert(int Line, string Pattern) : ScpiScriptDirective(Line);
+
+    /// <summary>
+    /// Check the most recent query response against a <c>!values</c>
+    /// pattern; <paramref name="Source"/> is the pattern as written.
+    /// </summary>
+    public sealed record Values(int Line, ValuesPattern Pattern, string Source)
+        : ScpiScriptDirective(Line);
 
     /// <summary>Write a literal line to stdout.</summary>
     public sealed record Echo(int Line, string Text) : ScpiScriptDirective(Line);

@@ -11,6 +11,32 @@ namespace IviCli.Domain.Tests.Scpi;
 public sealed class ScpiMessageTests
 {
     [Theory]
+    [InlineData("25.3,72.1", "25.3|72.1")]
+    [InlineData(" 1 , 2 ", "1|2")]
+    [InlineData("1;2,3", "1;2|3")]
+    [InlineData("\"a,b\",1", "\"a,b\"|1")]
+    [InlineData("'x;y';1", "'x;y';1")]
+    [InlineData("#13a,b,1", "[#13a,b]|1")]
+    [InlineData("1,#0a,b;c", "1|[#0a,b;c]")]
+    [InlineData("", "")]
+    public void A_response_splits_into_units_of_elements_outside_strings_and_blocks(
+        string response,
+        string expected
+    )
+    {
+        var rendered = string.Join(
+            ";",
+            ScpiMessage
+                .SplitResponse(response)
+                .Select(unit =>
+                    string.Join("|", unit.Select(e => e.IsBlock ? $"[{e.Text}]" : e.Text))
+                )
+        );
+
+        rendered.ShouldBe(expected);
+    }
+
+    [Theory]
     [InlineData("*IDN?")]
     [InlineData("*idn?")]
     [InlineData("*IDN?\r\n")]
