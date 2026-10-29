@@ -244,8 +244,10 @@ reconnects — or detaches and re-attaches a USB export — finds the wedge
 where it left it, as it would on the instrument. `0` wedges the stream
 before the first notification.
 
-Quirks are hand-written TOML only — there is no CLI flag for them, so
-author the file and `ivicli mock scenario import ./wedged.toml`.
+Quirks are hand-written TOML only — there is no CLI flag for them. Add the
+table to the scenario's file in the scenarios directory (see
+[Where scenarios live](#where-scenarios-live)), for example `wedged.toml`,
+and `ivicli mock scenario activate wedged`.
 
 ---
 
