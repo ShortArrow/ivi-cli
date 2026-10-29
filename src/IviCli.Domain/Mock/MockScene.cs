@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using IviCli.Domain.Scpi;
 
 namespace IviCli.Domain.Mock;
 
@@ -38,12 +39,14 @@ public sealed record MockScene(SceneName Name, ImmutableArray<MockRule> Rules)
     }
 
     /// <summary>
-    /// Looks up a rule by SCPI text. Matching is exact except for
-    /// the SCPI grammar's optional root-relative colon prefix
-    /// (IEEE 488.2 §7.5 / SCPI 1999 §6.1.1): a rule registered as
-    /// <c>OUTP ON</c> matches both <c>OUTP ON</c> and <c>:OUTP ON</c>
-    /// at lookup time, because — at the start of a message — both
-    /// forms address the same root command.
+    /// Looks up a rule by SCPI text (ADR 0051 §1). Matching is exact
+    /// except for two things an instrument ignores as well: the
+    /// optional root-relative colon prefix (IEEE 488.2 §7.5 / SCPI 1999
+    /// §6.1.1), and case outside quoted strings and block data
+    /// (<see cref="ScpiMessage.FoldCase"/>). A rule registered as
+    /// <c>OUTP ON</c> matches <c>OUTP ON</c>, <c>:OUTP ON</c> and
+    /// <c>outp on</c>. Short and long forms are not equivalent. The first
+    /// matching rule in <see cref="Rules"/> wins.
     /// </summary>
     public MockRule? FindByMatch(string scpi)
     {
@@ -75,5 +78,5 @@ public sealed record MockScene(SceneName Name, ImmutableArray<MockRule> Rules)
     }
 
     private static string NormalizeForMatch(string scpi) =>
-        scpi.Length > 0 && scpi[0] == ':' ? scpi[1..] : scpi;
+        ScpiMessage.FoldCase(scpi.Length > 0 && scpi[0] == ':' ? scpi[1..] : scpi);
 }

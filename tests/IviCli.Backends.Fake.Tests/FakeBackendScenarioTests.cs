@@ -77,6 +77,70 @@ public class FakeBackendScenarioTests
         result.ShouldBeOk().ShouldBe("3.30");
     }
 
+    [Theory]
+    [InlineData("meas:volt?", "MEAS:VOLT?")]
+    [InlineData("Meas:Volt?", "MEAS:VOLT?")]
+    [InlineData(":meas:volt?", "MEAS:VOLT?")]
+    [InlineData("MEAS:VOLT?", "meas:volt?")]
+    public async Task ActiveScenario_Case_Folded(string clientScpi, string sceneMatch)
+    {
+        // Given
+        var backend = new FakeBackend();
+        backend.ActivateScenario(
+            MakeScenario(new MockRule(sceneMatch, new RuleAction.Respond("3.30"))),
+            DevName()
+        );
+
+        // When
+        var result = await backend.QueryAsync(
+            Dev(),
+            ScpiQuery.From(clientScpi).ShouldBeOk(),
+            CancellationToken.None
+        );
+
+        // Then
+        result.ShouldBeOk().ShouldBe("3.30");
+    }
+
+    [Fact]
+    public async Task ActiveScenario_LongForm_DoesNotMatchShortFormRule()
+    {
+        // Given
+        var backend = new FakeBackend();
+        backend.ActivateScenario(
+            MakeScenario(new MockRule("MEAS:VOLT?", new RuleAction.Respond("3.30"))),
+            DevName()
+        );
+
+        // When
+        var result = await backend.QueryAsync(
+            Dev(),
+            ScpiQuery.From("MEASure:VOLTage?").ShouldBeOk(),
+            CancellationToken.None
+        );
+
+        // Then
+        result.ShouldBeOk().ShouldNotBe("3.30");
+    }
+
+    [Fact]
+    public async Task IdnFallback_Case_Folded()
+    {
+        // Given
+        var backend = new FakeBackend();
+        backend.ActivateScenario(MakeScenario(), DevName());
+
+        // When
+        var result = await backend.QueryAsync(
+            Dev(),
+            ScpiQuery.From("*idn?").ShouldBeOk(),
+            CancellationToken.None
+        );
+
+        // Then
+        result.ShouldBeOk().ShouldBe("ACME,FAKE-PSU,001,1.0");
+    }
+
     [Fact]
     public async Task ActiveScenario_IdnDefault_UsedWhenNoExplicitScene()
     {

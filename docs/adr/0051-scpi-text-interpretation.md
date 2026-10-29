@@ -9,14 +9,13 @@ rule for reading it without reference to the others:
 
 | Surface | Language | Implementation |
 | --- | --- | --- |
-| Mock rule matching | literal equality | `MockScene.FindByMatch` compares after `NormalizeForMatch`, which strips a leading `:` and nothing else |
+| Mock rule matching | literal equality after canonicalization (§1) | `MockScene.FindByMatch` compares after `NormalizeForMatch` |
 | Script `assert` | regular expression, partial match | `Regex.IsMatch(lastResponse, pattern)` ([ADR 0027](0027-phase3-operator-automation.md) §2) |
 | `visa lint`, completion | mnemonic vocabulary | `ScpiVocabulary`, standard roots only ([ADR 0032](0032-scpi-vocabulary-and-linter.md)) |
 
-The consequences are visible rather than theoretical. The mock treats
-`meas:volt?` and `MEAS:VOLT?` as different commands, so a client that sends
-lower case works against an instrument and gets nothing from the mock —
-which defeats the purpose of the mock. Nothing anywhere handles a compound
+The mock stands in for an instrument, including inside the tests of
+software that drives one, so a request an instrument answers and the mock
+refuses fails a test that should pass. Nothing anywhere handles a compound
 query. Whether a request expects a response at all is decided by whether the
 line ends in `?` once its terminator is stripped, in `ScpiQuery.From`, the
 script parser and all four gateways. Responses are strings from the backend
@@ -62,19 +61,16 @@ mnemonic, and the string alone cannot say which.
 
 ### 1. Canonicalization: case and leading colon, nothing more
 
-`NormalizeForMatch` gains case folding. It keeps stripping the leading
-`:`. It does not resolve short and long forms. The universal `*IDN?`
-fallback compares through the same canonicalization, so `*idn?` gets the
-identity string rather than its own text back.
+`NormalizeForMatch` strips the leading `:` and folds case
+(`ScpiMessage.FoldCase`). Quoted strings and block data keep their case,
+since an instrument takes them as sent. It does not resolve short and long
+forms. The universal `*IDN?` fallback compares case-insensitively too, so
+`*idn?` gets the identity string rather than its own text back.
 
-Every `match` in every scenario in this repository is written in short
-form and upper case — `MEAS:VOLT?`, `SYST:ERR?`, `OUTP?`. Case folding
-therefore changes no existing scenario's behaviour while making the mock
-accept requests it previously refused and an instrument would have
-answered.
+Folding cannot make a wrong request pass: no SCPI instrument tells a
+header or a character parameter apart by case.
 
-Short/long equivalence is refused rather than deferred, and the reason is
-worth writing down because the partial version is tempting.
+Short/long equivalence is refused. The partial version is tempting:
 `ScpiVocabulary` holds `("MEASure", "MEAS")` pairs for standard root
 nodes, so a partial implementation is available: roots would accept both
 spellings and sub-nodes would not, because `VOLT` and `CURR` are not root
@@ -255,10 +251,9 @@ backend as it was sent, less its terminator.
 
 ## Consequences
 
-- The mock stops refusing requests an instrument would answer, which is
-  the property that makes it usable as a stand-in. This is a behaviour
-  change with no effect on any scenario in the repository, because all
-  of them are already upper case.
+- The mock does not refuse a request for its case, which is the property
+  that makes it usable as a stand-in. Two rules that differ only in case
+  are the same rule, and the first one wins.
 - Scripts can assert on readings without a regular expression over
   digits, and the failure tells the reader which reading was wrong.
 - Two limits become explicit rather than emergent: compound requests are
@@ -305,13 +300,11 @@ backend as it was sent, less its terminator.
 
 ## Verification
 
-- Existing scenarios pass unchanged after case folding, including the
-  `docker/etc/ivi-cli/scenarios/default.toml`,
-  `docs/samples/psu/psu-bench.toml` and the bench scenario under
-  `tests/IviCli.Backends.Local.Tests/Assets`.
-- Case folding is pinned by a test asserting that a rule written
-  `MEAS:VOLT?` answers `meas:volt?`, `:MEAS:VOLT?` and `MEAS:VOLT?`, and
-  refuses `MEASure:VOLTage?`.
+- Case folding is pinned by tests asserting that a rule written
+  `MEAS:VOLT?` answers `meas:volt?`, `Meas:Volt?` and `:meas:volt?`, that
+  it does not answer `MEASure:VOLTage?`, and that `*idn?` gets the
+  scenario's identity. `ScpiMessage.FoldCase` is pinned on the pure
+  function, including a quoted string and a block that keep their case.
 - Query detection is pinned by cases on the pure function —
   `MEAS:VOLT? (@1)`, `*IDN? `, `VOLT 1;MEAS:VOLT? (@1)`, a `;` or `?`
   inside a quoted string, a `?` inside definite-length block data, and

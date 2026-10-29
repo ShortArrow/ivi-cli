@@ -83,6 +83,17 @@ public sealed class ScpiMessageTests
     ) => ScpiQuery.From(text).ShouldBeOk().Value.ShouldBe(text);
 
     [Theory]
+    [InlineData("meas:volt?", "MEAS:VOLT?")]
+    [InlineData("Outp on", "OUTP ON")]
+    [InlineData("DISP:TEXT \"Ready\"", "DISP:TEXT \"Ready\"")]
+    [InlineData("disp:text 'it''s'", "DISP:TEXT 'it''s'")]
+    [InlineData("data #13abc;*opc?", "DATA #13abc;*OPC?")]
+    public void FoldCase_upper_cases_everything_but_quoted_strings_and_block_data(
+        string text,
+        string folded
+    ) => ScpiMessage.FoldCase(text).ShouldBe(folded);
+
+    [Theory]
     [InlineData("*RST")]
     [InlineData("VOLT 1")]
     [InlineData("DISP:TEXT \"ready?\"")]
