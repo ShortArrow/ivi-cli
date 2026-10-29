@@ -66,7 +66,7 @@ public static class VisaLintCommand
                     var err = (
                         (Result<ScpiScript, ScpiScriptError>.Error)ScpiScript.Parse(source)
                     ).Err;
-                    Console.Error.WriteLine($"error: script could not be parsed: {err.Message}");
+                    Console.Error.WriteLine(ScriptParseMessage.For(err));
                     return ExitCodeMapper.UsageError;
                 }
 

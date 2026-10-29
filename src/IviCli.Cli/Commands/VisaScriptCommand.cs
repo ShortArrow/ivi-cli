@@ -90,9 +90,7 @@ public static class VisaScriptCommand
     private static string UserFacingMessage(ScriptDeviceError error) =>
         error switch
         {
-            ScriptDeviceParseFailure { Inner: ScpiScriptInvalidDirective d } =>
-                $"error: script line {d.Line}: {d.Reason}.",
-            ScriptDeviceParseFailure => "error: script parse failed.",
+            ScriptDeviceParseFailure p => ScriptParseMessage.For(p.Inner),
             ScriptDeviceInvalidName n => DeviceNameMessage.Invalid(n.Raw),
             ScriptDeviceNoTarget =>
                 "error: no current device. Use `visa use <name>` first or pass --device.",

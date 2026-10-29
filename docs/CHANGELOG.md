@@ -26,7 +26,8 @@ All notable changes to ivi-cli are documented here. Format roughly follows
 
 ### Fixed
 
-- **`visa script` says which line it could not read and why.** A parse
+- **`visa script`, `visa lint` and `mock scenario record` say which
+  script line they could not read and why.** A parse
   failure printed the error's template, `script line {Line}: {Reason}`,
   instead of the line number and the reason.
 

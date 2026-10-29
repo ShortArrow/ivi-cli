@@ -202,7 +202,7 @@ public static class MockScenarioCommand
             error switch
             {
                 RecordScenarioInvalidName n => $"error: invalid scenario name '{n.Raw}'.",
-                RecordScenarioParseFailure p => $"error: script parse failed ({p.Inner.Message}).",
+                RecordScenarioParseFailure p => ScriptParseMessage.For(p.Inner),
                 RecordScenarioInvalidDeviceName d => DeviceNameMessage.Invalid(d.Raw),
                 RecordScenarioNoTarget =>
                     "error: no current device. Use `visa use <name>` first or pass --device.",

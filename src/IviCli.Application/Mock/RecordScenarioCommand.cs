@@ -341,7 +341,7 @@ public sealed class RecordScenarioCommandHandler
                         await Task.Delay(s.Duration, ct);
                         break;
                     default:
-                        // assert / echo are passive during recording.
+                        // assert / values / echo are passive during recording.
                         break;
                 }
             }
