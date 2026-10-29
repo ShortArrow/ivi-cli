@@ -171,6 +171,9 @@ subset:
 | 15 | `IO_TIMEOUT` | backend timeout |
 | 17 | `IO_ERROR` | backend error |
 
+The gateway logs the backend error behind a failed write or query, at the error's
+own severity, so the log says why the call failed.
+
 ## Consequences
 
 - Existing VISA tooling that only speaks VXI-11 can drive the same

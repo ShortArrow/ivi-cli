@@ -242,11 +242,12 @@ extensions are forbidden in v1.
 ### 9. Error-path mapping
 
 `BackendError` variants emerging from the local backend are folded
-into protocol-native error reporting:
+into protocol-native error reporting, for a write as for a query, and
+the gateway logs the error at its own severity:
 
-- SOCKET: connection close + an Information-level log entry.
-- HiSLIP: a `FatalError` control message describing the variant, then
-  connection close.
+- SOCKET: connection close.
+- HiSLIP: a `FatalError` control message naming the failed operation,
+  then connection close.
 
 The control-plane Management API will surface the same `BackendError`
 sum directly when it lands.
