@@ -62,6 +62,7 @@ no state machine — yet.
 ```toml
 name = "psu-startup"
 idn = "ACME,FAKE-PSU,001,1.0"           # optional default IDN
+unmatched = "fail"                       # optional; "echo" when omitted (§4)
 
 [[scenes]]
 match = "*IDN?"                          # exact SCPI text to match
@@ -90,6 +91,9 @@ fail_detail = "50"                       # variant-specific payload (e.g. ms)
   later revision can adopt a hash map if needed.
 - `idn` is a convenience that pre-populates the universal `*IDN?`
   response unless a scene explicitly overrides it.
+- `unmatched` is `echo` or `fail` and decides step 3 of §4. A file that
+  omits it reads as `echo`, and an `echo` scenario is written back without
+  it.
 
 ### 4. Match resolution at runtime
 
@@ -103,13 +107,29 @@ scenario is loaded:
    - `ack` → return `Unit.Value` (WriteAsync only; QueryAsync treats it
      as an error).
    - `fail` → return the matching `BackendError` variant.
-3. If not found, fall through to the existing programmatic DSL
-   (`RespondToQuery` etc.), then to the universal defaults
-   (`*IDN?` → configured IDN, otherwise echo).
+3. If not found, fall through to the programmatic DSL
+   (`RespondToQuery` etc.), then to what the scenario's `unmatched`
+   says:
+   - `echo` → `*IDN?` gets the scenario's `idn`, then the
+     device-configured IDN, then `FAKE,FAKE,0,1.0`; any other query gets
+     its own text back, and a write succeeds.
+   - `fail` → `*IDN?` gets the scenario's `idn` or the device-configured
+     IDN; anything else, query or write, fails with `MockRuleUnmatched`,
+     which names the request and the current scene.
 
-This layering preserves backwards compatibility with the existing
-FakeBackend tests; scenarios are an *additional* layer, not a
-replacement.
+Scenarios are an *additional* layer over the programmatic DSL, not a
+replacement, so FakeBackend tests that use the DSL behave the same with
+or without one.
+
+`echo` is the default because it keeps an exploratory session going:
+a request nobody wrote a rule for still gets an answer. The same property
+makes a test of instrument-control code pass on a request the scenario
+never declared, which is what `fail` is for. `fail` does not imitate how
+an instrument reacts to an unknown command (no response to a query, an
+entry in the error queue for a write): the mock keeps no error queue, and
+a dedicated error names the request that needs a rule, where a timeout
+would not. Changing the default to `fail` would make every write without
+an `ack` rule fail in every existing scenario.
 
 ### 5. CLI surface
 

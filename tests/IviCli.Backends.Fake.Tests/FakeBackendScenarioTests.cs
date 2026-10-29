@@ -142,6 +142,153 @@ public class FakeBackendScenarioTests
     }
 
     [Fact]
+    public async Task EchoPolicy_UnmatchedQuery_AnswersWithItsText_AndUnmatchedWriteSucceeds()
+    {
+        // Given
+        var backend = new FakeBackend();
+        backend.ActivateScenario(MakeScenario(), DevName());
+
+        // When
+        var query = await backend.QueryAsync(
+            Dev(),
+            ScpiQuery.From("MEAS:CURR?").ShouldBeOk(),
+            CancellationToken.None
+        );
+        var write = await backend.WriteAsync(
+            Dev(),
+            ScpiCommand.From("OUTP OFF").ShouldBeOk(),
+            CancellationToken.None
+        );
+
+        // Then
+        query.ShouldBeOk().ShouldBe("MEAS:CURR?");
+        write.ShouldBeOk();
+    }
+
+    [Fact]
+    public async Task FailPolicy_UnmatchedQuery_FailsNamingRequestAndScene()
+    {
+        // Given
+        var backend = new FakeBackend();
+        backend.ActivateScenario(
+            MakeScenario(new MockRule("MEAS:VOLT?", new RuleAction.Respond("3.30"))) with
+            {
+                Unmatched = UnmatchedPolicy.Fail,
+            },
+            DevName()
+        );
+
+        // When
+        var result = await backend.QueryAsync(
+            Dev(),
+            ScpiQuery.From("MEAS:CURR?").ShouldBeOk(),
+            CancellationToken.None
+        );
+
+        // Then
+        var err = result.ShouldBeError().ShouldBeOfType<MockRuleUnmatched>();
+        err.Scpi.ShouldBe("MEAS:CURR?");
+        err.Scene.ShouldBe(SceneName.DefaultScene());
+    }
+
+    [Fact]
+    public async Task FailPolicy_UnmatchedWrite_Fails()
+    {
+        // Given
+        var backend = new FakeBackend();
+        backend.ActivateScenario(
+            MakeScenario(new MockRule("OUTP ON", new RuleAction.Ack())) with
+            {
+                Unmatched = UnmatchedPolicy.Fail,
+            },
+            DevName()
+        );
+
+        // When
+        var result = await backend.WriteAsync(
+            Dev(),
+            ScpiCommand.From("OUTP OFF").ShouldBeOk(),
+            CancellationToken.None
+        );
+
+        // Then
+        result.ShouldBeError().ShouldBeOfType<MockRuleUnmatched>().Scpi.ShouldBe("OUTP OFF");
+    }
+
+    [Fact]
+    public async Task FailPolicy_MatchedRule_StillAnswers()
+    {
+        // Given
+        var backend = new FakeBackend();
+        backend.ActivateScenario(
+            MakeScenario(new MockRule("MEAS:VOLT?", new RuleAction.Respond("3.30"))) with
+            {
+                Unmatched = UnmatchedPolicy.Fail,
+            },
+            DevName()
+        );
+
+        // When
+        var result = await backend.QueryAsync(
+            Dev(),
+            ScpiQuery.From("meas:volt?").ShouldBeOk(),
+            CancellationToken.None
+        );
+
+        // Then
+        result.ShouldBeOk().ShouldBe("3.30");
+    }
+
+    [Fact]
+    public async Task FailPolicy_Idn_AnsweredByTheScenariosIdn()
+    {
+        // Given
+        var backend = new FakeBackend();
+        backend.ActivateScenario(
+            MakeScenario() with
+            {
+                Unmatched = UnmatchedPolicy.Fail,
+            },
+            DevName()
+        );
+
+        // When
+        var result = await backend.QueryAsync(
+            Dev(),
+            ScpiQuery.From("*IDN?").ShouldBeOk(),
+            CancellationToken.None
+        );
+
+        // Then
+        result.ShouldBeOk().ShouldBe("ACME,FAKE-PSU,001,1.0");
+    }
+
+    [Fact]
+    public async Task FailPolicy_IdnWithoutScenarioIdn_Fails()
+    {
+        // Given
+        var backend = new FakeBackend();
+        backend.ActivateScenario(
+            MakeScenario() with
+            {
+                IdnDefault = null,
+                Unmatched = UnmatchedPolicy.Fail,
+            },
+            DevName()
+        );
+
+        // When
+        var result = await backend.QueryAsync(
+            Dev(),
+            ScpiQuery.From("*IDN?").ShouldBeOk(),
+            CancellationToken.None
+        );
+
+        // Then
+        result.ShouldBeError().ShouldBeOfType<MockRuleUnmatched>();
+    }
+
+    [Fact]
     public async Task ActiveScenario_IdnDefault_UsedWhenNoExplicitScene()
     {
         // Given

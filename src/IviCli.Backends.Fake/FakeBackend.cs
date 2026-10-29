@@ -124,7 +124,12 @@ public sealed class FakeBackend : IIviBackend, IScenarioAwareBackend
         }
     }
 
-    private sealed record ActiveBinding(MockScenario Scenario, SceneName CurrentScene);
+    private sealed record ActiveBinding(MockScenario Scenario, SceneName CurrentScene)
+    {
+        public bool FailsUnmatched => Scenario.Unmatched == UnmatchedPolicy.Fail;
+
+        public MockRuleUnmatched Unmatched(string scpi) => new(scpi, CurrentScene);
+    }
 
     /// <summary>
     /// Arranges that the next <see cref="OpenAsync"/> for <paramref name="name"/>
@@ -308,6 +313,13 @@ public sealed class FakeBackend : IIviBackend, IScenarioAwareBackend
             return Task.FromResult(effect);
         }
 
+        if (_bindings.TryGetValue(device.Name, out var binding) && binding.FailsUnmatched)
+        {
+            return Task.FromResult(
+                Result.Failure<Unit, BackendError>(binding.Unmatched(command.Value))
+            );
+        }
+
         state.LastWritten = command.Value;
         return Task.FromResult(Result.Success<Unit, BackendError>(Unit.Value));
     }
@@ -357,18 +369,29 @@ public sealed class FakeBackend : IIviBackend, IScenarioAwareBackend
             return Task.FromResult(Result.Success<string, BackendError>(response));
         }
 
+        var binding = _bindings.TryGetValue(device.Name, out var b) ? b : null;
+        var failsUnmatched = binding?.FailsUnmatched ?? false;
+
         // Universal *IDN? fallback: prefer the active scenario's IdnDefault,
-        // then the device-configured IDN, then a generic FAKE response.
+        // then the device-configured IDN, then a generic FAKE response
+        // unless the scenario fails unmatched requests.
         if (query.Value.Equals("*IDN?", StringComparison.OrdinalIgnoreCase))
         {
             var idn =
-                GetActiveScenario(device.Name)?.IdnDefault
+                binding?.Scenario.IdnDefault
                 ?? state.IdnResponse
-                ?? "FAKE,FAKE,0,1.0";
-            return Task.FromResult(Result.Success<string, BackendError>(idn));
+                ?? (failsUnmatched ? null : "FAKE,FAKE,0,1.0");
+            if (idn is not null)
+            {
+                return Task.FromResult(Result.Success<string, BackendError>(idn));
+            }
         }
 
-        return Task.FromResult(Result.Success<string, BackendError>(query.Value));
+        return Task.FromResult(
+            failsUnmatched
+                ? Result.Failure<string, BackendError>(binding!.Unmatched(query.Value))
+                : Result.Success<string, BackendError>(query.Value)
+        );
     }
 
     /// <inheritdoc/>

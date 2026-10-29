@@ -28,12 +28,16 @@ namespace IviCli.Domain.Mock;
 /// scenario is bound (issue #115). <see langword="null"/> — the default
 /// — means an ideally behaved mock.
 /// </param>
+/// <param name="Unmatched">
+/// What the mock does with a request no rule in the current scene matches.
+/// </param>
 public sealed record MockScenario(
     ScenarioName Name,
     SceneName InitialScene,
     string? IdnDefault,
     ImmutableArray<MockScene> Scenes,
-    MockQuirks? Quirks = null
+    MockQuirks? Quirks = null,
+    UnmatchedPolicy Unmatched = UnmatchedPolicy.Echo
 )
 {
     /// <summary>Creates an empty scenario with the supplied name and a
@@ -120,6 +124,7 @@ public sealed record MockScenario(
         && InitialScene == other.InitialScene
         && IdnDefault == other.IdnDefault
         && Quirks == other.Quirks
+        && Unmatched == other.Unmatched
         && Scenes.SequenceEqual(other.Scenes);
 
     /// <inheritdoc/>
@@ -130,6 +135,7 @@ public sealed record MockScenario(
         hash.Add(InitialScene);
         hash.Add(IdnDefault);
         hash.Add(Quirks);
+        hash.Add(Unmatched);
         foreach (var s in Scenes)
         {
             hash.Add(s);

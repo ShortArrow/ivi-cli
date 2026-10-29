@@ -32,7 +32,9 @@ namespace IviCli.Infrastructure.Mock;
 /// </list>
 ///
 /// Both shapes accept the optional <c>[quirks]</c> table, which names
-/// the firmware misbehaviour the mock reproduces (issue #115).
+/// the firmware misbehaviour the mock reproduces (issue #115), and the
+/// optional top-level <c>unmatched</c> string (<c>echo</c> or
+/// <c>fail</c>), which is omitted on write when it is <c>echo</c>.
 ///
 /// Serialisation always emits the v0.2.0 multi-scene shape, *except*
 /// for scenarios that have a single scene named <c>default</c> with
@@ -56,6 +58,7 @@ public static class TomlScenarioParser
     private const string SrqField = "srq";
     private const string QuirksTable = "quirks";
     private const string SrqNotifyWedgeAfterField = "srq_notify_wedge_after";
+    private const string UnmatchedField = "unmatched";
 
     /// <summary>
     /// Parses a TOML document into a <see cref="MockScenario"/>. The scenario's
@@ -104,13 +107,29 @@ public static class TomlScenarioParser
             );
         }
 
+        var unmatched = UnmatchedPolicy.Echo;
+        if (model.TryGetValue(UnmatchedField, out var unmatchedValue))
+        {
+            switch (unmatchedValue)
+            {
+                case "echo":
+                    break;
+                case "fail":
+                    unmatched = UnmatchedPolicy.Fail;
+                    break;
+                default:
+                    return Fail($"expected `{UnmatchedField}` to be \"echo\" or \"fail\"");
+            }
+        }
+
         if (!model.TryGetValue(ScenesArray, out var scenesValue))
         {
-            return WithQuirks(
+            return WithTopLevel(
                 Result.Success<MockScenario, ScenarioStoreError>(
                     MockScenario.SingleScene(name, idnDefault, ImmutableArray<MockRule>.Empty)
                 ),
-                quirksOk.Value
+                quirksOk.Value,
+                unmatched
             );
         }
         if (scenesValue is not TomlTableArray sceneTables)
@@ -122,20 +141,28 @@ public static class TomlScenarioParser
             sceneTables.Count > 0
             && sceneTables[0].ContainsKey(NameField)
             && !sceneTables[0].ContainsKey(MatchField);
-        return WithQuirks(
+        return WithTopLevel(
             isV02Schema
                 ? ParseMultiScene(name, idnDefault, initialSceneRaw, sceneTables)
                 : ParseFlatRules(name, idnDefault, sceneTables),
-            quirksOk.Value
+            quirksOk.Value,
+            unmatched
         );
     }
 
-    private static Result<MockScenario, ScenarioStoreError> WithQuirks(
+    private static Result<MockScenario, ScenarioStoreError> WithTopLevel(
         Result<MockScenario, ScenarioStoreError> scenario,
-        MockQuirks? quirks
+        MockQuirks? quirks,
+        UnmatchedPolicy unmatched
     ) =>
         scenario is Result<MockScenario, ScenarioStoreError>.Ok ok
-            ? Result.Success<MockScenario, ScenarioStoreError>(ok.Value with { Quirks = quirks })
+            ? Result.Success<MockScenario, ScenarioStoreError>(
+                ok.Value with
+                {
+                    Quirks = quirks,
+                    Unmatched = unmatched,
+                }
+            )
             : scenario;
 
     /// <summary>
@@ -184,6 +211,10 @@ public static class TomlScenarioParser
         {
             builder.AppendLine(inv, $"idn = \"{Escape(idn)}\"");
         }
+        if (scenario.Unmatched == UnmatchedPolicy.Fail)
+        {
+            builder.AppendLine(inv, $"{UnmatchedField} = \"fail\"");
+        }
 
         // v0.1.x flat-shape preservation: a scenario with a single
         // `default` scene whose rules carry no transitions is the
@@ -196,7 +227,7 @@ public static class TomlScenarioParser
             && scenario.Scenes[0].Rules.All(r => r.Action.Transition is null);
         if (canEmitFlat)
         {
-            if (scenario.IdnDefault is not null)
+            if (scenario.IdnDefault is not null || scenario.Unmatched == UnmatchedPolicy.Fail)
             {
                 builder.AppendLine();
             }

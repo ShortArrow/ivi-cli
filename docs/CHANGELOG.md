@@ -6,6 +6,16 @@ All notable changes to ivi-cli are documented here. Format roughly follows
 
 ## [Unreleased]
 
+### Added
+
+- **A mock scenario can fail the requests it has no rule for.** With
+  `unmatched = "fail"` in the scenario file, or
+  `mock scenario create --unmatched fail`, a query or write that no rule
+  in the current scene matches fails with an error naming the request and
+  the scene, instead of being echoed back or accepted. A test of
+  instrument-control code then cannot pass on a request the scenario never
+  declared. Scenarios that omit the key behave as before.
+
 ### Fixed
 
 - **The mock answers a request whatever its case.** A rule written

@@ -9,11 +9,14 @@ namespace IviCli.Application.Mock;
 /// with that scene (empty, no rules) as both its only scene and its
 /// initial scene. Otherwise the scenario starts with the synthetic
 /// <c>default</c> scene (v0.1.x-compatible shape).
+/// <paramref name="Unmatched"/> is what the scenario does with a request
+/// no rule matches.
 /// </summary>
 public sealed record CreateScenarioCommand(
     string Name,
     string? IdnDefault = null,
-    string? InitialScene = null
+    string? InitialScene = null,
+    UnmatchedPolicy Unmatched = UnmatchedPolicy.Echo
 );
 
 /// <summary>Outcomes the create command can fail with.</summary>

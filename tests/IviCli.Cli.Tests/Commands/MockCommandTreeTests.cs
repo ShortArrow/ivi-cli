@@ -42,6 +42,19 @@ public sealed class MockCommandTreeTests
     }
 
     [Theory]
+    [InlineData("mock scenario create my-dmm --unmatched fail", true)]
+    [InlineData("mock scenario create my-dmm --unmatched echo", true)]
+    [InlineData("mock scenario create my-dmm --unmatched loud", false)]
+    public void Create_accepts_only_echo_or_fail_for_unmatched(string commandLine, bool parses)
+    {
+        // Given / When
+        var errors = Parse(commandLine).Errors;
+
+        // Then
+        (errors.Count == 0).ShouldBe(parses);
+    }
+
+    [Theory]
     [InlineData("mock scenario scene add my-dmm idle")]
     [InlineData("mock scenario rule add my-dmm --in idle --match *IDN? --ack")]
     public void The_nested_spelling_is_gone(string commandLine)
