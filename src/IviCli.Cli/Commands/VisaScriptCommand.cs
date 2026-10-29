@@ -16,7 +16,7 @@ public static class VisaScriptCommand
         var fileArg = new Argument<string>("file")
         {
             Description =
-                "Path to a SCPI script file: !sleep, !assert, !echo and !# are directives, every other line is sent as written.",
+                "Path to a SCPI script file: !sleep, !assert, !values, !echo and !# are directives, every other line is sent as written.",
         };
         var deviceOpt = new Option<string?>("--device")
         {
@@ -81,7 +81,7 @@ public static class VisaScriptCommand
                 ExitCodeMapper.UsageError,
             ScriptDeviceUnknown => ExitCodeMapper.DeviceError,
             ScriptDeviceTransportFailure => ExitCodeMapper.TransportError,
-            ScriptDeviceAssertFailure => ExitCodeMapper.GenericFailure,
+            ScriptDeviceAssertFailure or ScriptDeviceValuesFailure => ExitCodeMapper.GenericFailure,
             ScriptDeviceStoreFailure => ExitCodeMapper.ConfigurationError,
             _ => ExitCodeMapper.GenericFailure,
         };
@@ -90,7 +90,7 @@ public static class VisaScriptCommand
     private static string UserFacingMessage(ScriptDeviceError error) =>
         error switch
         {
-            ScriptDeviceParseFailure p => $"error: script parse failed ({p.Inner.Message}).",
+            ScriptDeviceParseFailure p => ScriptParseMessage.For(p.Inner),
             ScriptDeviceInvalidName n => DeviceNameMessage.Invalid(n.Raw),
             ScriptDeviceNoTarget =>
                 "error: no current device. Use `visa use <name>` first or pass --device.",
@@ -98,6 +98,8 @@ public static class VisaScriptCommand
             ScriptDeviceTransportFailure t => $"error: transport failure on script line {t.Line}.",
             ScriptDeviceAssertFailure a =>
                 $"error: assert /{a.Pattern}/ failed on line {a.Line} (actual: {a.Actual}).",
+            ScriptDeviceValuesFailure v =>
+                $"error: values {v.Pattern} failed on line {v.Line}: {v.Reason} (response: {v.Actual}).",
             ScriptDeviceStoreFailure => "error: configuration storage failed.",
             _ => "error: script execution failed.",
         };

@@ -65,6 +65,28 @@ public class ScpiScriptTests
     }
 
     [Theory]
+    [InlineData("!values {4.9..5.1}", "{4.9..5.1}")]
+    [InlineData("!VALUES {temp:20..30}, *", "{temp:20..30}, *")]
+    public void Parse_reads_bang_values_whole_line_as_pattern(string line, string source)
+    {
+        var script = ScpiScript.Parse(line).ShouldBeOk();
+        script.Directives[0].ShouldBeOfType<ScpiScriptDirective.Values>().Source.ShouldBe(source);
+    }
+
+    [Theory]
+    [InlineData("!values {==3.271}", "slot 1: equality is not a predicate")]
+    [InlineData("!values 1,,2", "slot 2 is empty")]
+    public void Parse_rejects_a_malformed_values_pattern_with_its_reason(string line, string reason)
+    {
+        var error = ScpiScript
+            .Parse(line)
+            .ShouldBeOfType<Result<ScpiScript, ScpiScriptError>.Error>()
+            .Err.ShouldBeOfType<ScpiScriptInvalidDirective>();
+        error.Line.ShouldBe(1);
+        error.Reason.ShouldStartWith(reason);
+    }
+
+    [Theory]
     [InlineData("!echo hello world", "hello world")]
     [InlineData("!echo step #1 done", "step #1 done")]
     public void Parse_reads_bang_echo_whole_line_as_text(string line, string text)
