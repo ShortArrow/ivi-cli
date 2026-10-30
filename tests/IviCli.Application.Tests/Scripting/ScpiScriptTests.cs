@@ -56,6 +56,44 @@ public class ScpiScriptTests
     }
 
     [Theory]
+    [InlineData("!sleep", "sleep argument must be a non-negative integer")]
+    [InlineData("!assert", "assert requires a regex pattern")]
+    [InlineData("!values", "the pattern is empty")]
+    [InlineData("!wait 5", "unknown directive")]
+    public void Parse_names_what_a_directive_is_missing(string line, string reason)
+    {
+        var error = ScpiScript
+            .Parse(line)
+            .ShouldBeOfType<Result<ScpiScript, ScpiScriptError>.Error>()
+            .Err.ShouldBeOfType<ScpiScriptInvalidDirective>();
+        error.Reason.ShouldStartWith(reason);
+    }
+
+    [Fact]
+    public void Parse_reads_a_tab_after_the_keyword_as_the_separator()
+    {
+        var script = ScpiScript
+            .Parse("!sleep\t250\n!values\t{4.9..5.1}\n!echo\thello")
+            .ShouldBeOk();
+        script
+            .Directives[0]
+            .ShouldBeOfType<ScpiScriptDirective.Sleep>()
+            .Duration.ShouldBe(TimeSpan.FromMilliseconds(250));
+        script
+            .Directives[1]
+            .ShouldBeOfType<ScpiScriptDirective.Values>()
+            .Source.ShouldBe("{4.9..5.1}");
+        script.Directives[2].ShouldBeOfType<ScpiScriptDirective.Echo>().Text.ShouldBe("hello");
+    }
+
+    [Fact]
+    public void Parse_reads_a_bare_bang_echo_as_an_empty_line()
+    {
+        var script = ScpiScript.Parse("!echo").ShouldBeOk();
+        script.Directives[0].ShouldBeOfType<ScpiScriptDirective.Echo>().Text.ShouldBe(string.Empty);
+    }
+
+    [Theory]
     [InlineData("!assert ^FAKE,.*$", "^FAKE,.*$")]
     [InlineData("!assert ^#15", "^#15")]
     public void Parse_reads_bang_assert_whole_line_as_pattern(string line, string pattern)

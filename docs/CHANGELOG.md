@@ -31,6 +31,12 @@ All notable changes to ivi-cli are documented here. Format roughly follows
   failure printed the error's template, `script line {Line}: {Reason}`,
   instead of the line number and the reason.
 
+- **A script directive without its argument says what is missing.**
+  `!values`, `!assert` or `!sleep` on its own, or with a tab after the
+  keyword, was refused as an unknown directive. A tab now separates the
+  keyword from its argument as a space does, a bare directive is refused
+  with the argument it needs, and a bare `!echo` prints an empty line.
+
 - **The HiSLIP gateway reports a failed write.** When the backend failed
   a write, a HiSLIP client was told nothing and the write looked
   successful; it now gets a FatalError, as for a failed query. The

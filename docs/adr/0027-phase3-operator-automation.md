@@ -55,7 +55,8 @@ other line is SCPI sent to the instrument as written
 | `!echo <text>` | `text` written verbatim to stdout |
 | `!#` ... | comment |
 
-Directive keywords are case-insensitive. A failed `!assert` or `!values`
+Directive keywords are case-insensitive, and the first space or tab after
+the keyword separates it from its argument. A failed `!assert` or `!values`
 stops execution with a non-zero exit code (per ADR 0011). A script with a
 line that cannot be parsed is refused before any line runs. The parser
 is implemented as a pure function in Application; the handler is the only

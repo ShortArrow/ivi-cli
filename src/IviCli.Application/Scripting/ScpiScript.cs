@@ -141,16 +141,18 @@ public sealed record ScpiScript(ImmutableArray<ScpiScriptDirective> Directives)
     }
 
     /// <summary>
-    /// True when <paramref name="body"/> is <paramref name="keyword"/>
-    /// (case-insensitive) followed by a space; <paramref name="argument"/>
-    /// is everything after that space.
+    /// True when the keyword of <paramref name="body"/>, the text before its
+    /// first space or tab, is <paramref name="keyword"/> (case-insensitive);
+    /// <paramref name="argument"/> is everything after that space or tab, or
+    /// empty when the keyword stands alone.
     /// </summary>
     private static bool TryReadArgument(string body, string keyword, out string argument)
     {
-        var prefix = keyword + " ";
-        if (body.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+        var separator = body.AsSpan().IndexOfAny(" \t");
+        var written = separator < 0 ? body : body[..separator];
+        if (written.Equals(keyword, StringComparison.OrdinalIgnoreCase))
         {
-            argument = body[prefix.Length..];
+            argument = separator < 0 ? string.Empty : body[(separator + 1)..];
             return true;
         }
         argument = string.Empty;
