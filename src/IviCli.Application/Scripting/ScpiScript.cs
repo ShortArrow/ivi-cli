@@ -142,9 +142,9 @@ public sealed record ScpiScript(ImmutableArray<ScpiScriptDirective> Directives)
 
     /// <summary>
     /// True when the keyword of <paramref name="body"/>, the text before its
-    /// first whitespace, is <paramref name="keyword"/> (case-insensitive);
-    /// <paramref name="argument"/> is everything after that whitespace
-    /// character, or empty when the keyword stands alone.
+    /// first space or tab, is <paramref name="keyword"/> (case-insensitive);
+    /// <paramref name="argument"/> is everything after that space or tab, or
+    /// empty when the keyword stands alone.
     /// </summary>
     private static bool TryReadArgument(string body, string keyword, out string argument)
     {
