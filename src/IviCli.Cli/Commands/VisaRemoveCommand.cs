@@ -17,7 +17,10 @@ public static class VisaRemoveCommand
     {
         var nameArg = new Argument<string>("name") { Description = "The device alias to remove." };
 
-        var command = new Command("remove", "Remove a registered device alias.");
+        var command = new Command(
+            "remove",
+            "Remove a registered device alias and its mock scenario binding."
+        );
         command.Arguments.Add(nameArg);
 
         command.SetAction(
@@ -59,6 +62,8 @@ public static class VisaRemoveCommand
             RemoveDeviceInvalidName => ExitCodeMapper.UsageError,
             RemoveDeviceNotFound => ExitCodeMapper.DeviceError,
             RemoveDeviceStorageFailure => ExitCodeMapper.ConfigurationError,
+            RemoveDeviceSessionFailure => ExitCodeMapper.ConfigurationError,
+            RemoveDeviceBindingNotCleared => ExitCodeMapper.ConfigurationError,
             _ => ExitCodeMapper.GenericFailure,
         };
     }
@@ -69,6 +74,11 @@ public static class VisaRemoveCommand
             RemoveDeviceInvalidName n => DeviceNameMessage.Invalid(n.Raw),
             RemoveDeviceNotFound nf => $"error: no device named '{nf.Name.Value}'.",
             RemoveDeviceStorageFailure => "error: configuration storage failed.",
+            RemoveDeviceSessionFailure =>
+                "error: session storage failed; the device was not removed.",
+            RemoveDeviceBindingNotCleared b =>
+                $"error: removed device {b.Name.Value}, but could not clear its scenario binding. "
+                    + $"Run `ivicli mock scenario deactivate --for {b.Name.Value}`.",
             _ => "error: failed to remove device.",
         };
 }
