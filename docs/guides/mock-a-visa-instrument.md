@@ -187,11 +187,16 @@ that stands for the completing operation carries the status byte a real
 instrument would report. Put 0x40 in it if you want the RQS bit a serial
 poll expects.
 
-> **v0.2.x limitations.** Rules match a full SCPI line literally (no
-> parameter capture — `VOLT 7.5` then `VOLT?` still returns the canned
-> value), and rule sets are per-scene (static metadata like `*IDN?` is
-> repeated in every scene). Both are tracked in issue
-> [#26](https://github.com/ShortArrow/ivi-cli/issues/26).
+> **Limitations.** A rule matches a request as a whole and captures no
+> parameters: after `VOLT 7.5`, `VOLT?` still returns the rule's canned
+> value. A request that joins commands with `;`, such as
+> `VOLT 1;MEAS:VOLT?`, matches only a rule whose `match` is that whole
+> string, spaces included; it is not split into its commands. Rules
+> belong to one scene, so a response every scene gives, such as
+> `SYST:ERR?`, is written in each of them. `*IDN?` is the exception: the
+> scenario's top-level `idn` answers it in a scene with no `*IDN?` rule.
+> With no `idn` either, it answers `FAKE,FAKE,0,1.0`, or fails under
+> `unmatched = "fail"`.
 
 ### Requests no rule matches
 
