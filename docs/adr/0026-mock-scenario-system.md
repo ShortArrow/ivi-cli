@@ -423,7 +423,11 @@ nothing.
 registered under that name reaches its own resource. The device is removed
 first: if clearing the binding then fails, what is left is a binding to a
 name no device has, which the command reports with the `deactivate` that
-clears it. If the session cannot be read, nothing is removed.
+clears it. If the session cannot be read, nothing is removed. A gateway
+already serving the device sees the binding go as it sees a `deactivate`
+(§17), and it keeps the routes and devices it started with, so once its
+pooled backend is evicted a new connection reaches the removed device's
+resource.
 
 **Persistence migration.** `state.json` adds a new
 `device_scenarios` map; the legacy `active_scenario` field is
