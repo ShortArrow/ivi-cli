@@ -50,16 +50,23 @@ public sealed record MockScene(SceneName Name, ImmutableArray<MockRule> Rules)
     /// </summary>
     public MockRule? FindByMatch(string scpi)
     {
-        var normalized = NormalizeForMatch(scpi);
         foreach (var r in Rules)
         {
-            if (NormalizeForMatch(r.Match) == normalized)
+            if (SameRequest(r.Match, scpi))
             {
                 return r;
             }
         }
         return null;
     }
+
+    /// <summary>
+    /// Whether <paramref name="a"/> and <paramref name="b"/> are the same
+    /// request to the mock: equal once the leading colon and the case
+    /// <see cref="FindByMatch(string)"/> ignores are set aside.
+    /// </summary>
+    public static bool SameRequest(string a, string b) =>
+        NormalizeForMatch(a) == NormalizeForMatch(b);
 
     /// <summary>Custom structural equality including the array contents.</summary>
     public bool Equals(MockScene? other) =>

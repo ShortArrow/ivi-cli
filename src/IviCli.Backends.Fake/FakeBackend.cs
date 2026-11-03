@@ -374,7 +374,7 @@ public sealed class FakeBackend : IIviBackend, IScenarioAwareBackend
         // Universal *IDN? fallback: prefer the active scenario's IdnDefault,
         // then the device-configured IDN, then a generic FAKE response
         // unless the scenario fails unmatched requests.
-        if (query.Value.Equals("*IDN?", StringComparison.OrdinalIgnoreCase))
+        if (MockScene.SameRequest(query.Value, "*IDN?"))
         {
             var idn =
                 binding?.Scenario.IdnDefault

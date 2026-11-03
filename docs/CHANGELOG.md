@@ -26,6 +26,10 @@ All notable changes to ivi-cli are documented here. Format roughly follows
 
 ### Fixed
 
+- **A mock answers `:*IDN?` from the scenario's `idn`.** A rule ignored the
+  leading colon, but the `idn` fallback did not, so `:*IDN?` was echoed
+  back, or failed under `unmatched = "fail"`.
+
 - **`visa script`, `visa lint` and `mock scenario record` say which
   script line they could not read and why.** A parse
   failure printed the error's template, `script line {Line}: {Reason}`,
