@@ -337,6 +337,32 @@ public class FakeBackendScenarioTests
         result.ShouldBeOk().ShouldBe("ACME,CONFIGURED,7,1.0");
     }
 
+    [Theory]
+    [InlineData(":*IDN?")]
+    [InlineData("*idn?")]
+    public async Task ActiveScenario_IdnDefault_AnswersEverySpellingARuleWouldMatch(string spelling)
+    {
+        // Given
+        var backend = new FakeBackend();
+        backend.ActivateScenario(
+            MakeScenario() with
+            {
+                IdnDefault = "ACME,SCENARIO,1,1.0",
+            },
+            DevName()
+        );
+
+        // When
+        var result = await backend.QueryAsync(
+            Dev(),
+            ScpiQuery.From(spelling).ShouldBeOk(),
+            CancellationToken.None
+        );
+
+        // Then
+        result.ShouldBeOk().ShouldBe("ACME,SCENARIO,1,1.0");
+    }
+
     [Fact]
     public async Task ActiveScenario_IdnDefault_UsedWhenNoExplicitScene()
     {
