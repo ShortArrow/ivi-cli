@@ -1,4 +1,5 @@
 using IviCli.Application.Configuration;
+using IviCli.Application.Session;
 using IviCli.Domain;
 using IviCli.Domain.Devices;
 
@@ -46,6 +47,46 @@ public sealed record RemoveDeviceNotFound(DeviceName Name) : RemoveDeviceError
 
     /// <inheritdoc/>
     public override IReadOnlyList<object?> LogArgs => new object?[] { Name };
+}
+
+/// <summary>
+/// The session could not be read, so nothing was changed: without it the
+/// device's scenario binding cannot be cleared.
+/// </summary>
+public sealed record RemoveDeviceSessionFailure(SessionStoreError Inner) : RemoveDeviceError
+{
+    /// <inheritdoc/>
+    public override LogSeverity Severity => Inner.Severity;
+
+    /// <inheritdoc/>
+    public override string Message => Inner.Message;
+
+    /// <inheritdoc/>
+    public override IReadOnlyList<object?> LogArgs => Inner.LogArgs;
+
+    /// <inheritdoc/>
+    public override Exception? Cause => Inner.Cause;
+}
+
+/// <summary>
+/// The device was removed, but its scenario binding could not be cleared,
+/// so a device registered under the same name would answer from the mock
+/// until the binding is deactivated.
+/// </summary>
+public sealed record RemoveDeviceBindingNotCleared(DeviceName Name, SessionStoreError Inner)
+    : RemoveDeviceError
+{
+    /// <inheritdoc/>
+    public override LogSeverity Severity => Inner.Severity;
+
+    /// <inheritdoc/>
+    public override string Message => Inner.Message;
+
+    /// <inheritdoc/>
+    public override IReadOnlyList<object?> LogArgs => Inner.LogArgs;
+
+    /// <inheritdoc/>
+    public override Exception? Cause => Inner.Cause;
 }
 
 /// <summary>

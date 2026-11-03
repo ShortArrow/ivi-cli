@@ -419,6 +419,12 @@ Calls fail with `ActivateScenarioNoDeviceSelected` when
 gets a precise CLI message rather than silently binding to
 nothing.
 
+`visa remove` clears the removed device's binding, so a device later
+registered under that name reaches its own resource. The device is removed
+first: if clearing the binding then fails, what is left is a binding to a
+name no device has, which the command reports with the `deactivate` that
+clears it. If the session cannot be read, nothing is removed.
+
 **Persistence migration.** `state.json` adds a new
 `device_scenarios` map; the legacy `active_scenario` field is
 read-only and promotes to the binding for the then-current

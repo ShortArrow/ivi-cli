@@ -128,7 +128,7 @@ public sealed class ConfigMutatedWiringTests
         );
         var seeded = ConfigDocument.Empty.AddDevice(device).ShouldBeOk();
         var store = new FakeConfigStore(seeded);
-        var handler = new RemoveDeviceCommandHandler(store, audit, subject);
+        var handler = new RemoveDeviceCommandHandler(store, new FakeSessionStore(), audit, subject);
         var result = await handler.HandleAsync(new RemoveDeviceCommand("psu1"), default);
         result.ShouldBeOk();
     }

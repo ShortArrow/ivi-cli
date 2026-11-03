@@ -26,6 +26,10 @@ All notable changes to ivi-cli are documented here. Format roughly follows
 
 ### Fixed
 
+- **`visa remove` clears the device's mock scenario binding.** The binding
+  outlived the device, so a real instrument later registered under the same
+  name was answered by the mock, with no sign that it had not been reached.
+
 - **A mock answers `:*IDN?` from the scenario's `idn`.** A rule ignored the
   leading colon, but the `idn` fallback did not, so `:*IDN?` was echoed
   back, or failed under `unmatched = "fail"`.
