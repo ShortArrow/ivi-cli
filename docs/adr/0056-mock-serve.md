@@ -72,12 +72,11 @@ received` takes.
 
 A device name that already exists, given or by default, is reused only if the
 device has exactly the placeholder resource and no binding to another scenario.
-Anything else
-is an error that names the device and what differs, and nothing is changed.
-`mock serve` therefore never binds a scenario to a device with a real address, and
-never replaces another scenario's binding. A device a user registered by hand with
-that name and the placeholder is indistinguishable from one `mock serve` made, and
-is reused.
+Anything else is an error that names the device and what differs, and nothing is
+changed. `mock serve` therefore never binds a scenario to a device with a real
+address, and never replaces another scenario's binding. A device a user
+registered by hand with that name and the placeholder is indistinguishable from
+one `mock serve` made, and is reused.
 
 ### 4. An existing server must match
 
@@ -102,8 +101,8 @@ bind then fails, so a second run would report the running server as stopped.
 
 ### 7. What it registered can be removed
 
-A command removes the device, the binding and the server that `mock serve` derived
-for a scenario, and the routes that belong to them. Removing a device or a server
+A command removes the device, the binding and the server that one `mock serve`
+registered, and the routes that belong to them. Removing a device or a server
 cascades to its routes, including any added by hand, and no other entry changes.
 Its name is an open question.
 
@@ -157,8 +156,9 @@ Its name is an open question.
 - The route endpoint for `--type hislip`, `vxi11` and `usbip`, and whether `--port`
   is required for `vxi11`, which has no default in `server add`.
 - Whether `usbip` needs `--profile` here.
-- The spelling of the removal command in §7, and whether it refuses while the
-  server runs.
+- The spelling of the removal command in §7, how it names what to remove now that
+  the device name need not come from the scenario, and whether it refuses while
+  the server runs.
 - Whether §3 and §4 are enough to tell an entry `mock serve` made from one a user
   made by hand with the same values, or whether entries need a marker. A marker
   would change the `config.toml` schema.
