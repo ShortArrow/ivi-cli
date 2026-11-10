@@ -43,9 +43,9 @@ ivicli mock serve my-dmm --type socket --port 5025
 ```
 
 `mock serve <scenario>` takes `--type` (`socket`, `hislip`, `vxi11` or `usbip`),
-`--port`, and `--bind` with the same default as `server add`. It prints the
-device name it uses and how a client connects: the VISA resource, or for `usbip`
-the attach step. It then runs in the foreground as `server start` does.
+`--port`, `--alias`, and `--bind` with the same default as `server add`. It
+prints the device name it uses and how a client connects: the VISA resource, or
+for `usbip` the attach step. It then runs in the foreground as `server start` does.
 
 The scenario must already exist; `mock serve` does not create one. The path from
 nothing to a listening mock is `mock scenario create`, a `mock rule add` per
@@ -62,15 +62,21 @@ and behaviour.
 The device's resource is `TCPIP0::127.0.0.1::INSTR`, the placeholder the guide
 already uses.
 
+The device's name is the value of `--alias`, checked by the same rule as a name
+given to `visa add`. Without `--alias` it is `mock-<type>-<port>`, such as
+`mock-socket-5025`, which always satisfies that rule. A client reaches the device
+by the server's address; the name is what `visa list` shows and what `mock
+received` takes.
+
 ### 3. A name in use is reused only when it is the same entry
 
-A derived device name that already exists is reused only if the device has
-exactly the placeholder resource and no binding to another scenario. Anything else
-is an error that names the device and what differs, and nothing is changed.
-`mock serve` therefore never binds a scenario to a device with a real address, and
-never replaces another scenario's binding. A device a user registered by hand with
-that name and the placeholder is indistinguishable from one `mock serve` made, and
-is reused.
+A device name that already exists, given or by default, is reused only if the
+device has exactly the placeholder resource and no binding to another scenario.
+Anything else is an error that names the device and what differs, and nothing is
+changed. `mock serve` therefore never binds a scenario to a device with a real
+address, and never replaces another scenario's binding. A device a user
+registered by hand with that name and the placeholder is indistinguishable from
+one `mock serve` made, and is reused.
 
 ### 4. An existing server must match
 
@@ -95,8 +101,8 @@ bind then fails, so a second run would report the running server as stopped.
 
 ### 7. What it registered can be removed
 
-A command removes the device, the binding and the server that `mock serve` derived
-for a scenario, and the routes that belong to them. Removing a device or a server
+A command removes the device, the binding and the server that one `mock serve`
+registered, and the routes that belong to them. Removing a device or a server
 cascades to its routes, including any added by hand, and no other entry changes.
 Its name is an open question.
 
@@ -143,15 +149,16 @@ Its name is an open question.
 
 ## Open questions
 
-- How the device and server names derive from the scenario name and the type, and
-  whether they can always satisfy the name rules.
+- How the server name derives from the request, and whether it can always satisfy
+  the name rule.
 - Whether `--type vxi11`, once its binding is removed, dials its own gateway at
   127.0.0.1, and what stops that loop.
 - The route endpoint for `--type hislip`, `vxi11` and `usbip`, and whether `--port`
   is required for `vxi11`, which has no default in `server add`.
 - Whether `usbip` needs `--profile` here.
-- The spelling of the removal command in §7, and whether it refuses while the
-  server runs.
+- The spelling of the removal command in §7, how it names what to remove now that
+  the device name need not come from the scenario, and whether it refuses while
+  the server runs.
 - Whether §3 and §4 are enough to tell an entry `mock serve` made from one a user
   made by hand with the same values, or whether entries need a marker. A marker
   would change the `config.toml` schema.
