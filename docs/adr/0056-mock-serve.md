@@ -43,13 +43,15 @@ ivicli mock serve my-dmm --type socket --port 5025
 ```
 
 `mock serve <scenario>` takes `--type` (`socket`, `hislip`, `vxi11` or `usbip`),
-`--port`, `--alias`, and `--bind` with the same default as `server add`. It
-prints the device name it uses and how a client connects: the VISA resource, or
-for `usbip` the attach step. It then runs in the foreground as `server start` does.
+`--port`, `--alias`, `--bind` with the same default as `server add`, and
+`--profile`. It prints the device name it uses and how a client connects: the
+VISA resource, or for `usbip` the attach step. It then runs in the foreground as
+`server start` does.
 
 `--profile` takes `usbtmc` (the default) or `cdc-acm`, as `server route add`
-does, and sets the USB profile of the route for `--type usbip`; every other type
-ignores it.
+does, and sets the USB profile of the route for `--type usbip`. A route of any
+other type gets the default, whichever of the two is given. Any other value is
+refused for every type, as `server route add` refuses it.
 
 `--port` defaults as in `server add`, and to 1024 for `vxi11`, which has no
 default there. 1024 is the port the `ivicli` VXI-11 client dials when no
@@ -123,11 +125,11 @@ by hand.
 
 An existing server with that name is reused only if its type, bind address and
 port match the request, and it has no route other than the type's endpoint to
-the device with a matching USB profile. That route is added if it is missing, as
-it is after `visa remove` of the device. Otherwise the command fails, naming the
-entry and the difference, rather than serving at an address other than the one
-requested. A server that passes is the one `mock serve` would make, whoever made
-it.
+the device, with the requested USB profile when the type is `usbip`. That route
+is added, with the profile §1 gives it, if it is missing, as it is after `visa
+remove` of the device. Otherwise the command fails, naming the entry and the difference,
+rather than serving at an address other than the one requested. A server that
+passes serves as the one `mock serve` would make, whoever made it.
 
 A server with other routes holds several devices behind one listener, which
 remains `server`'s. A VXI-11 gateway answers from the server's first route, which
