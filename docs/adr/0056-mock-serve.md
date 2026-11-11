@@ -167,7 +167,7 @@ Its name is an open question.
 | --- | --- |
 | Replace `server` with `bridge` (real instruments) and `mock serve` (mocks) | Gives up real and mock devices behind one listener, and needs the `config.toml`, container, nightly and documentation changes of a break. A running `bridge` would still see a binding added or removed, so it needs a further mechanism to keep mocks and instruments apart |
 | Move `server` under `mock` as `mock server` | `server` also relays real instruments, which do not belong under `mock` |
-| The placeholder `TCPIP0::127.0.0.1::INSTR` as the device's resource | An unbound device dials its resource, here a VXI-11 listener at 127.0.0.1. That listener may relay to an instrument, and for a `--type vxi11` mock it is usually the mock's own gateway, which routes back to the same device |
+| The placeholder `TCPIP0::127.0.0.1::INSTR` as the device's resource | An unbound device dials its resource, here a VXI-11 listener at 127.0.0.1. That listener may relay to an instrument, and for a `--type vxi11` mock it can be the mock's own gateway, which routes back to the same device |
 | The placeholder plus a field in `config.toml` marking the device as a mock | An older `ivicli` ignores the field, and drops it when it writes `config.toml`, with no error. The device then dials the placeholder again. A plugin matcher sees only the resource, so it cannot tell such a device from the placeholder |
 | A `MOCK::<scenario>::INSTR` resource kind naming the scenario | The binding already names the scenario, and two places to name it can disagree |
 | `visa add --scenario` | Shortens only the first two commands, and puts the entry point in `visa` while users start in `mock` |
