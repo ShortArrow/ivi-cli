@@ -109,8 +109,8 @@ Anything else is an error that names the device and what differs, and nothing is
 changed. `mock serve` therefore never binds a scenario to a device with a
 transport, and never replaces another scenario's binding.
 
-Only `mock serve` registers a `MOCK::INSTR` device: `visa add` refuses that
-resource. A `MOCK::INSTR` device is therefore one `mock serve` made, which is what
+Only `mock serve` registers a `MOCK::INSTR` device: `visa add` and `visa scan
+--add` refuse that resource. A `MOCK::INSTR` device is therefore one `mock serve` made, which is what
 this section and §7 rely on, unless `config.toml` was edited by hand.
 
 ### 4. An existing server must match
@@ -171,8 +171,8 @@ Its name is an open question.
   VISA resource string.
 - `mock serve` does not end the behaviour of a device with a real address and a
   binding that is later removed. That path stays as ADR 0026 §16 and §17 describe.
-  A mock placed by hand behind a `server` with other devices takes that path too,
-  since `visa add` gives it a resource with a transport.
+  A mock composed with `visa add` and `server route add`, to sit behind a server
+  with other devices, takes that path too, since its resource has a transport.
 - If the binding of a `mock serve` device is removed, open connections and pooled
   backends keep answering from the mock backend, where an unmatched query echoes.
   Once the pooled backend is evicted, a new connection fails. A plugin whose
