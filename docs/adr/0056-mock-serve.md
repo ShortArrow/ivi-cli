@@ -110,8 +110,9 @@ changed. `mock serve` therefore never binds a scenario to a device with a
 transport, and never replaces another scenario's binding.
 
 Only `mock serve` registers a `MOCK::INSTR` device: `visa add` and `visa scan
---add` refuse that resource. A `MOCK::INSTR` device is therefore one `mock serve` made, which is what
-this section and §7 rely on, unless `config.toml` was edited by hand.
+--add` refuse that resource. A `MOCK::INSTR` device is therefore one `mock serve`
+made, which is what this section and §7 rely on, unless `config.toml` was edited
+by hand.
 
 ### 4. An existing server must match
 
