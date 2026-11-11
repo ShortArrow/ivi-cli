@@ -75,20 +75,21 @@ for both and the two entries do not collide. `ivi-management-api` is refused,
 since `api start` records its process under that server name. One name serves at
 one address: a second `mock serve` with the same name and a different port fails.
 
-The route's endpoint is fixed by the type, and matches the part of the resource
-after the host:
+The route's endpoint is fixed by the type. What `mock serve` prints names the
+port, since only `socket` carries it in the resource and the others reach the
+well-known port otherwise:
 
-| `--type` | Endpoint | A client connects with |
+| `--type` | Endpoint | Printed for a client |
 | --- | --- | --- |
 | `socket` | the port, such as `5025` | `TCPIP::127.0.0.1::5025::SOCKET` |
-| `hislip` | `hislip0` | `TCPIP::127.0.0.1::hislip0::INSTR` |
-| `vxi11` | `inst0` | `TCPIP::127.0.0.1::inst0::INSTR` |
-| `usbip` | `1-1` | `usbip attach -r 127.0.0.1 -b 1-1` |
+| `hislip` | `hislip0` | `TCPIP::127.0.0.1::hislip0,<port>::INSTR` |
+| `vxi11` | `inst0` | `TCPIP::127.0.0.1::inst0,<port>::INSTR` |
+| `usbip` | `1-1` | the attach command for busid `1-1` at the server's port |
 
-The server has one route, so no other endpoint is needed. The VXI-11 gateway
-ignores the device name a client sends and uses the server's first route, so
-`inst0` only matches the name VISA uses by default. Another endpoint, such as
-`hislip1`, is made with `server route add`.
+The VXI-11 gateway ignores the device name a client sends and answers from the
+server's first route, so `inst0` is chosen because VISA sends it by default, not
+because the gateway reads it. A server `mock serve` creates has only this route.
+Another endpoint, such as `hislip1`, is added with `server route add`.
 
 ### 3. A name in use is reused only when it is the same entry
 
@@ -174,6 +175,8 @@ Its name is an open question.
 - Whether `--type vxi11`, once its binding is removed, dials its own gateway at
   127.0.0.1, and what stops that loop.
 - Whether `--port` is required for `vxi11`, which has no default in `server add`.
+- Whether §4 reuses a VXI-11 server that already holds other routes. Its gateway
+  answers from the first route, which may not be the one `mock serve` added.
 - Whether `usbip` needs `--profile` here.
 - The spelling of the removal command in §7, how it names what to remove now that
   the device name need not come from the scenario, and whether it refuses while
