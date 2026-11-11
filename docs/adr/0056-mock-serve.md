@@ -128,14 +128,15 @@ port match the request, and it has no route other than the type's endpoint to
 the device, with the requested USB profile when the type is `usbip`. That route
 is added, with the profile §1 gives it, if it is missing, as it is after `visa
 remove` of the device. Otherwise the command fails, naming the entry and the
-difference, rather than serving at an address other than the one requested. A
-server that passes serves as the one `mock serve` would make, whoever made it.
+difference, and changes nothing, rather than serving at an address other than
+the one requested. A server that passes serves as the one `mock serve` would
+make, whoever made it.
 
 A server with other routes holds several devices behind one listener, which
 remains `server`'s. A VXI-11 gateway answers from the server's first route, which
 may not be the mock's, and a server composed by hand before `mock serve` ran
-would lose its routes to §7. A route added later with `server route add`
-therefore makes the next `mock serve` under that name fail.
+holds routes the mock did not add and must not remove. A route added later with
+`server route add` therefore makes the next `mock serve` under that name fail.
 
 ### 5. A gateway reads the bindings before it chooses a backend
 
@@ -160,12 +161,37 @@ If the server's recorded process is alive, `mock serve` fails and leaves
 the record alone. `server start` overwrites the record and removes it when the
 bind then fails, so a second run would report the running server as stopped.
 
-### 7. What it registered can be removed
+### 7. `mock unserve` removes what it registered
 
-A command removes the device, the binding and the server that one `mock serve`
-registered, and the routes that belong to them. Removing a device or a server
-cascades to its routes, including any added by hand, and no other entry changes.
-Its name is an open question.
+`mock unserve <alias>` takes the name `mock serve` gave the device and the
+server: the value of `--alias`, or the name it printed (§2). It removes the
+device with that name and its binding, whatever scenario the binding names, and
+the server with that name together with its routes. The scenario itself is kept.
+
+It removes nothing, and fails, naming the entry at fault, unless all of these
+hold:
+
+- A device with that name exists and its resource is `MOCK::INSTR` (§3).
+- The server with that name, if it exists, has one of the four types in §2's
+  table and at most one route. If it has one, that route goes to that device,
+  at the endpoint the table gives the server's type; for `socket`, the server's
+  port.
+- No other server has a route to that device.
+- No process is recorded under that name, or the recorded one is not alive
+  (§6), whether or not the server entry remains. A record that cannot be read
+  fails this check.
+
+If no server has that name, the device and its binding are still removed. A
+server that fails these conditions, such as a listener that serves the mock
+among other devices, makes the command fail and is left to `server`. A record
+whose process is not alive is removed with the server. Nothing else changes,
+except that the default device is cleared if it named that device, as `visa
+remove` does.
+
+A running server is refused because `server stop` finds a server only through
+its `config.toml` entry. Once that entry is removed, the process can be stopped
+only from where it runs, by the operating system, or after an entry with that
+name is added again.
 
 ### Not decided here
 
@@ -197,7 +223,7 @@ Its name is an open question.
 - Running `mock serve` again after `mock scenario deactivate` binds the scenario
   again, since the command's meaning is to serve that scenario.
 - The guide, the PRD's command reference and its Japanese mirror, and the README
-  table gain the command when it is implemented.
+  table gain `mock serve` and `mock unserve` when they are implemented.
 
 ## Alternatives
 
@@ -210,10 +236,5 @@ Its name is an open question.
 | A `MOCK::<scenario>::INSTR` resource kind naming the scenario | The binding already names the scenario, and two places to name it can disagree |
 | `visa add --scenario` | Shortens only the first two commands, and puts the entry point in `visa` while users start in `mock` |
 | Documentation and help text only | The steps can be listed from `mock --help`, but the placeholder and the five commands across three groups remain |
+| `mock remove <alias>` as the removal command | Sits beside `mock scenario remove` and reads as removing a scenario |
 | Compose the five handlers, ignoring already-exists errors, with no further rule | A name collision binds a mock onto a user's device, the first run fails unless a VXI-11 listener answers, and a second run reports a running server as stopped |
-
-## Open questions
-
-- The spelling of the removal command in §7, how it names what to remove now that
-  the device name need not come from the scenario, and whether it refuses while
-  the server runs.
