@@ -68,6 +68,13 @@ given to `visa add`. Without `--alias` it is `mock-<type>-<port>`, such as
 by the server's address; the name is what `visa list` shows and what `mock
 received` takes.
 
+The server takes the same name as the device, so the device and the server are
+reached by one name. Server names follow the same rule as device names, and
+devices and servers are separate tables in `config.toml`, so the name is valid
+for both and the two entries do not collide. `ivi-management-api` is refused,
+since `api start` records its process under that server name. One name serves at
+one address: a second `mock serve` with the same name and a different port fails.
+
 ### 3. A name in use is reused only when it is the same entry
 
 A device name that already exists, given or by default, is reused only if the
@@ -80,7 +87,7 @@ one `mock serve` made, and is reused.
 
 ### 4. An existing server must match
 
-An existing server with the derived name is reused only if its type, bind address
+An existing server with that name is reused only if its type, bind address
 and port match the request, and its route for the derived endpoint only if the
 route's device and USB profile match. Otherwise the command fails, naming the entry
 and the difference, rather than serving at an address other than the one requested.
@@ -95,7 +102,7 @@ the placeholder, and fail unless a VXI-11 listener answers on the local host.
 
 ### 6. A running server is refused
 
-If the derived server's recorded process is alive, `mock serve` fails and leaves
+If the server's recorded process is alive, `mock serve` fails and leaves
 the record alone. `server start` overwrites the record and removes it when the
 bind then fails, so a second run would report the running server as stopped.
 
@@ -149,8 +156,6 @@ Its name is an open question.
 
 ## Open questions
 
-- How the server name derives from the request, and whether it can always satisfy
-  the name rule.
 - Whether `--type vxi11`, once its binding is removed, dials its own gateway at
   127.0.0.1, and what stops that loop.
 - The route endpoint for `--type hislip`, `vxi11` and `usbip`, and whether `--port`
