@@ -116,10 +116,16 @@ by hand.
 
 ### 4. An existing server must match
 
-An existing server with that name is reused only if its type, bind address
-and port match the request, and its route for the type's endpoint only if the
-route's device and USB profile match. Otherwise the command fails, naming the entry
-and the difference, rather than serving at an address other than the one requested.
+An existing server with that name is reused only if its type, bind address and
+port match the request, and its only route is the type's endpoint to the device,
+with a matching USB profile. Otherwise the command fails, naming the entry and
+the difference, rather than serving at an address other than the one requested.
+
+A server with other routes was composed by hand, and several devices behind one
+listener remain `server`'s. Reusing it would let §7 remove the routes added by
+hand, and a VXI-11 gateway answers from the server's first route, which may not
+be the mock's. A route added later with `server route add` therefore makes the
+next `mock serve` under that name fail.
 
 ### 5. A gateway reads the bindings before it chooses a backend
 
@@ -198,8 +204,6 @@ Its name is an open question.
 
 ## Open questions
 
-- Whether §4 reuses a VXI-11 server that already holds other routes. Its gateway
-  answers from the first route, which may not be the one `mock serve` added.
 - Whether `usbip` needs `--profile` here.
 - The spelling of the removal command in §7, how it names what to remove now that
   the device name need not come from the scenario, and whether it refuses while
