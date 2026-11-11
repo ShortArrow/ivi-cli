@@ -47,6 +47,10 @@ ivicli mock serve my-dmm --type socket --port 5025
 prints the device name it uses and how a client connects: the VISA resource, or
 for `usbip` the attach step. It then runs in the foreground as `server start` does.
 
+`--profile` takes `usbtmc` (the default) or `cdc-acm`, as `server route add`
+does, and sets the USB profile of the route for `--type usbip`; every other type
+ignores it.
+
 `--port` defaults as in `server add`, and to 1024 for `vxi11`, which has no
 default there. 1024 is the port the `ivicli` VXI-11 client dials when no
 portmapper on the host gives it another, so that client reaches the mock through
@@ -208,7 +212,6 @@ Its name is an open question.
 
 ## Open questions
 
-- Whether `usbip` needs `--profile` here.
 - The spelling of the removal command in §7, how it names what to remove now that
   the device name need not come from the scenario, and whether it refuses while
   the server runs.
