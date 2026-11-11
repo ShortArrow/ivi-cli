@@ -56,13 +56,16 @@ rule, and `mock serve`.
 `mock serve` registers a device, a binding, a server and a route, and starts the
 server. These are ordinary entries, so `server stop`, `server status` and `visa
 list` work on them, and `mock received` works on the device when the server runs
-with `IVICLI_CAPTURE`. `server` keeps its commands and behaviour.
+with `IVICLI_CAPTURE`. `server` keeps its commands, and its gateways change only
+as §5 says.
 
 The device's resource is `MOCK::INSTR`, a resource kind with no transport. A
-device with it answers from its scenario while a binding names one, and otherwise
-fails with an error saying that no scenario is bound. It never dials, so removing
-the binding can neither reach an instrument nor loop back into the mock's own
-gateway.
+device with it answers from its scenario while a binding names one. Otherwise
+opening it fails, and the log says that no scenario is bound, an error distinct
+from the one for a transport no backend supports. A client sees what its protocol
+reports for a failed open: a closed connection, a HiSLIP fatal error or a VXI-11
+I/O error. The built-in routing never dials it, so removing the binding can
+neither reach an instrument nor loop back into the mock's own gateway.
 
 The device's name is the value of `--alias`, checked by the same rule as a name
 given to `visa add`. Without `--alias` it is `mock-<type>-<port>`, such as
@@ -111,12 +114,19 @@ and the difference, rather than serving at an address other than the one request
 ### 5. A gateway reads the bindings before it chooses a backend
 
 Today a process reads the session's bindings at startup, and a gateway refreshes
-them only after a connection's backend is chosen and opened. A `MOCK::INSTR`
-device that is unbound fails at that choice, so the refresh would never run, and
-a later `mock scenario activate` would go unseen until the server restarts. Each
-gateway therefore refreshes the bindings before it chooses a connection's
-backend. This also puts the binding `mock serve` writes in effect for the first
-connection.
+them only after a connection's backend is chosen and opened. An unbound
+`MOCK::INSTR` device fails when its backend is opened, so the refresh would never
+run, and a later `mock scenario activate` would go unseen until the server
+restarts. Each gateway therefore refreshes the bindings before it chooses a
+connection's backend. This also puts the binding `mock serve` writes in effect
+for the first connection.
+
+The change reaches every device. An `activate` or `deactivate` made while a
+server runs takes effect from the next connection, where today it takes effect
+one connection later. A device with a real address that is bound after the server
+started therefore answers its next connection from the mock, as ADR 0026 §17
+intends a serving gateway to follow the session. Bindings are session state, not
+`config.toml`, so this is outside the contract of ADR 0047 §2.
 
 ### 6. A running server is refused
 
@@ -176,7 +186,8 @@ Its name is an open question.
 
 ## Open questions
 
-- Whether `visa add` accepts `MOCK::INSTR` typed by hand.
+- Whether `visa add` accepts `MOCK::INSTR` typed by hand. If it does, §3 reuses
+  such a device, and §7 cannot tell it from one `mock serve` registered.
 - Whether `--port` is required for `vxi11`, which has no default in `server add`.
 - Whether §4 reuses a VXI-11 server that already holds other routes. Its gateway
   answers from the first route, which may not be the one `mock serve` added.
