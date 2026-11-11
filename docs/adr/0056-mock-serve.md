@@ -127,9 +127,9 @@ An existing server with that name is reused only if its type, bind address and
 port match the request, and it has no route other than the type's endpoint to
 the device, with the requested USB profile when the type is `usbip`. That route
 is added, with the profile §1 gives it, if it is missing, as it is after `visa
-remove` of the device. Otherwise the command fails, naming the entry and the difference,
-rather than serving at an address other than the one requested. A server that
-passes serves as the one `mock serve` would make, whoever made it.
+remove` of the device. Otherwise the command fails, naming the entry and the
+difference, rather than serving at an address other than the one requested. A
+server that passes serves as the one `mock serve` would make, whoever made it.
 
 A server with other routes holds several devices behind one listener, which
 remains `server`'s. A VXI-11 gateway answers from the server's first route, which
