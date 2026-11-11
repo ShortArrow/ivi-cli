@@ -99,7 +99,8 @@ port, since only `socket` carries it in the resource. Without it, `hislip` and
 The VXI-11 gateway ignores the device name a client sends and answers from the
 server's first route, so `inst0` is chosen because VISA sends it by default, not
 because the gateway reads it. A server `mock serve` creates has only this route.
-Another endpoint, such as `hislip1`, is added with `server route add`.
+Another endpoint, such as `hislip1`, is added with `server route add`, after
+which `mock serve` no longer reuses the server (§4).
 
 ### 3. A name in use is reused only when it is the same entry
 
@@ -116,10 +117,19 @@ by hand.
 
 ### 4. An existing server must match
 
-An existing server with that name is reused only if its type, bind address
-and port match the request, and its route for the type's endpoint only if the
-route's device and USB profile match. Otherwise the command fails, naming the entry
-and the difference, rather than serving at an address other than the one requested.
+An existing server with that name is reused only if its type, bind address and
+port match the request, and it has no route other than the type's endpoint to
+the device with a matching USB profile. That route is added if it is missing, as
+it is after `visa remove` of the device. Otherwise the command fails, naming the
+entry and the difference, rather than serving at an address other than the one
+requested. A server that passes is the one `mock serve` would make, whoever made
+it.
+
+A server with other routes holds several devices behind one listener, which
+remains `server`'s. A VXI-11 gateway answers from the server's first route, which
+may not be the mock's, and a server composed by hand before `mock serve` ran
+would lose its routes to §7. A route added later with `server route add`
+therefore makes the next `mock serve` under that name fail.
 
 ### 5. A gateway reads the bindings before it chooses a backend
 
@@ -198,11 +208,7 @@ Its name is an open question.
 
 ## Open questions
 
-- Whether §4 reuses a VXI-11 server that already holds other routes. Its gateway
-  answers from the first route, which may not be the one `mock serve` added.
 - Whether `usbip` needs `--profile` here.
 - The spelling of the removal command in §7, how it names what to remove now that
   the device name need not come from the scenario, and whether it refuses while
   the server runs.
-- Whether §4 is enough to tell a server `mock serve` made from one a user made by
-  hand with the same values.
