@@ -47,6 +47,11 @@ ivicli mock serve my-dmm --type socket --port 5025
 prints the device name it uses and how a client connects: the VISA resource, or
 for `usbip` the attach step. It then runs in the foreground as `server start` does.
 
+`--port` defaults as in `server add`, and to 1024 for `vxi11`, which has no
+default there. 1024 is the port the `ivicli` VXI-11 client dials when no
+portmapper on the host gives it another, so that client reaches the mock through
+a resource without a port unless another VXI-11 server is registered there.
+
 The scenario must already exist; `mock serve` does not create one. The path from
 nothing to a listening mock is `mock scenario create`, a `mock rule add` per
 rule, and `mock serve`.
@@ -81,8 +86,8 @@ since `api start` records its process under that server name. One name serves at
 one address: a second `mock serve` with the same name and a different port fails.
 
 The route's endpoint is fixed by the type. What `mock serve` prints names the
-port, since only `socket` carries it in the resource and the others reach the
-well-known port otherwise:
+port, since only `socket` carries it in the resource. Without it, `hislip` and
+`usbip` reach their well-known ports and `vxi11` asks a portmapper:
 
 | `--type` | Endpoint | Printed for a client |
 | --- | --- | --- |
@@ -188,7 +193,6 @@ Its name is an open question.
 
 - Whether `visa add` accepts `MOCK::INSTR` typed by hand. If it does, §3 reuses
   such a device, and §7 cannot tell it from one `mock serve` registered.
-- Whether `--port` is required for `vxi11`, which has no default in `server add`.
 - Whether §4 reuses a VXI-11 server that already holds other routes. Its gateway
   answers from the first route, which may not be the one `mock serve` added.
 - Whether `usbip` needs `--profile` here.
