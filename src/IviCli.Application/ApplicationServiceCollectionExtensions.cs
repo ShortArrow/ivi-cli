@@ -75,6 +75,7 @@ public static class ApplicationServiceCollectionExtensions
         services.AddSingleton<ITrafficScenarioConverter, DefaultTrafficScenarioConverter>();
         services.AddSingleton<ImportScenarioFromTrafficCommandHandler>();
         services.AddSingleton<MockReceivedWritesQueryHandler>();
+        services.AddSingleton<ServeMockCommandHandler>();
         return services;
     }
 

@@ -19,6 +19,12 @@ public sealed partial record ServerName
 
     private ServerName(string value) => Value = value;
 
+    /// <summary>
+    /// The name <c>api start</c> records the management API's process under,
+    /// which no configured server may take.
+    /// </summary>
+    public static ServerName ManagementApi { get; } = new("ivi-management-api");
+
     /// <summary>Parses and validates a raw string into a <see cref="ServerName"/>.</summary>
     public static Result<ServerName, ServerNameError> From(string raw)
     {

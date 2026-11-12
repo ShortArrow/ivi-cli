@@ -28,12 +28,6 @@ namespace IviCli.Cli.Commands;
 /// </summary>
 public static class ApiCommand
 {
-    /// <summary>The reserved <see cref="ServerName"/> used to track the API's PID file.</summary>
-    public static readonly ServerName ReservedName = ServerName.From("ivi-management-api")
-        is Result<ServerName, ServerNameError>.Ok ok
-        ? ok.Value
-        : throw new InvalidOperationException("ivi-management-api must be a valid ServerName");
-
     /// <summary>Default port for plaintext HTTP when <c>--port</c> is not supplied.</summary>
     public const int DefaultPort = 8080;
 
@@ -218,7 +212,12 @@ public static class ApiCommand
                 }
 
                 var pid = Environment.ProcessId;
-                _ = await registry.WriteAsync(ReservedName, pid, DateTimeOffset.UtcNow, ct);
+                _ = await registry.WriteAsync(
+                    ServerName.ManagementApi,
+                    pid,
+                    DateTimeOffset.UtcNow,
+                    ct
+                );
 
                 var scheme = tlsCfg.Enabled ? "https" : "http";
                 logger.LogInformation(
@@ -252,7 +251,10 @@ public static class ApiCommand
                 }
                 finally
                 {
-                    _ = await registry.DeleteAsync(ReservedName, CancellationToken.None);
+                    _ = await registry.DeleteAsync(
+                        ServerName.ManagementApi,
+                        CancellationToken.None
+                    );
                 }
             }
         );
@@ -315,7 +317,7 @@ public static class ApiCommand
             async (parseResult, ct) =>
             {
                 var registry = services.GetRequiredService<IServerProcessRegistry>();
-                var entryResult = await registry.ReadAsync(ReservedName, ct);
+                var entryResult = await registry.ReadAsync(ServerName.ManagementApi, ct);
                 if (
                     entryResult
                     is not Result<ServerProcessEntry?, ServerProcessRegistryError>.Ok
@@ -335,14 +337,14 @@ public static class ApiCommand
                     {
                         process.Kill(entireProcessTree: true);
                     }
-                    _ = await registry.DeleteAsync(ReservedName, ct);
+                    _ = await registry.DeleteAsync(ServerName.ManagementApi, ct);
                     Console.WriteLine("Management API stopped.");
                     return ExitCodeMapper.Success;
                 }
                 catch (ArgumentException)
                 {
                     // Process is already gone — clean up the stale PID file.
-                    _ = await registry.DeleteAsync(ReservedName, ct);
+                    _ = await registry.DeleteAsync(ServerName.ManagementApi, ct);
                     Console.WriteLine(
                         "Management API was not running (cleaned up stale PID file)."
                     );

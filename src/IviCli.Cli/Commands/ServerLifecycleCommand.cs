@@ -57,41 +57,50 @@ public static class ServerLifecycleCommand
                 var logger = services.GetRequiredService<ILogger<StartServerCommandHandler>>();
 
                 var result = await handler.HandleAsync(new StartServerCommand(name), ct);
-                return result switch
-                {
-                    Result<Unit, StartServerError>.Ok => ExitCodeMapper.Success,
-                    Result<Unit, StartServerError>.Error err => err.Err switch
-                    {
-                        StartServerInvalidName n => ServerCommand.Log(
-                            err.Err,
-                            logger,
-                            $"error: invalid server name '{n.Raw}'.",
-                            ExitCodeMapper.UsageError
-                        ),
-                        StartServerUnknown u => ServerCommand.Log(
-                            err.Err,
-                            logger,
-                            $"error: no such server '{u.Name.Value}'.",
-                            ExitCodeMapper.DeviceError
-                        ),
-                        StartServerLifecycleFailure => ServerCommand.Log(
-                            err.Err,
-                            logger,
-                            "error: gateway server failed.",
-                            ExitCodeMapper.TransportError
-                        ),
-                        _ => ServerCommand.Log(
-                            err.Err,
-                            logger,
-                            "error: configuration storage failed.",
-                            ExitCodeMapper.ConfigurationError
-                        ),
-                    },
-                    _ => ExitCodeMapper.GenericFailure,
-                };
+                return ReportStart(result, logger);
             }
         );
         return cmd;
+    }
+
+    /// <summary>
+    /// Writes what a <c>server start</c> run ended with and returns its exit
+    /// code.
+    /// </summary>
+    internal static int ReportStart(Result<Unit, StartServerError> result, ILogger logger)
+    {
+        return result switch
+        {
+            Result<Unit, StartServerError>.Ok => ExitCodeMapper.Success,
+            Result<Unit, StartServerError>.Error err => err.Err switch
+            {
+                StartServerInvalidName n => ServerCommand.Log(
+                    err.Err,
+                    logger,
+                    $"error: invalid server name '{n.Raw}'.",
+                    ExitCodeMapper.UsageError
+                ),
+                StartServerUnknown u => ServerCommand.Log(
+                    err.Err,
+                    logger,
+                    $"error: no such server '{u.Name.Value}'.",
+                    ExitCodeMapper.DeviceError
+                ),
+                StartServerLifecycleFailure => ServerCommand.Log(
+                    err.Err,
+                    logger,
+                    "error: gateway server failed.",
+                    ExitCodeMapper.TransportError
+                ),
+                _ => ServerCommand.Log(
+                    err.Err,
+                    logger,
+                    "error: configuration storage failed.",
+                    ExitCodeMapper.ConfigurationError
+                ),
+            },
+            _ => ExitCodeMapper.GenericFailure,
+        };
     }
 
     private static Command BuildStop(IServiceProvider services)

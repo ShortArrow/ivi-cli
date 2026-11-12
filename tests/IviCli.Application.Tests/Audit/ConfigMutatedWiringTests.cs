@@ -38,6 +38,7 @@ public sealed class ConfigMutatedWiringTests
     [InlineData("scenario.create", "scenario.create", "demo")]
     [InlineData("scenario.remove", "scenario.remove", "demo")]
     [InlineData("scenario.import", "scenario.import", "demo")]
+    [InlineData("mock.serve", "mock.serve", "mock-socket-5025")]
     public async Task Handler_emits_ConfigMutated_with_expected_shape(
         string handlerKey,
         string expectedOperation,
@@ -103,9 +104,32 @@ public sealed class ConfigMutatedWiringTests
             case "scenario.import":
                 await RunImportScenario(audit, subject);
                 break;
+            case "mock.serve":
+                await RunServeMock(audit, subject);
+                break;
             default:
                 throw new InvalidOperationException($"unknown handler key: {handlerKey}");
         }
+    }
+
+    private static async Task RunServeMock(FakeAuditLog audit, FakeAuditSubject subject)
+    {
+        var scenario = MockScenario.SingleScene(
+            ScenarioName.From("demo").ShouldBeOk(),
+            idnDefault: null,
+            rules: ImmutableArray<MockRule>.Empty
+        );
+        var handler = new ServeMockCommandHandler(
+            new FakeScenarioStore(new[] { scenario }),
+            new FakeConfigStore(),
+            new FakeSessionStore(),
+            new FakeServerProcessRegistry(),
+            new FakeProcessLiveness(),
+            audit,
+            subject
+        );
+        var result = await handler.HandleAsync(new ServeMockCommand("demo", "socket"), default);
+        result.ShouldBeOk();
     }
 
     private static async Task RunAddDevice(FakeAuditLog audit, FakeAuditSubject subject)
