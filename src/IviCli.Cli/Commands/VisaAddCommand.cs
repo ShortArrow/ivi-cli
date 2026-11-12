@@ -135,7 +135,7 @@ public static class VisaAddCommand
             AddDeviceInvalidName n => DeviceNameMessage.Invalid(n.Raw),
             AddDeviceInvalidResource r => $"error: invalid VISA resource '{r.Raw}'.",
             AddDeviceMockResource =>
-                "error: MOCK::INSTR is the resource of a mock device and cannot be added.",
+                "error: MOCK::INSTR is the resource of a mock device; `mock serve` registers one.",
             AddDeviceInvalidTimeout t => $"error: invalid timeout {t.RawMilliseconds}ms.",
             AddDeviceNameTaken nt => $"error: device '{nt.Name.Value}' already exists.",
             AddDeviceInvalidSerialSetting s => $"error: invalid {s.Field} '{s.Raw}'.",
