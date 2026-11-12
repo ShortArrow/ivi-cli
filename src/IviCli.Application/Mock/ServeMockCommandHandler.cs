@@ -40,9 +40,6 @@ public sealed class ServeMockCommandHandler
     /// <summary>The timeout of a device this command registers, as <c>visa add</c> defaults it.</summary>
     public const int DeviceTimeoutMilliseconds = 3000;
 
-    /// <summary>The port a VXI-11 mock listens on without <c>--port</c>.</summary>
-    public const int DefaultVxi11Port = 1024;
-
     private readonly IScenarioStore _scenarios;
     private readonly IConfigStore _config;
     private readonly ISessionStore _session;
@@ -259,7 +256,7 @@ public sealed class ServeMockCommandHandler
         var wanted = request.Server;
         if (server.Type != wanted.Type)
         {
-            return $"its type is {TypeName(server.Type)}, not {TypeName(wanted.Type)}";
+            return $"its type is {MockServerTypes.Name(server.Type)}, not {MockServerTypes.Name(wanted.Type)}";
         }
         if (server.Bind != wanted.Bind)
         {
@@ -295,7 +292,7 @@ public sealed class ServeMockCommandHandler
         {
             return Invalid(new ServeMockInvalidScenario(command.Scenario));
         }
-        if (ParseType(command.Type) is not { } type)
+        if (MockServerTypes.Parse(command.Type) is not { } type)
         {
             return Invalid(new ServeMockInvalidType(command.Type));
         }
@@ -303,7 +300,7 @@ public sealed class ServeMockCommandHandler
         {
             return Invalid(new ServeMockInvalidProfile(command.Profile!));
         }
-        var portNumber = command.Port ?? DefaultPort(type);
+        var portNumber = command.Port ?? MockServerTypes.DefaultPort(type);
         if (Port.From(portNumber) is not Result<Port, PortError>.Ok { Value: var port })
         {
             return Invalid(new ServeMockInvalidPort(portNumber));
@@ -316,7 +313,7 @@ public sealed class ServeMockCommandHandler
             return Invalid(new ServeMockInvalidBind(command.Bind));
         }
 
-        var alias = command.Alias ?? $"mock-{TypeName(type)}-{port.Value}";
+        var alias = command.Alias ?? $"mock-{MockServerTypes.Name(type)}-{port.Value}";
         if (
             DeviceName.From(alias)
                 is not Result<DeviceName, DeviceError>.Ok { Value: var deviceName }
@@ -331,7 +328,7 @@ public sealed class ServeMockCommandHandler
             return Invalid(new ServeMockReservedName(serverName));
         }
 
-        var endpoint = PublicEndpoint.From(Endpoint(type, port)).OrThrow();
+        var endpoint = PublicEndpoint.From(MockServerTypes.Endpoint(type, port)!).OrThrow();
         var route = new Route(serverName, endpoint, deviceName)
         {
             Profile = type == ServerType.UsbIp ? profile : UsbExportProfile.UsbTmc,
@@ -341,16 +338,6 @@ public sealed class ServeMockCommandHandler
         );
     }
 
-    private static ServerType? ParseType(string raw) =>
-        raw.ToLowerInvariant() switch
-        {
-            "socket" => ServerType.Socket,
-            "hislip" => ServerType.HiSlip,
-            "vxi11" => ServerType.Vxi11,
-            "usbip" => ServerType.UsbIp,
-            _ => null,
-        };
-
     private static UsbExportProfile? ParseProfile(string? raw) =>
         raw?.ToLowerInvariant() switch
         {
@@ -358,29 +345,6 @@ public sealed class ServeMockCommandHandler
             "cdc-acm" => UsbExportProfile.CdcAcm,
             _ => null,
         };
-
-    private static int DefaultPort(ServerType type) =>
-        type switch
-        {
-            ServerType.Socket => 5025,
-            ServerType.HiSlip => 4880,
-            ServerType.UsbIp => UsbIpConstants.DefaultPort,
-            _ => DefaultVxi11Port,
-        };
-
-    /// <summary>The route's endpoint, fixed by the type (ADR 0056 §2).</summary>
-    private static string Endpoint(ServerType type, Port port) =>
-        type switch
-        {
-            ServerType.Socket => port.Value.ToString(
-                System.Globalization.CultureInfo.InvariantCulture
-            ),
-            ServerType.HiSlip => "hislip0",
-            ServerType.UsbIp => "1-1",
-            _ => "inst0",
-        };
-
-    private static string TypeName(ServerType type) => type.ToString().ToLowerInvariant();
 
     private static string ProfileName(UsbExportProfile profile) =>
         profile == UsbExportProfile.CdcAcm ? "cdc-acm" : "usbtmc";
