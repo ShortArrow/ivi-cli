@@ -669,16 +669,8 @@ public sealed class HiSlipGatewayServer : IGatewayServer
         // activate` runs. Refreshed per message so the change is observed
         // without re-creating the link. The refresher re-applies only when
         // the bound scenario name changed (scene state is preserved
-        // otherwise), and is no-throw; guard anyway so a refresh failure
-        // never kills the link.
-        try
-        {
-            await _refresher.RefreshAsync(device, ct);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex, "scenario binding refresh failed; continuing");
-        }
+        // otherwise).
+        await _refresher.RefreshOrWarnAsync(device, _logger, ct);
 
         // Real VISA clients (NI-VISA, Keysight, R&S, PyVISA-py) terminate
         // SCPI lines with `\r\n` or `\n` per IEEE 488.2 §7.5, and may put
