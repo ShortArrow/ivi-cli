@@ -12,6 +12,7 @@ using IviCli.Domain.Session;
 using IviCli.Domain.Visa;
 using IviCli.Server.Vxi11;
 using IviCli.TestKit;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Shouldly;
 using Xunit;
@@ -127,7 +128,62 @@ public sealed class Vxi11LiveRebindTests
         catch (OperationCanceledException) { }
     }
 
+    /// <summary>
+    /// A device with no backend until a binding names a scenario fails
+    /// create_link, and the log says why rather than only that it failed.
+    /// </summary>
+    [Fact]
+    public async Task An_unbound_device_fails_the_link_and_the_log_says_why()
+    {
+        var (server, config, port) = BuildHarness();
+        var logger = new RecordingLogger<Vxi11GatewayServer>();
+        var gateway = new Vxi11GatewayServer(
+            new BindingGatedBackendFactory(new FakeBackend()),
+            logger
+        );
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        (port, var serverTask) = LoopbackGateway.Start(
+            server,
+            s => gateway.RunAsync(s, config, cts.Token)
+        );
+        await WaitForListenerAsync(port, cts.Token);
+
+        using var tcp = new TcpClient();
+        await tcp.ConnectAsync(IPAddress.Loopback, port, cts.Token);
+        using var stream = tcp.GetStream();
+        (await CreateLinkErrorAsync(stream, cts.Token)).ShouldBe(Vxi11IoError);
+
+        logger.Entries.ShouldContain(e =>
+            e.Level == LogLevel.Error && e.Message.Contains("no scenario is bound")
+        );
+
+        await cts.CancelAsync();
+        try
+        {
+            await serverTask;
+        }
+        catch (OperationCanceledException) { }
+    }
+
     private static async Task<int> CreateLinkAsync(NetworkStream stream, CancellationToken ct)
+    {
+        var reply = await SendCreateLinkAsync(stream, ct);
+        reply.ReadInt32().ShouldBe(Vxi11NoError);
+        var lid = reply.ReadInt32();
+        _ = reply.ReadUInt32(); // abort port
+        _ = reply.ReadUInt32(); // maxRecvSize
+        return lid;
+    }
+
+    private static async Task<int> CreateLinkErrorAsync(
+        NetworkStream stream,
+        CancellationToken ct
+    ) => (await SendCreateLinkAsync(stream, ct)).ReadInt32();
+
+    private static async Task<Vxi11XdrCodec.XdrReader> SendCreateLinkAsync(
+        NetworkStream stream,
+        CancellationToken ct
+    )
     {
         var createCall = BuildRpcCall(
             xid: 100,
@@ -143,12 +199,7 @@ public sealed class Vxi11LiveRebindTests
             }
         );
         await Vxi11RecordFraming.WriteRecordAsync(stream, createCall, ct);
-        var reply = SkipReplyHeader(await Vxi11RecordFraming.ReadRecordAsync(stream, ct));
-        reply.ReadInt32().ShouldBe(Vxi11NoError);
-        var lid = reply.ReadInt32();
-        _ = reply.ReadUInt32(); // abort port
-        _ = reply.ReadUInt32(); // maxRecvSize
-        return lid;
+        return SkipReplyHeader(await Vxi11RecordFraming.ReadRecordAsync(stream, ct));
     }
 
     private static async Task<string> QueryAsync(

@@ -546,6 +546,7 @@ public sealed class Vxi11GatewayServer : IGatewayServer
         var backendResult = _backendFactory.CreateFor(device);
         if (backendResult is not Result<IIviBackend, BackendError>.Ok { Value: var backend })
         {
+            _logger.LogIviError(((Result<IIviBackend, BackendError>.Error)backendResult).Err);
             await WriteCreateLinkReplyAsync(stream, xid, Vxi11IoError, lid: 0, abortPort: 0, ct);
             return;
         }
