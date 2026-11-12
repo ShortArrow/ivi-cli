@@ -1,6 +1,6 @@
 # 0056. `mock serve`: one command from a scenario to a listening mock
 
-- Status: Draft
+- Status: Accepted
 
 ## Context
 
