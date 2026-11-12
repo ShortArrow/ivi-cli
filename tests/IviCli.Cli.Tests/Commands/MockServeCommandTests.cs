@@ -13,7 +13,11 @@ namespace IviCli.Cli.Tests.Commands;
 /// </summary>
 public sealed class MockServeCommandTests
 {
-    private static IviCli.Domain.Servers.Server ServerOf(ServerType type, int port, string bind = "127.0.0.1") =>
+    private static IviCli.Domain.Servers.Server ServerOf(
+        ServerType type,
+        int port,
+        string bind = "127.0.0.1"
+    ) =>
         new(
             ServerName.From("mock").ShouldBeOk(),
             type,

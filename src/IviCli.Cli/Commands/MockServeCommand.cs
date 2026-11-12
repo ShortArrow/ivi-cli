@@ -36,8 +36,7 @@ public static class MockServeCommand
         };
         var aliasOpt = new Option<string?>("--alias")
         {
-            Description =
-                "Name of the mock's device and server (default mock-<type>-<port>).",
+            Description = "Name of the mock's device and server (default mock-<type>-<port>).",
         };
         var bindOpt = new Option<string>("--bind")
         {
