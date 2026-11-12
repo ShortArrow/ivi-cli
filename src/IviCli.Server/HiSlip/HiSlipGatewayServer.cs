@@ -260,6 +260,7 @@ public sealed class HiSlipGatewayServer : IGatewayServer
         var backendResult = _backendFactory.CreateFor(device);
         if (backendResult is not Result<IIviBackend, BackendError>.Ok { Value: var backend })
         {
+            _logger.LogIviError(((Result<IIviBackend, BackendError>.Error)backendResult).Err);
             await SendFatalAsync(stream, "backend resolution failed", ct);
             return;
         }

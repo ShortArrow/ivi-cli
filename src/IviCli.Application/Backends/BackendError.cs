@@ -205,6 +205,24 @@ public sealed record UnsupportedTransport(DeviceName DeviceName) : BackendError
 }
 
 /// <summary>
+/// The device's resource is <c>MOCK::INSTR</c> and no binding names a
+/// scenario for it, so it has nothing to answer from and nothing to dial
+/// (ADR 0056 §2).
+/// </summary>
+/// <param name="DeviceName">The device.</param>
+public sealed record NoScenarioBound(DeviceName DeviceName) : BackendError
+{
+    /// <inheritdoc/>
+    public override LogSeverity Severity => LogSeverity.Error;
+
+    /// <inheritdoc/>
+    public override string Message => "no scenario is bound to mock device {DeviceName}";
+
+    /// <inheritdoc/>
+    public override IReadOnlyList<object?> LogArgs => new object?[] { DeviceName };
+}
+
+/// <summary>
 /// The backend session pool (ADR 0038) waited longer than the device's
 /// configured timeout for an in-use entry to be released. Distinct from
 /// <see cref="TransportTimeout"/> (which means the wire didn't respond)

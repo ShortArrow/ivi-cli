@@ -14,6 +14,9 @@ namespace IviCli.Infrastructure.Backends;
 /// VISA for the other TCPIP, USB and GPIB resources, and the serial
 /// backends for ASRL (ADR 0055 §2). A kind no case names fails with
 /// <see cref="UnsupportedTransport"/> rather than reaching the Fake backend.
+/// <c>MOCK::INSTR</c> has no transport: it reaches the Fake backend while a
+/// binding names a scenario for the device, and fails with
+/// <see cref="NoScenarioBound"/> otherwise (ADR 0056 §2).
 /// </remarks>
 public sealed class DefaultBackendFactory : IBackendFactory
 {
@@ -85,6 +88,13 @@ public sealed class DefaultBackendFactory : IBackendFactory
         // the same gateway may still hit their real transport backend.
         var hasActiveScenario =
             _fallbackBackend is IScenarioAwareBackend probe && probe.HasActiveScenarioFor(device);
+
+        if (device.Resource is VisaResource.Mock)
+        {
+            return hasActiveScenario
+                ? Result.Success<IIviBackend, BackendError>(_fallbackBackend)
+                : Result.Failure<IIviBackend, BackendError>(new NoScenarioBound(device.Name));
+        }
 
         IIviBackend? backend = device.Resource switch
         {

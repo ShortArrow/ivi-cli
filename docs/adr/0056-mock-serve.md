@@ -204,9 +204,8 @@ name is added again.
 
 - Reaching a mock takes `mock scenario create`, the rules and `mock serve`, with
   no resource to invent.
-- Nothing is removed or renamed, and a `config.toml` that loads today behaves as
-  before, since `MOCK::INSTR` is rejected today. This requires no minor version
-  under ADR 0047 §2. `config.toml` does gain entries the user did not type.
+- Nothing is removed or renamed, and a `config.toml` without a `MOCK::INSTR`
+  device behaves as before. This requires no minor version under ADR 0047 §2. `config.toml` does gain entries the user did not type.
 - An older `ivicli` cannot load a `config.toml` holding a `MOCK::INSTR` device. It
   rejects the whole file, including every other device and server, with an
   invalid-resource error.

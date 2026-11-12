@@ -12,6 +12,7 @@ using IviCli.Domain.Session;
 using IviCli.Domain.Visa;
 using IviCli.Server.HiSlip;
 using IviCli.TestKit;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Shouldly;
 using Xunit;
@@ -168,6 +169,67 @@ public sealed class HiSlipLiveRebindTests
             .ShouldBe("1.00");
 
         await client.CloseAsync(device, cts.Token);
+        await cts.CancelAsync();
+        try
+        {
+            await serverTask;
+        }
+        catch (OperationCanceledException) { }
+    }
+
+    /// <summary>
+    /// A device with no backend until a binding names a scenario fails the
+    /// first request with a FatalError, since the gateway answers Initialize
+    /// before it chooses the backend, and the log says why.
+    /// </summary>
+    [Fact]
+    public async Task An_unbound_device_fails_the_first_request_and_the_log_says_why()
+    {
+        var port = LoopbackGateway.FreePort();
+        var deviceName = DeviceName.From("dut").ShouldBeOk();
+        var device = new Device(
+            deviceName,
+            VisaResource.Parse("TCPIP0::127.0.0.1::hislip0::INSTR").ShouldBeOk(),
+            Timeout.FromMilliseconds(3000).ShouldBeOk()
+        );
+        var serverName = ServerName.From("hislip-srv").ShouldBeOk();
+        var server = new IviCli.Domain.Servers.Server(
+            serverName,
+            ServerType.HiSlip,
+            IpAddress.From("127.0.0.1").ShouldBeOk(),
+            Port.From(port).ShouldBeOk()
+        );
+        var config = ConfigDocument
+            .Empty.AddDevice(device)
+            .ShouldBeOk()
+            .AddServer(server)
+            .ShouldBeOk()
+            .AddRoute(
+                new Route(serverName, PublicEndpoint.From("hislip0").ShouldBeOk(), deviceName)
+            )
+            .ShouldBeOk();
+        var logger = new RecordingLogger<HiSlipGatewayServer>();
+        var gateway = new HiSlipGatewayServer(
+            new BindingGatedBackendFactory(new FakeBackend()),
+            logger
+        );
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        (port, var serverTask) = LoopbackGateway.Start(
+            server,
+            s => gateway.RunAsync(s, config, cts.Token)
+        );
+        await WaitForListenerAsync(port, cts.Token);
+
+        var client = new HiSlipBackend(port);
+        (await client.OpenAsync(device, cts.Token)).ShouldBeOk();
+        (
+            await client.QueryAsync(device, ScpiQuery.From("MEAS:VOLT?").ShouldBeOk(), cts.Token)
+        ).ShouldBeError();
+
+        logger.Entries.ShouldContain(e =>
+            e.Level == LogLevel.Error && e.Message.Contains("no scenario is bound")
+        );
+
         await cts.CancelAsync();
         try
         {

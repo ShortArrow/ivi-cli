@@ -40,6 +40,7 @@ public static class ExitCodeMapper
             // Usage / argument-validation errors from a Command.
             AddDeviceInvalidName
             or AddDeviceInvalidResource
+            or AddDeviceMockResource
             or AddDeviceInvalidTimeout
             or AddDeviceInvalidSerialSetting
             or AddDeviceSerialOnNonSerial
