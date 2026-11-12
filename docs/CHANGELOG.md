@@ -8,6 +8,26 @@ All notable changes to ivi-cli are documented here. Format roughly follows
 
 ### Added
 
+- **`mock serve` makes a scenario reachable in one command.**
+  `ivicli mock serve my-dmm --type socket` registers a device, a server and
+  a route, binds the scenario to the device, prints how a client connects
+  (`connect: TCPIP::127.0.0.1::5025::SOCKET`), and runs the server in the
+  foreground as `server start` does. `--type` is `socket`, `hislip`,
+  `vxi11` or `usbip`; `--port`, `--alias`, `--bind` and `--profile` are
+  optional, and the device and server are named `mock-<type>-<port>`
+  unless `--alias` names them. Running it again reuses those entries. It
+  refuses a name that belongs to a device with an address, a device bound
+  to another scenario, a server whose type, address, port or routes
+  differ, and a server that is already running, and then changes nothing.
+
+- **A mock's device has the resource `MOCK::INSTR`.** Such a device
+  answers only from the scenario bound to it. With no binding, opening it
+  fails with "no scenario is bound to mock device …" and nothing is
+  dialled, so removing the binding never sends a request to an
+  instrument. `visa add` and `visa scan --add` refuse the resource. A
+  `config.toml` holding such a device cannot be read by an earlier
+  `ivicli`.
+
 - **`!values` checks a reading in a script.** `!values {temp:20..30},{rh:40..60}`
   checks the last query response element by element: a literal, `*` for any
   element, or a numeric predicate (`>`, `>=`, `<`, `<=`, or an inclusive
