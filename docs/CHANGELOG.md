@@ -20,6 +20,13 @@ All notable changes to ivi-cli are documented here. Format roughly follows
   to another scenario, a server whose type, address, port or routes
   differ, and a server that is already running, and then changes nothing.
 
+- **`mock unserve` removes what `mock serve` registered.**
+  `ivicli mock unserve mock-socket-5025` removes the device with that
+  name, its scenario binding, and the server with that name with its
+  route, and keeps the scenario. It removes nothing, and names the entry
+  at fault, when the device has an address, another server routes to it,
+  the server holds other routes, or the server is running.
+
 - **A mock's device has the resource `MOCK::INSTR`.** Such a device
   answers only from the scenario bound to it. With no binding, opening it
   fails with "no scenario is bound to mock device …" and nothing is
