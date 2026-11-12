@@ -4,8 +4,8 @@
 
 ## Context
 
-Making a scenario reachable by a client takes five commands from three
-groups, after the scenario itself is authored:
+Composed from the general commands, making a scenario reachable by a client
+takes five commands from three groups, after the scenario itself is authored:
 
 ```sh
 ivicli visa add dut 'TCPIP0::127.0.0.1::INSTR'
@@ -16,9 +16,10 @@ ivicli server start dmm-srv
 ```
 
 `mock --help` shows none of the last three, and `visa add` requires a resource
-that a mock does not use. A user who starts from `mock` cannot tell from the
-help that the next step is in `visa`, or what address to give it. The address
-a client connects to is the server's, not the one given to `visa add`.
+that a mock does not use. A user who starts from `mock` cannot tell from those
+commands' help that the next step is in `visa`, or what address to give it.
+The address a client connects to is the server's, not the one given to `visa
+add`.
 
 Three forces are in tension:
 
