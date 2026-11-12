@@ -1,3 +1,4 @@
+using IviCli.Application.Audit;
 using IviCli.Application.Configuration;
 using IviCli.Application.Servers;
 using IviCli.Application.Session;
@@ -47,14 +48,24 @@ public sealed class ServeMockCommandHandler
     private readonly ISessionStore _session;
     private readonly IServerProcessRegistry _registry;
     private readonly IProcessLiveness _liveness;
+    private readonly IAuditLog _audit;
+    private readonly IAuditSubject _subject;
+    private readonly TimeProvider _time;
 
-    /// <summary>Creates a new handler.</summary>
+    /// <summary>
+    /// Creates a new handler. <paramref name="audit"/> and
+    /// <paramref name="subject"/> record one <see cref="ConfigMutated"/>,
+    /// <c>mock.serve</c>, when a run adds to <c>config.toml</c> (ADR 0043).
+    /// </summary>
     public ServeMockCommandHandler(
         IScenarioStore scenarios,
         IConfigStore config,
         ISessionStore session,
         IServerProcessRegistry registry,
-        IProcessLiveness liveness
+        IProcessLiveness liveness,
+        IAuditLog? audit = null,
+        IAuditSubject? subject = null,
+        TimeProvider? time = null
     )
     {
         _scenarios = scenarios;
@@ -62,6 +73,9 @@ public sealed class ServeMockCommandHandler
         _session = session;
         _registry = registry;
         _liveness = liveness;
+        _audit = audit ?? NullAuditLog.Instance;
+        _subject = subject ?? new StaticAuditSubject("unknown");
+        _time = time ?? TimeProvider.System;
     }
 
     /// <summary>Finds or registers the entries that serve the scenario.</summary>
@@ -140,6 +154,15 @@ public sealed class ServeMockCommandHandler
             {
                 return Fail(new ServeMockConfigFailure(saveErr.Err));
             }
+            await _audit.AppendAsync(
+                new ConfigMutated(
+                    _time.GetUtcNow(),
+                    "mock.serve",
+                    request.Server.Name.Value,
+                    _subject.Get()
+                ),
+                ct
+            );
         }
 
         if (session.GetActiveScenario(request.DeviceName) != request.Scenario)

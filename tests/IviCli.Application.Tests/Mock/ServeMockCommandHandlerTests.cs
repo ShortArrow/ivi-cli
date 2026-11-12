@@ -277,6 +277,28 @@ public sealed class ServeMockCommandHandlerTests
     }
 
     [Fact]
+    public async Task A_run_that_registers_nothing_records_no_config_change()
+    {
+        var audit = new FakeAuditLog();
+        var config = new FakeConfigStore();
+        var handler = new ServeMockCommandHandler(
+            new FakeScenarioStore(new[] { ScenarioNamed(Scenario) }),
+            config,
+            new FakeSessionStore(),
+            new FakeServerProcessRegistry(),
+            new FakeProcessLiveness(),
+            audit,
+            new FakeAuditSubject("test")
+        );
+        var command = new ServeMockCommand(Scenario, "socket");
+        (await handler.HandleAsync(command, CancellationToken.None)).ShouldBeOk();
+
+        (await handler.HandleAsync(command, CancellationToken.None)).ShouldBeOk();
+
+        audit.Events.Count.ShouldBe(1);
+    }
+
+    [Fact]
     public async Task An_unbound_mock_device_is_bound_again()
     {
         var config = ConfigDocument.Empty.AddDevice(MockDevice("mock-socket-5025")).ShouldBeOk();
