@@ -583,4 +583,30 @@ public class TomlConfigParserTests
         var rt = TomlConfigParser.Parse(serialized).ShouldBeOk();
         rt.Plugins.ShouldBe(p);
     }
+
+    /// <summary>
+    /// A <c>MOCK::INSTR</c> device, which <c>mock serve</c> writes, is read
+    /// back as written (ADR 0056 §2).
+    /// </summary>
+    [Fact]
+    public void Serialize_MockDevice_RoundTrips()
+    {
+        // Given
+        var original = ConfigDocument
+            .Empty.AddDevice(
+                new Device(
+                    DeviceName.From("mock-socket-5025").ShouldBeOk(),
+                    VisaResource.Parse("MOCK::INSTR").ShouldBeOk(),
+                    Timeout.FromMilliseconds(3000).ShouldBeOk()
+                )
+            )
+            .ShouldBeOk();
+
+        // When
+        var parsed = TomlConfigParser.Parse(TomlConfigParser.Serialize(original)).ShouldBeOk();
+
+        // Then
+        parsed.ShouldBe(original);
+        parsed.Devices[0].Resource.ShouldBeOfType<VisaResource.Mock>();
+    }
 }

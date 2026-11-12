@@ -75,7 +75,9 @@ public static class InfrastructureServiceCollectionExtensions
     /// <summary>
     /// Registers the <see cref="IServerProcessRegistry"/> implementation
     /// backed by <see cref="FilePidRegistry"/> rooted at
-    /// <paramref name="serverStateDirectory"/>.
+    /// <paramref name="serverStateDirectory"/>, and the
+    /// <see cref="IProcessLiveness"/> that tells whether a recorded process
+    /// runs.
     /// </summary>
     public static IServiceCollection AddIviCliServerProcessRegistry(
         this IServiceCollection services,
@@ -86,6 +88,7 @@ public static class InfrastructureServiceCollectionExtensions
             sp.GetRequiredService<IFileSystem>(),
             serverStateDirectory
         ));
+        services.AddSingleton<IProcessLiveness, OsProcessLiveness>();
         return services;
     }
 
