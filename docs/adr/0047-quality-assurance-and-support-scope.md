@@ -53,8 +53,8 @@ contracts**:
 A breaking change to either requires a **minor** version bump
 (0.Y → 0.Y+1) and an explicit CHANGELOG entry naming the break;
 patch releases never break them. Both surfaces are pinned in CI by
-Verify snapshots and parser tests, so an accidental break fails the
-PR, not the consumer.
+tests of the output and of the parser, so an accidental break fails
+the PR, not the consumer.
 
 The `config.toml` contract covers what a value does as well as how it
 is spelled. A change that makes an unchanged configuration behave

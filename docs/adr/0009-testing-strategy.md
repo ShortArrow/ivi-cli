@@ -94,7 +94,7 @@ All lifecycle test targets in PRD §13.3 (open success/failure, query/read timeo
 | Tool | Purpose | Adopted |
 | --- | --- | --- |
 | **NetArchTest** | Detect dependency-direction violations, layer violations, missing interface implementations, etc. from 0021 | Adopted |
-| **Verify** (snapshot) | `--json` output contract, help text, rendered output | Adopted |
+| **Verify** (snapshot) | `--json` output contract, help text, rendered output | **Not adopted**: from version 33 its build fails unless a maintenance fee, or an exemption from it, is declared in MSBuild. An output contract is a short string, which an `Assert` against a raw string literal pins without a library |
 | **FsCheck** (property-based) | VO invariants (VisaResource parse/serialize roundtrip, Timeout range constraints, etc.) | Adopted with scope limited to VO-related areas; no test uses it yet, so `FsCheck.Xunit.v3` is added with the first one |
 | **coverlet** (`coverlet.mtp`) | Coverage measurement | Adopted (visualization only, no numeric gate) |
 | **Stryker.NET** (mutation) | Verifying test quality | **Not adopted** (overkill for Phase 1) |
@@ -106,7 +106,6 @@ Create a shared library that consolidates:
 - **Test Data Builders**: `ConfigBuilder`, `SessionStateBuilder`, `DeviceBuilder`, etc.
 - **FakeBackend Schedule DSL**: the builder API from §6.
 - **Custom Shouldly extensions**: Result-type assertions such as `result.ShouldBeError(...)`.
-- **Verify configuration**: snapshot placement conventions and normalization rules.
 - **Trait constants**: `Categories.Integration`, `Categories.Architecture`.
 
 `tests/IviCli.TestKit/` lives under `tests/` rather than `src/` (it is outside the 1:1 mirror rule from 0021 and treated as test infrastructure).
@@ -141,13 +140,13 @@ Create a shared library that consolidates:
 
 - A single mock library plus a single fake gives a consistent feel when writing tests.
 - Architecture tests catch CA violations early (reducing reliance on manual review).
-- Snapshots pin the `--json` output contract in CI (the basis for AI/CI integration in PRD §9).
+- Tests pin the `--json` output contract in CI (the basis for AI/CI integration in PRD §9).
 - The absence of a coverage gate suppresses "tests written to hit a number."
 
 **Cons**
 
 - Up-front investment to implement the FakeBackend fault injection DSL.
-- More NuGet dependencies from NetArchTest / Verify / FsCheck / coverlet (test-side only; no impact on the shipped binary).
+- More NuGet dependencies from NetArchTest / FsCheck / coverlet (test-side only; no impact on the shipped binary).
 - Sharing via TestKit creates coupling across tests; careless extension can raise coupling further.
 
 **Mitigations**
