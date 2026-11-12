@@ -147,6 +147,7 @@ successful save. Wired sites:
 | `RemoveScenarioCommandHandler` | `scenario.remove` | `{ScenarioName}` |
 | `ImportScenarioFromTrafficCommandHandler` | `scenario.import` | `{ScenarioName}` |
 | `ServeMockCommandHandler` | `mock.serve` | `{ServerName}`, also the device's name |
+| `UnserveMockCommandHandler` | `mock.unserve` | `{DeviceName}`, also the server's name |
 
 Emission fires only on `SaveAsync` success — failed saves are
 operational errors, not security events. The architecture test

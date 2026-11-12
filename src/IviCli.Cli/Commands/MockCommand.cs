@@ -5,7 +5,8 @@ namespace IviCli.Cli.Commands;
 /// <summary>
 /// Builds the <c>ivicli mock ...</c> command group: the three nouns a mock is
 /// made of — scenario, scene, rule — plus the capture reader and
-/// <c>serve</c>, which makes a scenario reachable at an address.
+/// <c>serve</c> and <c>unserve</c>, which make a scenario reachable at an
+/// address and remove what made it so.
 /// </summary>
 public static class MockCommand
 {
@@ -18,6 +19,7 @@ public static class MockCommand
         command.Subcommands.Add(MockRuleCommand.Build(services));
         command.Subcommands.Add(MockReceivedWritesCommand.Build(services));
         command.Subcommands.Add(MockServeCommand.Build(services));
+        command.Subcommands.Add(MockUnserveCommand.Build(services));
         return command;
     }
 }
