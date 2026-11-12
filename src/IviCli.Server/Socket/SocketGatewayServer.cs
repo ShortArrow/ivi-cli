@@ -167,6 +167,7 @@ public sealed class SocketGatewayServer : IGatewayServer
                 return;
             }
 
+            await _refresher.RefreshOrWarnAsync(device, _logger, ct);
             if (Failed(_backendFactory.CreateFor(device), out var backend))
             {
                 return;
@@ -210,16 +211,8 @@ public sealed class SocketGatewayServer : IGatewayServer
                     // `mock scenario activate` runs. Refreshed per request so the
                     // change is observed without reconnecting. The refresher
                     // re-applies only when the bound scenario name changed (scene
-                    // state is preserved otherwise), and is no-throw; guard anyway
-                    // so a refresh failure never kills the connection.
-                    try
-                    {
-                        await _refresher.RefreshAsync(device, ct);
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger.LogWarning(ex, "scenario binding refresh failed; continuing");
-                    }
+                    // state is preserved otherwise).
+                    await _refresher.RefreshOrWarnAsync(device, _logger, ct);
 
                     sessionActivity ??= GatewayTelemetry.StartSession(
                         "socket",

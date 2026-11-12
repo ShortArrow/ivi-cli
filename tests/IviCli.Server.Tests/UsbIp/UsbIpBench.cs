@@ -1,8 +1,10 @@
 using System.Net;
 using System.Net.Sockets;
+using IviCli.Application.Session;
 using IviCli.Backends.Fake;
 using IviCli.Domain.Configuration;
 using IviCli.Domain.Devices;
+using IviCli.Domain.Mock;
 using IviCli.Domain.Protocols;
 using IviCli.Domain.Servers;
 using IviCli.Domain.Visa;
@@ -85,9 +87,42 @@ internal sealed class UsbIpBench : IAsyncDisposable
     ) => StartAsync(NullLogger<UsbIpGatewayServer>.Instance, exports);
 
     /// <summary>Starts the bench with a logger the test can read back.</summary>
-    public static async Task<UsbIpBench> StartAsync(
+    public static Task<UsbIpBench> StartAsync(
         ILogger<UsbIpGatewayServer> logger,
         params (string BusId, UsbExportProfile Profile, string DeviceName)[] exports
+    ) =>
+        StartAsync(
+            backend => new UsbIpGatewayServer(new FakeBackendFactory(backend), logger),
+            exports
+        );
+
+    /// <summary>
+    /// A gateway with one USBTMC export at <see cref="BusId"/> whose device
+    /// has a backend only while <paramref name="sessions"/> binds it to one of
+    /// <paramref name="scenarios"/>, read back from the session as the
+    /// gateway serves.
+    /// </summary>
+    public static Task<UsbIpBench> StartBindingGatedAsync(
+        ISessionStore sessions,
+        params MockScenario[] scenarios
+    ) =>
+        StartAsync(
+            backend => new UsbIpGatewayServer(
+                new BindingGatedBackendFactory(backend),
+                NullLogger<UsbIpGatewayServer>.Instance,
+                new SessionScenarioBindingRefresher(
+                    backend,
+                    new FakeScenarioStore(scenarios),
+                    sessions,
+                    NullLogger<SessionScenarioBindingRefresher>.Instance
+                )
+            ),
+            [(BusId, UsbExportProfile.UsbTmc, DefaultDeviceName)]
+        );
+
+    private static async Task<UsbIpBench> StartAsync(
+        Func<FakeBackend, UsbIpGatewayServer> composeGateway,
+        (string BusId, UsbExportProfile Profile, string DeviceName)[] exports
     )
     {
         var port = LoopbackGateway.FreePort();
@@ -127,7 +162,7 @@ internal sealed class UsbIpBench : IAsyncDisposable
                 .ShouldBeOk();
         }
 
-        var gateway = new UsbIpGatewayServer(new FakeBackendFactory(backend), logger);
+        var gateway = composeGateway(backend);
 
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(20));
         (port, var serverTask) = LoopbackGateway.Start(

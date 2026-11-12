@@ -24,6 +24,15 @@ All notable changes to ivi-cli are documented here. Format roughly follows
   instrument-control code then cannot pass on a request the scenario never
   declared. Scenarios that omit the key behave as before.
 
+### Changed
+
+- **A running gateway follows a scenario binding from the next connection.**
+  The SOCKET, HiSLIP, VXI-11 and USB/IP gateways read the session's bindings
+  before they choose a connection's backend, as well as on each request. A
+  `mock scenario activate` or `deactivate` run while a server is serving now
+  takes effect on the next connection, where it took effect one connection
+  later before.
+
 ### Fixed
 
 - **`visa remove` clears the device's mock scenario binding.** The binding

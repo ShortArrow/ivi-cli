@@ -542,6 +542,7 @@ public sealed class Vxi11GatewayServer : IGatewayServer
             return;
         }
 
+        await _refresher.RefreshOrWarnAsync(device, _logger, ct);
         var backendResult = _backendFactory.CreateFor(device);
         if (backendResult is not Result<IIviBackend, BackendError>.Ok { Value: var backend })
         {
@@ -613,16 +614,8 @@ public sealed class Vxi11GatewayServer : IGatewayServer
         // activate` runs. Refreshed per completed write so the change is
         // observed without re-creating the link. The refresher re-applies
         // only when the bound scenario name changed (scene state is
-        // preserved otherwise), and is no-throw; guard anyway so a refresh
-        // failure never kills the link.
-        try
-        {
-            await _refresher.RefreshAsync(state.Device, ct);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex, "scenario binding refresh failed; continuing");
-        }
+        // preserved otherwise).
+        await _refresher.RefreshOrWarnAsync(state.Device, _logger, ct);
 
         using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(ct, state.Cts.Token);
         var opCt = linkedCts.Token;

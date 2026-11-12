@@ -436,6 +436,7 @@ public sealed class UsbIpGatewayServer : IGatewayServer
     private async Task ServeAsync(NetworkStream stream, ExportedDevice export, CancellationToken ct)
     {
         var device = export.Device;
+        await _refresher.RefreshOrWarnAsync(device, _logger, ct);
         if (Failed(_backendFactory.CreateFor(device), out var backend))
         {
             return;
@@ -902,16 +903,8 @@ public sealed class UsbIpGatewayServer : IGatewayServer
         // Pick up an out-of-process scenario re-binding mid-attach: a
         // host may hold one attach for hours while a separate
         // `mock scenario activate` runs. The refresher re-applies only
-        // when the bound scenario name changed and is no-throw; guard
-        // anyway so a refresh failure never kills the attach.
-        try
-        {
-            await _refresher.RefreshAsync(device, ct);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex, "scenario binding refresh failed; continuing");
-        }
+        // when the bound scenario name changed.
+        await _refresher.RefreshOrWarnAsync(device, _logger, ct);
 
         if (ScpiMessage.IsQuery(text))
         {

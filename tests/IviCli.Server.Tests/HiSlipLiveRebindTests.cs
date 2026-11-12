@@ -106,6 +106,76 @@ public sealed class HiSlipLiveRebindTests
         catch (OperationCanceledException) { }
     }
 
+    /// <summary>
+    /// A device whose backend exists only while a binding names a scenario,
+    /// bound after the gateway started, answers the next link from it.
+    /// </summary>
+    [Fact]
+    public async Task A_binding_made_while_serving_answers_the_next_link()
+    {
+        var port = LoopbackGateway.FreePort();
+        var deviceName = DeviceName.From("dut").ShouldBeOk();
+        var device = new Device(
+            deviceName,
+            VisaResource.Parse("TCPIP0::127.0.0.1::hislip0::INSTR").ShouldBeOk(),
+            Timeout.FromMilliseconds(3000).ShouldBeOk()
+        );
+        var serverName = ServerName.From("hislip-srv").ShouldBeOk();
+        var server = new IviCli.Domain.Servers.Server(
+            serverName,
+            ServerType.HiSlip,
+            IpAddress.From("127.0.0.1").ShouldBeOk(),
+            Port.From(port).ShouldBeOk()
+        );
+        var config = ConfigDocument
+            .Empty.AddDevice(device)
+            .ShouldBeOk()
+            .AddServer(server)
+            .ShouldBeOk()
+            .AddRoute(
+                new Route(serverName, PublicEndpoint.From("hislip0").ShouldBeOk(), deviceName)
+            )
+            .ShouldBeOk();
+
+        var scenarioA = VoltScenario("a", "1.00");
+        var fake = new FakeBackend();
+        var sessions = new FakeSessionStore(SessionState.Empty);
+        var refresher = new SessionScenarioBindingRefresher(
+            fake,
+            new FakeScenarioStore(new[] { scenarioA }),
+            sessions,
+            NullLogger<SessionScenarioBindingRefresher>.Instance
+        );
+
+        var gateway = new HiSlipGatewayServer(
+            new BindingGatedBackendFactory(fake),
+            NullLogger<HiSlipGatewayServer>.Instance,
+            refresher
+        );
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        (port, var serverTask) = LoopbackGateway.Start(
+            server,
+            s => gateway.RunAsync(s, config, cts.Token)
+        );
+        await WaitForListenerAsync(port, cts.Token);
+
+        await sessions.SaveAsync(SessionWith(deviceName, "a"), cts.Token);
+
+        var client = new HiSlipBackend(port);
+        (await client.OpenAsync(device, cts.Token)).ShouldBeOk();
+        (await client.QueryAsync(device, ScpiQuery.From("MEAS:VOLT?").ShouldBeOk(), cts.Token))
+            .ShouldBeOk()
+            .ShouldBe("1.00");
+
+        await client.CloseAsync(device, cts.Token);
+        await cts.CancelAsync();
+        try
+        {
+            await serverTask;
+        }
+        catch (OperationCanceledException) { }
+    }
+
     private static MockScenario VoltScenario(string name, string volts) =>
         MockScenario.SingleScene(
             ScenarioName.From(name).ShouldBeOk(),

@@ -91,6 +91,65 @@ public sealed class SocketLiveRebindTests
         catch (OperationCanceledException) { }
     }
 
+    /// <summary>
+    /// A device whose backend exists only while a binding names a scenario,
+    /// bound after the gateway started, answers the next connection from it.
+    /// </summary>
+    [Fact]
+    public async Task A_binding_made_while_serving_answers_the_next_connection()
+    {
+        var deviceName = DeviceName.From("dut").ShouldBeOk();
+        var device = new Device(
+            deviceName,
+            VisaResource.Parse("TCPIP0::127.0.0.1::5025::SOCKET").ShouldBeOk(),
+            Timeout.FromMilliseconds(3000).ShouldBeOk()
+        );
+        var scenarioA = VoltScenario("a", "1.00");
+        var fake = new FakeBackend();
+        var sessions = new FakeSessionStore(SessionState.Empty);
+        var refresher = new SessionScenarioBindingRefresher(
+            fake,
+            new FakeScenarioStore(new[] { scenarioA }),
+            sessions,
+            NullLogger<SessionScenarioBindingRefresher>.Instance
+        );
+
+        var (server, config, port) = BuildHarness(device);
+        var gateway = new SocketGatewayServer(
+            new BindingGatedBackendFactory(fake),
+            NullLogger<SocketGatewayServer>.Instance,
+            refresher
+        );
+
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        (port, var serverTask) = LoopbackGateway.Start(
+            server,
+            s => gateway.RunAsync(s, config, cts.Token)
+        );
+        await WaitForListenerAsync(port, cts.Token);
+
+        await sessions.SaveAsync(SessionWith(deviceName, "a"), cts.Token);
+
+        using var tcp = new TcpClient();
+        await tcp.ConnectAsync(IPAddress.Loopback, port, cts.Token);
+        using var stream = tcp.GetStream();
+        using var reader = new StreamReader(stream, Encoding.UTF8, leaveOpen: true);
+        using var writer = new StreamWriter(stream, new UTF8Encoding(false), leaveOpen: true)
+        {
+            NewLine = "\n",
+            AutoFlush = true,
+        };
+        await writer.WriteLineAsync("MEAS:VOLT?");
+        (await reader.ReadLineAsync(cts.Token)).ShouldBe("1.00");
+
+        await cts.CancelAsync();
+        try
+        {
+            await serverTask;
+        }
+        catch (OperationCanceledException) { }
+    }
+
     private static MockScenario VoltScenario(string name, string volts) =>
         MockScenario.SingleScene(
             ScenarioName.From(name).ShouldBeOk(),
