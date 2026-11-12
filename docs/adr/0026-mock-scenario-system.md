@@ -462,7 +462,10 @@ re-syncs a device's binding from the persisted session into the running
 scenario-aware backend. Each LAN gateway — SOCKET, HiSLIP, and VXI-11 —
 invokes it before dispatching an incoming SCPI operation (per request line
 for SOCKET, per message for HiSLIP, per completed write for VXI-11), so a
-new binding is picked up on the next operation without reconnecting.
+new binding is picked up on the next operation without reconnecting. Each
+gateway, USB/IP included, also invokes it once per connection before it
+chooses the connection's backend, so the backend chosen follows a binding
+made after the gateway started (ADR 0056 §5).
 
 Re-application is **scoped to a changed scenario name**: an unchanged
 binding is left untouched so in-flight scene / transition state (e.g. a

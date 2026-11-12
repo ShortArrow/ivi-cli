@@ -256,6 +256,7 @@ public sealed class HiSlipGatewayServer : IGatewayServer
         );
         await stream.WriteAsync(respHeader, ct);
 
+        await _refresher.RefreshOrWarnAsync(device, _logger, ct);
         var backendResult = _backendFactory.CreateFor(device);
         if (backendResult is not Result<IIviBackend, BackendError>.Ok { Value: var backend })
         {

@@ -167,6 +167,7 @@ public sealed class SocketGatewayServer : IGatewayServer
                 return;
             }
 
+            await _refresher.RefreshOrWarnAsync(device, _logger, ct);
             if (Failed(_backendFactory.CreateFor(device), out var backend))
             {
                 return;

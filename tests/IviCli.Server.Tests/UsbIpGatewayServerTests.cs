@@ -1,9 +1,11 @@
 using System.Collections.Immutable;
 using System.Text;
 using IviCli.Domain;
+using IviCli.Domain.Devices;
 using IviCli.Domain.Mock;
 using IviCli.Domain.Protocols;
 using IviCli.Domain.Servers;
+using IviCli.Domain.Session;
 using IviCli.Server.UsbIp;
 using IviCli.TestKit;
 using Microsoft.Extensions.Logging;
@@ -507,6 +509,50 @@ public sealed class UsbIpGatewayServerTests
         );
         descriptor.Reply.Status.ShouldBe(0);
         return descriptor;
+    }
+
+    /// <summary>
+    /// A device whose backend exists only while a binding names a scenario,
+    /// bound after the gateway started, answers the next attach from it.
+    /// </summary>
+    [Fact]
+    public async Task A_binding_made_while_serving_answers_the_next_attach()
+    {
+        var sessions = new FakeSessionStore(SessionState.Empty);
+        var scenario = MockScenario.SingleScene(
+            ScenarioName.From("a").ShouldBeOk(),
+            idnDefault: null,
+            rules: [new MockRule("MEAS:VOLT?", new RuleAction.Respond("1.00"))]
+        );
+        await using var bench = await UsbIpBench.StartBindingGatedAsync(sessions, scenario);
+
+        await sessions.SaveAsync(
+            SessionState.Empty.BindScenario(
+                DeviceName.From(UsbIpBench.DefaultDeviceName).ShouldBeOk(),
+                scenario.Name
+            ),
+            bench.Token
+        );
+        var client = await bench.ImportAsync();
+        await WriteAsync(client, "MEAS:VOLT?", bench.Token);
+
+        var requested = await client.BulkOutAsync(
+            UsbTmcCodec.WriteRequestDevDepMsgIn(
+                new UsbTmcRequestDevDepMsgIn(
+                    BTag: 2,
+                    TransferSize: 1024,
+                    TermCharEnabled: false,
+                    TermChar: 0
+                )
+            ),
+            bench.Token
+        );
+        requested.Reply.Status.ShouldBe(0);
+        var answer = await client.BulkInAsync(bufferLength: 1024, bench.Token);
+        answer.Reply.Status.ShouldBe(0);
+        Encoding
+            .ASCII.GetString(UsbTmcCodec.ReadDevDepMsgIn(answer.Payload).Payload)
+            .ShouldBe("1.00\n");
     }
 
     private static async Task WriteAsync(UsbIpTestClient client, string scpi, CancellationToken ct)

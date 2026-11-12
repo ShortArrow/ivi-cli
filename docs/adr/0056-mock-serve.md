@@ -140,20 +140,20 @@ holds routes the mock did not add and must not remove. A route added later with
 
 ### 5. A gateway reads the bindings before it chooses a backend
 
-Today a process reads the session's bindings at startup, and a gateway refreshes
-them only after a connection's backend is chosen and opened. An unbound
-`MOCK::INSTR` device fails when its backend is opened, so the refresh would never
-run, and a later `mock scenario activate` would go unseen until the server
-restarts. Each gateway therefore refreshes the bindings before it chooses a
-connection's backend. This also puts the binding `mock serve` writes in effect
-for the first connection.
+A process reads the session's bindings at startup, and a gateway refreshes them
+on each request of an open connection (ADR 0026 §17). An unbound `MOCK::INSTR`
+device fails when its backend is opened, so a refresh made only on requests would
+never run for it, and a later `mock scenario activate` would go unseen until the
+server restarts. Each gateway therefore also refreshes the bindings before it
+chooses a connection's backend. This also puts the binding `mock serve` writes in
+effect for the first connection.
 
-The change reaches every device. An `activate` or `deactivate` made while a
-server runs takes effect from the next connection, where today it takes effect
-one connection later. A device with a real address that is bound after the server
-started therefore answers its next connection from the mock, as ADR 0026 §17
-intends a serving gateway to follow the session. Bindings are session state, not
-`config.toml`, so this is outside the contract of ADR 0047 §2.
+The refresh reaches every device. An `activate` or `deactivate` made while a
+server runs takes effect from the next connection. A device with a real address
+that is bound after the server started therefore answers its next connection
+from the mock, as ADR 0026 §17 intends a serving gateway to follow the session.
+Bindings are session state, not `config.toml`, so this is outside the contract
+of ADR 0047 §2.
 
 ### 6. A running server is refused
 

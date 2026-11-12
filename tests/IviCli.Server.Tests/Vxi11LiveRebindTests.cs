@@ -80,6 +80,53 @@ public sealed class Vxi11LiveRebindTests
         catch (OperationCanceledException) { }
     }
 
+    /// <summary>
+    /// A device whose backend exists only while a binding names a scenario,
+    /// bound after the gateway started, answers the next link from it.
+    /// </summary>
+    [Fact]
+    public async Task A_binding_made_while_serving_answers_the_next_link()
+    {
+        var deviceName = DeviceName.From("dut").ShouldBeOk();
+        var scenarioA = VoltScenario("a", "1.00");
+        var fake = new FakeBackend();
+        var sessions = new FakeSessionStore(SessionState.Empty);
+        var refresher = new SessionScenarioBindingRefresher(
+            fake,
+            new FakeScenarioStore(new[] { scenarioA }),
+            sessions,
+            NullLogger<SessionScenarioBindingRefresher>.Instance
+        );
+
+        var (server, config, port) = BuildHarness();
+        var gateway = new Vxi11GatewayServer(
+            new BindingGatedBackendFactory(fake),
+            NullLogger<Vxi11GatewayServer>.Instance,
+            refresher
+        );
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        (port, var serverTask) = LoopbackGateway.Start(
+            server,
+            s => gateway.RunAsync(s, config, cts.Token)
+        );
+        await WaitForListenerAsync(port, cts.Token);
+
+        await sessions.SaveAsync(SessionWith(deviceName, "a"), cts.Token);
+
+        using var tcp = new TcpClient();
+        await tcp.ConnectAsync(IPAddress.Loopback, port, cts.Token);
+        using var stream = tcp.GetStream();
+        var lid = await CreateLinkAsync(stream, cts.Token);
+        (await QueryAsync(stream, lid, xid: 200, "MEAS:VOLT?", cts.Token)).ShouldBe("1.00");
+
+        await cts.CancelAsync();
+        try
+        {
+            await serverTask;
+        }
+        catch (OperationCanceledException) { }
+    }
+
     private static async Task<int> CreateLinkAsync(NetworkStream stream, CancellationToken ct)
     {
         var createCall = BuildRpcCall(

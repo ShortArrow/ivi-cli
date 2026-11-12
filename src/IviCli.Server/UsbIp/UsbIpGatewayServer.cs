@@ -436,6 +436,7 @@ public sealed class UsbIpGatewayServer : IGatewayServer
     private async Task ServeAsync(NetworkStream stream, ExportedDevice export, CancellationToken ct)
     {
         var device = export.Device;
+        await _refresher.RefreshOrWarnAsync(device, _logger, ct);
         if (Failed(_backendFactory.CreateFor(device), out var backend))
         {
             return;
