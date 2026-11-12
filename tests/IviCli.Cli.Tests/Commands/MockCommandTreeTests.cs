@@ -24,6 +24,7 @@ public sealed class MockCommandTreeTests
     [InlineData("rule")]
     [InlineData("received")]
     [InlineData("serve")]
+    [InlineData("unserve")]
     public void Every_noun_a_mock_is_made_of_shows_under_mock(string name)
     {
         // Given / When
