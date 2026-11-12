@@ -168,6 +168,51 @@ public sealed class DefaultBackendFactoryTests
         picked.Tag.ShouldBe("fallback");
     }
 
+    [Fact]
+    public void A_mock_resource_with_a_bound_scenario_reaches_the_mock()
+    {
+        var factory = new DefaultBackendFactory(
+            new ScenarioAwareMarkerBackend("fallback", hasActiveScenario: true),
+            localBackend: new MarkerBackend("local"),
+            vxi11Backend: new MarkerBackend("vxi11")
+        );
+
+        var picked = (ScenarioAwareMarkerBackend)
+            factory.CreateFor(BuildDevice("MOCK::INSTR")).ShouldBeOk();
+
+        picked.Tag.ShouldBe("fallback");
+    }
+
+    /// <summary>
+    /// An unbound <c>MOCK::INSTR</c> device has nothing to dial, so it fails
+    /// with its own error, even where the fallback is the Fake backend that
+    /// a transport with no registration reaches (ADR 0056 §2).
+    /// </summary>
+    [Fact]
+    public void A_mock_resource_with_no_bound_scenario_fails_as_unbound()
+    {
+        var factory = new DefaultBackendFactory(
+            new ScenarioAwareMarkerBackend("fallback", hasActiveScenario: false)
+        );
+
+        factory
+            .CreateFor(BuildDevice("MOCK::INSTR"))
+            .ShouldBeError()
+            .ShouldBeOfType<NoScenarioBound>()
+            .DeviceName.Value.ShouldBe("d");
+    }
+
+    [Fact]
+    public void A_mock_resource_fails_as_unbound_when_the_fallback_holds_no_scenarios()
+    {
+        var factory = new DefaultBackendFactory(new MarkerBackend("fallback"));
+
+        factory
+            .CreateFor(BuildDevice("MOCK::INSTR"))
+            .ShouldBeError()
+            .ShouldBeOfType<NoScenarioBound>();
+    }
+
     private static Device BuildDevice(string resource) =>
         new(
             DeviceName.From("d").ShouldBeOk(),

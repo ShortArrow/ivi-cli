@@ -14,7 +14,8 @@ namespace IviCli.Domain.Visa;
 /// instrument), <see cref="TcpipSocket"/> (raw-socket SCPI on a
 /// TCP port — see ADR 0018 §3), <see cref="Usb"/>, and
 /// <see cref="Gpib"/>, and the two serial forms <see cref="AsrlBoard"/>
-/// and <see cref="AsrlPort"/> (ADR 0055). Additional transports are added
+/// and <see cref="AsrlPort"/> (ADR 0055), and <see cref="Mock"/>, which has
+/// no transport (ADR 0056 §2). Additional transports are added
 /// as new backend dispatch cases land.
 /// </remarks>
 public abstract partial record VisaResource
@@ -229,6 +230,23 @@ public abstract partial record VisaResource
         public override string ToCanonical() => $"ASRL{Port}::INSTR";
     }
 
+    /// <summary>
+    /// <c>MOCK::INSTR</c>, a resource with no transport. A device with it
+    /// answers from the scenario a binding names, and fails to open while no
+    /// binding does, so it never dials anything (ADR 0056 §2).
+    /// </summary>
+    public sealed record Mock : VisaResource
+    {
+        /// <summary>The resource string, which carries nothing to mask.</summary>
+        public const string Canonical = "MOCK::INSTR";
+
+        /// <inheritdoc/>
+        public override string ToLogString() => Canonical;
+
+        /// <inheritdoc/>
+        public override string ToCanonical() => Canonical;
+    }
+
     /// <summary>Inclusive upper bound for GPIB primary and secondary addresses.</summary>
     public const int MaxGpibAddress = 30;
 
@@ -294,6 +312,11 @@ public abstract partial record VisaResource
         if (segments[0].StartsWith("ASRL", StringComparison.Ordinal))
         {
             return ParseAsrl(raw, segments);
+        }
+
+        if (raw == Mock.Canonical)
+        {
+            return Result.Success<VisaResource, VisaResourceError>(new Mock());
         }
 
         return Fail(raw);

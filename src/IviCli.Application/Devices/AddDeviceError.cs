@@ -52,6 +52,19 @@ public sealed record AddDeviceInvalidResource(string Raw) : AddDeviceError
     public override IReadOnlyList<object?> LogArgs => new object?[] { Raw };
 }
 
+/// <summary>
+/// The resource is <c>MOCK::INSTR</c>, which the mock commands register and
+/// <c>visa add</c> refuses (ADR 0056 §3).
+/// </summary>
+public sealed record AddDeviceMockResource : AddDeviceError
+{
+    /// <inheritdoc/>
+    public override LogSeverity Severity => LogSeverity.Warning;
+
+    /// <inheritdoc/>
+    public override string Message => "MOCK::INSTR cannot be added as a device";
+}
+
 /// <summary>The candidate timeout failed validation (negative or above the maximum).</summary>
 /// <param name="RawMilliseconds">The raw millisecond value as supplied.</param>
 public sealed record AddDeviceInvalidTimeout(int RawMilliseconds) : AddDeviceError

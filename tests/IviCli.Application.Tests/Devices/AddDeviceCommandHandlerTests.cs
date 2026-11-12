@@ -81,6 +81,27 @@ public class AddDeviceCommandHandlerTests
         err.RawMilliseconds.ShouldBe(-1);
     }
 
+    /// <summary>
+    /// A <c>MOCK::INSTR</c> device is only ever one the mock commands made,
+    /// so <c>visa add</c> and <c>visa scan --add</c> refuse the resource and
+    /// write nothing (ADR 0056 §3).
+    /// </summary>
+    [Fact]
+    public async Task Handle_WithMockResource_ReturnsAddDeviceMockResourceAndSavesNothing()
+    {
+        // Given
+        var store = new FakeConfigStore();
+        var handler = new AddDeviceCommandHandler(store);
+        var command = new AddDeviceCommand(ValidName, "MOCK::INSTR", ValidTimeout);
+
+        // When
+        var result = await handler.HandleAsync(command, CancellationToken.None);
+
+        // Then
+        result.ShouldBeError().ShouldBeOfType<AddDeviceMockResource>();
+        (await store.LoadAsync(CancellationToken.None)).ShouldBeOk().Devices.ShouldBeEmpty();
+    }
+
     [Fact]
     public async Task Handle_WithDuplicateName_ReturnsAddDeviceNameTaken()
     {

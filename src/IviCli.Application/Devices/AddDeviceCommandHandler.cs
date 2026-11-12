@@ -73,6 +73,11 @@ public sealed class AddDeviceCommandHandler
             return Fail(new AddDeviceInvalidResource(command.Resource));
         }
 
+        if (resource is VisaResource.Mock)
+        {
+            return Fail(new AddDeviceMockResource());
+        }
+
         if (
             Timeout.FromMilliseconds(command.TimeoutMilliseconds)
             is not Result<Timeout, TimeoutError>.Ok { Value: var timeout }
