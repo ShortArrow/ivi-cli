@@ -54,10 +54,9 @@
     <PackageVersion Include="Shouldly" Version="4.3.0" />
   </ItemGroup>
 
-  <ItemGroup Label="Test stack — coverage / hang dump / snapshot / arch">
+  <ItemGroup Label="Test stack — coverage / hang dump / arch">
     <PackageVersion Include="coverlet.mtp" Version="10.1.0" />
     <PackageVersion Include="Microsoft.Testing.Extensions.HangDump" Version="2.5.2" />
-    <PackageVersion Include="Verify.XunitV3" Version="31.12.5" />
     <PackageVersion Include="NetArchTest.Rules" Version="1.3.2" />
   </ItemGroup>
 

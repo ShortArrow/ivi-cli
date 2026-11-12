@@ -9,9 +9,8 @@ namespace IviCli.Cli.Commands;
 
 /// <summary>
 /// Pure formatters for <see cref="DeviceListing"/> output. Extracted from
-/// <see cref="VisaListCommand"/> so the contract can be locked down with
-/// snapshot tests (Verify, per ADR 0009 §7) without spawning the CLI as a
-/// subprocess.
+/// <see cref="VisaListCommand"/> so the contract can be locked down by
+/// tests without spawning the CLI as a subprocess.
 /// </summary>
 public static class DeviceListingFormatter
 {
@@ -55,7 +54,7 @@ public static class DeviceListingFormatter
     /// <summary>
     /// Renders the listing as the JSON contract emitted on stdout when
     /// <c>--json</c> is passed. The shape is intentionally compact and
-    /// stable; the snapshot test in <c>IviCli.Cli.Tests</c> locks it. A
+    /// stable; the tests in <c>IviCli.Cli.Tests</c> lock it. A
     /// serial device adds <c>serial</c>, the settings its line opens with,
     /// and a device adds each terminator it sets, all named as in
     /// <c>config.toml</c>. Only quotes, backslashes and control characters

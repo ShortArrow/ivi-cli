@@ -10,8 +10,10 @@ using Shouldly;
 namespace IviCli.Cli.Tests.Commands;
 
 /// <summary>
-/// <c>visa list</c> shows a serial device's line and every device's
-/// terminators, named as in <c>config.toml</c> (ADR 0055 §10).
+/// Locks the <c>visa list</c> stdout contract: the JSON shape PRD §9
+/// declares for AI and CI consumers, and the human form, so that a change to
+/// either is reviewed deliberately. A serial device's line and every
+/// device's terminators are named as in <c>config.toml</c> (ADR 0055 §10).
 /// </summary>
 public sealed class DeviceListingFormatterTests
 {
@@ -59,6 +61,60 @@ public sealed class DeviceListingFormatterTests
             ],
             DefaultDevice: DeviceName.From("dmm").ShouldBeOk()
         );
+
+    private static DeviceListing EmptyListing() => new([], DefaultDevice: null);
+
+    private static DeviceListing TwoDeviceListing() =>
+        new(
+            [
+                Dev("psu1", "TCPIP0::192.168.0.10::inst0::INSTR", 3000),
+                Dev("scope1", "USB0::0x0699::0x0408::C012345::INSTR", 5000),
+            ],
+            DefaultDevice: DeviceName.From("psu1").ShouldBeOk()
+        );
+
+    [Fact]
+    public void FormatJson_writes_an_empty_array_and_a_null_default_when_nothing_is_configured()
+    {
+        DeviceListingFormatter
+            .FormatJson(EmptyListing())
+            .ShouldBe(
+                """
+                {"devices":[],"default":null}
+
+                """
+            );
+    }
+
+    [Fact]
+    public void FormatJson_writes_each_device_and_the_default()
+    {
+        DeviceListingFormatter
+            .FormatJson(TwoDeviceListing())
+            .ShouldBe(
+                """
+                {"devices":[{"name":"psu1","resource":"TCPIP0::192.168.0.10::inst0::INSTR","timeout_ms":3000},{"name":"scope1","resource":"USB0::0x0699::0x0408::C012345::INSTR","timeout_ms":5000}],"default":"psu1"}
+
+                """
+            );
+    }
+
+    [Fact]
+    public void FormatHuman_says_so_when_nothing_is_configured()
+    {
+        DeviceListingFormatter.FormatHuman(EmptyListing()).ShouldBe("(no devices configured)\n");
+    }
+
+    [Fact]
+    public void FormatHuman_marks_the_default_and_writes_one_line_per_device()
+    {
+        DeviceListingFormatter
+            .FormatHuman(TwoDeviceListing())
+            .ShouldBe(
+                "* psu1\tTCPIP0::192.168.0.10::inst0::INSTR\t3000ms\n"
+                    + "  scope1\tUSB0::0x0699::0x0408::C012345::INSTR\t5000ms\n"
+            );
+    }
 
     [Fact]
     public void FormatJson_adds_the_serial_line_and_the_terminators_that_are_set()

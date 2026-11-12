@@ -23,7 +23,6 @@ updates:
           - 'NSubstitute*'
           - 'Shouldly*'
           - 'coverlet*'
-          - 'Verify*'
           - 'NetArchTest*'
           - 'Microsoft.Testing.*'
       microsoft-extensions:
@@ -35,11 +34,6 @@ updates:
       opentelemetry:
         patterns:
           - 'OpenTelemetry*'
-    # Verify 33 and later fail the build with SponsorCheck SC021 until a
-    # sponsorship, exemption or ignored license is declared in MSBuild.
-    ignore:
-      - dependency-name: 'Verify.XunitV3'
-        versions: ['>= 33']
     labels:
       - dependencies
       - nuget
