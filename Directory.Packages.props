@@ -61,9 +61,9 @@
   </ItemGroup>
 
   <ItemGroup Label="Test stack — IO abstractions">
-    <PackageVersion Include="TestableIO.System.IO.Abstractions" Version="22.3.0" />
-    <PackageVersion Include="TestableIO.System.IO.Abstractions.TestingHelpers" Version="22.3.0" />
-    <PackageVersion Include="TestableIO.System.IO.Abstractions.Wrappers" Version="22.3.0" />
+    <PackageVersion Include="TestableIO.System.IO.Abstractions" Version="23.0.0" />
+    <PackageVersion Include="TestableIO.System.IO.Abstractions.TestingHelpers" Version="23.0.0" />
+    <PackageVersion Include="TestableIO.System.IO.Abstractions.Wrappers" Version="23.0.0" />
   </ItemGroup>
 
   <ItemGroup Label="Logging abstractions for tests">
