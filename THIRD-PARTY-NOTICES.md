@@ -128,6 +128,7 @@ none of them is redistributed modified.
 - `Microsoft.OpenApi`
 - `NETStandard.Library`
 - `System.CommandLine`
+- `System.Diagnostics.DiagnosticSource`
 - `System.Diagnostics.EventLog`
 - `System.IO.Ports`
 - `Spectre.Console` — Copyright (c) Patrik Svensson, Phil Scott, Nils Andresen,
