@@ -397,7 +397,63 @@ route を削除する。
 
 ---
 
-## 6.4 Mock Operations
+## 6.4 Diagnostics
+
+### doctor
+
+```bash
+ivicli doctor
+```
+
+以下を診断：
+
+* IVI Shared Components
+* VISA DLL
+* VISA implementation
+* PATH
+* Backend selection
+
+---
+
+### visa traffic capture
+
+`IVICLI_CAPTURE=<path>`（絶対パス、または rolling-log ディレクトリからの相対パス）を設定すると、CLI 全体の backend 操作が UTF-8 NDJSON ファイルにストリームされる。1 行 1 イベントで、`timestamp` / `device` / `op` (`Open` / `Close` / `Write` / `Query` / `Read`) / `data` / `response` / `ok` / `latencyMs` / `error` を含む。環境変数未設定なら null sink（ゼロオーバヘッド）。sink 失敗は飲み込まれ、verb は audit sink の失敗で落ちない。
+
+---
+
+## 6.5 Driver / IVI Features
+
+`visa` namespace は VISA transport / SCPI operation を担当する。
+
+メーカー固有 IVI driver / logical name 操作は
+`driver` / `logical` namespace に分離する。
+
+---
+
+### driver list
+
+```bash
+ivicli driver list
+```
+
+インストール済み IVI driver を列挙する。
+
+---
+
+### logical list
+
+```bash
+ivicli logical list
+```
+
+IVI logical name を列挙する。
+
+---
+
+## 6.6 Mock Operations
+
+`mock` 名前空間はシナリオを作り（`mock scenario`、`mock scene`、`mock rule`）、
+それを提供する。この節は提供を扱う。
 
 ### mock serve
 
@@ -435,59 +491,6 @@ ivicli mock unserve mock-socket-5025
 シナリオは残す。デバイスのリソースが `MOCK::INSTR` でない、別のサーバーがその
 デバイスへのルートを持つ、サーバーが `mock serve` の追加しないルートを持つ、
 サーバーが動いている、のいずれかに当たるときは、何も削除せずに失敗する。
-
----
-
-## 6.5 Diagnostics
-
-### doctor
-
-```bash
-ivicli doctor
-```
-
-以下を診断：
-
-* IVI Shared Components
-* VISA DLL
-* VISA implementation
-* PATH
-* Backend selection
-
----
-
-### visa traffic capture
-
-`IVICLI_CAPTURE=<path>`（絶対パス、または rolling-log ディレクトリからの相対パス）を設定すると、CLI 全体の backend 操作が UTF-8 NDJSON ファイルにストリームされる。1 行 1 イベントで、`timestamp` / `device` / `op` (`Open` / `Close` / `Write` / `Query` / `Read`) / `data` / `response` / `ok` / `latencyMs` / `error` を含む。環境変数未設定なら null sink（ゼロオーバヘッド）。sink 失敗は飲み込まれ、verb は audit sink の失敗で落ちない。
-
----
-
-## 6.6 Driver / IVI Features
-
-`visa` namespace は VISA transport / SCPI operation を担当する。
-
-メーカー固有 IVI driver / logical name 操作は
-`driver` / `logical` namespace に分離する。
-
----
-
-### driver list
-
-```bash
-ivicli driver list
-```
-
-インストール済み IVI driver を列挙する。
-
----
-
-### logical list
-
-```bash
-ivicli logical list
-```
-
-IVI logical name を列挙する。
 
 ---
 

@@ -55,7 +55,7 @@ flowchart LR
     client["your app<br/>(VISA / socket / USB host)"] -->|"endpoint"| server["ivicli server<br/>route: endpoint → device"]
     server --> device["device alias"]
     device -->|"active scenario"| mock["in-process mock<br/>(scenes + rules)"]
-    device -->|"no scenario"| real["the device's VISA resource"]
+    device -->|"no scenario"| real["the device's VISA resource<br/>(MOCK::INSTR: the open fails)"]
 ```
 
 For one scenario at one address, `mock serve` does it all: it registers the
@@ -292,8 +292,8 @@ ivicli mock serve my-dmm --type hislip --alias dut
 `--type` is `socket`, `hislip`, `vxi11` or `usbip`. `--port` defaults to
 5025, 4880, 1024 and 3240 in that order, and `--bind` to `127.0.0.1`. The
 device and the server both take the name `--alias`; without it the name is
-`mock-<type>-<port>`, such as `mock-hislip-4880`. The rest of this guide
-uses `dut`, the name in the example.
+`mock-<type>-<port>`, such as `mock-hislip-4880`. The sections after
+Option D use `dut`, the name in the example.
 
 The second line is the resource a client connects to:
 

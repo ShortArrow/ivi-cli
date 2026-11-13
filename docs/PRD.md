@@ -394,7 +394,62 @@ Removes a route.
 
 ---
 
-## 6.4 Mock Operations
+## 6.4 Diagnostics
+
+### doctor
+
+```bash
+ivicli doctor
+```
+
+Diagnoses the following:
+
+* IVI Shared Components
+* VISA DLL
+* VISA implementation
+* PATH
+* Backend selection
+
+---
+
+### visa traffic capture
+
+Set `IVICLI_CAPTURE=<path>` (absolute, or relative to the rolling-log directory) and every backend operation across the CLI streams to a UTF-8 NDJSON file: one event per line carrying `timestamp` / `device` / `op` (`Open` / `Close` / `Write` / `Query` / `Read`) / `data` / `response` / `ok` / `latencyMs` / `error`. Activation is opt-in (no env var → null sink, zero overhead). Sink failures are swallowed so the operator's verbs never break because the audit sink does.
+
+---
+
+## 6.5 Driver / IVI Features
+
+The `visa` namespace handles VISA transport / SCPI operation.
+
+Vendor-specific IVI driver and logical-name operations are split into the `driver` and `logical` namespaces.
+
+---
+
+### driver list
+
+```bash
+ivicli driver list
+```
+
+Lists installed IVI drivers.
+
+---
+
+### logical list
+
+```bash
+ivicli logical list
+```
+
+Lists IVI logical names.
+
+---
+
+## 6.6 Mock Operations
+
+The `mock` namespace authors scenarios (`mock scenario`, `mock scene`,
+`mock rule`) and serves them; this section covers serving.
 
 ### mock serve
 
@@ -432,58 +487,6 @@ Removes the device, its binding, and the server with that name with its
 route. The scenario is kept. It removes nothing and fails when the device's
 resource is not `MOCK::INSTR`, another server routes to the device, the
 server has a route `mock serve` does not add, or the server is running.
-
----
-
-## 6.5 Diagnostics
-
-### doctor
-
-```bash
-ivicli doctor
-```
-
-Diagnoses the following:
-
-* IVI Shared Components
-* VISA DLL
-* VISA implementation
-* PATH
-* Backend selection
-
----
-
-### visa traffic capture
-
-Set `IVICLI_CAPTURE=<path>` (absolute, or relative to the rolling-log directory) and every backend operation across the CLI streams to a UTF-8 NDJSON file: one event per line carrying `timestamp` / `device` / `op` (`Open` / `Close` / `Write` / `Query` / `Read`) / `data` / `response` / `ok` / `latencyMs` / `error`. Activation is opt-in (no env var → null sink, zero overhead). Sink failures are swallowed so the operator's verbs never break because the audit sink does.
-
----
-
-## 6.6 Driver / IVI Features
-
-The `visa` namespace handles VISA transport / SCPI operation.
-
-Vendor-specific IVI driver and logical-name operations are split into the `driver` and `logical` namespaces.
-
----
-
-### driver list
-
-```bash
-ivicli driver list
-```
-
-Lists installed IVI drivers.
-
----
-
-### logical list
-
-```bash
-ivicli logical list
-```
-
-Lists IVI logical names.
 
 ---
 
