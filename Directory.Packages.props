@@ -7,9 +7,9 @@
   <ItemGroup Label="Runtime — production">
     <PackageVersion
       Include="Microsoft.Extensions.DependencyInjection.Abstractions"
-      Version="10.0.14"
+      Version="11.0.0"
     />
-    <PackageVersion Include="Microsoft.Extensions.DependencyInjection" Version="10.0.12" />
+    <PackageVersion Include="Microsoft.Extensions.DependencyInjection" Version="11.0.0" />
     <!--
       The IVI Foundation's own VISA.NET shared components (the Ivi.Visa
       abstraction), published by the foundation's verified nuget.org
@@ -21,8 +21,8 @@
     <PackageVersion Include="Microsoft.NET.ILLink.Tasks" Version="10.0.12" />
     <PackageVersion Include="Tomlyn" Version="2.10.1" />
     <PackageVersion Include="System.IO.Ports" Version="10.0.12" />
-    <PackageVersion Include="Microsoft.Extensions.Hosting" Version="10.0.12" />
-    <PackageVersion Include="Microsoft.Extensions.Logging" Version="10.0.12" />
+    <PackageVersion Include="Microsoft.Extensions.Hosting" Version="11.0.0" />
+    <PackageVersion Include="Microsoft.Extensions.Logging" Version="11.0.0" />
     <PackageVersion Include="System.CommandLine" Version="2.0.12" />
     <PackageVersion Include="Serilog" Version="4.4.0" />
     <PackageVersion Include="Serilog.Extensions.Hosting" Version="10.0.0" />
@@ -67,10 +67,10 @@
   </ItemGroup>
 
   <ItemGroup Label="Logging abstractions for tests">
-    <PackageVersion Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.14" />
+    <PackageVersion Include="Microsoft.Extensions.Logging.Abstractions" Version="11.0.0" />
   </ItemGroup>
 
   <ItemGroup Label="Time abstractions for tests">
-    <PackageVersion Include="Microsoft.Extensions.TimeProvider.Testing" Version="10.11.0" />
+    <PackageVersion Include="Microsoft.Extensions.TimeProvider.Testing" Version="11.0.0" />
   </ItemGroup>
 </Project>
