@@ -12,6 +12,9 @@
 #   .\setup.ps1
 #   .\setup.ps1 -Proto socket -Port 5025
 #   .\setup.ps1 -Port 4881
+#
+# The server runs in the foreground until Ctrl+C; `ivicli mock unserve
+# psu-mock` then removes the device and server it registered.
 
 [CmdletBinding()]
 param(
@@ -19,9 +22,7 @@ param(
     [ValidateSet('hislip', 'socket')]
     [string]$Proto = 'hislip',
     [int]$Port = 4880,
-    [string]$SubAddr = 'hislip0',
-    [string]$Server = "$Proto-psu",
-    [string]$Device = 'psu_mock'
+    [string]$Name = 'psu-mock'
 )
 
 $ErrorActionPreference = 'Continue'
@@ -38,7 +39,7 @@ function Invoke-IvicliStep {
     }
 }
 
-Write-Host "==> scenario=$Scenario  proto=$Proto  port=$Port  device=$Device  server=$Server" -ForegroundColor Yellow
+Write-Host "==> scenario=$Scenario  proto=$Proto  port=$Port  name=$Name" -ForegroundColor Yellow
 
 # 1) Scenario + scenes — FSM (off/on).
 # --initial off makes the FSM start in the `off` scene, so the
@@ -100,40 +101,16 @@ foreach ($r in $onRules) {
     Invoke-IvicliStep ("rule [on] " + $r.Match) $a
 }
 
-# 2) Logical device alias (DeviceName regex = ^[a-z][a-z0-9_-]*$)
-Invoke-IvicliStep "device alias '$Device'" @('visa', 'add', $Device, 'TCPIP0::127.0.0.1::INSTR')
-
-# 3) Bind the scenario to the device; the alias answers from the scenario from here on.
-Invoke-IvicliStep 'activate scenario' @('mock', 'scenario', 'activate', $Scenario, '--for', $Device)
-
-# 4) Gateway server
-Invoke-IvicliStep "server '$Server'" @('server', 'add', $Server, '--type', $Proto, '--port', "$Port")
-
-# 5) Route
 if ($Proto -eq 'hislip') {
-    Invoke-IvicliStep "route $Server/$SubAddr -> $Device" @('server', 'route', 'add', $Server, $SubAddr, $Device)
+    $resource = "TCPIP::127.0.0.1::hislip0,$Port::INSTR"
+    $lanDeviceName = if ($Port -eq 4880) { 'hislip0' } else { "hislip0,$Port" }
 } else {
-    Invoke-IvicliStep "route $Server/$Port -> $Device" @('server', 'route', 'add', $Server, "$Port", $Device)
+    $resource = "TCPIP::127.0.0.1::$Port::SOCKET"
 }
-
-# 6) Start. Since v0.1.3, the gateway honours the active scenario at
-# backend-dispatch time, so IVICLI_MOCK_ONLY=1 is not required.
-Invoke-IvicliStep "start $Server" @('server', 'start', $Server)
 
 Write-Host ''
-Write-Host '==> mock PSU is live (state: off).' -ForegroundColor Green
-if ($Proto -eq 'hislip') {
-    Write-Host "    Resource: TCPIP::localhost::$SubAddr::INSTR  (HiSLIP, port $Port)" -ForegroundColor Green
-} else {
-    Write-Host "    Resource: TCPIP::localhost::$Port::SOCKET    (raw socket)" -ForegroundColor Green
-}
-Write-Host ''
-Write-Host 'Smoke test:'
-if ($Proto -eq 'hislip') {
-    Write-Host "    ivicli visa add tester 'TCPIP::localhost::$SubAddr::INSTR'"
-} else {
-    Write-Host "    ivicli visa add tester 'TCPIP::localhost::$Port::SOCKET'"
-}
+Write-Host 'Smoke test, from another terminal once the server listens:'
+Write-Host "    ivicli visa add tester '$resource'"
 Write-Host "    ivicli visa query tester 'OUTP?'    # -> 0"
 Write-Host "    ivicli visa write tester 'OUTP ON'"
 Write-Host "    ivicli visa query tester 'OUTP?'    # -> 1  (state switched to on)"
@@ -145,8 +122,14 @@ Write-Host 'NI MAX registration (for apps that use NI-VISA, e.g. ImageDataGetter
 Write-Host '  Devices and Interfaces -> Network Devices -> right-click ->'
 Write-Host '  Create New -> "VISA TCP/IP Resource..." -> "Manual Entry of LAN Instrument" ->'
 if ($Proto -eq 'hislip') {
-    Write-Host "  Hostname: 127.0.0.1   LAN Device Name: $SubAddr"
+    Write-Host "  Hostname: 127.0.0.1   LAN Device Name: $lanDeviceName"
 } else {
     Write-Host "  Hostname: 127.0.0.1   (TCP/IP Socket, Port: $Port)"
 }
 Write-Host '  -> Validate -> Finish'
+Write-Host ''
+
+# 2) Serve the scenario: registers the device and the server under $Name
+# and runs the server in the foreground.
+& ivicli mock serve $Scenario --type $Proto --port "$Port" --alias $Name
+exit $LASTEXITCODE

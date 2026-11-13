@@ -10,7 +10,7 @@
 # Typical install:
 #   cp docs/samples/psu/psu-bench.toml \
 #      ~/.config/ivi-cli/scenarios/psu-bench.toml
-#   ivicli mock scenario activate psu-bench
+#   ivicli mock serve psu-bench --type hislip
 #
 # Or, for the mock container:
 #   docker run -v $PWD/docs/samples/psu:/etc/ivi-cli/scenarios \

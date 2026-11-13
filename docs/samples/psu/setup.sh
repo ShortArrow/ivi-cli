@@ -5,13 +5,15 @@
 # the equivalent ready-to-drop TOML is in psu-bench.toml next to
 # this script.
 #
-# Default: HiSLIP gateway on tcp/4880, sub-address `hislip0`.
+# Default: HiSLIP gateway on tcp/4880, sub-address `hislip0`. The
+# server runs in the foreground until Ctrl+C; `ivicli mock unserve
+# psu-mock` then removes the device and server it registered.
 #
 # Requires: ivicli on PATH (dotnet tool install -g ivi-cli >= 0.2.0,
 # or the GitHub Releases self-contained binary on PATH).
 #
 # Usage:
-#   ./setup.sh                          # default: hislip-psu / 4880
+#   ./setup.sh                          # default: hislip / 4880
 #   PROTO=socket PORT=5025 ./setup.sh   # raw socket gateway
 #   PORT=4881 ./setup.sh                # custom hislip port
 #
@@ -22,11 +24,9 @@ set -euo pipefail
 SCENARIO="${SCENARIO:-psu-bench}"
 PROTO="${PROTO:-hislip}"
 PORT="${PORT:-4880}"
-SUBADDR="${SUBADDR:-hislip0}"     # only meaningful for hislip
-SERVER="${SERVER:-${PROTO}-psu}"
-DEVICE="${DEVICE:-psu_mock}"
+NAME="${NAME:-psu-mock}"          # the device and the server `mock serve` registers
 
-echo "==> using scenario=$SCENARIO  proto=$PROTO  port=$PORT  device=$DEVICE  server=$SERVER"
+echo "==> using scenario=$SCENARIO  proto=$PROTO  port=$PORT  name=$NAME"
 
 # 1) Scenario + scenes — define the PSU's FSM (off/on).
 # `--initial off` makes the FSM start in the `off` scene, so the
@@ -61,45 +61,23 @@ ivicli mock rule add "$SCENARIO" --in on --match 'OUTP ON'    --ack             
 ivicli mock rule add "$SCENARIO" --in on --match 'MEAS:VOLT?' --respond '4.998'              || true
 ivicli mock rule add "$SCENARIO" --in on --match 'MEAS:CURR?' --respond '0.823'              || true
 
-# 2) Logical device alias the gateway will route to.
-ivicli visa add "$DEVICE" 'TCPIP0::127.0.0.1::INSTR' || true
-
-# 3) Bind the scenario to the device; the alias answers from the scenario from here on.
-ivicli mock scenario activate "$SCENARIO" --for "$DEVICE"
-
-# 4) Gateway server.
-ivicli server add "$SERVER" --type "$PROTO" --port "$PORT" || true
-
-# 5) Route binding.
 if [ "$PROTO" = "hislip" ]; then
-  ivicli server route add "$SERVER" "$SUBADDR" "$DEVICE" || true
+  RESOURCE="TCPIP::127.0.0.1::hislip0,$PORT::INSTR"
 else
-  # SOCKET has no sub-address; the route endpoint is the port itself.
-  ivicli server route add "$SERVER" "$PORT" "$DEVICE" || true
+  RESOURCE="TCPIP::127.0.0.1::$PORT::SOCKET"
 fi
-
-# 6) Start. Since v0.1.3, the gateway honours the active scenario at
-# backend-dispatch time, so IVICLI_MOCK_ONLY=1 is not required on the
-# host CLI path.
-ivicli server start "$SERVER"
 
 echo
-echo "==> mock PSU is live (state: off)."
-if [ "$PROTO" = "hislip" ]; then
-  echo "    Resource: TCPIP::localhost::$SUBADDR::INSTR  (HiSLIP, port $PORT)"
-else
-  echo "    Resource: TCPIP::localhost::$PORT::SOCKET    (raw socket)"
-fi
-echo
-echo "Try it:"
-if [ "$PROTO" = "hislip" ]; then
-  echo "    ivicli visa add tester 'TCPIP::localhost::$SUBADDR::INSTR'"
-else
-  echo "    ivicli visa add tester 'TCPIP::localhost::$PORT::SOCKET'"
-fi
+echo "Try it from another terminal once the server listens:"
+echo "    ivicli visa add tester '$RESOURCE'"
 echo "    ivicli visa query tester 'OUTP?'    # -> 0"
 echo "    ivicli visa write tester 'OUTP ON'"
 echo "    ivicli visa query tester 'OUTP?'    # -> 1  (state switched to on)"
 echo "    ivicli visa query tester 'MEAS:VOLT?'  # -> 4.998 (was 0.001 when off)"
 echo "    ivicli visa write tester 'OUTP OFF'"
 echo "    ivicli visa query tester 'OUTP?'    # -> 0  (back to off)"
+echo
+
+# 2) Serve the scenario: registers the device and the server under $NAME
+# and runs the server in the foreground.
+exec ivicli mock serve "$SCENARIO" --type "$PROTO" --port "$PORT" --alias "$NAME"

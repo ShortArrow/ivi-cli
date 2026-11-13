@@ -17,7 +17,7 @@ values (off) and the configured setpoint (on).
 | File | Purpose |
 |---|---|
 | `psu-bench.toml` | The scenario itself — drop into a scenarios directory. |
-| `setup.sh` | bash idempotent walker for Linux / macOS / WSL / Git Bash. |
+| `setup.sh` | Builds the scenario from CLI verbs and serves it with `ivicli mock serve`; bash, for Linux / macOS / WSL / Git Bash. Safe to re-run. |
 | `setup.ps1` | PowerShell-native equivalent for Windows. |
 
 ## Quick start — bare CLI
@@ -26,29 +26,45 @@ values (off) and the configured setpoint (on).
 
 ```sh
 ./setup.sh
+```
+
+The script runs the server in the foreground until Ctrl+C. From another
+terminal:
+
+```sh
 ivicli visa add tester TCPIP::localhost::hislip0::INSTR
 ivicli visa query tester "*IDN?"
 # → IVICLI-MOCK,PSU,SN0001,1.0.0
 ```
 
-`setup.sh` accepts `PROTO=socket PORT=5025` (and `PORT=...` /
-`SUBADDR=...`) to route through the raw-SOCKET gateway or a
-different TCP port.
+`setup.sh` accepts `PROTO=socket PORT=5025` to serve over raw SOCKET,
+`PORT=...` for another TCP port, and `NAME=...` for the name of the device
+and server it registers (default `psu-mock`).
 
 ### Windows / PowerShell 7+
 
 ```powershell
 .\setup.ps1
+# from another terminal:
 ivicli visa add tester 'TCPIP::localhost::hislip0::INSTR'
 ivicli visa query tester '*IDN?'
 # → IVICLI-MOCK,PSU,SN0001,1.0.0
 ```
 
 Accepts the same overrides as parameters:
-`.\setup.ps1 -Proto socket -Port 5025`. Tail of the script
-also prints the **NI MAX manual-registration steps** for apps
+`.\setup.ps1 -Proto socket -Port 5025 -Name psu-mock`. Before the server
+starts, the script prints the **NI MAX manual-registration steps** for apps
 that go through NI-VISA / Keysight VISA (e.g. ImageDataGetter)
 and need a static resource entry to pick the mock up.
+
+### Remove it
+
+After Ctrl+C, remove the device and server the script registered. The
+scenario is kept:
+
+```sh
+ivicli mock unserve psu-mock
+```
 
 ## Quick start — mock-VISA container
 
