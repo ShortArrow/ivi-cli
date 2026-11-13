@@ -37,9 +37,8 @@ public sealed class GatewayEmptyMessageTests
             NullLogger<HiSlipGatewayServer>.Instance
         );
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
-        var (port, serverTask) = LoopbackGateway.Start(
-            server,
-            s => gateway.RunAsync(s, config, cts.Token)
+        var (port, serverTask) = LoopbackGateway.Start(server, s =>
+            gateway.RunAsync(s, config, cts.Token)
         );
         await WaitForListenerAsync(port, cts.Token);
 
@@ -70,9 +69,8 @@ public sealed class GatewayEmptyMessageTests
             PortmapUdpPort = LoopbackGateway.FreePort(),
         };
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
-        var (port, serverTask) = LoopbackGateway.Start(
-            server,
-            s => gateway.RunAsync(s, config, cts.Token)
+        var (port, serverTask) = LoopbackGateway.Start(server, s =>
+            gateway.RunAsync(s, config, cts.Token)
         );
         await WaitForListenerAsync(port, cts.Token);
 

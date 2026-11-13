@@ -38,8 +38,7 @@ public sealed class TomlApiTokenStore : IApiTokenStore
                 return Result.Success<ApiTokenDocument, ApiTokenStoreError>(ApiTokenDocument.Empty);
             }
             var text = await _fs.File.ReadAllTextAsync(_path, ct);
-            var model =
-                TomlSerializer.Deserialize<TomlTable>(text, TomlModelContext.Default)
+            var model = TomlSerializer.Deserialize<TomlTable>(text, TomlModelContext.Default)
                 ?? new TomlTable();
             var tokens = ImmutableArray.CreateBuilder<ApiToken>();
             if (model.TryGetValue("token", out var raw) && raw is TomlTableArray array)

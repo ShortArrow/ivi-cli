@@ -56,35 +56,31 @@ public static class IviCliApiBuilder
 
         builder.WebHost.ConfigureKestrel(o =>
         {
-            o.Listen(
-                bind,
-                port,
-                lo =>
+            o.Listen(bind, port, lo =>
+            {
+                lo.Protocols = HttpProtocols.Http1;
+                if (tls is not null)
                 {
-                    lo.Protocols = HttpProtocols.Http1;
-                    if (tls is not null)
+                    // Read through the source per handshake so a hot
+                    // reload (RotatingTlsCertificate, ADR 0039) applies
+                    // to the next connection without a restart.
+                    var source = tlsSource ?? (() => tls);
+                    lo.UseHttps(httpsOptions =>
                     {
-                        // Read through the source per handshake so a hot
-                        // reload (RotatingTlsCertificate, ADR 0039) applies
-                        // to the next connection without a restart.
-                        var source = tlsSource ?? (() => tls);
-                        lo.UseHttps(httpsOptions =>
+                        httpsOptions.ServerCertificateSelector = (_, _) =>
+                            source().ServerCertificate;
+                        if (tls.ClientCaBundle is not null)
                         {
-                            httpsOptions.ServerCertificateSelector = (_, _) =>
-                                source().ServerCertificate;
-                            if (tls.ClientCaBundle is not null)
-                            {
-                                httpsOptions.ClientCertificateMode =
-                                    ClientCertificateMode.RequireCertificate;
-                                httpsOptions.ClientCertificateValidation = (cert, chain, _) =>
-                                    chain is not null
-                                    && source().ClientCaBundle is { } caBundle
-                                    && ValidateClientChain(cert, chain, caBundle);
-                            }
-                        });
-                    }
+                            httpsOptions.ClientCertificateMode =
+                                ClientCertificateMode.RequireCertificate;
+                            httpsOptions.ClientCertificateValidation = (cert, chain, _) =>
+                                chain is not null
+                                && source().ClientCaBundle is { } caBundle
+                                && ValidateClientChain(cert, chain, caBundle);
+                        }
+                    });
                 }
-            );
+            });
             o.AddServerHeader = false;
         });
 
@@ -125,13 +121,11 @@ public static class IviCliApiBuilder
         );
         app.UseApiTokenAuthentication();
         app.MapOpenApi("/openapi/v1.json");
-        app.MapGet(
-            "/healthz",
-            () =>
-                Microsoft.AspNetCore.Http.Results.Json(
-                    new HealthzDto("ok"),
-                    ApiJsonContext.Default.HealthzDto
-                )
+        app.MapGet("/healthz", () =>
+            Microsoft.AspNetCore.Http.Results.Json(
+                new HealthzDto("ok"),
+                ApiJsonContext.Default.HealthzDto
+            )
         );
         app.MapDevices();
         app.MapServers();

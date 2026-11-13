@@ -303,9 +303,8 @@ public sealed class Vxi11GatewayIoTimeoutTests
             };
             var (server, config) = Topology(gatewayDeviceTimeout);
             var stop = CancellationTokenSource.CreateLinkedTokenSource(ct);
-            var (port, run) = LoopbackGateway.Start(
-                server,
-                s => gateway.RunAsync(s, config, stop.Token)
+            var (port, run) = LoopbackGateway.Start(server, s =>
+                gateway.RunAsync(s, config, stop.Token)
             );
             var client = new Vxi11Backend(port);
             var device = new Device(

@@ -114,9 +114,8 @@ public sealed class HiSlipBackendFailureTests
             );
             var gateway = new HiSlipGatewayServer(new FakeBackendFactory(fake), logger);
             var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
-            (port, var run) = LoopbackGateway.Start(
-                server,
-                s => gateway.RunAsync(s, config, cts.Token)
+            (port, var run) = LoopbackGateway.Start(server, s =>
+                gateway.RunAsync(s, config, cts.Token)
             );
             var tcp = await ConnectAsync(port, cts.Token);
             await InitializeAsync(tcp.GetStream(), cts.Token);

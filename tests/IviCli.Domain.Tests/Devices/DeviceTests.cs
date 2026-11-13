@@ -81,10 +81,7 @@ public class DeviceTests
         var original = new Device(Name("psu1"), Resource("TCPIP0::host::inst0::INSTR"), T(3000));
 
         // When
-        var updated = original with
-        {
-            Timeout = T(5000),
-        };
+        var updated = original with { Timeout = T(5000) };
 
         // Then
         original.Timeout.ShouldBe(T(3000));
@@ -110,10 +107,7 @@ public class DeviceTests
         var omitted = new Device(Name("dmm"), Resource("ASRL1::INSTR"), T(3000));
 
         // When
-        var changed = omitted with
-        {
-            Serial = SerialSettings.Default,
-        };
+        var changed = omitted with { Serial = SerialSettings.Default };
 
         // Then
         spelled.Serial.ShouldBeNull();

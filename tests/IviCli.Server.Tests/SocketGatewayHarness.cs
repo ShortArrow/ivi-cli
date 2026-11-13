@@ -75,9 +75,8 @@ internal sealed class SocketGatewayHarness : IAsyncDisposable
         var gateway = new SocketGatewayServer(new FakeBackendFactory(fake), logger);
 
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
-        (port, var serverTask) = LoopbackGateway.Start(
-            config.Servers.Single(),
-            s => gateway.RunAsync(s, config, cts.Token)
+        (port, var serverTask) = LoopbackGateway.Start(config.Servers.Single(), s =>
+            gateway.RunAsync(s, config, cts.Token)
         );
         await WaitForListenerAsync(port, cts.Token);
         await WaitForMessageAsync(logger, "client disconnected", 1, cts.Token);

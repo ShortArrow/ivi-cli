@@ -47,9 +47,8 @@ public sealed class ClientTimeoutTests
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
         var gateway = Gateway(transport);
         var (gatewayServer, config) = Topology(transport);
-        var (port, run) = LoopbackGateway.Start(
-            gatewayServer,
-            s => gateway.RunAsync(s, config, cts.Token)
+        var (port, run) = LoopbackGateway.Start(gatewayServer, s =>
+            gateway.RunAsync(s, config, cts.Token)
         );
         var (client, device) = Client(transport, port);
 
@@ -94,9 +93,8 @@ public sealed class ClientTimeoutTests
             PortmapUdpPort = LoopbackGateway.FreePort(),
         };
         var (gatewayServer, config) = Topology(ServerType.Vxi11);
-        var (port, run) = LoopbackGateway.Start(
-            gatewayServer,
-            s => gateway.RunAsync(s, config, cts.Token)
+        var (port, run) = LoopbackGateway.Start(gatewayServer, s =>
+            gateway.RunAsync(s, config, cts.Token)
         );
         var (client, device) = Client(ServerType.Vxi11, port);
 

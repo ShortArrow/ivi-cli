@@ -446,15 +446,11 @@ public sealed class UsbControlPipeTests
         );
 
         var (reply, payload) = Pipe()
-            .HandleEp0(
-                submit,
-                ReadOnlyMemory<byte>.Empty,
-                _ =>
-                {
-                    consulted = true;
-                    return UsbControlResult.Stall();
-                }
-            );
+            .HandleEp0(submit, ReadOnlyMemory<byte>.Empty, _ =>
+            {
+                consulted = true;
+                return UsbControlResult.Stall();
+            });
 
         consulted.ShouldBeFalse();
         reply.Status.ShouldBe(0);
@@ -495,15 +491,11 @@ public sealed class UsbControlPipeTests
         );
 
         var (reply, payload) = Pipe()
-            .HandleEp0(
-                submit,
-                coding,
-                (_, outPayload) =>
-                {
-                    received = outPayload.ToArray();
-                    return UsbControlResult.HandledEmpty();
-                }
-            );
+            .HandleEp0(submit, coding, (_, outPayload) =>
+            {
+                received = outPayload.ToArray();
+                return UsbControlResult.HandledEmpty();
+            });
 
         received.ShouldBe(coding);
         reply.Status.ShouldBe(0);

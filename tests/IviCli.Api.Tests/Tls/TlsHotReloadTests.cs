@@ -65,9 +65,8 @@ public sealed class TlsHotReloadTests
             (await ServedThumbprintAsync(port)).ShouldBe(cert1.Thumbprint);
 
             Rotate(certPath, cert2.Pfx);
-            await PollUntilAsync(
-                rotation,
-                () => rotation.Current.ServerCertificate.Thumbprint == cert2.Thumbprint
+            await PollUntilAsync(rotation, () =>
+                rotation.Current.ServerCertificate.Thumbprint == cert2.Thumbprint
             );
 
             (await ServedThumbprintAsync(port)).ShouldBe(cert2.Thumbprint);

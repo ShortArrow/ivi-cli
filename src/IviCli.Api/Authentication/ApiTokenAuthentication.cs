@@ -57,12 +57,11 @@ public static class ApiTokenAuthentication
                     return;
                 }
 
-                var options =
-                    context.RequestServices.GetService<ApiAuthenticationOptions>()
+                var options = context.RequestServices.GetService<ApiAuthenticationOptions>()
                     ?? new ApiAuthenticationOptions();
                 var store = context.RequestServices.GetRequiredService<IApiTokenStore>();
-                var audit =
-                    context.RequestServices.GetService<IAuditLog>() ?? NullAuditLog.Instance;
+                var audit = context.RequestServices.GetService<IAuditLog>()
+                    ?? NullAuditLog.Instance;
                 var transport = context.WebSockets.IsWebSocketRequest ? "websocket" : "http";
                 var loaded = await store.LoadAsync(context.RequestAborted);
                 if (

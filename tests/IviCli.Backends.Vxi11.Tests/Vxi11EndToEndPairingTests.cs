@@ -31,9 +31,8 @@ public sealed class Vxi11EndToEndPairingTests
         fake.RespondToQuery(deviceName, "*IDN?", "FAKE,VXI11,IVI-CLI,1.0");
 
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
-        (port, var serverTask) = LoopbackGateway.Start(
-            server,
-            s => gateway.RunAsync(s, config, cts.Token)
+        (port, var serverTask) = LoopbackGateway.Start(server, s =>
+            gateway.RunAsync(s, config, cts.Token)
         );
         await WaitForListenerAsync(port, cts.Token);
 
@@ -62,9 +61,8 @@ public sealed class Vxi11EndToEndPairingTests
         _ = fake;
 
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
-        (port, var serverTask) = LoopbackGateway.Start(
-            server,
-            s => gateway.RunAsync(s, config, cts.Token)
+        (port, var serverTask) = LoopbackGateway.Start(server, s =>
+            gateway.RunAsync(s, config, cts.Token)
         );
         await WaitForListenerAsync(port, cts.Token);
 
@@ -93,9 +91,8 @@ public sealed class Vxi11EndToEndPairingTests
         fake.RespondToQuery(deviceName, "*IDN?", "FAKE,VXI11,IVI-CLI,1.0");
 
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
-        (port, var serverTask) = LoopbackGateway.Start(
-            server,
-            s => gateway.RunAsync(s, config, cts.Token)
+        (port, var serverTask) = LoopbackGateway.Start(server, s =>
+            gateway.RunAsync(s, config, cts.Token)
         );
         await WaitForListenerAsync(port, cts.Token);
 
