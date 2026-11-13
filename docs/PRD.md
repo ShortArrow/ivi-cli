@@ -128,6 +128,7 @@ are all usable transparently.
 ivicli
  ├─ visa      # data plane / VISA transport / SCPI operation
  ├─ server    # gateway / remote instrument publishing
+ ├─ mock      # mock scenarios and serving them
  ├─ logical   # logical name management
  ├─ config    # configuration management
  ├─ doctor    # environment diagnostics
@@ -203,6 +204,8 @@ flow control applies to what it leaves out. Any device takes
 `--read-termination` and `--write-termination` (`lf`, `cr` or `crlf`),
 which apply to SOCKET and serial devices, whose transports have no message
 end of their own.
+
+`MOCK::INSTR` is refused; only `mock serve` registers a device with it.
 
 ---
 
@@ -391,7 +394,48 @@ Removes a route.
 
 ---
 
-## 6.4 Diagnostics
+## 6.4 Mock Operations
+
+### mock serve
+
+```bash
+ivicli mock serve my-dmm --type socket
+ivicli mock serve my-dmm --type hislip --port 4881 --alias dmm
+```
+
+Serves an existing scenario at one address and runs the server in the
+foreground, as `server start` does. It registers a device with the resource
+`MOCK::INSTR`, binds the scenario to it, and adds a server with one route to
+the device, then prints the name and the resource a client connects to.
+
+`--type` is `socket`, `hislip`, `vxi11` or `usbip`. `--port` defaults to
+5025, 4880, 1024 and 3240 in that order, and `--bind` to `127.0.0.1`.
+`--profile` (`usbtmc` or `cdc-acm`) sets the USB profile of a `usbip` route.
+The device and the server share one name: `--alias`, or
+`mock-<type>-<port>`.
+
+`MOCK::INSTR` has no transport. A device with it answers from its scenario
+while one is bound, and fails to open otherwise, so it never reaches an
+instrument. An existing device or server with the name is reused only when
+it is what `mock serve` registers; otherwise the command fails, naming what
+differs, and changes nothing. A server whose process is running is refused.
+
+---
+
+### mock unserve
+
+```bash
+ivicli mock unserve mock-socket-5025
+```
+
+Removes the device, its binding, and the server with that name with its
+route. The scenario is kept. It removes nothing and fails when the device's
+resource is not `MOCK::INSTR`, another server routes to the device, the
+server has a route `mock serve` does not add, or the server is running.
+
+---
+
+## 6.5 Diagnostics
 
 ### doctor
 
@@ -415,7 +459,7 @@ Set `IVICLI_CAPTURE=<path>` (absolute, or relative to the rolling-log directory)
 
 ---
 
-## 6.5 Driver / IVI Features
+## 6.6 Driver / IVI Features
 
 The `visa` namespace handles VISA transport / SCPI operation.
 

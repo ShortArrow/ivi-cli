@@ -24,19 +24,23 @@ start at [Author a scenario](#author-a-scenario). If the split between
 
 Three nouns carry the whole design, and each has its own command group.
 
-A **device** is an alias for a VISA resource; `ivicli visa add dut
-'TCPIP0::127.0.0.1::INSTR'` registers one. Every operation in `ivicli`
-targets a device, never a resource string directly.
+A **device** is an alias for a VISA resource; `ivicli visa add psu1
+'TCPIP0::192.168.0.10::inst0::INSTR'` registers one. Every operation in
+`ivicli` targets a device, never a resource string directly.
 
 A **scenario** is behaviour: scenes, rules, and the `*IDN?` string. `ivicli
 mock` authors scenarios and *activates* one against a device (`mock scenario
 activate my-dmm --for dut`). Activation is a binding, device → scenario, and
 it changes how that device is reached: while a device has an active scenario,
 `ivicli` answers its SCPI from the in-process mock instead of opening its
-resource. The resource string is then a placeholder that is never dialled,
-which is why the recipes below register the mock as `TCPIP0::127.0.0.1::INSTR`.
-`mock scenario deactivate --for dut` clears the binding, and the same alias
-reaches its real resource again.
+resource. `mock scenario deactivate --for dut` clears the binding, and the
+next connection to the device opens its resource again.
+
+The device `mock serve` registers has the resource `MOCK::INSTR`, which has
+no transport: while no scenario is bound to it, opening it fails, so a mock
+served that way never reaches an instrument. `visa add` refuses `MOCK::INSTR`.
+A mock composed by hand with `visa add` keeps the resource it was given, and
+that resource is dialled once its binding is gone.
 
 A **server** is a listener (HiSLIP, raw SOCKET, VXI-11, or USB/IP), and
 its **routes** map a public endpoint (a HiSLIP sub-address, a port, a USB
@@ -54,10 +58,13 @@ flowchart LR
     device -->|"no scenario"| real["the device's VISA resource"]
 ```
 
-Reading a mock recipe with this in mind: `visa add` names the device, `mock
-scenario activate --for` decides that the device is answered by a scenario,
-and `server add` / `server route add` / `server start` decide how clients
-reach it.
+For one scenario at one address, `mock serve` does it all: it registers the
+device, binds the scenario to it, adds a server with one route to the
+device, and starts the server. Composed by hand, `visa add` names the
+device, `mock scenario activate --for` decides that the device is answered
+by a scenario, and `server add` / `server route add` / `server start` decide
+how clients reach it. That is the path for what `mock serve` does not do, such as several
+devices behind one listener.
 
 One server per process, and the mock lives in the process. `server start`
 runs a single server; its routes may point at as many devices as you like,
@@ -125,9 +132,9 @@ ivicli mock rule add my-dmm --in measuring --match 'ABOR'  --ack --transition-to
 ### By hand-writing TOML
 
 The same scenario is a plain TOML file. Drop it in the scenarios directory
-(see [Where scenarios live](#where-scenarios-live)) as `my-dmm.toml` and
-`ivicli mock scenario activate my-dmm`. (`mock scenario import` is for
-NDJSON captures, not TOML files.)
+(see [Where scenarios live](#where-scenarios-live)) as `my-dmm.toml`, and
+it is the scenario `my-dmm`. (`mock scenario import` is for NDJSON
+captures, not TOML files.)
 
 ```toml
 idn = "ACME,DMM-1000,SN42,2.1"
@@ -252,7 +259,7 @@ before the first notification.
 Quirks are hand-written TOML only — there is no CLI flag for them. Add the
 table to the scenario's file in the scenarios directory (see
 [Where scenarios live](#where-scenarios-live)), for example `wedged.toml`,
-and `ivicli mock scenario activate wedged`.
+and serve the scenario `wedged`.
 
 ---
 
@@ -270,46 +277,64 @@ docker run --rm \
   ghcr.io/shortarrow/ivi-cli-mock:latest
 ```
 
-### Option B — the bare CLI
+It answers at the resources in [Run a ready-made mock](#run-a-ready-made-mock).
 
-Register a device, bind the scenario to it, and expose it through a gateway
-server:
+### Option B — `mock serve`
+
+One command serves the scenario and runs in the foreground until Ctrl+C:
 
 ```sh
-ivicli visa add dut 'TCPIP0::127.0.0.1::INSTR'      # placeholder resource; never dialled while a scenario is active
-ivicli mock scenario activate my-dmm --for dut       # dut now answers from the scenario
-ivicli server add dmm-srv --type hislip --port 4880 # or --type socket --port 5025
-ivicli server route add dmm-srv hislip0 dut         # SOCKET: route the port itself
-ivicli server start dmm-srv
+ivicli mock serve my-dmm --type hislip --alias dut
+# dut serves the scenario my-dmm.
+# connect: TCPIP::127.0.0.1::hislip0,4880::INSTR
 ```
 
-`activate` needs a device: pass `--for`, or select one once with `ivicli visa
-use dut` and omit it afterwards.
+`--type` is `socket`, `hislip`, `vxi11` or `usbip`. `--port` defaults to
+5025, 4880, 1024 and 3240 in that order, and `--bind` to `127.0.0.1`. The
+device and the server both take the name `--alias`; without it the name is
+`mock-<type>-<port>`, such as `mock-hislip-4880`. The rest of this guide
+uses `dut`, the name in the example.
 
-Either way the mock now listens on:
+The second line is the resource a client connects to:
 
-| Transport | VISA resource |
+| `--type` | Client connects to |
 | --- | --- |
-| HiSLIP | `TCPIP::localhost::hislip0::INSTR` |
-| Raw SOCKET | `TCPIP::localhost::5025::SOCKET` |
+| `socket` | `TCPIP::127.0.0.1::5025::SOCKET` |
+| `hislip` | `TCPIP::127.0.0.1::hislip0,4880::INSTR`, or `TCPIP::127.0.0.1::hislip0::INSTR` at the default port |
+| `vxi11` | `TCPIP::127.0.0.1::inst0,1024::INSTR` |
+| `usbip` | the attach step in [Option C](#option-c--as-a-usb-device) |
+
+Running the same command again after Ctrl+C reuses the entries it
+registered. A name that is already taken by something else, such as a
+device with a real address or a server on another port, is refused with
+what differs, and nothing is changed. So is a name whose server is still
+running.
+
+To remove what it registered, stop the server and run `mock unserve`:
+
+```sh
+ivicli mock unserve dut
+# removed the mock device and server dut.
+```
+
+It removes the device, its binding, the server and its route, and keeps the
+scenario. It removes nothing if the device has a real address, another
+server routes to it, the server has routes `mock serve` did not add, or the
+server is running.
 
 ### Option C — as a USB device
 
 A `usbip` server exports the device over the USB/IP protocol, and a USB/IP
 client on the host attaches it as if it were plugged in: the operating
 system enumerates it, the class driver binds, and NI-VISA lists it like any
-USB instrument. On the ivicli side only the server type and the
-shape of the endpoint change: the endpoint is a USB bus id such as `1-1`.
+USB instrument.
 
 ```sh
-ivicli visa add dut 'TCPIP0::127.0.0.1::INSTR'
-ivicli mock scenario activate my-dmm --for dut
-ivicli server add usb-srv --type usbip               # listens on 3240
-ivicli server route add usb-srv 1-1 dut              # USBTMC (default profile)
-ivicli server route add usb-srv 1-2 dut --profile cdc-acm   # the same device as a serial port
-ivicli server start usb-srv
+ivicli mock serve my-dmm --type usbip --alias dut
 ```
 
+The server listens on 3240 and exports the device at bus id `1-1` with the
+USBTMC profile; `--profile cdc-acm` exports it as a USB serial port instead.
 The client is USB/IP tooling on the host; ivicli installs no driver.
 
 | Host | Client | Attach |
@@ -332,6 +357,37 @@ Use the USBTMC profile when the code under test goes through a vendor VISA
 stack and you want that stack in the loop: its resource enumeration, its USB
 class driver, its I/O trace tools. Use the CDC-ACM profile for tools
 that only speak COM ports.
+
+### Option D — compose it yourself
+
+`mock serve` gives a server one route to one device. Several devices behind
+one listener, a mock beside a real instrument, or one device under both USB
+profiles take the commands `mock serve` is made of:
+
+```sh
+ivicli visa add dmm 'TCPIP0::192.0.2.1::INSTR'      # see below for the resource
+ivicli mock scenario activate my-dmm --for dmm       # dmm now answers from the scenario
+ivicli server add dmm-srv --type hislip --port 4880 # or --type socket --port 5025
+ivicli server route add dmm-srv hislip0 dmm         # SOCKET: route the port itself
+ivicli server start dmm-srv
+```
+
+`activate` needs a device: pass `--for`, or select one once with `ivicli visa
+use dmm` and omit it afterwards.
+
+The device needs a resource, since `visa add` refuses `MOCK::INSTR`. It is
+not opened while the scenario is bound, and is dialled once the binding is
+gone, so give it an address where nothing answers. `192.0.2.1` is reserved
+for documentation (RFC 5737), so no instrument is assigned it.
+
+The same device can sit behind two USB/IP routes, one per profile:
+
+```sh
+ivicli server add usb-srv --type usbip               # listens on 3240
+ivicli server route add usb-srv 1-1 dmm              # USBTMC (default profile)
+ivicli server route add usb-srv 1-2 dmm --profile cdc-acm   # the same device as a serial port
+ivicli server start usb-srv
+```
 
 A device is attached through one route at a time; the client refuses a
 second attach while the first is up. Detach, then attach the other profile.
@@ -386,7 +442,7 @@ read back the writes out of band:
 ```sh
 # Start the mock with capture enabled. Use a FRESH path per test run so a
 # previous run's writes don't leak in (see isolation note below).
-IVICLI_CAPTURE=run-$RANDOM.ndjson ivicli server start dmm-srv
+IVICLI_CAPTURE=run-$RANDOM.ndjson ivicli mock serve my-dmm --type hislip --alias dut
 
 # ... your app connects and writes :VOLT 24.000 ...
 

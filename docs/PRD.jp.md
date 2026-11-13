@@ -133,6 +133,7 @@ ReplayBackend
 ivicli
  ├─ visa      # data plane / VISA transport / SCPI operation
  ├─ server    # gateway / remote instrument publishing
+ ├─ mock      # mock scenarios and serving them
  ├─ logical   # logical name management
  ├─ config    # configuration management
  ├─ doctor    # environment diagnostics
@@ -205,6 +206,9 @@ VISA resource または scan index から alias を登録する。
 （9600 8-N-1、フロー制御なし）が使われる。どのデバイスも
 `--read-termination` と `--write-termination`（`lf`、`cr`、`crlf`）を
 受け取り、これらはメッセージの終わりを持たない SOCKET とシリアルで効く。
+
+`MOCK::INSTR` は受け付けない。このリソースのデバイスを登録するのは `mock serve`
+だけである。
 
 ---
 
@@ -393,7 +397,48 @@ route を削除する。
 
 ---
 
-## 6.4 Diagnostics
+## 6.4 Mock Operations
+
+### mock serve
+
+```bash
+ivicli mock serve my-dmm --type socket
+ivicli mock serve my-dmm --type hislip --port 4881 --alias dmm
+```
+
+既存のシナリオを 1 つのアドレスで提供し、`server start` と同じくサーバーを
+フォアグラウンドで動かす。リソースが `MOCK::INSTR` のデバイスを登録してシナリオを
+紐付け、そのデバイスへのルートを 1 つ持つサーバーを追加したうえで、名前と、
+クライアントが接続するリソースを表示する。
+
+`--type` は `socket`、`hislip`、`vxi11`、`usbip` のいずれか。`--port` の既定値は
+この順に 5025、4880、1024、3240、`--bind` の既定値は `127.0.0.1`。
+`--profile`（`usbtmc` または `cdc-acm`）は `usbip` のルートの USB プロファイルを
+決める。デバイスとサーバーは同じ名前を持ち、その名前は `--alias` の値、省略時は
+`mock-<type>-<port>` になる。
+
+`MOCK::INSTR` には通信経路がない。このリソースのデバイスは、シナリオが紐付いて
+いる間はそのシナリオで応答し、紐付いていなければ開くときに失敗する。そのため
+実機には届かない。同じ名前のデバイスやサーバーがすでにあるときは、`mock serve`
+が登録するものと同じ場合だけ使い回す。違う場合は違う点を示して失敗し、何も
+変えない。サーバーのプロセスが動いている場合も断る。
+
+---
+
+### mock unserve
+
+```bash
+ivicli mock unserve mock-socket-5025
+```
+
+その名前のデバイスとシナリオの紐付け、同じ名前のサーバーとそのルートを削除する。
+シナリオは残す。デバイスのリソースが `MOCK::INSTR` でない、別のサーバーがその
+デバイスへのルートを持つ、サーバーが `mock serve` の追加しないルートを持つ、
+サーバーが動いている、のいずれかに当たるときは、何も削除せずに失敗する。
+
+---
+
+## 6.5 Diagnostics
 
 ### doctor
 
@@ -417,7 +462,7 @@ ivicli doctor
 
 ---
 
-## 6.5 Driver / IVI Features
+## 6.6 Driver / IVI Features
 
 `visa` namespace は VISA transport / SCPI operation を担当する。
 
