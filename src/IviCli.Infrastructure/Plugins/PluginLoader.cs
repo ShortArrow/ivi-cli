@@ -184,8 +184,7 @@ public sealed class PluginLoader
         TomlTable model;
         try
         {
-            model =
-                TomlSerializer.Deserialize<TomlTable>(toml, TomlModelContext.Default)
+            model = TomlSerializer.Deserialize<TomlTable>(toml, TomlModelContext.Default)
                 ?? new TomlTable();
         }
         catch (TomlException ex)

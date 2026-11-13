@@ -74,9 +74,8 @@ public sealed class HiSlipLiveRebindTests
             refresher
         );
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
-        (port, var serverTask) = LoopbackGateway.Start(
-            server,
-            s => gateway.RunAsync(s, config, cts.Token)
+        (port, var serverTask) = LoopbackGateway.Start(server, s =>
+            gateway.RunAsync(s, config, cts.Token)
         );
         await WaitForListenerAsync(port, cts.Token);
 
@@ -86,17 +85,13 @@ public sealed class HiSlipLiveRebindTests
         var query = ScpiQuery.From("MEAS:VOLT?").ShouldBeOk();
 
         // Before: scenario "a".
-        (await client.QueryAsync(device, query, cts.Token))
-            .ShouldBeOk()
-            .ShouldBe("1.00");
+        (await client.QueryAsync(device, query, cts.Token)).ShouldBeOk().ShouldBe("1.00");
 
         // A separate process activates "b" (writes only the session store).
         await sessions.SaveAsync(SessionWith(deviceName, "b"), cts.Token);
 
         // After: the same link now serves scenario "b".
-        (await client.QueryAsync(device, query, cts.Token))
-            .ShouldBeOk()
-            .ShouldBe("2.00");
+        (await client.QueryAsync(device, query, cts.Token)).ShouldBeOk().ShouldBe("2.00");
 
         await client.CloseAsync(device, cts.Token);
         await cts.CancelAsync();
@@ -154,9 +149,8 @@ public sealed class HiSlipLiveRebindTests
             refresher
         );
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
-        (port, var serverTask) = LoopbackGateway.Start(
-            server,
-            s => gateway.RunAsync(s, config, cts.Token)
+        (port, var serverTask) = LoopbackGateway.Start(server, s =>
+            gateway.RunAsync(s, config, cts.Token)
         );
         await WaitForListenerAsync(port, cts.Token);
 
@@ -214,9 +208,8 @@ public sealed class HiSlipLiveRebindTests
             logger
         );
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
-        (port, var serverTask) = LoopbackGateway.Start(
-            server,
-            s => gateway.RunAsync(s, config, cts.Token)
+        (port, var serverTask) = LoopbackGateway.Start(server, s =>
+            gateway.RunAsync(s, config, cts.Token)
         );
         await WaitForListenerAsync(port, cts.Token);
 

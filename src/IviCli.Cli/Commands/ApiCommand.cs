@@ -146,8 +146,7 @@ public static class ApiCommand
                     return ExitCodeMapper.UsageError;
                 }
 
-                var port =
-                    parseResult.GetValue(portOpt)
+                var port = parseResult.GetValue(portOpt)
                     ?? (tlsCfg.Enabled ? DefaultTlsPort : DefaultPort);
 
                 // Non-loopback gate (ADR 0036 §4): require at least one

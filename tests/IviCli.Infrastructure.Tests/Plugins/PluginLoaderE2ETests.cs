@@ -29,8 +29,7 @@ public sealed class PluginLoaderE2ETests
     public async Task Sample_plugin_round_trips_through_loader_and_factory()
     {
         // 1. Copy the sample plugin DLL into a temporary plugins/<name>/ dir.
-        var sampleDll =
-            typeof(IviCli.Plugin.Sample.SampleAcmePlugin).Assembly.Location
+        var sampleDll = typeof(IviCli.Plugin.Sample.SampleAcmePlugin).Assembly.Location
             ?? throw new InvalidOperationException("sample plugin assembly location missing");
         var sampleDir = Path.GetDirectoryName(sampleDll)!;
         using var temp = new TempPluginsRoot();

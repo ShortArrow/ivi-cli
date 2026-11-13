@@ -44,16 +44,13 @@ public sealed class Vxi11BackendTests
             // create_link
             var call = session.ReadCall();
             call.Procedure.ShouldBe(ProcCreateLink);
-            session.WriteReply(
-                call.Xid,
-                writer =>
-                {
-                    writer.WriteInt32(Vxi11NoError);
-                    writer.WriteInt32(42); // lid
-                    writer.WriteUInt32(0); // abort port
-                    writer.WriteUInt32(16 * 1024 * 1024); // maxRecvSize
-                }
-            );
+            session.WriteReply(call.Xid, writer =>
+            {
+                writer.WriteInt32(Vxi11NoError);
+                writer.WriteInt32(42); // lid
+                writer.WriteUInt32(0); // abort port
+                writer.WriteUInt32(16 * 1024 * 1024); // maxRecvSize
+            });
             AckInterruptSetup(session);
         });
 
@@ -72,40 +69,31 @@ public sealed class Vxi11BackendTests
         await using var stub = await StubServer.StartAsync(programmer: session =>
         {
             var create = session.ReadCall();
-            session.WriteReply(
-                create.Xid,
-                writer =>
-                {
-                    writer.WriteInt32(Vxi11NoError);
-                    writer.WriteInt32(7);
-                    writer.WriteUInt32(0);
-                    writer.WriteUInt32(16 * 1024 * 1024);
-                }
-            );
+            session.WriteReply(create.Xid, writer =>
+            {
+                writer.WriteInt32(Vxi11NoError);
+                writer.WriteInt32(7);
+                writer.WriteUInt32(0);
+                writer.WriteUInt32(16 * 1024 * 1024);
+            });
             AckInterruptSetup(session);
 
             var write = session.ReadCall();
             write.Procedure.ShouldBe(ProcDeviceWrite);
-            session.WriteReply(
-                write.Xid,
-                writer =>
-                {
-                    writer.WriteInt32(Vxi11NoError);
-                    writer.WriteUInt32(8); // bytes accepted
-                }
-            );
+            session.WriteReply(write.Xid, writer =>
+            {
+                writer.WriteInt32(Vxi11NoError);
+                writer.WriteUInt32(8); // bytes accepted
+            });
 
             var read = session.ReadCall();
             read.Procedure.ShouldBe(ProcDeviceRead);
-            session.WriteReply(
-                read.Xid,
-                writer =>
-                {
-                    writer.WriteInt32(Vxi11NoError);
-                    writer.WriteInt32(ReadReasonEnd);
-                    writer.WriteOpaque("FAKE,IDN\n"u8.ToArray());
-                }
-            );
+            session.WriteReply(read.Xid, writer =>
+            {
+                writer.WriteInt32(Vxi11NoError);
+                writer.WriteInt32(ReadReasonEnd);
+                writer.WriteOpaque("FAKE,IDN\n"u8.ToArray());
+            });
         });
 
         var backend = new Vxi11Backend(stub.Port);
@@ -125,26 +113,20 @@ public sealed class Vxi11BackendTests
         await using var stub = await StubServer.StartAsync(programmer: session =>
         {
             var create = session.ReadCall();
-            session.WriteReply(
-                create.Xid,
-                writer =>
-                {
-                    writer.WriteInt32(Vxi11NoError);
-                    writer.WriteInt32(1);
-                    writer.WriteUInt32(0);
-                    writer.WriteUInt32(16 * 1024 * 1024);
-                }
-            );
+            session.WriteReply(create.Xid, writer =>
+            {
+                writer.WriteInt32(Vxi11NoError);
+                writer.WriteInt32(1);
+                writer.WriteUInt32(0);
+                writer.WriteUInt32(16 * 1024 * 1024);
+            });
             AckInterruptSetup(session);
             var write = session.ReadCall();
-            session.WriteReply(
-                write.Xid,
-                writer =>
-                {
-                    writer.WriteInt32(Vxi11IoError);
-                    writer.WriteUInt32(0);
-                }
-            );
+            session.WriteReply(write.Xid, writer =>
+            {
+                writer.WriteInt32(Vxi11IoError);
+                writer.WriteUInt32(0);
+            });
         });
 
         var backend = new Vxi11Backend(stub.Port);
@@ -190,26 +172,20 @@ public sealed class Vxi11BackendTests
             var write = session.ReadCall();
             ioTimeouts.Add(write.Word(1)); // lid, io_timeout, lock_timeout, ...
             lockTimeouts.Add(write.Word(2));
-            session.WriteReply(
-                write.Xid,
-                writer =>
-                {
-                    writer.WriteInt32(Vxi11NoError);
-                    writer.WriteUInt32(6);
-                }
-            );
+            session.WriteReply(write.Xid, writer =>
+            {
+                writer.WriteInt32(Vxi11NoError);
+                writer.WriteUInt32(6);
+            });
             var read = session.ReadCall();
             ioTimeouts.Add(read.Word(2)); // lid, requestSize, io_timeout, lock_timeout, ...
             lockTimeouts.Add(read.Word(3));
-            session.WriteReply(
-                read.Xid,
-                writer =>
-                {
-                    writer.WriteInt32(Vxi11NoError);
-                    writer.WriteInt32(ReadReasonEnd);
-                    writer.WriteOpaque("1\n"u8.ToArray());
-                }
-            );
+            session.WriteReply(read.Xid, writer =>
+            {
+                writer.WriteInt32(Vxi11NoError);
+                writer.WriteInt32(ReadReasonEnd);
+                writer.WriteOpaque("1\n"u8.ToArray());
+            });
             var trigger = session.ReadCall();
             trigger.Procedure.ShouldBe(ProcDeviceTrigger);
             ioTimeouts.Add(trigger.Word(3)); // lid, flags, lock_timeout, io_timeout
@@ -243,15 +219,12 @@ public sealed class Vxi11BackendTests
             AckCreateLink(session);
             AckInterruptSetup(session);
             var read = session.ReadCall();
-            session.WriteReply(
-                read.Xid,
-                writer =>
-                {
-                    writer.WriteInt32(Vxi11IoTimeout);
-                    writer.WriteInt32(0);
-                    writer.WriteOpaque([]);
-                }
-            );
+            session.WriteReply(read.Xid, writer =>
+            {
+                writer.WriteInt32(Vxi11IoTimeout);
+                writer.WriteInt32(0);
+                writer.WriteOpaque([]);
+            });
         });
         var backend = new Vxi11Backend(stub.Port);
         var device = BuildDevice();
@@ -313,16 +286,13 @@ public sealed class Vxi11BackendTests
     {
         var create = session.ReadCall();
         create.Procedure.ShouldBe(ProcCreateLink);
-        session.WriteReply(
-            create.Xid,
-            writer =>
-            {
-                writer.WriteInt32(Vxi11NoError);
-                writer.WriteInt32(1); // lid
-                writer.WriteUInt32(0); // abort port
-                writer.WriteUInt32(16 * 1024 * 1024); // maxRecvSize
-            }
-        );
+        session.WriteReply(create.Xid, writer =>
+        {
+            writer.WriteInt32(Vxi11NoError);
+            writer.WriteInt32(1); // lid
+            writer.WriteUInt32(0); // abort port
+            writer.WriteUInt32(16 * 1024 * 1024); // maxRecvSize
+        });
     }
 
     [Fact]

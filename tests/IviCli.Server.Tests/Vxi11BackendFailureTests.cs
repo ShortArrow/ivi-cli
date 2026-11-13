@@ -66,9 +66,8 @@ public sealed class Vxi11BackendFailureTests
         {
             PortmapUdpPort = LoopbackGateway.FreePort(),
         };
-        var (port, run) = LoopbackGateway.Start(
-            server,
-            s => gateway.RunAsync(s, config, cts.Token)
+        var (port, run) = LoopbackGateway.Start(server, s =>
+            gateway.RunAsync(s, config, cts.Token)
         );
         var client = new Vxi11Backend(port);
         var remote = new Device(

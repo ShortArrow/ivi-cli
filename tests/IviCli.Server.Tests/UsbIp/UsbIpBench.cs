@@ -165,9 +165,8 @@ internal sealed class UsbIpBench : IAsyncDisposable
         var gateway = composeGateway(backend);
 
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(20));
-        (port, var serverTask) = LoopbackGateway.Start(
-            server,
-            s => gateway.RunAsync(s, config, cts.Token)
+        (port, var serverTask) = LoopbackGateway.Start(server, s =>
+            gateway.RunAsync(s, config, cts.Token)
         );
         await WaitForListenerAsync(port, cts.Token);
         return new UsbIpBench(cts, serverTask, port, backend, devices);

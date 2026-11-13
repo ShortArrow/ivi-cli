@@ -376,8 +376,7 @@ public sealed class FakeBackend : IIviBackend, IScenarioAwareBackend
         // unless the scenario fails unmatched requests.
         if (MockScene.SameRequest(query.Value, "*IDN?"))
         {
-            var idn =
-                binding?.Scenario.IdnDefault
+            var idn = binding?.Scenario.IdnDefault
                 ?? state.IdnResponse
                 ?? (failsUnmatched ? null : "FAKE,FAKE,0,1.0");
             if (idn is not null)

@@ -62,9 +62,8 @@ public sealed class HiSlipPyVisaInteropTests
             NullLogger<HiSlipGatewayServer>.Instance
         );
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
-        (port, var serverTask) = LoopbackGateway.Start(
-            server,
-            s => gateway.RunAsync(s, config, cts.Token)
+        (port, var serverTask) = LoopbackGateway.Start(server, s =>
+            gateway.RunAsync(s, config, cts.Token)
         );
         await WaitForListenerAsync(port, cts.Token);
 
@@ -111,8 +110,8 @@ public sealed class HiSlipPyVisaInteropTests
         psi.ArgumentList.Add("-c");
         psi.ArgumentList.Add(script);
 
-        using var process =
-            Process.Start(psi) ?? throw new InvalidOperationException("python failed to start");
+        using var process = Process.Start(psi)
+            ?? throw new InvalidOperationException("python failed to start");
         var stdoutTask = process.StandardOutput.ReadToEndAsync(ct);
         var stderrTask = process.StandardError.ReadToEndAsync(ct);
         await process.WaitForExitAsync(ct);

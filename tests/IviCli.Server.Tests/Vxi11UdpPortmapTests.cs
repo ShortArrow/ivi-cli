@@ -28,9 +28,8 @@ public sealed class Vxi11UdpPortmapTests
     {
         var (gateway, server, config, tcpPort, udpPort) = BuildHarness();
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
-        (tcpPort, var serverTask) = LoopbackGateway.Start(
-            server,
-            s => gateway.RunAsync(s, config, cts.Token)
+        (tcpPort, var serverTask) = LoopbackGateway.Start(server, s =>
+            gateway.RunAsync(s, config, cts.Token)
         );
         await WaitForListenerAsync(tcpPort, cts.Token);
 
@@ -50,9 +49,8 @@ public sealed class Vxi11UdpPortmapTests
     {
         var (gateway, server, config, tcpPort, udpPort) = BuildHarness();
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
-        (tcpPort, var serverTask) = LoopbackGateway.Start(
-            server,
-            s => gateway.RunAsync(s, config, cts.Token)
+        (tcpPort, var serverTask) = LoopbackGateway.Start(server, s =>
+            gateway.RunAsync(s, config, cts.Token)
         );
         await WaitForListenerAsync(tcpPort, cts.Token);
 

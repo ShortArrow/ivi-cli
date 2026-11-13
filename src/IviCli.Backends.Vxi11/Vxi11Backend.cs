@@ -396,19 +396,13 @@ public sealed class Vxi11Backend : IIviBackend, IEnforcesDeviceTimeout
         CancellationToken ct
     )
     {
-        var call = BuildCall(
-            session.NextXid(),
-            CoreProgram,
-            CoreVersion,
-            ProcCreateLink,
-            body =>
-            {
-                body.WriteInt32(Environment.ProcessId);
-                body.WriteUInt32(0); // lockDevice = false
-                body.WriteUInt32(0); // lock_timeout
-                body.WriteString(lanDevice);
-            }
-        );
+        var call = BuildCall(session.NextXid(), CoreProgram, CoreVersion, ProcCreateLink, body =>
+        {
+            body.WriteInt32(Environment.ProcessId);
+            body.WriteUInt32(0); // lockDevice = false
+            body.WriteUInt32(0); // lock_timeout
+            body.WriteString(lanDevice);
+        });
         await Vxi11RecordFraming.WriteRecordAsync(session.Stream, call, ct);
         var reply = SkipReplyHeader(await Vxi11RecordFraming.ReadRecordAsync(session.Stream, ct));
         var error = reply.ReadInt32();
@@ -428,19 +422,13 @@ public sealed class Vxi11Backend : IIviBackend, IEnforcesDeviceTimeout
         CancellationToken ct
     )
     {
-        var call = BuildCall(
-            session.NextXid(),
-            CoreProgram,
-            CoreVersion,
-            ProcDeviceTrigger,
-            body =>
-            {
-                body.WriteInt32(session.LinkId);
-                body.WriteInt32(0); // flags (0 = no special semantics)
-                body.WriteUInt32(0); // lock_timeout
-                body.WriteUInt32(ioTimeoutMs); // io_timeout
-            }
-        );
+        var call = BuildCall(session.NextXid(), CoreProgram, CoreVersion, ProcDeviceTrigger, body =>
+        {
+            body.WriteInt32(session.LinkId);
+            body.WriteInt32(0); // flags (0 = no special semantics)
+            body.WriteUInt32(0); // lock_timeout
+            body.WriteUInt32(ioTimeoutMs); // io_timeout
+        });
         await Vxi11RecordFraming.WriteRecordAsync(session.Stream, call, ct);
         var reply = SkipReplyHeader(await Vxi11RecordFraming.ReadRecordAsync(session.Stream, ct));
         var error = reply.ReadInt32();
@@ -520,12 +508,8 @@ public sealed class Vxi11Backend : IIviBackend, IEnforcesDeviceTimeout
 
     private static async Task DestroyLinkAsync(Vxi11Session session, CancellationToken ct)
     {
-        var call = BuildCall(
-            session.NextXid(),
-            CoreProgram,
-            CoreVersion,
-            ProcDestroyLink,
-            body => body.WriteInt32(session.LinkId)
+        var call = BuildCall(session.NextXid(), CoreProgram, CoreVersion, ProcDestroyLink, body =>
+            body.WriteInt32(session.LinkId)
         );
         await Vxi11RecordFraming.WriteRecordAsync(session.Stream, call, ct);
         var reply = SkipReplyHeader(await Vxi11RecordFraming.ReadRecordAsync(session.Stream, ct));
@@ -551,20 +535,14 @@ public sealed class Vxi11Backend : IIviBackend, IEnforcesDeviceTimeout
     )
     {
         var data = Encoding.ASCII.GetBytes(scpi);
-        var call = BuildCall(
-            session.NextXid(),
-            CoreProgram,
-            CoreVersion,
-            ProcDeviceWrite,
-            body =>
-            {
-                body.WriteInt32(session.LinkId);
-                body.WriteUInt32(ioTimeoutMs); // io_timeout
-                body.WriteUInt32(0); // lock_timeout
-                body.WriteInt32(WriteEndFlag);
-                body.WriteOpaque(data);
-            }
-        );
+        var call = BuildCall(session.NextXid(), CoreProgram, CoreVersion, ProcDeviceWrite, body =>
+        {
+            body.WriteInt32(session.LinkId);
+            body.WriteUInt32(ioTimeoutMs); // io_timeout
+            body.WriteUInt32(0); // lock_timeout
+            body.WriteInt32(WriteEndFlag);
+            body.WriteOpaque(data);
+        });
         await Vxi11RecordFraming.WriteRecordAsync(session.Stream, call, ct);
         var reply = SkipReplyHeader(await Vxi11RecordFraming.ReadRecordAsync(session.Stream, ct));
         var error = reply.ReadInt32();

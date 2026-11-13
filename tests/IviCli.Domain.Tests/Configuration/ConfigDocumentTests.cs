@@ -55,10 +55,7 @@ public class ConfigDocumentTests
     public void AddDevice_SerialSettingsOnASerialDevice_AppendsDevice()
     {
         // Given
-        var device = Dev("dmm", resource: "ASRL1::INSTR") with
-        {
-            Serial = Baud19200,
-        };
+        var device = Dev("dmm", resource: "ASRL1::INSTR") with { Serial = Baud19200 };
 
         // When
         var result = ConfigDocument.Empty.AddDevice(device);
@@ -71,10 +68,7 @@ public class ConfigDocumentTests
     public void AddDevice_SerialSettingsOnANetworkDevice_ReturnsSerialSettingsOnNonSerialDevice()
     {
         // Given
-        var device = Dev("psu1") with
-        {
-            Serial = Baud19200,
-        };
+        var device = Dev("psu1") with { Serial = Baud19200 };
 
         // When
         var result = ConfigDocument.Empty.AddDevice(device);

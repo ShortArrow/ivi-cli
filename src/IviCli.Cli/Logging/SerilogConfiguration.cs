@@ -22,8 +22,8 @@ public static class SerilogConfiguration
     /// <summary>Builds a Serilog logger from <paramref name="options"/>.</summary>
     public static Serilog.ILogger Build(Options options)
     {
-        var logFilePath =
-            options.LogFileOverride ?? Path.Combine(IviPaths.ResolveLogDirectory(), "ivi-cli-.log");
+        var logFilePath = options.LogFileOverride
+            ?? Path.Combine(IviPaths.ResolveLogDirectory(), "ivi-cli-.log");
 
         var directory = Path.GetDirectoryName(logFilePath);
         if (!string.IsNullOrEmpty(directory))

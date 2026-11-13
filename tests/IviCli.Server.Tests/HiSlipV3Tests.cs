@@ -160,9 +160,8 @@ public sealed class HiSlipV3Tests
                 NullLogger<HiSlipGatewayServer>.Instance
             );
             var cts = new CancellationTokenSource(TimeSpan.FromSeconds(20));
-            (port, var serverTask) = LoopbackGateway.Start(
-                server,
-                s => gateway.RunAsync(s, config, cts.Token)
+            (port, var serverTask) = LoopbackGateway.Start(server, s =>
+                gateway.RunAsync(s, config, cts.Token)
             );
             await WaitForListenerAsync(port, cts.Token);
             return new Harness(port, cts, serverTask);

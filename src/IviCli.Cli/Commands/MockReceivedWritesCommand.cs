@@ -77,8 +77,7 @@ public static class MockReceivedWritesCommand
                     return ExitCodeMapper.UsageError;
                 }
 
-                var capture =
-                    parseResult.GetValue(captureOpt)
+                var capture = parseResult.GetValue(captureOpt)
                     ?? Environment.GetEnvironmentVariable("IVICLI_CAPTURE");
                 if (string.IsNullOrWhiteSpace(capture))
                 {

@@ -58,8 +58,7 @@ internal sealed class ApiTestHost : IAsyncDisposable
         FakeScenarioStore? scenarioStore = null
     )
     {
-        var resolvedAuthOptions =
-            authOptions
+        var resolvedAuthOptions = authOptions
             ?? new ApiAuthenticationOptions { IsLoopback = true, AllowAnonymous = true };
         var hostBuilder = new HostBuilder().ConfigureWebHost(web =>
         {
@@ -302,9 +301,8 @@ internal sealed class ApiTestHost : IAsyncDisposable
                 app.UseRouting();
                 app.UseEndpoints(endpoints =>
                 {
-                    endpoints.MapGet(
-                        "/healthz",
-                        () => Microsoft.AspNetCore.Http.Results.Json(new { status = "ok" })
+                    endpoints.MapGet("/healthz", () =>
+                        Microsoft.AspNetCore.Http.Results.Json(new { status = "ok" })
                     );
                     endpoints.MapDevices();
                     endpoints.MapServers();

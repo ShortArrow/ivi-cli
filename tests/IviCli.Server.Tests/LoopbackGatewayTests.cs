@@ -34,9 +34,8 @@ public sealed class LoopbackGatewayTests
         );
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
 
-        var (port, serverTask) = LoopbackGateway.Start(
-            server,
-            s => gateway.RunAsync(s, config, cts.Token)
+        var (port, serverTask) = LoopbackGateway.Start(server, s =>
+            gateway.RunAsync(s, config, cts.Token)
         );
 
         port.ShouldNotBe(takenPort);

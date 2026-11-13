@@ -31,9 +31,8 @@ public sealed class GatewayPeerAbortTests
         var logger = new RecordingLogger<HiSlipGatewayServer>();
         var gateway = new HiSlipGatewayServer(new FakeBackendFactory(new FakeBackend()), logger);
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
-        var (port, serverTask) = LoopbackGateway.Start(
-            server,
-            s => gateway.RunAsync(s, config, cts.Token)
+        var (port, serverTask) = LoopbackGateway.Start(server, s =>
+            gateway.RunAsync(s, config, cts.Token)
         );
         await WaitForListenerAsync(port, cts.Token);
 
@@ -72,9 +71,8 @@ public sealed class GatewayPeerAbortTests
             PortmapUdpPort = LoopbackGateway.FreePort(),
         };
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
-        var (port, serverTask) = LoopbackGateway.Start(
-            server,
-            s => gateway.RunAsync(s, config, cts.Token)
+        var (port, serverTask) = LoopbackGateway.Start(server, s =>
+            gateway.RunAsync(s, config, cts.Token)
         );
         await WaitForListenerAsync(port, cts.Token);
 

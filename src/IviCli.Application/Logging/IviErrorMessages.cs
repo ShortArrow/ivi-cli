@@ -15,12 +15,10 @@ public static partial class IviErrorMessages
     {
         var index = 0;
         return Placeholder()
-            .Replace(
-                error.Message,
-                match =>
-                    index < error.LogArgs.Count
-                        ? error.LogArgs[index++]?.ToString() ?? "(null)"
-                        : match.Value
+            .Replace(error.Message, match =>
+                index < error.LogArgs.Count
+                    ? error.LogArgs[index++]?.ToString() ?? "(null)"
+                    : match.Value
             );
     }
 

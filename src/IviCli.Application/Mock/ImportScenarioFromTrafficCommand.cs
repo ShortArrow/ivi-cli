@@ -142,8 +142,7 @@ public sealed class ImportScenarioFromTrafficCommandHandler
             ct
         );
 
-        var device =
-            deviceFilter?.Value
+        var device = deviceFilter?.Value
             ?? events.First(e => e.Op is TrafficOp.Write or TrafficOp.Query && e.Ok).Device;
         return Result.Success<ImportSummary, ImportTrafficError>(
             new ImportSummary(name, device, scenario.Scenes.Sum(s => s.Rules.Length))

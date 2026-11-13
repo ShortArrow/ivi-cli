@@ -54,9 +54,8 @@ public sealed class HiSlipHealthcheckProbeTests
             capturedLogger
         );
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
-        (port, var serverTask) = LoopbackGateway.Start(
-            server,
-            s => gateway.RunAsync(s, config, cts.Token)
+        (port, var serverTask) = LoopbackGateway.Start(server, s =>
+            gateway.RunAsync(s, config, cts.Token)
         );
 
         await WaitForListenerAsync(port, cts.Token);

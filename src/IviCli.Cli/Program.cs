@@ -92,8 +92,7 @@ internal static class Program
             // [audit] override when supplied, otherwise IviPaths-derived.
             if (bootstrapConfig.Audit.Enabled)
             {
-                var auditPath =
-                    bootstrapConfig.Audit.Path
+                var auditPath = bootstrapConfig.Audit.Path
                     ?? Path.Combine(IviPaths.ResolveAuditDirectory(), "audit.ndjson");
                 services.AddIviCliAuditLog(auditPath);
             }

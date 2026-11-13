@@ -10,9 +10,8 @@ public sealed class ApiTokenHandlersTests
     public async Task Create_mints_token_with_ivicli_pat_prefix_and_persists_hash()
     {
         var store = new FakeApiTokenStore();
-        var handler = new CreateApiTokenCommandHandler(
-            store,
-            () => new DateTimeOffset(2026, 5, 27, 12, 0, 0, TimeSpan.Zero)
+        var handler = new CreateApiTokenCommandHandler(store, () =>
+            new DateTimeOffset(2026, 5, 27, 12, 0, 0, TimeSpan.Zero)
         );
 
         var report = (

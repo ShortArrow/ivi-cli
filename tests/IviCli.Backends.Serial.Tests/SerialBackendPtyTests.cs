@@ -225,8 +225,8 @@ public sealed class SerialBackendPtyTests
             };
             psi.ArgumentList.Add($"pty,raw,echo=0,link={Path.Combine(directory, "port")}");
             psi.ArgumentList.Add($"pty,raw,echo=0,link={Path.Combine(directory, "instrument")}");
-            var socat =
-                Process.Start(psi) ?? throw new InvalidOperationException("socat did not start");
+            var socat = Process.Start(psi)
+                ?? throw new InvalidOperationException("socat did not start");
             var pair = new PtyPair(socat, directory);
             for (
                 var i = 0;

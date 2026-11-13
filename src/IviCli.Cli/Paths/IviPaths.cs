@@ -78,8 +78,7 @@ public static class IviPaths
         }
 
         // Linux / other Unix
-        var stateRoot =
-            Environment.GetEnvironmentVariable("XDG_STATE_HOME")
+        var stateRoot = Environment.GetEnvironmentVariable("XDG_STATE_HOME")
             ?? Path.Combine(
                 Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
                 ".local",
@@ -122,8 +121,7 @@ public static class IviPaths
         }
 
         // Linux / other Unix
-        var stateRoot =
-            Environment.GetEnvironmentVariable("XDG_STATE_HOME")
+        var stateRoot = Environment.GetEnvironmentVariable("XDG_STATE_HOME")
             ?? Path.Combine(
                 Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
                 ".local",
@@ -158,8 +156,7 @@ public static class IviPaths
         // Linux / macOS: co-located with config.toml under
         // $XDG_CONFIG_HOME/ivi-cli/auth so users see all CLI state in
         // one tree.
-        var configRoot =
-            Environment.GetEnvironmentVariable("XDG_CONFIG_HOME")
+        var configRoot = Environment.GetEnvironmentVariable("XDG_CONFIG_HOME")
             ?? Path.Combine(
                 Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
                 ".config"
@@ -190,8 +187,7 @@ public static class IviPaths
             );
         }
 
-        var configRoot =
-            Environment.GetEnvironmentVariable("XDG_CONFIG_HOME")
+        var configRoot = Environment.GetEnvironmentVariable("XDG_CONFIG_HOME")
             ?? Path.Combine(
                 Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
                 ".config"
@@ -223,8 +219,7 @@ public static class IviPaths
             );
         }
 
-        var configRoot =
-            Environment.GetEnvironmentVariable("XDG_CONFIG_HOME")
+        var configRoot = Environment.GetEnvironmentVariable("XDG_CONFIG_HOME")
             ?? Path.Combine(
                 Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
                 ".config"
