@@ -102,6 +102,7 @@ VISA 計測器を操作するアプリを開発していて、実機を用意せ
 
 - **既製 mock を動かす** — 上のコンテナ、または bare CLI。
 - **自分の計測器用にシナリオを書く** — `*IDN?`・各クエリ・状態遷移をマッピング。
+- **提供する** — `ivicli mock serve my-dmm --type hislip` で待ち受けを始め、接続先のリソースを表示します。`ivicli mock unserve <name>` で登録したものを削除します。
 - **アプリを接続する** — `ivicli` や任意の VISA クライアント。NI-VISA / Keysight-VISA アプリは mock を NI MAX に登録。
 
 → 手順は **[Mock a VISA instrument](guides/mock-a-visa-instrument.md)**（英語ガイド）、完全な実例は **[PSU サンプル](samples/psu/)**（drop-in シナリオ + セットアップスクリプト）。
@@ -113,6 +114,7 @@ VISA 計測器を操作するアプリを開発していて、実機を用意せ
 | `visa` | `add` `remove` `list` `use` `current` `scan` `query` `write` `read` `status` `script` `monitor` `watch` `lint` + `asrl add` / `asrl list` / `asrl remove` | 計測器の管理と通信 |
 | `mock scenario` | `list` `create` `remove` `show` `activate` `deactivate` `record` `import` + `scene add` / `scene remove` | モックデバイス用シナリオの編集と記録 |
 | `mock received` | `<device>` | デバイスが受信した SCPI 書き込みを `IVICLI_CAPTURE` トラフィックログから確認 |
+| `mock serve` / `mock unserve` | `<scenario>` / `<name>` | シナリオを 1 コマンドで 1 つのアドレスに提供し、そのとき登録したものを削除 |
 | `server` | `add` `remove` `list` `route add` / `route remove` / `route list` `start` `stop` `status` `log` | ゲートウェイサーバのライフサイクル |
 | `api` | `start` `stop` `token create` `token list` `token revoke` | Management HTTP JSON API + WebSocket サブプロトコル + PAT 認証 |
 | top-level | `doctor` `completion <shell>` | 環境ヘルスチェック + シェル補完 |

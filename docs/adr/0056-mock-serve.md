@@ -222,8 +222,6 @@ name is added again.
   matcher claims the resource takes the device whether or not a binding exists.
 - Running `mock serve` again after `mock scenario deactivate` binds the scenario
   again, since the command's meaning is to serve that scenario.
-- The guide, the PRD's command reference and its Japanese mirror, and the README
-  table gain `mock serve` and `mock unserve` when they are implemented.
 
 ## Alternatives
 

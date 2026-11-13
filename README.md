@@ -103,6 +103,7 @@ Building an app that drives a VISA instrument and want to test it without the ha
 
 - **Run a ready-made mock** — the container above, or the bare CLI.
 - **Author a scenario for *your* instrument** — map its `*IDN?`, queries, and state transitions.
+- **Serve it** — `ivicli mock serve my-dmm --type hislip` listens and prints the resource to connect to; `ivicli mock unserve <name>` removes what it registered.
 - **Point your app at it** — `ivicli` or any VISA client; NI-VISA / Keysight-VISA apps register the mock in NI MAX.
 
 → **[Mock a VISA instrument](docs/guides/mock-a-visa-instrument.md)** is the step-by-step guide; the **[PSU sample](docs/samples/psu/)** is a complete worked example (drop-in scenario + setup scripts).
@@ -114,6 +115,7 @@ Building an app that drives a VISA instrument and want to test it without the ha
 | `visa` | `add` `remove` `list` `use` `current` `scan` `query` `write` `read` `status` `script` `monitor` `watch` `lint` + `asrl add` / `asrl list` / `asrl remove` | Manage and talk to instruments |
 | `mock scenario` | `list` `create` `remove` `show` `activate` `deactivate` `record` `import` + `scene add` / `scene remove` | Author and capture mock-device scenarios |
 | `mock received` | `<device>` | Confirm which SCPI writes a device received, read back from an `IVICLI_CAPTURE` traffic log |
+| `mock serve` / `mock unserve` | `<scenario>` / `<name>` | Serve a scenario at one address in one command, and remove what that registered |
 | `server` | `add` `remove` `list` `route add` / `route remove` / `route list` `start` `stop` `status` `log` | Gateway-server lifecycle |
 | `api` | `start` `stop` `token create` `token list` `token revoke` | Management HTTP JSON API + WebSocket subprotocol + PAT auth |
 | top-level | `doctor` `completion <shell>` | Environment health + shell autocomplete |
