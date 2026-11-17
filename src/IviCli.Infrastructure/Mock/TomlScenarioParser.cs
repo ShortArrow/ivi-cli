@@ -208,7 +208,7 @@ public static class TomlScenarioParser
 
         if (scenario.IdnDefault is { } idn)
         {
-            builder.AppendLine(inv, $"idn = \"{Escape(idn)}\"");
+            builder.AppendLine(inv, $"idn = {TomlBasicString.Quote(idn)}");
         }
         if (scenario.Unmatched == UnmatchedPolicy.Fail)
         {
@@ -241,14 +241,17 @@ public static class TomlScenarioParser
         }
 
         // v0.2.0 multi-scene shape.
-        builder.AppendLine(inv, $"initial_scene = \"{Escape(scenario.InitialScene.Value)}\"");
+        builder.AppendLine(
+            inv,
+            $"initial_scene = {TomlBasicString.Quote(scenario.InitialScene.Value)}"
+        );
         builder.AppendLine();
         AppendQuirks(builder, scenario.Quirks, inv);
 
         foreach (var scene in scenario.Scenes)
         {
             builder.AppendLine("[[scenes]]");
-            builder.AppendLine(inv, $"name = \"{Escape(scene.Name.Value)}\"");
+            builder.AppendLine(inv, $"name = {TomlBasicString.Quote(scene.Name.Value)}");
             builder.AppendLine();
             foreach (var rule in scene.Rules)
             {
@@ -290,20 +293,20 @@ public static class TomlScenarioParser
         System.Globalization.CultureInfo inv
     )
     {
-        builder.AppendLine(inv, $"match = \"{Escape(rule.Match)}\"");
+        builder.AppendLine(inv, $"match = {TomlBasicString.Quote(rule.Match)}");
         switch (rule.Action)
         {
             case RuleAction.Respond r:
-                builder.AppendLine(inv, $"respond = \"{Escape(r.Text)}\"");
+                builder.AppendLine(inv, $"respond = {TomlBasicString.Quote(r.Text)}");
                 break;
             case RuleAction.Ack:
                 builder.AppendLine("ack = true");
                 break;
             case RuleAction.Fail f:
-                builder.AppendLine(inv, $"fail = \"{Escape(f.Variant)}\"");
+                builder.AppendLine(inv, $"fail = {TomlBasicString.Quote(f.Variant)}");
                 if (f.Detail is { } detail)
                 {
-                    builder.AppendLine(inv, $"fail_detail = \"{Escape(detail)}\"");
+                    builder.AppendLine(inv, $"fail_detail = {TomlBasicString.Quote(detail)}");
                 }
                 break;
             default:
@@ -313,7 +316,7 @@ public static class TomlScenarioParser
         }
         if (rule.Action.Transition is { } target)
         {
-            builder.AppendLine(inv, $"transition_to = \"{Escape(target.Value)}\"");
+            builder.AppendLine(inv, $"transition_to = {TomlBasicString.Quote(target.Value)}");
         }
         if (rule.Srq is { } srq)
         {
@@ -521,8 +524,4 @@ public static class TomlScenarioParser
 
     private static Result<MockRule, ScenarioStoreError> FailRule(string reason) =>
         Result.Failure<MockRule, ScenarioStoreError>(new ScenarioStoreParseFailure(reason));
-
-    private static string Escape(string raw) =>
-        raw.Replace("\\", "\\\\", StringComparison.Ordinal)
-            .Replace("\"", "\\\"", StringComparison.Ordinal);
 }
