@@ -109,6 +109,34 @@ public sealed class TomlScenarioParserTests
         serialized.ShouldNotContain("srq");
     }
 
+    [Theory]
+    [InlineData("line1\nline2")]
+    [InlineData("a\r\nb")]
+    [InlineData("tab\there")]
+    [InlineData("bell\u0007 del\u007f")]
+    [InlineData(@"C:\path ""quoted""")]
+    public void Strings_with_control_characters_round_trip(string text)
+    {
+        var scenario = MockScenario.SingleScene(
+            ScenarioName.From("ctl").ShouldBeOk(),
+            idnDefault: text,
+            rules: ImmutableArray.Create(
+                new MockRule(text, new RuleAction.Respond(text)),
+                new MockRule("FAIL", new RuleAction.Fail("timeout", text))
+            )
+        );
+
+        var loaded = TomlScenarioParser
+            .Parse(ScenarioName.From("ctl").ShouldBeOk(), TomlScenarioParser.Serialize(scenario))
+            .ShouldBeOk();
+
+        loaded.IdnDefault.ShouldBe(text);
+        var rules = loaded.Scenes[0].Rules;
+        rules[0].Match.ShouldBe(text);
+        rules[0].Action.ShouldBe(new RuleAction.Respond(text));
+        rules[1].Action.ShouldBe(new RuleAction.Fail("timeout", text));
+    }
+
     [Fact]
     public void Empty_scenario_load_round_trips()
     {

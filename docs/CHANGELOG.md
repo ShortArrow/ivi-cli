@@ -62,6 +62,12 @@ All notable changes to ivi-cli are documented here. Format roughly follows
 
 ### Fixed
 
+- **A mock scenario with a newline in a string can be saved and loaded
+  again.** A `respond` text, `fail_detail`, `match` or `idn` holding a
+  newline or another control character was written as it was, and the next
+  load rejected the file. These characters are now escaped, as `config.toml`
+  escapes them.
+
 - **`visa remove` clears the device's mock scenario binding.** The binding
   outlived the device, so a real instrument later registered under the same
   name was answered by the mock, with no sign that it had not been reached.
