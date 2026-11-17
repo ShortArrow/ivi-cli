@@ -1,4 +1,7 @@
 using System.Globalization;
+using System.Text;
+using System.Text.Encodings.Web;
+using System.Text.Json;
 using IviCli.Application.Devices;
 
 namespace IviCli.Cli.Commands;
@@ -13,23 +16,32 @@ public static class DeviceStatusFormatter
     /// <summary>
     /// Renders the status as the one-line JSON object emitted on stdout when
     /// <c>--json</c> is passed. The resource is the masked log form, so the
-    /// output is safe to copy into a bug report.
+    /// output is safe to copy into a bug report. The response time keeps one
+    /// decimal place. Only quotes, backslashes and control characters are
+    /// escaped; other text is written as it is.
     /// </summary>
     public static string FormatJson(DeviceStatus status)
     {
-        var inv = CultureInfo.InvariantCulture;
-        var resource = status.Device.Resource.ToLogString();
-        var idnJson = status.IdnResponse is null ? "null" : $"\"{Escape(status.IdnResponse)}\"";
-        var failureJson = status.FailureMessage is null
-            ? "null"
-            : $"\"{Escape(status.FailureMessage)}\"";
-        return string.Create(
-            inv,
-            $"{{\"device\":\"{status.Device.Name.Value}\",\"resource\":\"{resource}\",\"online\":{(status.IsOnline ? "true" : "false")},\"response_time_ms\":{status.ResponseTime.TotalMilliseconds:F1},\"idn\":{idnJson},\"failure\":{failureJson}}}"
-        );
+        using var stream = new MemoryStream();
+        using (
+            var json = new Utf8JsonWriter(
+                stream,
+                new JsonWriterOptions { Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping }
+            )
+        )
+        {
+            json.WriteStartObject();
+            json.WriteString("device", status.Device.Name.Value);
+            json.WriteString("resource", status.Device.Resource.ToLogString());
+            json.WriteBoolean("online", status.IsOnline);
+            json.WritePropertyName("response_time_ms");
+            json.WriteRawValue(
+                status.ResponseTime.TotalMilliseconds.ToString("F1", CultureInfo.InvariantCulture)
+            );
+            json.WriteString("idn", status.IdnResponse);
+            json.WriteString("failure", status.FailureMessage);
+            json.WriteEndObject();
+        }
+        return Encoding.UTF8.GetString(stream.ToArray());
     }
-
-    private static string Escape(string raw) =>
-        raw.Replace("\\", "\\\\", StringComparison.Ordinal)
-            .Replace("\"", "\\\"", StringComparison.Ordinal);
 }

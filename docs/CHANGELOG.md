@@ -62,6 +62,12 @@ All notable changes to ivi-cli are documented here. Format roughly follows
 
 ### Fixed
 
+- **`visa status --json` and `doctor --json` escape what they print.** An
+  `*IDN?` answer, a failure message or a check's detail holding a newline or
+  another control character made the JSON unreadable. Such characters are
+  now written as JSON escapes such as `\n`, as `visa list --json` writes
+  them.
+
 - **A mock scenario with a newline in a string can be saved and loaded
   again.** A `respond` text, `fail_detail`, `match` or `idn` holding a
   newline or another control character was written as it was, and the next

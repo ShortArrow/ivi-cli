@@ -1,5 +1,6 @@
-using System.Globalization;
 using System.Text;
+using System.Text.Encodings.Web;
+using System.Text.Json;
 using IviCli.Application.Diagnostics;
 
 namespace IviCli.Cli.Commands;
@@ -14,25 +15,33 @@ public static class DiagnosticsReportFormatter
     /// <summary>
     /// Renders the report as the one-line JSON object emitted on stdout when
     /// <c>--json</c> is passed: a <c>checks</c> array of name, status and
-    /// detail.
+    /// detail. Only quotes, backslashes and control characters are escaped;
+    /// other text is written as it is.
     /// </summary>
     public static string FormatJson(DiagnosticsReport report)
     {
-        var inv = CultureInfo.InvariantCulture;
-        var builder = new StringBuilder("{\"checks\":[");
-        for (var i = 0; i < report.Checks.Length; i++)
+        using var stream = new MemoryStream();
+        using (
+            var json = new Utf8JsonWriter(
+                stream,
+                new JsonWriterOptions { Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping }
+            )
+        )
         {
-            if (i > 0)
+            json.WriteStartObject();
+            json.WriteStartArray("checks");
+            foreach (var c in report.Checks)
             {
-                builder.Append(',');
+                json.WriteStartObject();
+                json.WriteString("name", c.Name);
+                json.WriteString("status", StatusLabel(c.Status));
+                json.WriteString("detail", c.Detail);
+                json.WriteEndObject();
             }
-            var c = report.Checks[i];
-            builder.Append(
-                inv,
-                $"{{\"name\":\"{c.Name}\",\"status\":\"{StatusLabel(c.Status)}\",\"detail\":\"{Escape(c.Detail)}\"}}"
-            );
+            json.WriteEndArray();
+            json.WriteEndObject();
         }
-        return builder.Append("]}").ToString();
+        return Encoding.UTF8.GetString(stream.ToArray());
     }
 
     private static string StatusLabel(DiagnosticStatus status) =>
@@ -43,8 +52,4 @@ public static class DiagnosticsReportFormatter
             DiagnosticStatus.Error => "error",
             _ => "unknown",
         };
-
-    private static string Escape(string raw) =>
-        raw.Replace("\\", "\\\\", StringComparison.Ordinal)
-            .Replace("\"", "\\\"", StringComparison.Ordinal);
 }

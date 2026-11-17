@@ -1,3 +1,4 @@
+using System.Text.Json;
 using IviCli.Application.Devices;
 using IviCli.Cli.Commands;
 using IviCli.Domain;
@@ -40,6 +41,28 @@ public sealed class DeviceStatusFormatterTests
             .ShouldBe(
                 """{"device":"dmm","resource":"TCPIP0::***::inst0::INSTR","online":true,"response_time_ms":12.3,"idn":"ACME,DMM,1,1.0","failure":null}"""
             );
+    }
+
+    [Fact]
+    public void FormatJson_escapes_control_characters_quotes_and_backslashes()
+    {
+        const string idn = "A\nB\u0007C";
+        const string failure = "C:\\dir \"q\"\r\n\tend\u007f";
+        var status = new DeviceStatus(
+            Dmm(),
+            IsOnline: false,
+            ResponseTime: TimeSpan.Zero,
+            IdnResponse: idn,
+            FailureMessage: failure
+        );
+
+        var json = DeviceStatusFormatter.FormatJson(status);
+
+        json.ShouldContain(@"""idn"":""A\nB\u0007C""", Case.Sensitive);
+        json.ShouldContain(@"""failure"":""C:\\dir \""q\""\r\n\tend", Case.Sensitive);
+        using var doc = JsonDocument.Parse(json);
+        doc.RootElement.GetProperty("idn").GetString().ShouldBe(idn);
+        doc.RootElement.GetProperty("failure").GetString().ShouldBe(failure);
     }
 
     [Fact]
