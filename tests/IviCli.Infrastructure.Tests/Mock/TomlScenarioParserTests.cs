@@ -138,6 +138,22 @@ public sealed class TomlScenarioParserTests
     }
 
     [Fact]
+    public void Control_characters_are_written_as_TOML_escapes()
+    {
+        var scenario = MockScenario.SingleScene(
+            ScenarioName.From("ctl").ShouldBeOk(),
+            idnDefault: null,
+            rules: ImmutableArray.Create(
+                new MockRule("Q?", new RuleAction.Respond("a\nb\u0007c\u007f"))
+            )
+        );
+
+        var serialized = TomlScenarioParser.Serialize(scenario);
+
+        serialized.ShouldContain(@"respond = ""a\nb\u0007c\u007F""", Case.Sensitive);
+    }
+
+    [Fact]
     public void Empty_scenario_load_round_trips()
     {
         var scenario = MockScenario.Empty(ScenarioName.From("empty").ShouldBeOk());
