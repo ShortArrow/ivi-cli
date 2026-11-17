@@ -34,11 +34,15 @@ updates:
       opentelemetry:
         patterns:
           - 'OpenTelemetry*'
-    # Microsoft.Extensions 11 belongs to .NET 11. On net10.0 it ships
-    # System.Text.Json and other runtime assemblies at 11 beside the
-    # 10 copies ASP.NET Core uses. Remove this when the target moves.
+    # Both belong to .NET 11; remove these when the target moves.
+    # Microsoft.Extensions 11 on net10.0 ships System.Text.Json and other
+    # runtime assemblies at 11 beside the 10 copies ASP.NET Core uses.
+    # Microsoft.NET.ILLink.Tasks 11 targets net11.0 only, so the .NET 10
+    # SDK cannot load its tasks and the NativeAOT publish fails.
     ignore:
       - dependency-name: 'Microsoft.Extensions.*'
+        versions: ['>= 11']
+      - dependency-name: 'Microsoft.NET.ILLink.Tasks'
         versions: ['>= 11']
     labels:
       - dependencies
