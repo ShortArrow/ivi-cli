@@ -49,22 +49,7 @@ public static class DoctorCommand
         var inv = CultureInfo.InvariantCulture;
         if (emitJson)
         {
-            Console.Write("{\"checks\":[");
-            for (var i = 0; i < report.Checks.Length; i++)
-            {
-                if (i > 0)
-                {
-                    Console.Write(",");
-                }
-                var c = report.Checks[i];
-                Console.Write(
-                    string.Create(
-                        inv,
-                        $"{{\"name\":\"{c.Name}\",\"status\":\"{StatusLabel(c.Status)}\",\"detail\":\"{Escape(c.Detail)}\"}}"
-                    )
-                );
-            }
-            Console.WriteLine("]}");
+            Console.WriteLine(DiagnosticsReportFormatter.FormatJson(report));
         }
         else
         {
@@ -96,17 +81,4 @@ public static class DoctorCommand
             DiagnosticStatus.Error => "ERR",
             _ => "?  ",
         };
-
-    private static string StatusLabel(DiagnosticStatus status) =>
-        status switch
-        {
-            DiagnosticStatus.Ok => "ok",
-            DiagnosticStatus.Warning => "warning",
-            DiagnosticStatus.Error => "error",
-            _ => "unknown",
-        };
-
-    private static string Escape(string raw) =>
-        raw.Replace("\\", "\\\\", StringComparison.Ordinal)
-            .Replace("\"", "\\\"", StringComparison.Ordinal);
 }

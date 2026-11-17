@@ -56,19 +56,7 @@ public static class VisaStatusCommand
         var inv = CultureInfo.InvariantCulture;
         if (emitJson)
         {
-            // Use the masked log form so JSON output is also safe to copy
-            // into bug reports without leaking host/serial.
-            var resource = status.Device.Resource.ToLogString();
-            var idnJson = status.IdnResponse is null ? "null" : $"\"{Escape(status.IdnResponse)}\"";
-            var failureJson = status.FailureMessage is null
-                ? "null"
-                : $"\"{Escape(status.FailureMessage)}\"";
-            Console.WriteLine(
-                string.Create(
-                    inv,
-                    $"{{\"device\":\"{status.Device.Name.Value}\",\"resource\":\"{resource}\",\"online\":{(status.IsOnline ? "true" : "false")},\"response_time_ms\":{status.ResponseTime.TotalMilliseconds:F1},\"idn\":{idnJson},\"failure\":{failureJson}}}"
-                )
-            );
+            Console.WriteLine(DeviceStatusFormatter.FormatJson(status));
         }
         else
         {
@@ -118,8 +106,4 @@ public static class VisaStatusCommand
             StatusDeviceSessionFailure => "error: session storage failed.",
             _ => "error: status probe failed.",
         };
-
-    private static string Escape(string raw) =>
-        raw.Replace("\\", "\\\\", StringComparison.Ordinal)
-            .Replace("\"", "\\\"", StringComparison.Ordinal);
 }
