@@ -710,7 +710,7 @@
           "Serilog.Sinks.Console": "[6.1.1, )",
           "Serilog.Sinks.File": "[7.0.0, )",
           "Spectre.Console": "[0.57.2, )",
-          "System.CommandLine": "[2.0.12, )"
+          "System.CommandLine": "[3.0.0, )"
         }
       },
       "ivicli.api": {
@@ -1012,9 +1012,9 @@
       },
       "System.CommandLine": {
         "type": "CentralTransitive",
-        "requested": "[2.0.12, )",
-        "resolved": "2.0.12",
-        "contentHash": "FpW672e6qqrTd1EfKqsvUtFZaJWlTlszUR1o8tdakXhkzKbnEZVndtpfd4K3fUPCFcIs9UmcswMyYGJP1zp/rg=="
+        "requested": "[3.0.0, )",
+        "resolved": "3.0.0",
+        "contentHash": "swNpSTl0iYJeBuvYYfaY+VxzZ5YC8wklwkqDCNOq2aTQqJzjauJfh/O3Zw93nwxspWrxvZTjT45f8VPR0ParEA=="
       },
       "System.IO.Ports": {
         "type": "CentralTransitive",
