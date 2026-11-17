@@ -18,7 +18,7 @@
       release line as the installed shared components (8.0.x).
     -->
     <PackageVersion Include="IviFoundation.Visa" Version="8.0.2" />
-    <PackageVersion Include="Microsoft.NET.ILLink.Tasks" Version="10.0.12" />
+    <PackageVersion Include="Microsoft.NET.ILLink.Tasks" Version="11.0.0" />
     <PackageVersion Include="Tomlyn" Version="2.11.1" />
     <PackageVersion Include="System.IO.Ports" Version="10.0.12" />
     <PackageVersion Include="Microsoft.Extensions.Hosting" Version="10.0.15" />
