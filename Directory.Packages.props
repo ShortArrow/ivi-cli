@@ -71,6 +71,6 @@
   </ItemGroup>
 
   <ItemGroup Label="Time abstractions for tests">
-    <PackageVersion Include="Microsoft.Extensions.TimeProvider.Testing" Version="10.11.0" />
+    <PackageVersion Include="Microsoft.Extensions.TimeProvider.Testing" Version="10.11.1" />
   </ItemGroup>
 </Project>
