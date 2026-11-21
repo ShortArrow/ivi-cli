@@ -19,7 +19,7 @@
           "IviCli.Domain": "[0.5.0, )",
           "Microsoft.Extensions.DependencyInjection.Abstractions": "[10.0.15, )",
           "Microsoft.Extensions.Logging.Abstractions": "[10.0.15, )",
-          "TestableIO.System.IO.Abstractions": "[23.0.0, )"
+          "TestableIO.System.IO.Abstractions": "[23.0.1, )"
         }
       },
       "ivicli.domain": {
@@ -42,9 +42,9 @@
       },
       "TestableIO.System.IO.Abstractions": {
         "type": "CentralTransitive",
-        "requested": "[23.0.0, )",
-        "resolved": "23.0.0",
-        "contentHash": "xodhCNREe8aUgwqeN372r/CF6uOowyHfC5hgBIvs7Taax9p5v/z6PC8fA/weEDxZyJzzjxcpT8vf4xQdcq+2ug==",
+        "requested": "[23.0.1, )",
+        "resolved": "23.0.1",
+        "contentHash": "eTlzbhssKk5xKvyK76WcnIbYCvoL7kfv2EWibMB/8/XZsSMiKzFn7pxS59PYD4fTdDhQEbf3Nk4x8TGXLEXiYw==",
         "dependencies": {
           "Testably.Abstractions.FileSystem.Interface": "11.0.0"
         }
