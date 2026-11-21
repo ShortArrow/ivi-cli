@@ -32,20 +32,20 @@
       },
       "TestableIO.System.IO.Abstractions": {
         "type": "Direct",
-        "requested": "[23.0.0, )",
-        "resolved": "23.0.0",
-        "contentHash": "xodhCNREe8aUgwqeN372r/CF6uOowyHfC5hgBIvs7Taax9p5v/z6PC8fA/weEDxZyJzzjxcpT8vf4xQdcq+2ug==",
+        "requested": "[23.0.1, )",
+        "resolved": "23.0.1",
+        "contentHash": "eTlzbhssKk5xKvyK76WcnIbYCvoL7kfv2EWibMB/8/XZsSMiKzFn7pxS59PYD4fTdDhQEbf3Nk4x8TGXLEXiYw==",
         "dependencies": {
           "Testably.Abstractions.FileSystem.Interface": "11.0.0"
         }
       },
       "TestableIO.System.IO.Abstractions.TestingHelpers": {
         "type": "Direct",
-        "requested": "[23.0.0, )",
-        "resolved": "23.0.0",
-        "contentHash": "8ezFNBOIkdenxLd1C8tgoZPDEgqJ1rC3PRgaMdRnfoOGP2dcvTAM9vs94UW/b6KBAdoEtJMRN8A82/MtLCIruw==",
+        "requested": "[23.0.1, )",
+        "resolved": "23.0.1",
+        "contentHash": "fevd8a+0C9YJw8Ma1byZhbxbEbOuuMgKZgLPayG8+VOUrWabnghA36qkoBEEVqhQiD20wHK+Et8eER+8U9Q6gw==",
         "dependencies": {
-          "TestableIO.System.IO.Abstractions.Wrappers": "23.0.0",
+          "TestableIO.System.IO.Abstractions.Wrappers": "23.0.1",
           "Testably.Abstractions.FileSystem.Interface": "11.0.0"
         }
       },
@@ -100,7 +100,7 @@
           "IviCli.Domain": "[0.5.0, )",
           "Microsoft.Extensions.DependencyInjection.Abstractions": "[10.0.15, )",
           "Microsoft.Extensions.Logging.Abstractions": "[10.0.15, )",
-          "TestableIO.System.IO.Abstractions": "[23.0.0, )"
+          "TestableIO.System.IO.Abstractions": "[23.0.1, )"
         }
       },
       "ivicli.domain": {
