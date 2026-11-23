@@ -53,11 +53,13 @@ Rationale:
 - CSharpier's output is deterministic across machines, so violations are unambiguous.
 - pre-commit must stay fast (sub-second). Format check qualifies; tests do not.
 
-### 4. pre-push: no build or tests (CI owns them)
+### 4. pre-push: the documents check, no build or tests (CI owns them)
 
-Pre-push runs nothing. Build and `dotnet test --filter "Category!=Integration"` run in CI (`pr.yml`) on every PR, in a clean environment with `--locked-mode`. There is no `.husky/pre-push` hook.
+Pre-push runs only `.github/scripts/docs-follow.sh` against the merge base with `origin/main` ([ADR 0024 §11](0024-documentation-policy.md)). It reads `git diff` and `git log`, takes well under a second, and fails the push the same way the `docs-sync-check` job would fail the pull request. It runs the script directly from `.husky/pre-push` rather than as a Husky.Net task, because a task's `bash` can resolve to WSL's on Windows, while the hook runs under Git's own shell.
 
-Rationale:
+Build and `dotnet test --filter "Category!=Integration"` run in CI (`pr.yml`) on every PR, in a clean environment with `--locked-mode`, not before a push.
+
+Rationale for leaving build and tests to CI:
 
 - CI is the authoritative build / test gate. A local run has no `--locked-mode` and a different SDK / OS, so a local pass does not imply a CI pass, and a local failure can be environmental.
 - Squash merge means individual commit greenness does not survive to `main`, so there is little value in blocking each local push on the full suite.
@@ -88,7 +90,7 @@ No local `commit-msg` hook is configured.
 
 ### 8. File-type filtering: not needed
 
-No `staged-file-type` filter is required. The only local hook is the pre-commit CSharpier check, which inspects C# and is a no-op on docs-only changes.
+No `staged-file-type` filter is required. The pre-commit CSharpier check inspects C# and is a no-op on docs-only changes; the pre-push documents check reads every changed path by design.
 
 ### 9. Branch-aware policy: not adopted
 
@@ -108,7 +110,14 @@ dotnet tool restore >/dev/null
 dotnet husky run --group pre-commit
 ```
 
-There is no `.husky/pre-push` (§4).
+`.husky/pre-push` (§4):
+
+```sh
+#!/bin/sh
+. "$(dirname "$0")/_/husky.sh"
+
+bash .github/scripts/docs-follow.sh origin/main HEAD
+```
 
 `.claude/settings.json` (PostToolUse hook for CSharpier):
 

@@ -36,37 +36,21 @@ jobs:
             hotfix
 
   docs-sync-check:
-    name: PRD/README/CONTRIBUTING i18n sync
+    name: documents follow the change
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
-      - name: Verify bilingual doc pairs modified together
-        shell: bash
-        run: |
-          set -euo pipefail
-          base="${{ github.event.pull_request.base.sha }}"
-          head="${{ github.event.pull_request.head.sha }}"
-          changed=$(git diff --name-only "$base" "$head")
-          check_pair() {
-            local en_path="$1"
-            local jp_path="$2"
-            local en=0
-            local jp=0
-            echo "$changed" | grep -qx "$en_path" && en=1 || true
-            echo "$changed" | grep -qx "$jp_path" && jp=1 || true
-            # JP mirror may not yet exist; skip gating until it does.
-            if [ -f "$jp_path" ] && [ "$en" -ne "$jp" ]; then
-              echo "::error::$en_path and $jp_path must be modified in the same PR (ADR 0024 §4)."
-              exit 1
-            fi
-          }
-          check_pair 'docs/PRD.md' 'docs/PRD.jp.md'
-          check_pair 'README.md' 'docs/README.jp.md'
-          check_pair 'docs/CONTRIBUTING.md' 'docs/CONTRIBUTING.jp.md'
-          check_pair 'docs/conformance.md' 'docs/conformance.jp.md'
+      - name: Rules of the check
+        run: bash .github/scripts/docs-follow.test.sh
+      - name: Documents changed with the code, bilingual pairs together
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+          TITLE: ${{ github.event.pull_request.title }}
+        run: bash .github/scripts/docs-follow.sh "$BASE" "$HEAD" "$TITLE"
 
   version-changelog-sync:
     name: version / CHANGELOG sync

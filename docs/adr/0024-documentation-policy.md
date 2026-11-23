@@ -32,6 +32,7 @@ This ADR establishes those conventions. It is the first ADR written in English; 
 | User manual / tutorials | `docs/user/` (future) | Long-form user-facing docs |
 | API reference | Generated from XML doc comments (future) | Public API surface |
 | `--help` text | Embedded in code via System.CommandLine annotations | Authoritative source for CLI usage |
+| Command reference | `docs/cli-reference.md`, generated from the command tree | Every command, argument and option with its `--help` text; never edited by hand (§11) |
 
 README, CONTRIBUTING, and CHANGELOG are deferred until they have a non-trivial first revision (README when Phase 1 scaffolding is runnable; CONTRIBUTING when an external contributor is anticipated; CHANGELOG at the `v0.1.0` release tag).
 
@@ -117,6 +118,36 @@ In effect as of this ADR's acceptance:
 3. Skeleton ADRs `0001`–`0020` already have English titles; their bodies remain `TBD` and are unaffected.
 4. `docs/PRD.md` (English) is already the canonical PRD; `docs/PRD.jp.md` remains as the optional bilingual companion under §4.
 
+### 11. Documents follow the change
+
+A user learns ivi-cli from its documents, and a document that lags the code
+misleads without any error. Review alone missed it: commands reached `main`
+before the PRD described them, and feature and fix changes before their
+CHANGELOG entry. So the rules that a machine can decide are checked by
+`.github/scripts/docs-follow.sh`, in the `docs-sync-check` job on every pull
+request and in the pre-push hook against `origin/main`:
+
+- A bilingual pair (§2) changes on both sides or on neither.
+- A pull request whose title is a `feat`, `fix` or `perf`, or marks a breaking
+  change, and that changes `src/`, adds to `docs/CHANGELOG.md`. Without a
+  title, as before a push, the subjects of its commits decide.
+- `docs/cli-reference.md` is generated from the command tree, and a test fails
+  when the two differ, so any change to a command, an argument, an option or
+  its `--help` text changes that page. When it changes, the PRD and the
+  CHANGELOG change too, and when a command is added or removed, so does the
+  README's command map.
+- A test that pins command output, a `*FormatterTests.cs`, that loses or
+  rewrites an expected line marks a change to an output contract, which the
+  PRD and the CHANGELOG follow. Adding an expectation does not.
+
+A commit line `Docs-Unaffected: <reason>` lifts every rule but the pairs; the
+job prints the reason, so the exception is reviewed rather than silent.
+
+The check sees that a document changed, not that it says the right thing, and
+it does not see a change in behaviour that alters no command and is not typed
+`feat`, `fix` or `perf`, nor human-readable output, exit codes, log text or the
+`config.toml` and scenario formats. Those stay with review.
+
 ## Consequences
 
 **Pros**
@@ -133,5 +164,5 @@ In effect as of this ADR's acceptance:
 **Mitigations**
 
 - ADRs are short, structured, and follow a fixed template. Reading-comprehension cost amortizes as contributors become familiar with the recurring vocabulary.
-- For paired documents, CI or PR review enforces sync (specific mechanism deferred to the CI ADR 0020).
+- For paired documents, the `docs-sync-check` job and the pre-push hook enforce sync (§11).
 - AI-assisted reading is a practical fallback for any contributor who needs a quick summary in their native language.
