@@ -90,7 +90,7 @@ No local `commit-msg` hook is configured.
 
 ### 8. File-type filtering: not needed
 
-No `staged-file-type` filter is required. The only local hook is the pre-commit CSharpier check, which inspects C# and is a no-op on docs-only changes.
+No `staged-file-type` filter is required. The pre-commit CSharpier check inspects C# and is a no-op on docs-only changes; the pre-push documents check reads every changed path by design.
 
 ### 9. Branch-aware policy: not adopted
 
@@ -110,7 +110,14 @@ dotnet tool restore >/dev/null
 dotnet husky run --group pre-commit
 ```
 
-There is no `.husky/pre-push` (§4).
+`.husky/pre-push` (§4):
+
+```sh
+#!/bin/sh
+. "$(dirname "$0")/_/husky.sh"
+
+bash .github/scripts/docs-follow.sh origin/main HEAD
+```
 
 `.claude/settings.json` (PostToolUse hook for CSharpier):
 
