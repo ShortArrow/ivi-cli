@@ -23,11 +23,11 @@ GitHub Flow (single `main`, short-lived topic branches, squash-merge, Convention
 
 ## Local hooks
 
-Husky.Net pre-commit runs CSharpier. Build and tests are not run on push — that is CI's job (`pr.yml`) — see [ADR 0025](adr/0025-dev-automation-hooks.md).
+Husky.Net pre-commit runs CSharpier. Pre-push runs the documents check described under [Documentation](#documentation) against `origin/main`, so fetch first. Build and tests are not run on push — that is CI's job (`pr.yml`) — see [ADR 0025](adr/0025-dev-automation-hooks.md).
 
 ## CI gating
 
-`pr.yml` (PR), `nightly.yml` (scheduled, includes Integration), `release.yml` (tagged) — see [ADR 0020](adr/0020-ci-cd-strategy.md). The `docs-sync-check` job enforces that bilingual doc pairs stay in lock-step.
+`pr.yml` (PR), `nightly.yml` (scheduled, includes Integration), `release.yml` (tagged) — see [ADR 0020](adr/0020-ci-cd-strategy.md). The `docs-sync-check` job enforces that the documents follow the change, bilingual pairs included (see [Documentation](#documentation)).
 
 ## Adding a dependency
 
@@ -36,6 +36,15 @@ A new package reference is also a redistribution obligation: its assembly ships 
 ## Documentation
 
 All repository documentation is English-primary. Japanese mirrors (`*.jp.md`) are required for the PRD, README, and this file via an `**English** | [日本語](...)` switcher header — see [ADR 0024](adr/0024-documentation-policy.md).
+
+The documents change in the same pull request as the code they describe. `.github/scripts/docs-follow.sh` fails a pull request, and a push, when:
+
+- the PRD, README, this file or the conformance document changes in one language only;
+- a `feat`, `fix` or `perf` change, or a breaking one, touches `src/` without an entry under `[Unreleased]` in `docs/CHANGELOG.md`;
+- `docs/cli-reference.md` changes without the PRD and the CHANGELOG, or a command is added or removed without the README's command map;
+- a `*FormatterTests.cs` changes an existing expected output without the PRD and the CHANGELOG.
+
+`docs/cli-reference.md` is generated: after changing a command, an argument, an option or its `--help` text, run `IVICLI_UPDATE_CLI_REFERENCE=1 dotnet test --project tests/IviCli.Cli.Tests -- --filter-class "*CliReferenceTests"` and commit the page. When no document describes a change, add a line `Docs-Unaffected: <reason>` to a commit message; the check prints the reason for the reviewer. The check sees that a document changed, not that it is right, and review still owns that.
 
 ## Architecture
 

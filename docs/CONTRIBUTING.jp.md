@@ -23,11 +23,11 @@ GitHub Flow（単一の `main`、短命の topic branch、squash-merge、Convent
 
 ## ローカル hooks
 
-Husky.Net の pre-commit が CSharpier を実行します。build とテストは push 時には走らせず CI（`pr.yml`）の担当 — [ADR 0025](adr/0025-dev-automation-hooks.md) を参照。
+Husky.Net の pre-commit が CSharpier を実行します。pre-push は [ドキュメント](#ドキュメント) に書いた文書の検査を `origin/main` と比べて実行するので、先に fetch してください。build とテストは push 時には走らせず CI（`pr.yml`）の担当 — [ADR 0025](adr/0025-dev-automation-hooks.md) を参照。
 
 ## CI ゲーティング
 
-`pr.yml`（PR）、`nightly.yml`（スケジュール、Integration を含む）、`release.yml`（tag 起動）— [ADR 0020](adr/0020-ci-cd-strategy.md) を参照。`docs-sync-check` ジョブが bilingual ペアの整合性を強制します。
+`pr.yml`（PR）、`nightly.yml`（スケジュール、Integration を含む）、`release.yml`（tag 起動）— [ADR 0020](adr/0020-ci-cd-strategy.md) を参照。`docs-sync-check` ジョブが、bilingual ペアを含め、文書が変更に追従していることを強制します（[ドキュメント](#ドキュメント) を参照）。
 
 ## 依存パッケージの追加
 
@@ -36,6 +36,15 @@ PackageReference を 1 つ増やすことは、再配布義務を 1 つ増やす
 ## ドキュメント
 
 リポジトリの文書は英語を primary とし、PRD・README・本ファイルは `**English** | [日本語](...)` スイッチャヘッダ付きで `*.jp.md` の日本語ミラーを必須とします — [ADR 0024](adr/0024-documentation-policy.md) を参照。
+
+文書は、それが説明するコードと同じ PR で変更します。`.github/scripts/docs-follow.sh` は、次のときに PR と push を失敗させます。
+
+- PRD・README・本ファイル・conformance 文書が、片方の言語だけ変わったとき
+- `feat`・`fix`・`perf`、または破壊的な変更が `src/` を変えたのに、`docs/CHANGELOG.md` の `[Unreleased]` に記載がないとき
+- `docs/cli-reference.md` が変わったのに PRD と CHANGELOG が変わっていないとき、またはコマンドが増減したのに README のコマンド一覧が変わっていないとき
+- `*FormatterTests.cs` が既存の出力の期待値を変えたのに、PRD と CHANGELOG が変わっていないとき
+
+`docs/cli-reference.md` は生成物です。コマンド・引数・オプション・その `--help` の文を変えたら、`IVICLI_UPDATE_CLI_REFERENCE=1 dotnet test --project tests/IviCli.Cli.Tests -- --filter-class "*CliReferenceTests"` を実行して、その文書をコミットしてください。説明すべき文書がない変更では、コミットメッセージに `Docs-Unaffected: <理由>` という行を足してください。検査はその理由をレビュー担当に向けて表示します。検査が見るのは文書が変わったことだけで、内容が正しいかはレビューの担当です。
 
 ## アーキテクチャ
 
